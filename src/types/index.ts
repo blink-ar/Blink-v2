@@ -5,6 +5,16 @@ export interface BankBenefit {
   rewardRate: string;
   color: string;
   icon: string;
+  // Extended fields from beneficios array
+  tipo?: string;
+  cuando?: string;
+  valor?: string;
+  tope?: string;
+  claseDeBeneficio?: string;
+  condicion?: string;
+  requisitos?: string[];
+  usos?: string[];
+  textoAplicacion?: string;
 }
 
 export interface Business {
@@ -16,6 +26,10 @@ export interface Business {
   location: string;
   image: string;
   benefits: BankBenefit[];
+  // Enhanced fields for new functionality
+  isFavorite?: boolean;
+  lastUpdated?: number;
+  imageLoaded?: boolean;
 }
 
 export type Category =

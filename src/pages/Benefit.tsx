@@ -2,11 +2,472 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Business, BankBenefit } from "../types";
 import { fetchBusinesses } from "../services/api";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  DollarSign,
+  AlertCircle,
+  CheckCircle,
+  FileText,
+  AlertTriangle,
+} from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
+import {
+  formatValue,
+  formatValidityPeriod,
+  processArrayField,
+  processTextField,
+  hasValidContent,
+  formatBenefitType,
+  formatUsageType,
+} from "../utils/benefitFormatters";
+import { Logger } from "../services/base/Logger";
+import { DaysOfWeek } from "../components/ui/DaysOfWeek";
+
+const logger = Logger.getInstance().createServiceLogger("BenefitPage");
+
+// Component prop interfaces
+interface BenefitDetailsProps {
+  benefit: BankBenefit;
+}
+
+// Error boundary wrapper for benefit sections
+interface SafeBenefitSectionProps {
+  children: React.ReactNode;
+  sectionName: string;
+  fallback?: React.ReactNode;
+}
+
+const SafeBenefitSection: React.FC<SafeBenefitSectionProps> = ({
+  children,
+  sectionName,
+  fallback = null,
+}) => {
+  try {
+    return <>{children}</>;
+  } catch (error) {
+    logger.error(`Error rendering ${sectionName} section`, error as Error);
+
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+
+    // Return a minimal error indicator that doesn't break the layout
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertTriangle className="h-4 w-4" />
+          <span className="text-sm">
+            Unable to display {sectionName.toLowerCase()} information
+          </span>
+        </div>
+      </div>
+    );
+  }
+};
+
+interface RequirementsSectionProps {
+  requirements: string[];
+}
+
+interface ValiditySectionProps {
+  validity: string;
+}
+
+interface LimitsSectionProps {
+  value?: string;
+  limit?: string;
+}
+
+interface ConditionsSectionProps {
+  condition: string;
+}
+
+interface UsageSectionProps {
+  usageTypes: string[];
+}
+
+interface ApplicationTextSectionProps {
+  applicationText: string;
+}
+
+// Individual benefit detail components
+const RequirementsSection: React.FC<RequirementsSectionProps> = ({
+  requirements,
+}) => {
+  return (
+    <SafeBenefitSection sectionName="Requirements">
+      {(() => {
+        try {
+          const processedRequirements = processArrayField(requirements);
+
+          if (processedRequirements.length === 0) return null;
+
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <h4 className="font-semibold text-blue-900">Requisitos</h4>
+              </div>
+              <ul className="space-y-3">
+                {processedRequirements.map((requirement, index) => {
+                  try {
+                    return (
+                      <li key={index} className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
+                          <span className="text-blue-600 text-xs font-bold">
+                            {index + 1}
+                          </span>
+                        </div>
+                        <span className="text-gray-700 text-sm whitespace-pre-line leading-relaxed">
+                          {processTextField(requirement)}
+                        </span>
+                      </li>
+                    );
+                  } catch (error) {
+                    logger.error(
+                      `Error rendering requirement item ${index}`,
+                      error as Error,
+                      { requirement }
+                    );
+                    return (
+                      <li key={index} className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center mt-0.5">
+                          <span className="text-gray-600 text-xs font-bold">
+                            {index + 1}
+                          </span>
+                        </div>
+                        <span className="text-gray-500 text-sm italic">
+                          Unable to display this requirement
+                        </span>
+                      </li>
+                    );
+                  }
+                })}
+              </ul>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing requirements data", error as Error, {
+            requirements,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+const ValiditySection: React.FC<ValiditySectionProps> = ({ validity }) => {
+  return (
+    <SafeBenefitSection sectionName="Validity">
+      {(() => {
+        try {
+          const processedValidity = processTextField(validity);
+
+          if (!hasValidContent(processedValidity)) return null;
+
+          const formattedValidity = formatValidityPeriod(processedValidity);
+
+          return (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-5 w-5 text-green-600" />
+                <h4 className="font-semibold text-green-900">Vigencia</h4>
+              </div>
+              <div className="text-green-800">
+                <span className="text-sm font-semibold">
+                  {formattedValidity}
+                </span>
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing validity data", error as Error, {
+            validity,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+const LimitsSection: React.FC<LimitsSectionProps> = ({ value, limit }) => {
+  return (
+    <SafeBenefitSection sectionName="Limits">
+      {(() => {
+        try {
+          const processedValue = processTextField(value);
+          const processedLimit = processTextField(limit);
+
+          if (
+            !hasValidContent(processedValue) &&
+            !hasValidContent(processedLimit)
+          )
+            return null;
+
+          const formattedValue = processedValue
+            ? formatValue(processedValue)
+            : null;
+
+          return (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="h-5 w-5 text-purple-600" />
+                <h4 className="font-semibold text-purple-900">
+                  Descuentos y Limites
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {formattedValue && (
+                  <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100">
+                    <span className="text-sm font-medium text-purple-800">
+                      Descuento:
+                    </span>
+                    <span className="text-sm text-purple-700 font-bold">
+                      {formattedValue}%
+                    </span>
+                  </div>
+                )}
+                {processedLimit && (
+                  <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-orange-100">
+                    <span className="text-sm font-medium text-orange-800">
+                      Tope de reintegro:
+                    </span>
+                    <span className="text-sm text-orange-700 font-bold">
+                      ${processedLimit}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing limits data", error as Error, {
+            value,
+            limit,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+const ConditionsSection: React.FC<ConditionsSectionProps> = ({ condition }) => {
+  return (
+    <SafeBenefitSection sectionName="Conditions">
+      {(() => {
+        try {
+          const processedCondition = processTextField(condition);
+
+          if (!hasValidContent(processedCondition)) return null;
+
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-semibold text-yellow-900">Condiciones</h4>
+              </div>
+              <div className="bg-white border-l-4 border-yellow-400 px-4 py-3 rounded">
+                <p className="text-gray-700 text-sm whitespace-pre-line leading-relaxed">
+                  {processedCondition}
+                </p>
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing conditions data", error as Error, {
+            condition,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+const UsageSection: React.FC<UsageSectionProps> = ({ usageTypes }) => {
+  return (
+    <SafeBenefitSection sectionName="Usage">
+      {(() => {
+        try {
+          const processedUsageTypes = processArrayField(usageTypes);
+
+          if (processedUsageTypes.length === 0) return null;
+
+          return (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-5 w-5 text-indigo-600" />
+                <h4 className="font-semibold text-indigo-900">Donde?</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {processedUsageTypes.map((usage, index) => {
+                  try {
+                    const formattedUsage = formatUsageType(usage);
+                    return (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-3 py-2 bg-white border border-indigo-200 text-indigo-800 rounded-lg text-sm font-medium"
+                      >
+                        {formattedUsage}
+                      </span>
+                    );
+                  } catch (error) {
+                    logger.error(
+                      `Error formatting usage type ${index}`,
+                      error as Error,
+                      { usage }
+                    );
+                    return (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium"
+                      >
+                        Invalid usage type
+                      </span>
+                    );
+                  }
+                })}
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing usage types data", error as Error, {
+            usageTypes,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+const ApplicationTextSection: React.FC<ApplicationTextSectionProps> = ({
+  applicationText,
+}) => {
+  return (
+    <SafeBenefitSection sectionName="Application Text">
+      {(() => {
+        try {
+          const processedText = processTextField(applicationText);
+
+          if (!hasValidContent(processedText)) return null;
+
+          return (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-5 w-5 text-gray-600" />
+                <h4 className="font-semibold text-gray-800">How to Apply</h4>
+              </div>
+              <div className="bg-white border border-gray-200 rounded px-4 py-3">
+                <p className="text-gray-700 text-sm whitespace-pre-line leading-relaxed">
+                  {processedText}
+                </p>
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error(
+            "Error processing application text data",
+            error as Error,
+            { applicationText }
+          );
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
+
+// Main benefit details section component
+const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
+  return (
+    <SafeBenefitSection
+      sectionName="Benefit Details"
+      fallback={
+        <div className="border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">
+            Detailed Information
+          </h3>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-yellow-700">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="text-sm">
+                Unable to load detailed benefit information
+              </span>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      {(() => {
+        try {
+          const hasDetails =
+            hasValidContent(benefit.cuando) ||
+            hasValidContent(benefit.valor) ||
+            hasValidContent(benefit.tope) ||
+            hasValidContent(benefit.condicion) ||
+            hasValidContent(benefit.requisitos) ||
+            hasValidContent(benefit.usos) ||
+            hasValidContent(benefit.textoAplicacion);
+
+          if (!hasDetails) return null;
+
+          return (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                Detailed Information
+              </h3>
+
+              <div className="space-y-6">
+                {/* Key Financial Information - Most Important */}
+                <div className="grid gap-4">
+                  <ValiditySection validity={benefit.cuando || ""} />
+                  {/* Days of Week Availability */}
+                  <DaysOfWeek
+                    availability={benefit.cuando}
+                    className="bg-teal-50 border border-teal-200 rounded-lg p-4"
+                  />
+                  <LimitsSection value={benefit.valor} limit={benefit.tope} />
+                </div>
+
+                {/* Usage and Application Information */}
+                <div className="space-y-4">
+                  <ConditionsSection condition={benefit.condicion || ""} />
+                  <UsageSection usageTypes={benefit.usos || []} />
+                </div>
+
+                {/* Requirements and Application Details */}
+                <div className="space-y-4">
+                  <RequirementsSection
+                    requirements={benefit.requisitos || []}
+                  />
+                  <ApplicationTextSection
+                    applicationText={benefit.textoAplicacion || ""}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        } catch (error) {
+          logger.error("Error processing benefit details", error as Error, {
+            benefit,
+          });
+          return null;
+        }
+      })()}
+    </SafeBenefitSection>
+  );
+};
 
 function Benefit() {
-  const { id, benefitIndex } = useParams<{ id: string; benefitIndex: string }>();
+  const { id, benefitIndex } = useParams<{
+    id: string;
+    benefitIndex: string;
+  }>();
   const navigate = useNavigate();
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
@@ -58,15 +519,125 @@ function Benefit() {
         alt={business.name}
         className="w-full h-48 object-cover rounded-xl mb-4"
       />
-      <div className="bg-white rounded-xl shadow p-6">
-        <h3 className="text-xl font-semibold mb-2">
-          {benefit.bankName} {benefit.cardName}
-        </h3>
-        <p className="mb-2">{benefit.benefit}</p>
-        <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold mb-2">
-          {benefit.rewardRate}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        {/* Main Benefit Information */}
+        <SafeBenefitSection
+          sectionName="Main Benefit Information"
+          fallback={
+            <div className="border-b border-gray-200 pb-6 mb-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="text-sm">
+                    Unable to display main benefit information
+                  </span>
+                </div>
+              </div>
+            </div>
+          }
+        >
+          <div className="border-b border-gray-200 pb-6 mb-6">
+            <h3 className="text-xl font-semibold mb-3 text-gray-900">
+              {(() => {
+                try {
+                  const bankName =
+                    typeof benefit.bankName === "string"
+                      ? benefit.bankName
+                      : "Unknown Bank";
+                  const cardName =
+                    typeof benefit.cardName === "string"
+                      ? benefit.cardName
+                      : "Unknown Card";
+                  return `${bankName} ${cardName}`;
+                } catch (error) {
+                  logger.error(
+                    "Error displaying bank/card name",
+                    error as Error,
+                    { benefit }
+                  );
+                  return "Benefit Information";
+                }
+              })()}
+            </h3>
+            <p className="text-gray-700 mb-4 leading-relaxed">
+              {(() => {
+                try {
+                  const benefitText =
+                    typeof benefit.benefit === "string"
+                      ? benefit.benefit
+                      : "Benefit description not available";
+                  return benefitText || "Benefit description not available";
+                } catch (error) {
+                  logger.error(
+                    "Error displaying benefit description",
+                    error as Error,
+                    { benefit }
+                  );
+                  return "Benefit description not available";
+                }
+              })()}
+            </p>
+            <div className="flex items-center gap-3 mb-4">
+              {(() => {
+                try {
+                  const rewardRate =
+                    typeof benefit.rewardRate === "string"
+                      ? benefit.rewardRate
+                      : "Rate not available";
+                  const tipo =
+                    typeof benefit.tipo === "string" ? benefit.tipo : null;
+                  const claseDeBeneficio =
+                    typeof benefit.claseDeBeneficio === "string"
+                      ? benefit.claseDeBeneficio
+                      : null;
+
+                  return (
+                    <>
+                      <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                        {rewardRate || "Rate not available"}
+                      </div>
+                      {/* Benefit Type and Class badges */}
+                      {tipo && (
+                        <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                          {formatBenefitType(tipo)}
+                        </span>
+                      )}
+                      {claseDeBeneficio && (
+                        <span className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                          {formatBenefitType(claseDeBeneficio)}
+                        </span>
+                      )}
+                    </>
+                  );
+                } catch (error) {
+                  logger.error(
+                    "Error displaying benefit badges",
+                    error as Error,
+                    { benefit }
+                  );
+                  return (
+                    <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm">
+                      Benefit details unavailable
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          </div>
+        </SafeBenefitSection>
+
+        {/* Business Description */}
+        <div className="mb-6">
+          <h4 className="text-lg font-semibold text-gray-900 mb-3">
+            About {business.name}
+          </h4>
+          <p className="text-gray-600 leading-relaxed">
+            {business.description}
+          </p>
         </div>
-        <p className="text-gray-600 mt-4">{business.description}</p>
+
+        {/* Benefit Details Section */}
+        <BenefitDetailsSection benefit={benefit} />
       </div>
     </div>
   );

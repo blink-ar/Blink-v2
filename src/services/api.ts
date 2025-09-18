@@ -1,5 +1,5 @@
 import { mockBusinesses } from "../data/mockData";
-import { Business } from "../types";
+import { Business, BankBenefit } from "../types";
 
 declare global {
   // Extend the globalThis type to include allCategories
@@ -13,15 +13,17 @@ interface BenefitResponse {
   _id: { $oid: string };
   id: string;
   beneficios: Array<{
-    tipo: string;
-    cuando: string;
-    valor: string;
-    cuota: { $numberInt: string };
-    tope: string;
-    claseDeBeneficio: string;
-    casuistica: { descripcion: string };
-    condicion: string;
-    requisitos: string[];
+    tipo?: string;
+    cuando?: string;
+    valor?: string;
+    cuota?: { $numberInt: string };
+    tope?: string;
+    claseDeBeneficio?: string;
+    casuistica?: { descripcion: string };
+    condicion?: string;
+    requisitos?: string[];
+    usos?: string[];
+    textoAplicacion?: string;
   }>;
   cabecera: string;
   destacado: boolean;
@@ -52,7 +54,7 @@ export async function fetchBusinesses(): Promise<Business[]> {
 
     console.log("📊 Raw API Response:", {
       banks: Object.keys(data),
-      sampleBenefit: Object.values(data)[0]?.[0],
+      sampleBenefit: Object.values(data)[0]?.[25],
     });
 
     // Transform the object of benefits into an array of businesses grouped by titulo
@@ -83,20 +85,38 @@ export async function fetchBusinesses(): Promise<Business[]> {
 
         // Add this bank's benefit to the business
         const business = businessMap.get(titulo)!;
-        const rewardRate = benefit.beneficios[0]?.valor || "N/A";
+        const firstBenefit = benefit.beneficios[0];
+        const rewardRate = firstBenefit?.valor || "N/A";
         const benefitDescription =
-          benefit.beneficios[0]?.casuistica?.descripcion ||
+          firstBenefit?.casuistica?.descripcion ||
           benefit.details.beneficio.subtitulo ||
           "";
 
-        business.benefits.push({
+        // Extract all fields from beneficios array, handling missing or empty values
+        const bankBenefit: BankBenefit = {
           bankName: bankName,
           cardName: "Credit Card",
           benefit: benefitDescription,
           rewardRate: rewardRate,
           color: "bg-blue-500",
           icon: "CreditCard",
-        });
+          // Extract all new fields from the first beneficio, with fallbacks
+          tipo: firstBenefit?.tipo || undefined,
+          cuando: firstBenefit?.cuando || undefined,
+          valor: firstBenefit?.valor || undefined,
+          tope: firstBenefit?.tope || undefined,
+          claseDeBeneficio: firstBenefit?.claseDeBeneficio || undefined,
+          condicion: firstBenefit?.condicion || undefined,
+          requisitos: firstBenefit?.requisitos && firstBenefit.requisitos.length > 0
+            ? firstBenefit.requisitos.filter(req => req && req.trim() !== '')
+            : undefined,
+          usos: firstBenefit?.usos && firstBenefit.usos.length > 0
+            ? firstBenefit.usos.filter(uso => uso && uso.trim() !== '')
+            : undefined,
+          textoAplicacion: firstBenefit?.textoAplicacion || undefined,
+        };
+
+        business.benefits.push(bankBenefit);
       });
     });
 
