@@ -428,7 +428,7 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
                   <ValiditySection validity={benefit.cuando || ""} />
                   {/* Days of Week Availability */}
                   <DaysOfWeek
-                    availability={benefit.cuando}
+                    benefit={benefit}
                     className="bg-teal-50 border border-teal-200 rounded-lg p-4"
                   />
                   <LimitsSection value={benefit.valor} limit={benefit.tope} />

@@ -21,6 +21,24 @@ export interface PatternMatch {
     isNegation: boolean;
 }
 
+// Interface for multi-field parsing
+export interface BenefitDayInfo {
+    cuando?: string;
+    requisitos?: string[];
+    condicion?: string;
+    textoAplicacion?: string;
+}
+
+// Interface for field parsing results
+export interface FieldParsingResult {
+    field: 'cuando' | 'requisitos' | 'condicion' | 'textoAplicacion';
+    availability: DayAvailability;
+    confidence: number;
+    isRestriction: boolean;
+    isNegation: boolean;
+    originalText: string;
+}
+
 // Enhanced regex patterns for Spanish day-related text
 const DAY_PATTERNS = {
     // Weekend patterns
@@ -564,21 +582,7 @@ export const parseDayAvailabilityEnhanced = (cuando?: string): { availability: D
         return { availability, match: timeRangeMatch };
     }
 
-    // Check for "all days" patterns
-    if (DAY_PATTERNS.allDays.test(text)) {
-        setAllDays(availability);
-        return {
-            availability,
-            match: {
-                pattern: 'allDays',
-                confidence: calculateConfidence(text, 'general'),
-                isRestriction: false,
-                isNegation: false
-            }
-        };
-    }
-
-    // Check for weekend patterns
+    // Check for weekend patterns first (more specific)
     if (DAY_PATTERNS.weekends.test(text)) {
         setWeekends(availability);
         return {
@@ -592,7 +596,7 @@ export const parseDayAvailabilityEnhanced = (cuando?: string): { availability: D
         };
     }
 
-    // Check for weekday patterns
+    // Check for weekday patterns (more specific than "all days")
     if (DAY_PATTERNS.weekdays.test(text)) {
         setWeekdays(availability);
         return {
@@ -601,6 +605,20 @@ export const parseDayAvailabilityEnhanced = (cuando?: string): { availability: D
                 pattern: 'weekdays',
                 confidence: calculateConfidence(text, 'context'),
                 isRestriction: detectRestriction(text),
+                isNegation: false
+            }
+        };
+    }
+
+    // Check for "all days" patterns (less specific, should come after weekdays/weekends)
+    if (DAY_PATTERNS.allDays.test(text)) {
+        setAllDays(availability);
+        return {
+            availability,
+            match: {
+                pattern: 'allDays',
+                confidence: calculateConfidence(text, 'general'),
+                isRestriction: false,
                 isNegation: false
             }
         };
@@ -699,4 +717,317 @@ export const getAvailableDayNames = (availability: DayAvailability): string[] =>
 export const getPatternConfidence = (cuando?: string): number => {
     const result = parseDayAvailabilityEnhanced(cuando);
     return result ? result.match.confidence : 0;
+};
+
+// Field priority system (higher number = higher priority)
+const FIELD_PRIORITY = {
+    'condicion': 4,      // Most specific restrictions
+    'requisitos': 3,     // Specific requirements
+    'cuando': 2,         // General validity period
+    'textoAplicacion': 1 // Application instructions (lowest priority)
+} as const;
+
+/**
+ * Checks if a text field contains potential day-related keywords
+ */
+const containsDayKeywords = (text: string): boolean => {
+    const dayKeywords = [
+        'lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo',
+        'días', 'dias', 'semana', 'hábiles', 'habiles', 'laborables', 'fines', 'válido', 'valido',
+        'aplicable', 'excepto', 'todos', 'permanente', 'siempre'
+    ];
+
+    const lowerText = text.toLowerCase();
+    return dayKeywords.some(keyword => lowerText.includes(keyword));
+};
+
+/**
+ * Parses day availability from a single field with metadata
+ */
+const parseFieldDayAvailability = (
+    text: string,
+    fieldName: 'cuando' | 'requisitos' | 'condicion' | 'textoAplicacion'
+): FieldParsingResult | null => {
+    try {
+        // Skip parsing if no day keywords are present (performance optimization)
+        if (!containsDayKeywords(text)) {
+            return null;
+        }
+
+        const result = parseDayAvailabilityEnhanced(text);
+        if (!result) {
+            return null;
+        }
+
+        return {
+            field: fieldName,
+            availability: result.availability,
+            confidence: result.match.confidence,
+            isRestriction: result.match.isRestriction,
+            isNegation: result.match.isNegation,
+            originalText: text
+        };
+    } catch (error) {
+        // Log error but don't throw - graceful degradation
+        console.warn(`Error parsing field ${fieldName}:`, error);
+        return null;
+    }
+};
+
+/**
+ * Parses day availability from requisitos array
+ */
+const parseRequisitosArray = (requisitos: string[]): FieldParsingResult[] => {
+    const results: FieldParsingResult[] = [];
+
+    for (const requisito of requisitos) {
+        if (typeof requisito === 'string' && requisito.trim()) {
+            const result = parseFieldDayAvailability(requisito, 'requisitos');
+            if (result) {
+                results.push(result);
+            }
+        }
+    }
+
+    return results;
+};
+
+/**
+ * Merges two DayAvailability objects using the most restrictive approach
+ */
+const mergeDayAvailability = (
+    primary: DayAvailability,
+    secondary: DayAvailability,
+    primaryIsRestriction: boolean,
+    secondaryIsRestriction: boolean,
+    sameField: boolean = false
+): DayAvailability => {
+    const merged = createDefaultDayAvailability();
+
+    // If both results are from the same field (e.g., multiple requisitos), always use union (OR)
+    if (sameField) {
+        // Union logic - combine all available days from same field
+        merged.monday = primary.monday || secondary.monday;
+        merged.tuesday = primary.tuesday || secondary.tuesday;
+        merged.wednesday = primary.wednesday || secondary.wednesday;
+        merged.thursday = primary.thursday || secondary.thursday;
+        merged.friday = primary.friday || secondary.friday;
+        merged.saturday = primary.saturday || secondary.saturday;
+        merged.sunday = primary.sunday || secondary.sunday;
+        merged.allDays = primary.allDays || secondary.allDays;
+    } else if (primaryIsRestriction && !secondaryIsRestriction) {
+        // If one is a restriction and the other isn't, prioritize the restriction
+        return { ...primary };
+    } else if (secondaryIsRestriction && !primaryIsRestriction) {
+        // If one is a restriction and the other isn't, prioritize the restriction
+        return { ...secondary };
+    } else if (!primaryIsRestriction && !secondaryIsRestriction) {
+        // Union logic for non-restrictions from different fields
+        merged.monday = primary.monday || secondary.monday;
+        merged.tuesday = primary.tuesday || secondary.tuesday;
+        merged.wednesday = primary.wednesday || secondary.wednesday;
+        merged.thursday = primary.thursday || secondary.thursday;
+        merged.friday = primary.friday || secondary.friday;
+        merged.saturday = primary.saturday || secondary.saturday;
+        merged.sunday = primary.sunday || secondary.sunday;
+        merged.allDays = primary.allDays || secondary.allDays;
+    } else {
+        // Intersection logic - most restrictive wins for different fields with restrictions
+        merged.monday = primary.monday && secondary.monday;
+        merged.tuesday = primary.tuesday && secondary.tuesday;
+        merged.wednesday = primary.wednesday && secondary.wednesday;
+        merged.thursday = primary.thursday && secondary.thursday;
+        merged.friday = primary.friday && secondary.friday;
+        merged.saturday = primary.saturday && secondary.saturday;
+        merged.sunday = primary.sunday && secondary.sunday;
+        merged.allDays = primary.allDays && secondary.allDays;
+    }
+
+    // Preserve custom text from higher confidence result
+    if (primary.customText && !secondary.customText) {
+        merged.customText = primary.customText;
+    } else if (secondary.customText && !primary.customText) {
+        merged.customText = secondary.customText;
+    }
+
+    return merged;
+};
+
+/**
+ * Resolves conflicts between multiple field parsing results
+ */
+const resolveFieldConflicts = (results: FieldParsingResult[]): FieldParsingResult | null => {
+    if (results.length === 0) {
+        return null;
+    }
+
+    if (results.length === 1) {
+        return results[0];
+    }
+
+    // Sort by priority (field priority first, then confidence)
+    const sortedResults = results.sort((a, b) => {
+        const priorityDiff = FIELD_PRIORITY[b.field] - FIELD_PRIORITY[a.field];
+        if (priorityDiff !== 0) {
+            return priorityDiff;
+        }
+        return b.confidence - a.confidence;
+    });
+
+    // Start with the highest priority result
+    let mergedResult = sortedResults[0];
+
+    // Merge with other compatible results
+    for (let i = 1; i < sortedResults.length; i++) {
+        const currentResult = sortedResults[i];
+
+        // Skip if confidence is too low compared to the primary result
+        if (currentResult.confidence < mergedResult.confidence * 0.7) {
+            continue;
+        }
+
+        // Merge the availability data
+        const sameField = mergedResult.field === currentResult.field;
+        const mergedAvailability = mergeDayAvailability(
+            mergedResult.availability,
+            currentResult.availability,
+            mergedResult.isRestriction,
+            currentResult.isRestriction,
+            sameField
+        );
+
+        // Update the merged result
+        mergedResult = {
+            ...mergedResult,
+            availability: mergedAvailability,
+            confidence: Math.max(mergedResult.confidence, currentResult.confidence),
+            isRestriction: mergedResult.isRestriction || currentResult.isRestriction,
+            isNegation: mergedResult.isNegation || currentResult.isNegation,
+            originalText: `${mergedResult.originalText}; ${currentResult.originalText}`
+        };
+    }
+
+    return mergedResult;
+};
+
+/**
+ * Parses day availability from multiple benefit fields
+ * 
+ * @param benefitInfo - Object containing the benefit fields to parse
+ * @returns DayAvailability object or null if no day information is found
+ */
+export const parseMultiFieldDayAvailability = (benefitInfo: BenefitDayInfo): DayAvailability | null => {
+    try {
+        const fieldResults: FieldParsingResult[] = [];
+
+        // Parse condicion field (highest priority)
+        if (benefitInfo.condicion && typeof benefitInfo.condicion === 'string') {
+            const result = parseFieldDayAvailability(benefitInfo.condicion, 'condicion');
+            if (result) {
+                fieldResults.push(result);
+            }
+        }
+
+        // Parse requisitos array and merge multiple results
+        if (benefitInfo.requisitos && Array.isArray(benefitInfo.requisitos)) {
+            const requisitosResults = parseRequisitosArray(benefitInfo.requisitos);
+            if (requisitosResults.length > 0) {
+
+
+                // Merge all requisitos results into a single result
+                let mergedRequisitos = requisitosResults[0];
+                for (let i = 1; i < requisitosResults.length; i++) {
+                    const currentResult = requisitosResults[i];
+
+
+                    const mergedAvailability = mergeDayAvailability(
+                        mergedRequisitos.availability,
+                        currentResult.availability,
+                        mergedRequisitos.isRestriction,
+                        currentResult.isRestriction,
+                        true // Same field
+                    );
+
+
+
+                    mergedRequisitos = {
+                        ...mergedRequisitos,
+                        availability: mergedAvailability,
+                        confidence: Math.max(mergedRequisitos.confidence, currentResult.confidence),
+                        isRestriction: mergedRequisitos.isRestriction || currentResult.isRestriction,
+                        isNegation: mergedRequisitos.isNegation || currentResult.isNegation,
+                        originalText: `${mergedRequisitos.originalText}; ${currentResult.originalText}`
+                    };
+                }
+                fieldResults.push(mergedRequisitos);
+            }
+        }
+
+        // Parse cuando field
+        if (benefitInfo.cuando && typeof benefitInfo.cuando === 'string') {
+            const result = parseFieldDayAvailability(benefitInfo.cuando, 'cuando');
+            if (result) {
+                fieldResults.push(result);
+            }
+        }
+
+        // Parse textoAplicacion field (lowest priority)
+        if (benefitInfo.textoAplicacion && typeof benefitInfo.textoAplicacion === 'string') {
+            const result = parseFieldDayAvailability(benefitInfo.textoAplicacion, 'textoAplicacion');
+            if (result) {
+                fieldResults.push(result);
+            }
+        }
+
+        // Resolve conflicts and return the best result
+        const resolvedResult = resolveFieldConflicts(fieldResults);
+        return resolvedResult ? resolvedResult.availability : null;
+
+    } catch (error) {
+        // Log error but don't throw - graceful degradation
+        console.warn('Error in multi-field parsing:', error);
+
+        // Fallback to single-field parsing with cuando field
+        if (benefitInfo.cuando) {
+            return parseDayAvailability(benefitInfo.cuando);
+        }
+
+        return null;
+    }
+};
+
+/**
+ * Parses day availability from a BankBenefit object
+ * 
+ * @param benefit - The BankBenefit object to parse
+ * @returns DayAvailability object or null if no day information is found
+ */
+export const parseDayAvailabilityFromBenefit = (benefit: any): DayAvailability | null => {
+    try {
+        // Handle null or undefined benefit objects
+        if (!benefit || typeof benefit !== 'object') {
+            return null;
+        }
+
+        // Extract relevant fields from the benefit object
+        const benefitInfo: BenefitDayInfo = {
+            cuando: benefit.cuando,
+            requisitos: benefit.requisitos,
+            condicion: benefit.condicion,
+            textoAplicacion: benefit.textoAplicacion
+        };
+
+        return parseMultiFieldDayAvailability(benefitInfo);
+
+    } catch (error) {
+        // Log error but don't throw - graceful degradation
+        console.warn('Error parsing benefit object:', error);
+
+        // Fallback to single-field parsing with cuando field
+        if (benefit && benefit.cuando) {
+            return parseDayAvailability(benefit.cuando);
+        }
+
+        return null;
+    }
 };

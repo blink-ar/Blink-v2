@@ -436,6 +436,30 @@ export const mockBusinesses: Business[] = [
         textoAplicacion: "Descuento aplicado automáticamente en caja. Válido sábados y domingos únicamente."
       },
       {
+        bankName: "Banco Ciudad",
+        cardName: "Tarjeta Martes",
+        benefit: "Descuento especial todos los martes",
+        rewardRate: "15%",
+        color: "bg-blue-500",
+        icon: "CreditCard",
+        tipo: "Descuento Semanal",
+        cuando: "Disponible siempre",
+        valor: "15%",
+        tope: "Descuento máximo $200 por compra",
+        claseDeBeneficio: "Gastronomía",
+        condicion: "todos los martes",
+        requisitos: [
+          "Tarjeta activa",
+          "Compra mínima de $100"
+        ],
+        usos: [
+          "Restaurantes participantes",
+          "Delivery de comida",
+          "Cafeterías"
+        ],
+        textoAplicacion: "Presentar tarjeta antes del pago. Válido exclusivamente los martes."
+      },
+      {
         bankName: "Santander",
         cardName: "Business Card",
         benefit: "Earn 2x points on clothing",

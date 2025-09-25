@@ -1,14 +1,18 @@
 import React, { useMemo } from "react";
 import {
   parseDayAvailability,
+  parseDayAvailabilityFromBenefit,
   hasAnyDayAvailable,
   type DayAvailability,
 } from "../../utils/dayAvailabilityParser";
 import { DayIndicator } from "./DayIndicator";
+import type { BankBenefit } from "../../types";
 
 interface DaysOfWeekProps {
-  /** The availability text to parse (e.g., "fines de semana", "lunes a viernes") */
+  /** The availability text to parse (e.g., "fines de semana", "lunes a viernes") - for backward compatibility */
   availability?: string;
+  /** The full benefit object for multi-field parsing - preferred approach */
+  benefit?: BankBenefit;
   /** Additional CSS classes */
   className?: string;
 }
@@ -36,11 +40,17 @@ const DAYS: DayInfo[] = [
  */
 export const DaysOfWeek: React.FC<DaysOfWeekProps> = ({
   availability,
+  benefit,
   className = "",
 }) => {
   const dayAvailability = useMemo(() => {
+    // Prefer multi-field parsing if benefit object is provided
+    if (benefit) {
+      return parseDayAvailabilityFromBenefit(benefit);
+    }
+    // Fallback to single-field parsing for backward compatibility
     return parseDayAvailability(availability);
-  }, [availability]);
+  }, [availability, benefit]);
 
   // Don't render if no day information is available
   if (!dayAvailability) {
