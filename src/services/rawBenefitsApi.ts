@@ -1,6 +1,6 @@
 import { RawBenefit, BenefitsApiResponse } from '../types/benefit';
 
-const BASE_URL = 'http://localhost:3002';
+const BASE_URL = 'https://benefits-backend-v2-public.onrender.com';
 
 /**
  * Simple API service that returns your MongoDB data exactly as-is

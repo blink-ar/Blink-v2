@@ -122,8 +122,8 @@ export const BenefitsPage: React.FC = () => {
               Retry
             </button>
             <p className="text-sm text-gray-500">
-              Make sure your MongoDB API is running on{" "}
-              <code>http://localhost:3002</code>
+              Using MongoDB API from{" "}
+              <code>https://benefits-backend-v2-public.onrender.com</code>
             </p>
           </div>
         </div>
