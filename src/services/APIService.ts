@@ -230,8 +230,13 @@ export class APIService extends AbstractBaseService {
             const getNumber = (value: unknown): number =>
                 typeof value === 'number' ? value : 5;
 
-            const getStringArray = (value: unknown): string[] | undefined =>
-                Array.isArray(value) && value.every(item => typeof item === 'string') ? value : undefined;
+            const getStringArray = (value: unknown): string[] | undefined => {
+                if (!Array.isArray(value)) return undefined;
+                for (const item of value) {
+                    if (typeof item !== 'string') return undefined;
+                }
+                return value;
+            };
 
             data.forEach((benefit) => {
                 try {

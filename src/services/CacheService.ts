@@ -502,7 +502,7 @@ export class CacheService extends AbstractBaseService {
 
     private startCleanupTimer(): void {
         this.cleanupTimer = setInterval(() => {
-            this.cleanup();
+            this.performCleanup();
         }, this.config.cleanupInterval);
     }
 
