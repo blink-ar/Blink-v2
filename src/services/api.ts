@@ -14,7 +14,7 @@ declare global {
   let allCategories: Set<string> | undefined;
 }
 
-const BASE_URL = 'http://localhost:3002';
+const BASE_URL = 'https://benefits-backend-v2-public.onrender.com';
 
 class BenefitsAPI {
   async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
