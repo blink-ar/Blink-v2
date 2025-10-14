@@ -187,7 +187,7 @@ const LimitsSection: React.FC<LimitsSectionProps> = ({ value, limit }) => {
                       Descuento:
                     </span>
                     <span className="text-sm text-purple-700 font-bold">
-                      {formattedValue}%
+                      {formattedValue}
                     </span>
                   </div>
                 )}
