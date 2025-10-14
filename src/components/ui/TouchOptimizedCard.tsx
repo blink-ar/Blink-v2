@@ -1,12 +1,9 @@
 import React, { useState } from "react";
-import { useSwipeGesture } from "../../hooks/useSwipeGesture";
 
 interface TouchOptimizedCardProps {
   children: React.ReactNode;
   onTap?: () => void;
   onDoubleTap?: () => void;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
   onLongPress?: () => void;
   className?: string;
   disabled?: boolean;
@@ -17,8 +14,6 @@ export const TouchOptimizedCard: React.FC<TouchOptimizedCardProps> = ({
   children,
   onTap,
   onDoubleTap,
-  onSwipeLeft,
-  onSwipeRight,
   onLongPress,
   className = "",
   disabled = false,
@@ -45,39 +40,30 @@ export const TouchOptimizedCard: React.FC<TouchOptimizedCardProps> = ({
     }
   };
 
-  const { handlers } = useSwipeGesture(
-    {
-      onSwipeLeft,
-      onSwipeRight,
-      onSwipeStart: () => {
-        if (disabled) return;
-        setIsPressed(true);
+  const handleTouchStart = () => {
+    if (disabled) return;
+    setIsPressed(true);
 
-        // Start long press timer
-        if (onLongPress) {
-          const timer = setTimeout(() => {
-            triggerHaptic("medium");
-            onLongPress();
-            setLongPressTimer(null);
-          }, 500); // 500ms for long press
-          setLongPressTimer(timer);
-        }
-      },
-      onSwipeEnd: () => {
-        setIsPressed(false);
-
-        // Clear long press timer
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          setLongPressTimer(null);
-        }
-      },
-    },
-    {
-      threshold: 50,
-      trackMouse: true, // Enable for desktop testing
+    // Start long press timer
+    if (onLongPress) {
+      const timer = setTimeout(() => {
+        triggerHaptic("medium");
+        onLongPress();
+        setLongPressTimer(null);
+      }, 500); // 500ms for long press
+      setLongPressTimer(timer);
     }
-  );
+  };
+
+  const handleTouchEnd = () => {
+    setIsPressed(false);
+
+    // Clear long press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
 
   const handleClick = () => {
     if (disabled) return;
@@ -122,7 +108,11 @@ export const TouchOptimizedCard: React.FC<TouchOptimizedCardProps> = ({
     <div
       className={cardClasses}
       onClick={handleClick}
-      {...handlers}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleTouchStart}
+      onMouseUp={handleTouchEnd}
+      onMouseLeave={handleTouchEnd}
       style={{
         // Prevent text selection and callouts on mobile
         WebkitUserSelect: "none",

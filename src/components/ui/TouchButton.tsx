@@ -1,10 +1,4 @@
-import React from "react";
-import {
-  useHoverAnimation,
-  useFocusAnimation,
-  useLoadingAnimation,
-  useReducedMotion,
-} from "../../hooks/useAnimation";
+import React, { useState } from "react";
 
 interface TouchButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -44,16 +38,12 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const { elementRef: hoverRef, isHovered } = useHoverAnimation();
-  const { elementRef: focusRef, isFocused } = useFocusAnimation();
-  const { animationState, getLoadingClass } = useLoadingAnimation(isLoading);
-  const prefersReducedMotion = useReducedMotion();
+  const [isPressed, setIsPressed] = useState(false);
 
-  // Combine refs
-  const combinedRef = (node: HTMLButtonElement) => {
-    if (hoverRef) hoverRef.current = node;
-    if (focusRef) focusRef.current = node;
-  };
+  // Simple reduced motion detection
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Animation intensity settings
   const getAnimationClasses = () => {
@@ -63,17 +53,17 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
       subtle: {
         hover: "hover:scale-[1.01] hover:shadow-sm",
         active: "active:scale-[0.99]",
-        transition: "transition-all duration-150 ease-out-smooth",
+        transition: "transition-all duration-150 ease-out",
       },
       normal: {
         hover: "hover:scale-[1.02] hover:shadow-md",
         active: "active:scale-[0.98]",
-        transition: "transition-all duration-150 ease-out-smooth",
+        transition: "transition-all duration-150 ease-out",
       },
       enhanced: {
         hover: "hover:scale-[1.03] hover:shadow-lg hover:-translate-y-0.5",
         active: "active:scale-[0.97] active:translate-y-0",
-        transition: "transition-all duration-200 ease-out-smooth",
+        transition: "transition-all duration-200 ease-out",
       },
     };
 
@@ -94,10 +84,10 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
     touchOptimized && "select-none", // Prevents text selection on touch
     // Animation classes
     getAnimationClasses(),
-    // Loading animation
-    getLoadingClass(),
     // Performance optimization
     "will-change-transform",
+    // Pressed state
+    isPressed && !disabled && "scale-95",
   ].filter(Boolean);
 
   const variantClasses = variants[variant];
@@ -112,19 +102,25 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
     className,
   ].join(" ");
 
+  const handleMouseDown = () => setIsPressed(true);
+  const handleMouseUp = () => setIsPressed(false);
+  const handleMouseLeave = () => setIsPressed(false);
+
   return (
     <button
-      ref={combinedRef}
       className={allClasses}
       disabled={disabled || isLoading}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleMouseDown}
+      onTouchEnd={handleMouseUp}
       {...props}
     >
       {isLoading ? (
         <>
           <svg
-            className={`animate-spin -ml-1 mr-2 h-4 w-4 ${
-              animationState === "success" ? "animate-bounce-in" : ""
-            }`}
+            className="animate-spin -ml-1 mr-2 h-4 w-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -143,16 +139,10 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span
-            className={animationState === "success" ? "animate-fade-in" : ""}
-          >
-            {animationState === "success" ? "Success!" : "Loading..."}
-          </span>
+          <span>Loading...</span>
         </>
       ) : (
-        <span className={isHovered || isFocused ? "animate-fade-in" : ""}>
-          {children}
-        </span>
+        <span>{children}</span>
       )}
     </button>
   );

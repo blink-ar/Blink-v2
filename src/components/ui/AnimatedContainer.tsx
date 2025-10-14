@@ -1,9 +1,11 @@
-import React, { forwardRef, HTMLAttributes } from "react";
-import {
-  useAnimatedVisibility,
-  useInViewAnimation,
-  useReducedMotion,
-} from "../../hooks/useAnimation";
+import React, {
+  forwardRef,
+  HTMLAttributes,
+  useRef,
+  useEffect,
+  useState,
+  useImperativeHandle,
+} from "react";
 
 interface AnimatedContainerProps extends HTMLAttributes<HTMLDivElement> {
   /** Animation type to apply */
@@ -40,46 +42,93 @@ const AnimatedContainer = forwardRef<HTMLDivElement, AnimatedContainerProps>(
     },
     ref
   ) => {
-    const prefersReducedMotion = useReducedMotion();
-    const { shouldRender, animationClass } = useAnimatedVisibility(
-      isVisible,
-      duration
-    );
-    const { elementRef, isInView } = useInViewAnimation(threshold);
+    const [shouldRender, setShouldRender] = useState(isVisible);
+    const [isInView, setIsInView] = useState(!animateOnScroll);
+    const elementRef = useRef<HTMLDivElement>(null);
 
-    // Combine refs
-    const combinedRef = (node: HTMLDivElement) => {
-      if (elementRef) elementRef.current = node;
-      if (ref) {
-        if (typeof ref === "function") ref(node);
-        else ref.current = node;
+    // Simple reduced motion detection
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Handle visibility changes
+    useEffect(() => {
+      if (isVisible) {
+        setShouldRender(true);
+      } else {
+        const timer = setTimeout(() => setShouldRender(false), duration);
+        return () => clearTimeout(timer);
       }
-    };
+    }, [isVisible, duration]);
+
+    // Simple intersection observer for scroll animations
+    useEffect(() => {
+      if (!animateOnScroll || !elementRef.current) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            if (animateOnce) {
+              observer.disconnect();
+            }
+          } else if (!animateOnce) {
+            setIsInView(false);
+          }
+        },
+        { threshold }
+      );
+
+      observer.observe(elementRef.current);
+      return () => observer.disconnect();
+    }, [animateOnScroll, threshold, animateOnce]);
+
+    // Use imperative handle to properly expose the ref
+    useImperativeHandle(ref, () => elementRef.current!);
 
     // Determine animation class based on type and state
     const getAnimationClass = () => {
       if (prefersReducedMotion) return "";
 
-      if (animateOnScroll) {
-        if (!isInView) return "opacity-0";
+      const baseClasses = "transition-all ease-out";
+      const durationClass = `duration-${duration}`;
 
-        switch (animation) {
-          case "fade":
-            return "animate-fade-in";
-          case "slide-up":
-            return "animate-slide-up";
-          case "slide-down":
-            return "animate-slide-down";
-          case "scale":
-            return "animate-scale-in";
-          case "bounce":
-            return "animate-bounce-in";
-          default:
-            return "animate-fade-in";
+      if (animateOnScroll) {
+        if (!isInView) {
+          switch (animation) {
+            case "fade":
+              return `${baseClasses} ${durationClass} opacity-0`;
+            case "slide-up":
+              return `${baseClasses} ${durationClass} opacity-0 translate-y-4`;
+            case "slide-down":
+              return `${baseClasses} ${durationClass} opacity-0 -translate-y-4`;
+            case "scale":
+              return `${baseClasses} ${durationClass} opacity-0 scale-95`;
+            default:
+              return `${baseClasses} ${durationClass} opacity-0`;
+          }
+        } else {
+          return `${baseClasses} ${durationClass} opacity-100 translate-y-0 scale-100`;
         }
       }
 
-      return animationClass;
+      // Visibility-based animation
+      if (isVisible) {
+        return `${baseClasses} ${durationClass} opacity-100 translate-y-0 scale-100`;
+      } else {
+        switch (animation) {
+          case "fade":
+            return `${baseClasses} ${durationClass} opacity-0`;
+          case "slide-up":
+            return `${baseClasses} ${durationClass} opacity-0 translate-y-4`;
+          case "slide-down":
+            return `${baseClasses} ${durationClass} opacity-0 -translate-y-4`;
+          case "scale":
+            return `${baseClasses} ${durationClass} opacity-0 scale-95`;
+          default:
+            return `${baseClasses} ${durationClass} opacity-0`;
+        }
+      }
     };
 
     // Don't render if not visible and using visibility animation
@@ -87,11 +136,11 @@ const AnimatedContainer = forwardRef<HTMLDivElement, AnimatedContainerProps>(
       return null;
     }
 
-    const animationStyles = delay > 0 ? { animationDelay: `${delay}ms` } : {};
+    const animationStyles = delay > 0 ? { transitionDelay: `${delay}ms` } : {};
 
     return (
       <div
-        ref={combinedRef}
+        ref={elementRef}
         className={`${getAnimationClass()} ${className}`.trim()}
         style={{
           ...style,

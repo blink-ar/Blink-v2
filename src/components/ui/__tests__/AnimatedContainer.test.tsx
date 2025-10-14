@@ -1,20 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-
-// Mock the animation hooks before importing the component
-vi.mock("../../../hooks/useAnimation", () => ({
-  useReducedMotion: vi.fn(() => false),
-  useAnimatedVisibility: vi.fn(() => ({
-    shouldRender: true,
-    animationClass: "animate-fade-in",
-  })),
-  useInViewAnimation: vi.fn(() => ({
-    elementRef: { current: null },
-    isInView: true,
-  })),
-}));
-
 import AnimatedContainer from "../AnimatedContainer";
 
 describe("AnimatedContainer", () => {
@@ -40,7 +26,7 @@ describe("AnimatedContainer", () => {
     );
 
     const animatedElement = container.firstChild as HTMLElement;
-    expect(animatedElement).toHaveClass("animate-fade-in");
+    expect(animatedElement).toHaveClass("transition-all");
   });
 
   it("should apply custom className", () => {
@@ -62,7 +48,7 @@ describe("AnimatedContainer", () => {
     );
 
     const animatedElement = container.firstChild as HTMLElement;
-    expect(animatedElement.style.animationDelay).toBe("200ms");
+    expect(animatedElement.style.transitionDelay).toBe("200ms");
   });
 
   it("should forward ref correctly", () => {

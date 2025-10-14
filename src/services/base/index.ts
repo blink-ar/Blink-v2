@@ -1,6 +1,5 @@
 // Base service infrastructure
 export { BaseService, AbstractBaseService } from './BaseService';
-export { ServiceRegistry } from './ServiceRegistry';
 
 // Error handling
 export {
