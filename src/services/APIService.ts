@@ -2,45 +2,10 @@ import { AbstractBaseService, Logger, NetworkError, ValidationError } from './ba
 import { CacheService } from './CacheService';
 import { HTTPClient } from './HTTPClient';
 import { Business, BankBenefit } from '../types';
-import { mockBusinesses } from '../data/mockData';
+// Removed mockBusinesses import - using only real MongoDB data
+import { benefitsAPI } from './api';
 
-/**
- * Raw API response interfaces
- */
-interface BenefitResponse {
-    _id: { $oid: string };
-    id: string;
-    beneficios: Array<{
-        tipo?: string;
-        cuando?: string;
-        valor?: string;
-        cuota?: { $numberInt: string };
-        tope?: string;
-        claseDeBeneficio?: string;
-        casuistica?: { descripcion: string };
-        condicion?: string;
-        requisitos?: string[];
-        usos?: string[];
-        textoAplicacion?: string;
-    }>;
-    cabecera: string;
-    destacado: boolean;
-    details: {
-        beneficio: {
-            titulo: string;
-            rubros: { id: number; nombre: string }[];
-            subtitulo: string;
-            imagen: string;
-            vigencia: string;
-            subcabecera: string;
-            cabecera: string;
-        };
-    };
-}
 
-interface AllBenefits {
-    [key: string]: BenefitResponse[];
-}
 
 /**
  * API service configuration
@@ -200,14 +165,14 @@ export class APIService extends AbstractBaseService {
         try {
             this.logger.debug('Fetching businesses from API');
 
-            const response = await this.httpClient.get<AllBenefits>('/api/benefits');
+            const data = await benefitsAPI.getBenefits();
 
-            if (!response.data) {
+            if (!data) {
                 throw new ValidationError('API response is empty');
             }
 
             // Transform and validate the data
-            const businesses = this.transformAPIResponse(response.data);
+            const businesses = this.transformMongoDBResponse(data);
 
             if (businesses.length === 0) {
                 this.logger.warn('No businesses found in API response');
@@ -247,43 +212,104 @@ export class APIService extends AbstractBaseService {
         }
     }
 
-    private transformAPIResponse(data: AllBenefits): Business[] {
+    private transformMongoDBResponse(data: Record<string, unknown>[]): Business[] {
         try {
-            this.logger.debug('Transforming API response', {
-                banks: Object.keys(data).length
+            this.logger.debug('Transforming MongoDB API response', {
+                benefitsCount: data.length
             });
 
             const businessMap = new Map<string, Business>();
 
-            // Iterate through each bank's benefits
-            Object.entries(data).forEach(([bankKey, benefits]) => {
-                if (!Array.isArray(benefits)) {
-                    this.logger.warn('Invalid benefits data for bank', { bankKey });
-                    return;
-                }
+            // Helper functions for safe type conversion
+            const getString = (value: unknown): string =>
+                typeof value === 'string' ? value : '';
 
-                benefits.forEach((benefit) => {
-                    try {
-                        const transformedBusiness = this.transformBenefit(bankKey, benefit);
-                        if (transformedBusiness) {
-                            const { business, bankBenefit } = transformedBusiness;
+            const getStringOrDefault = (value: unknown, defaultValue: string): string =>
+                typeof value === 'string' ? value : defaultValue;
 
-                            if (!businessMap.has(business.id)) {
-                                businessMap.set(business.id, business);
-                            }
+            const getNumber = (value: unknown): number =>
+                typeof value === 'number' ? value : 5;
 
-                            // Add the bank benefit to the existing business
-                            const existingBusiness = businessMap.get(business.id)!;
-                            existingBusiness.benefits.push(bankBenefit);
-                        }
-                    } catch (error) {
-                        this.logger.warn('Error transforming benefit', {
-                            bankKey,
-                            benefitId: benefit.id,
-                            error: error instanceof Error ? error.message : String(error)
+            const getStringArray = (value: unknown): string[] | undefined =>
+                Array.isArray(value) && value.every(item => typeof item === 'string') ? value : undefined;
+
+            data.forEach((benefit) => {
+                try {
+                    // Extract business information from the raw benefit data
+                    const businessName = getStringOrDefault(benefit.name, '') ||
+                        getStringOrDefault(benefit.titulo, '') ||
+                        getStringOrDefault(benefit.business_name, '') ||
+                        'Unknown Business';
+
+                    const category = getStringOrDefault(benefit.category, '') ||
+                        getStringOrDefault(benefit.categoria, '') ||
+                        'otros';
+
+                    const description = getStringOrDefault(benefit.description, '') ||
+                        getStringOrDefault(benefit.descripcion, '') ||
+                        getStringOrDefault(benefit.cabecera, '') ||
+                        'No description available';
+
+                    const image = getStringOrDefault(benefit.image, '') ||
+                        getStringOrDefault(benefit.imagen, '') ||
+                        'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+
+                    if (!businessMap.has(businessName)) {
+                        businessMap.set(businessName, {
+                            id: getString(benefit._id) || getString(benefit.id) || businessName,
+                            name: businessName,
+                            category: category,
+                            description: description,
+                            rating: getNumber(benefit.rating),
+                            location: getStringOrDefault(benefit.location, '') ||
+                                getStringOrDefault(benefit.ubicacion, '') ||
+                                'Multiple locations',
+                            image: image,
+                            benefits: [],
                         });
                     }
-                });
+
+                    // Add benefit to the business
+                    const business = businessMap.get(businessName)!;
+                    const bankBenefit: BankBenefit = {
+                        bankName: getStringOrDefault(benefit.bank, '') ||
+                            getStringOrDefault(benefit.banco, '') ||
+                            'Bank',
+                        cardName: getStringOrDefault(benefit.card, '') ||
+                            getStringOrDefault(benefit.tarjeta, '') ||
+                            'Credit Card',
+                        benefit: getStringOrDefault(benefit.benefit, '') ||
+                            getStringOrDefault(benefit.beneficio, '') ||
+                            description,
+                        rewardRate: getStringOrDefault(benefit.reward_rate, '') ||
+                            getStringOrDefault(benefit.tasa_recompensa, '') ||
+                            getStringOrDefault(benefit.valor, '') ||
+                            'N/A',
+                        color: getStringOrDefault(benefit.color, 'bg-blue-500'),
+                        icon: getStringOrDefault(benefit.icon, 'CreditCard'),
+                        // Map additional fields from raw benefit data
+                        tipo: getString(benefit.tipo) || undefined,
+                        cuando: getString(benefit.cuando) || undefined,
+                        valor: getString(benefit.valor) || undefined,
+                        tope: getString(benefit.tope) || undefined,
+                        claseDeBeneficio: getString(benefit.claseDeBeneficio) ||
+                            getString(benefit.clase_beneficio) ||
+                            undefined,
+                        condicion: getString(benefit.condicion) || undefined,
+                        requisitos: getStringArray(benefit.requisitos),
+                        usos: getStringArray(benefit.usos),
+                        textoAplicacion: getString(benefit.textoAplicacion) ||
+                            getString(benefit.texto_aplicacion) ||
+                            undefined,
+                    };
+
+                    business.benefits.push(bankBenefit);
+                } catch (error) {
+                    this.logger.warn('Error transforming MongoDB benefit', {
+                        benefitId: getString(benefit._id) || getString(benefit.id),
+                        error: error instanceof Error ? error.message : String(error)
+                    });
+                }
             });
 
             const businesses = Array.from(businessMap.values());
@@ -291,75 +317,23 @@ export class APIService extends AbstractBaseService {
             // Validate the transformed data
             this.validateBusinesses(businesses);
 
+            this.logger.info('Successfully transformed MongoDB response', {
+                businessCount: businesses.length
+            });
+
             return businesses;
 
         } catch (error) {
-            this.logger.error('Error transforming API response', {
+            this.logger.error('Error transforming MongoDB API response', {
                 error: error instanceof Error ? error.message : String(error)
             });
-            throw new ValidationError('Failed to transform API response data');
+            throw new ValidationError('Failed to transform MongoDB API response data');
         }
     }
 
-    private transformBenefit(bankKey: string, benefit: BenefitResponse): { business: Business; bankBenefit: BankBenefit } | null {
-        // Validate required fields
-        if (!benefit.details?.beneficio?.titulo) {
-            this.logger.warn('Benefit missing required titulo field', { benefitId: benefit.id });
-            return null;
-        }
 
-        const titulo = benefit.details.beneficio.titulo;
-        const category = benefit.details.beneficio.rubros?.[0]?.nombre || 'otros';
-        const description = benefit.cabecera || 'No description available';
-        const bankName = this.formatBankName(bankKey);
 
-        // Create business object
-        const business: Business = {
-            id: this.generateBusinessId(titulo),
-            name: titulo,
-            category: this.validateCategory(category),
-            description: this.sanitizeText(description),
-            rating: 5, // Default rating
-            location: 'Multiple locations',
-            image: this.validateImageUrl(benefit.details.beneficio.imagen),
-            benefits: [],
-            lastUpdated: Date.now()
-        };
 
-        // Create bank benefit
-        const firstBenefit = benefit.beneficios?.[0];
-        const rewardRate = firstBenefit?.valor || 'N/A';
-        const benefitDescription =
-            firstBenefit?.casuistica?.descripcion ||
-            benefit.details.beneficio.subtitulo ||
-            'Benefit available';
-
-        // Extract all fields from beneficios array, handling missing or empty values
-        const bankBenefit: BankBenefit = {
-            bankName,
-            cardName: 'Credit Card',
-            benefit: this.sanitizeText(benefitDescription),
-            rewardRate: this.sanitizeText(rewardRate),
-            color: this.assignBankColor(bankName),
-            icon: 'CreditCard',
-            // Extract all new fields from the first beneficio, with fallbacks
-            tipo: firstBenefit?.tipo || undefined,
-            cuando: firstBenefit?.cuando || undefined,
-            valor: firstBenefit?.valor || undefined,
-            tope: firstBenefit?.tope || undefined,
-            claseDeBeneficio: firstBenefit?.claseDeBeneficio || undefined,
-            condicion: firstBenefit?.condicion || undefined,
-            requisitos: firstBenefit?.requisitos && firstBenefit.requisitos.length > 0
-                ? firstBenefit.requisitos.filter(req => req && req.trim() !== '')
-                : undefined,
-            usos: firstBenefit?.usos && firstBenefit.usos.length > 0
-                ? firstBenefit.usos.filter(uso => uso && uso.trim() !== '')
-                : undefined,
-            textoAplicacion: firstBenefit?.textoAplicacion || undefined,
-        };
-
-        return { business, bankBenefit };
-    }
 
     private validateBusinesses(businesses: Business[]): void {
         if (!Array.isArray(businesses)) {
@@ -393,80 +367,9 @@ export class APIService extends AbstractBaseService {
     }
 
     private getFallbackData(): Business[] {
-        this.logger.info('Using fallback mock data');
-        return mockBusinesses.map(business => ({
-            ...business,
-            lastUpdated: Date.now()
-        }));
+        this.logger.warn('No fallback data available - returning empty array');
+        return []; // Return empty array instead of mock data
     }
 
-    private generateBusinessId(titulo: string): string {
-        return titulo.toLowerCase()
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, '-')
-            .substring(0, 50);
-    }
 
-    private validateCategory(category: string): string {
-        const validCategories = [
-            'gastronomia', 'moda', 'entretenimiento', 'otros', 'deportes',
-            'regalos', 'viajes', 'automotores', 'belleza', 'jugueterias',
-            'hogar', 'electro', 'shopping'
-        ];
-
-        const normalizedCategory = category.toLowerCase();
-        return validCategories.includes(normalizedCategory) ? normalizedCategory : 'otros';
-    }
-
-    private validateImageUrl(url?: string): string {
-        const defaultImage = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
-
-        if (!url) return defaultImage;
-
-        try {
-            new URL(url);
-            return url;
-        } catch {
-            this.logger.warn('Invalid image URL, using default', { url });
-            return defaultImage;
-        }
-    }
-
-    private sanitizeText(text: string): string {
-        if (typeof text !== 'string') return '';
-
-        return text
-            .trim()
-            .replace(/\s+/g, ' ')
-            .substring(0, 500); // Limit length
-    }
-
-    private formatBankName(bankKey: string): string {
-        // Handle specific BBVA case
-        if (bankKey.includes('BBVA')) {
-            return 'BBVA';
-        }
-
-        return bankKey
-            .replace(/_GO$/, '')
-            .replace(/_/g, ' ')
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
-    }
-
-    private assignBankColor(bankName: string): string {
-        // Simple hash-based color assignment for consistency
-        const colors = [
-            'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500',
-            'bg-yellow-500', 'bg-indigo-500', 'bg-pink-500', 'bg-teal-500'
-        ];
-
-        let hash = 0;
-        for (let i = 0; i < bankName.length; i++) {
-            hash = ((hash << 5) - hash + bankName.charCodeAt(i)) & 0xffffffff;
-        }
-
-        return colors[Math.abs(hash) % colors.length];
-    }
 }

@@ -1,42 +1,63 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import { CategoryDropdown } from "../components/CategoryDropdown";
 import { Container, Stack, ResponsiveBusinessGrid } from "../components/layout";
 import { PullToRefresh } from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
+
 import { categories as rawCategories } from "../data/mockData";
 import { Business, Category } from "../types";
-import { fetchBusinesses } from "../services/api";
+import { fetchAllBusinessesComplete } from "../services/api";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const loadBusinesses = async () => {
+  // State for loading all businesses at once
+  const [paginatedBusinesses, setPaginatedBusinesses] = useState<Business[]>(
+    []
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load ALL businesses at once
+  const loadAllBusinesses = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await fetchBusinesses();
-      setBusinesses(data);
       setError(null);
+      console.log("🚀 Loading ALL businesses from all 1,714 benefits...");
+
+      const allBusinesses = await fetchAllBusinessesComplete();
+      setPaginatedBusinesses(allBusinesses);
+
+      console.log(
+        `✅ Loaded ${allBusinesses.length} businesses from all benefits!`
+      );
     } catch (err) {
-      console.error("Failed to load businesses:", err);
-      const error =
-        err instanceof Error
-          ? err.message
-          : "Failed to load businesses. Please try again later.";
-      setError(error);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load all businesses";
+      setError(errorMessage);
+      console.error("❌ Error loading all businesses:", err);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadBusinesses();
   }, []);
+
+  // Load all businesses on mount
+  useEffect(() => {
+    loadAllBusinesses();
+  }, [loadAllBusinesses]);
+
+  // For compatibility with infinite scroll components (not used when loading all at once)
+  const isLoadingMore = false;
+  const hasMore = false;
+  const setLoadingRef = () => {};
+
+  const handleRefresh = async () => {
+    // Refresh all businesses data
+    await loadAllBusinesses();
+  };
 
   const {
     searchTerm,
@@ -44,12 +65,12 @@ function Home() {
     selectedCategory,
     setSelectedCategory,
     filteredBusinesses,
-  } = useBusinessFilter(businesses);
+  } = useBusinessFilter(paginatedBusinesses);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <PullToRefresh onRefresh={loadBusinesses} className="min-h-screen">
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
         <main className="py-6 sm:py-8">
           <Container size="md">
             <Stack spacing="lg">
@@ -80,14 +101,17 @@ function Home() {
                 </div>
               )}
 
-              {/* Business Grid */}
+              {/* Business Grid with Infinite Scroll */}
               <ResponsiveBusinessGrid
                 businesses={filteredBusinesses}
                 onBenefitClick={(businessId, benefitIndex) =>
                   navigate(`/benefit/${businessId}/${benefitIndex}`)
                 }
                 isLoading={isLoading}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
                 variant="default"
+                setLoadingRef={setLoadingRef}
               />
             </Stack>
           </Container>

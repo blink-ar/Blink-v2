@@ -1,10 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Business, BankBenefit } from "../types";
+import { RawBenefit } from "../types/benefit";
+import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
 import { fetchBusinesses } from "../services/api";
 import {
   ArrowLeft,
-  Clock,
   DollarSign,
   AlertCircle,
   CheckCircle,
@@ -14,7 +15,6 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import {
   formatValue,
-  formatValidityPeriod,
   processArrayField,
   processTextField,
   hasValidContent,
@@ -68,10 +68,6 @@ const SafeBenefitSection: React.FC<SafeBenefitSectionProps> = ({
 
 interface RequirementsSectionProps {
   requirements: string[];
-}
-
-interface ValiditySectionProps {
-  validity: string;
 }
 
 interface LimitsSectionProps {
@@ -150,41 +146,6 @@ const RequirementsSection: React.FC<RequirementsSectionProps> = ({
         } catch (error) {
           logger.error("Error processing requirements data", error as Error, {
             requirements,
-          });
-          return null;
-        }
-      })()}
-    </SafeBenefitSection>
-  );
-};
-
-const ValiditySection: React.FC<ValiditySectionProps> = ({ validity }) => {
-  return (
-    <SafeBenefitSection sectionName="Validity">
-      {(() => {
-        try {
-          const processedValidity = processTextField(validity);
-
-          if (!hasValidContent(processedValidity)) return null;
-
-          const formattedValidity = formatValidityPeriod(processedValidity);
-
-          return (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-5 w-5 text-green-600" />
-                <h4 className="font-semibold text-green-900">Vigencia</h4>
-              </div>
-              <div className="text-green-800">
-                <span className="text-sm font-semibold">
-                  {formattedValidity}
-                </span>
-              </div>
-            </div>
-          );
-        } catch (error) {
-          logger.error("Error processing validity data", error as Error, {
-            validity,
           });
           return null;
         }
@@ -425,7 +386,6 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
               <div className="space-y-6">
                 {/* Key Financial Information - Most Important */}
                 <div className="grid gap-4">
-                  <ValiditySection validity={benefit.cuando || ""} />
                   {/* Days of Week Availability */}
                   <DaysOfWeek
                     benefit={benefit}
@@ -448,6 +408,8 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
                   <ApplicationTextSection
                     applicationText={benefit.textoAplicacion || ""}
                   />
+
+                  {/* Original Text Section for AI Analyzed Benefits */}
                 </div>
               </div>
             </div>
@@ -469,6 +431,7 @@ function Benefit() {
     benefitIndex: string;
   }>();
   const navigate = useNavigate();
+  const [rawBenefit, setRawBenefit] = useState<RawBenefit | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -477,19 +440,170 @@ function Benefit() {
   useEffect(() => {
     const load = async () => {
       try {
-        const businesses = await fetchBusinesses();
-        const found = businesses.find((b: Business) => b.id === id);
-        setBusiness(found || null);
-        if (found && benefitIndex !== undefined) {
-          const idx = parseInt(benefitIndex, 10);
-          setBenefit(found.benefits[idx] || null);
-          setError(found.benefits[idx] ? null : "Benefit not found");
-        } else {
-          setBenefit(null);
-          setError("Benefit not found");
+        console.log(
+          "🔍 Loading benefit with ID:",
+          id,
+          "and index:",
+          benefitIndex
+        );
+
+        // Try to get raw benefit by ID first (if id is a MongoDB ObjectId)
+        if (id && id.length === 24) {
+          // MongoDB ObjectId length
+          console.log("🔍 Trying to fetch raw benefit by ID:", id);
+          const rawBenefitData = await getRawBenefitById(id);
+          if (rawBenefitData) {
+            console.log("✅ Found raw benefit:", rawBenefitData);
+            setRawBenefit(rawBenefitData);
+
+            // Convert raw benefit to the format expected by the UI
+            const convertedBenefit: BankBenefit = {
+              bankName: rawBenefitData.bank,
+              cardName: rawBenefitData.cardTypes[0]?.name || "Credit Card",
+              benefit: rawBenefitData.benefitTitle,
+              rewardRate: `${rawBenefitData.discountPercentage}%`,
+              color: "bg-blue-500",
+              icon: "CreditCard",
+              tipo: "descuento",
+              cuando: rawBenefitData.availableDays.join(", "),
+              valor: `${rawBenefitData.discountPercentage}%`,
+              condicion: rawBenefitData.termsAndConditions,
+              requisitos: [
+                rawBenefitData.cardTypes[0]?.name || "Tarjeta de crédito",
+              ],
+              usos: rawBenefitData.online
+                ? ["online", "presencial"]
+                : ["presencial"],
+              textoAplicacion: rawBenefitData.link,
+            };
+
+            // Create a business object for the UI
+            const convertedBusiness: Business = {
+              id: rawBenefitData._id.$oid,
+              name: rawBenefitData.merchant.name,
+              category: rawBenefitData.categories[0] || "otros",
+              description: rawBenefitData.description,
+              rating: 5,
+              location: rawBenefitData.location,
+              image:
+                "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400",
+              benefits: [convertedBenefit],
+            };
+
+            setBusiness(convertedBusiness);
+            setBenefit(convertedBenefit);
+            setError(null);
+            return;
+          }
         }
+
+        // Fallback: try to find business by merchant name
+        console.log("🔍 Searching for business by merchant name...");
+        const businesses = await fetchBusinesses();
+        console.log("📊 Got", businesses.length, "businesses");
+
+        // Find business by ID (which is now merchant-name-based)
+        const matchingBusiness = businesses.find(
+          (business: Business) =>
+            business.id === id ||
+            business.name.toLowerCase().replace(/\s+/g, "-") === id
+        );
+
+        if (matchingBusiness && benefitIndex !== undefined) {
+          const idx = parseInt(benefitIndex, 10);
+          const selectedBenefit = matchingBusiness.benefits[idx];
+
+          if (selectedBenefit) {
+            console.log("✅ Found business and benefit:", {
+              businessName: matchingBusiness.name,
+              benefitIndex: idx,
+              benefit: selectedBenefit,
+            });
+
+            setBusiness(matchingBusiness);
+            setBenefit(selectedBenefit);
+            setError(null);
+            return;
+          }
+        }
+
+        // Last resort: try to find by MongoDB ObjectId in raw benefits
+        console.log("🔍 Last resort: searching in all raw benefits...");
+        const allRawBenefits = await getRawBenefits({
+          limit: "1000",
+          offset: "0",
+        });
+        console.log("📊 Got", allRawBenefits.length, "raw benefits");
+
+        // Try to find by MongoDB ObjectId
+        const matchingBenefits = allRawBenefits.filter(
+          (b) => b._id.$oid === id
+        );
+
+        if (matchingBenefits.length > 0) {
+          const benefitToShow =
+            benefitIndex !== undefined
+              ? matchingBenefits[parseInt(benefitIndex, 10)] ||
+                matchingBenefits[0]
+              : matchingBenefits[0];
+
+          if (benefitToShow) {
+            console.log("✅ Found matching benefit:", benefitToShow);
+            setRawBenefit(benefitToShow);
+
+            // Convert to UI format (same as above)
+            const convertedBenefit: BankBenefit = {
+              bankName: benefitToShow.bank,
+              cardName: benefitToShow.cardTypes[0]?.name || "Credit Card",
+              benefit: benefitToShow.benefitTitle,
+              rewardRate: `${benefitToShow.discountPercentage}%`,
+              color: "bg-blue-500",
+              icon: "CreditCard",
+              tipo: "descuento",
+              cuando: benefitToShow.availableDays.join(", "),
+              valor: `${benefitToShow.discountPercentage}%`,
+              condicion: benefitToShow.termsAndConditions,
+              requisitos: [
+                benefitToShow.cardTypes[0]?.name || "Tarjeta de crédito",
+              ],
+              usos: benefitToShow.online
+                ? ["online", "presencial"]
+                : ["presencial"],
+              textoAplicacion: benefitToShow.link,
+            };
+
+            const convertedBusiness: Business = {
+              id: benefitToShow._id.$oid,
+              name: benefitToShow.merchant.name,
+              category: benefitToShow.categories[0] || "otros",
+              description: benefitToShow.description,
+              rating: 5,
+              location: benefitToShow.location,
+              image:
+                "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400",
+              benefits: [convertedBenefit],
+            };
+
+            setBusiness(convertedBusiness);
+            setBenefit(convertedBenefit);
+            setError(null);
+            return;
+          }
+        }
+
+        // If nothing found
+        console.warn(
+          "❌ No benefit found for ID:",
+          id,
+          "and index:",
+          benefitIndex
+        );
+        setBusiness(null);
+        setBenefit(null);
+        setError("Benefit not found");
       } catch (err) {
-        setError("Failed to load business");
+        console.error("❌ Error loading benefit:", err);
+        setError("Failed to load benefit");
       } finally {
         setLoading(false);
       }
@@ -638,6 +752,46 @@ function Benefit() {
 
         {/* Benefit Details Section */}
         <BenefitDetailsSection benefit={benefit} />
+
+        {/* Raw MongoDB Data Section */}
+        {rawBenefit && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">
+              📊 Raw MongoDB Data
+            </h4>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p>
+                <strong>ID:</strong> {rawBenefit._id.$oid}
+              </p>
+              <p>
+                <strong>Source:</strong> {rawBenefit.sourceCollection}
+              </p>
+              <p>
+                <strong>Status:</strong> {rawBenefit.processingStatus}
+              </p>
+              <p>
+                <strong>Valid Until:</strong> {rawBenefit.validUntil}
+              </p>
+              {rawBenefit.link && (
+                <p>
+                  <strong>Website:</strong>{" "}
+                  <a
+                    href={
+                      rawBenefit.link.startsWith("http")
+                        ? rawBenefit.link
+                        : `https://${rawBenefit.link}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    {rawBenefit.link}
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ interface DayInfo {
 const DAYS: DayInfo[] = [
   { key: "monday", abbreviation: "L", name: "Lunes" },
   { key: "tuesday", abbreviation: "M", name: "Martes" },
-  { key: "wednesday", abbreviation: "X", name: "Miércoles" },
+  { key: "wednesday", abbreviation: "M", name: "Miércoles" },
   { key: "thursday", abbreviation: "J", name: "Jueves" },
   { key: "friday", abbreviation: "V", name: "Viernes" },
   { key: "saturday", abbreviation: "S", name: "Sábado" },

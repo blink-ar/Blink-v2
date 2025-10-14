@@ -1,142 +1,730 @@
-import { mockBusinesses } from "../data/mockData";
+// Removed mockBusinesses import - using only real MongoDB data
 import { Business, BankBenefit } from "../types";
+import {
+  Benefit,
+  MongoBenefitsResponse,
+  MongoCategoriesResponse,
+  MongoBanksResponse,
+  MongoStatsResponse,
+  transformRawBenefitToBenefit
+} from '../types/mongodb';
 
 declare global {
   // Extend the globalThis type to include allCategories
-  var allCategories: Set<string> | undefined;
+  let allCategories: Set<string> | undefined;
 }
 
-const API_BASE_URL =
-  "https://benefits-fetcher-5na20bs0n-andresimachs-projects.vercel.app";
+const BASE_URL = 'http://localhost:3002';
 
-interface BenefitResponse {
-  _id: { $oid: string };
-  id: string;
-  beneficios: Array<{
-    tipo?: string;
-    cuando?: string;
-    valor?: string;
-    cuota?: { $numberInt: string };
-    tope?: string;
-    claseDeBeneficio?: string;
-    casuistica?: { descripcion: string };
-    condicion?: string;
-    requisitos?: string[];
-    usos?: string[];
-    textoAplicacion?: string;
-  }>;
-  cabecera: string;
-  destacado: boolean;
-  details: {
-    beneficio: {
-      titulo: string;
-      rubros: { id: number; nombre: string }[];
-      subtitulo: string;
-      imagen: string;
-      vigencia: string;
-      subcabecera: string;
-      cabecera: string;
-    };
-  };
-}
+class BenefitsAPI {
+  async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
+    const queryParams = new URLSearchParams();
 
-interface AllBenefits {
-  [key: string]: BenefitResponse[];
-}
-
-export async function fetchBusinesses(): Promise<Business[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/benefits`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch business benefits");
-    }
-    const data: AllBenefits = await response.json();
-
-    console.log("📊 Raw API Response:", {
-      banks: Object.keys(data),
-      sampleBenefit: Object.values(data)[0]?.[25],
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value);
+      }
     });
 
-    // Transform the object of benefits into an array of businesses grouped by titulo
+    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+    console.log('🔍 MongoDB API Request:', {
+      url,
+      params,
+      timestamp: new Date().toISOString()
+    });
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error('❌ MongoDB API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url
+      });
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: MongoBenefitsResponse = await response.json();
+
+    console.log('📊 MongoDB API Raw Response:', {
+      success: data.success,
+      benefitsCount: data.benefits?.length || 0,
+      pagination: data.pagination,
+      filters: data.filters,
+      fullResponse: data
+    });
+
+    if (data.benefits && data.benefits.length > 0) {
+      console.log('🎯 Sample MongoDB Benefit:', {
+        firstBenefit: data.benefits[0],
+        benefitStructure: {
+          id: data.benefits[0]._id,
+          merchant: data.benefits[0].merchant,
+          bank: data.benefits[0].bank,
+          benefitTitle: data.benefits[0].benefitTitle,
+          discountPercentage: data.benefits[0].discountPercentage,
+          categories: data.benefits[0].categories,
+          location: data.benefits[0].location
+        }
+      });
+    } else {
+      console.warn('⚠️ No benefits found in MongoDB response');
+    }
+
+    // Transform raw MongoDB benefits to your preferred Benefit structure
+    const rawBenefits = data.benefits || [];
+    const transformedBenefits = rawBenefits.map(transformRawBenefitToBenefit);
+
+    console.log('🔄 Transformed benefits:', {
+      rawCount: rawBenefits.length,
+      transformedCount: transformedBenefits.length,
+      sampleTransformed: transformedBenefits[0]
+    });
+
+    return transformedBenefits;
+  }
+
+  async getBenefitsResponse(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value);
+      }
+    });
+
+    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async getBenefitById(id: string): Promise<Benefit | null> {
+    const response = await fetch(`${BASE_URL}/api/benefits/${id}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Handle structured response - extract benefit object if wrapped
+    let rawBenefit = data;
+    if (data && typeof data === 'object' && data.benefit) {
+      rawBenefit = data.benefit;
+    }
+
+    if (!rawBenefit) return null;
+
+    // Transform to your preferred Benefit structure
+    return transformRawBenefitToBenefit(rawBenefit);
+  }
+
+  async getNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
+    const queryParams = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      ...params
+    });
+
+    const response = await fetch(`${BASE_URL}/api/benefits/nearby?${queryParams.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: MongoBenefitsResponse = await response.json();
+
+    // Transform raw MongoDB benefits to your preferred Benefit structure
+    const rawBenefits = data.benefits || [];
+    return rawBenefits.map(transformRawBenefitToBenefit);
+  }
+
+  async getCategories(): Promise<string[]> {
+    const response = await fetch(`${BASE_URL}/api/categories`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data: MongoCategoriesResponse = await response.json();
+    return data.categories || [];
+  }
+
+  async getBanks(): Promise<string[]> {
+    const response = await fetch(`${BASE_URL}/api/banks`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data: MongoBanksResponse = await response.json();
+    return data.banks || [];
+  }
+
+  async getStats(): Promise<MongoStatsResponse> {
+    const response = await fetch(`${BASE_URL}/api/stats`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  }
+}
+
+const benefitsAPI = new BenefitsAPI();
+
+// New MongoDB-native functions
+export async function fetchBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
+  try {
+    console.log('🔍 fetchBenefits: Called with params (no limit applied):', params);
+
+    // Remove any limit restrictions - fetch all available benefits
+    const { ...filteredParams } = params;
+
+    // If no offset specified, start from the beginning
+    if (!filteredParams.offset) {
+      filteredParams.offset = '0';
+      console.log('🎯 fetchBenefits: No offset specified, starting from beginning');
+    }
+
+    const benefits = await benefitsAPI.getBenefits(filteredParams);
+    console.log('✅ fetchBenefits: Success, returned', benefits.length, 'benefits (no limit)');
+    return benefits;
+  } catch (error) {
+    console.error("❌ fetchBenefits: Failed to fetch benefits:", error);
+    console.warn("⚠️ fetchBenefits: Falling back to empty array");
+    return [];
+  }
+}
+
+// Function to get ALL benefits using pagination
+export async function fetchAllBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
+  try {
+    console.log('🔍 fetchAllBenefits: Starting to fetch ALL benefits using pagination...');
+
+    const allBenefits: Benefit[] = [];
+    let offset = 0;
+    const limit = 100; // Use larger chunks for efficiency
+    let hasMore = true;
+
+    while (hasMore) {
+      console.log(`📄 fetchAllBenefits: Fetching page at offset ${offset}...`);
+
+      const pageParams = {
+        ...params,
+        offset: offset.toString(),
+        limit: limit.toString()
+      };
+
+      const pageBenefits = await benefitsAPI.getBenefits(pageParams);
+
+      if (pageBenefits.length === 0 || pageBenefits.length < limit) {
+        hasMore = false;
+      }
+
+      allBenefits.push(...pageBenefits);
+      offset += pageBenefits.length;
+
+      console.log(`📊 fetchAllBenefits: Page complete. Total so far: ${allBenefits.length}`);
+
+      // Safety break to prevent infinite loops
+      if (offset > 10000) {
+        console.warn('⚠️ fetchAllBenefits: Safety limit reached, stopping at 10,000 benefits');
+        break;
+      }
+    }
+
+    console.log(`🎯 fetchAllBenefits: Complete! Total benefits: ${allBenefits.length}`);
+    return allBenefits;
+  } catch (error) {
+    console.error("❌ fetchAllBenefits: Failed to fetch all benefits:", error);
+    console.warn("⚠️ fetchAllBenefits: Falling back to regular fetch");
+    return fetchBenefits(params);
+  }
+}
+
+export async function fetchMongoBenefitsWithPagination(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
+  try {
+    return await benefitsAPI.getBenefitsResponse(params);
+  } catch (error) {
+    console.warn("Failed to fetch MongoDB benefits response:", error);
+    return {
+      success: false,
+      benefits: [],
+      pagination: { total: 0, limit: 50, offset: 0, hasMore: false },
+      filters: {}
+    };
+  }
+}
+
+export async function fetchMongoBenefitById(id: string): Promise<Benefit | null> {
+  try {
+    return await benefitsAPI.getBenefitById(id);
+  } catch (error) {
+    console.error("Failed to fetch MongoDB benefit by ID:", error);
+    return null;
+  }
+}
+
+export async function fetchMongoNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
+  try {
+    return await benefitsAPI.getNearbyBenefits(lat, lng, params);
+  } catch (error) {
+    console.error("Failed to fetch nearby MongoDB benefits:", error);
+    return [];
+  }
+}
+
+export async function fetchMongoCategories(): Promise<string[]> {
+  try {
+    return await benefitsAPI.getCategories();
+  } catch (error) {
+    console.error("Failed to fetch MongoDB categories:", error);
+    return [];
+  }
+}
+
+export async function fetchMongoBanks(): Promise<string[]> {
+  try {
+    return await benefitsAPI.getBanks();
+  } catch (error) {
+    console.error("Failed to fetch MongoDB banks:", error);
+    return [];
+  }
+}
+
+export async function fetchMongoStats(): Promise<MongoStatsResponse> {
+  try {
+    return await benefitsAPI.getStats();
+  } catch (error) {
+    console.error("Failed to fetch MongoDB stats:", error);
+    return {
+      success: false,
+      stats: {
+        totalBenefits: 0,
+        totalMerchants: 0,
+        totalBanks: 0,
+        totalCategories: 0
+      }
+    };
+  }
+}
+
+// Legacy function - converts your new Benefit type to old Business format for backward compatibility
+
+export async function fetchBusinesses(options: {
+  limit?: number;
+  offset?: number;
+  fetchAll?: boolean;
+  filters?: Record<string, string>
+} = {}): Promise<Business[]> {
+  try {
+    console.log('🚀 fetchBusinesses: Starting to fetch from MongoDB API...', options);
+
+    let benefits: Benefit[];
+
+    if (options.fetchAll) {
+      console.log('📚 fetchBusinesses: Fetching ALL benefits using pagination...');
+      benefits = await fetchAllBenefits(options.filters || {});
+    } else {
+      const offset = options.offset || 0;
+      const limit = options.limit || 50; // Default limit for pagination
+      console.log(`📊 fetchBusinesses: Fetching benefits with offset=${offset}, limit=${limit}...`);
+
+      const params: Record<string, string> = {
+        offset: offset.toString(),
+        limit: limit.toString(),
+        ...options.filters || {}
+      };
+
+      benefits = await benefitsAPI.getBenefits(params);
+    }
+
+    console.log("📊 fetchBusinesses: Benefits Retrieved:", {
+      benefitsCount: benefits.length,
+      sampleBenefit: benefits[0],
+      allBenefitIds: benefits.map(b => b.id),
+      merchantNames: benefits.map(b => b.merchant.name),
+      banks: [...new Set(benefits.map(b => b.bank))],
+      categories: [...new Set(benefits.flatMap(b => b.categories))]
+    });
+
+    if (benefits.length === 0) {
+      console.warn("⚠️ fetchBusinesses: No benefits found in MongoDB API response");
+      return []; // Return empty array instead of mock data
+    }
+
+    // Group benefits by merchant name
+    console.log('🔄 fetchBusinesses: Starting transformation to Business format...');
     const businessMap = new Map<string, Business>();
 
-    // Iterate through each bank's benefits
-    Object.entries(data).forEach(([bankKey, benefits]) => {
-      benefits.forEach((benefit) => {
-        const titulo = benefit.details.beneficio.titulo;
-        const category = benefit.details.beneficio.rubros;
-        const description = benefit.cabecera || "No description available";
-        const bankName = bankKey.replace(/_GO$/, "").replace(/_/g, " ");
+    benefits.forEach((benefit, index) => {
+      const businessName = benefit.merchant.name;
 
-        if (!businessMap.has(titulo)) {
-          businessMap.set(titulo, {
-            id: titulo,
-            name: titulo,
-            category: category[0]?.nombre || "otros",
-            description: description,
-            rating: 5,
-            location: "Multiple locations",
-            image:
-              benefit.details.beneficio.imagen ||
-              "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400",
-            benefits: [],
-          });
-        }
+      console.log(`🏪 Processing benefit ${index + 1}/${benefits.length}:`, {
+        businessName,
+        bank: benefit.bank,
+        benefitTitle: benefit.benefitTitle,
+        discountPercentage: benefit.discountPercentage,
+        categories: benefit.categories,
+        cardTypes: benefit.cardTypes.map(ct => ct.name)
+      });
 
-        // Add this bank's benefit to the business
-        const business = businessMap.get(titulo)!;
-        const firstBenefit = benefit.beneficios[0];
-        const rewardRate = firstBenefit?.valor || "N/A";
-        const benefitDescription =
-          firstBenefit?.casuistica?.descripcion ||
-          benefit.details.beneficio.subtitulo ||
-          "";
+      if (!businessMap.has(businessName)) {
+        console.log(`✨ Creating new business: ${businessName}`);
 
-        // Extract all fields from beneficios array, handling missing or empty values
+        // Create a new business from the benefit
+        const business: Business = {
+          id: businessName.toLowerCase().replace(/\s+/g, '-'), // Use merchant name as ID
+          name: businessName,
+          category: benefit.categories[0] || 'otros',
+          description: benefit.description,
+          rating: 5,
+          location: benefit.locations[0]?.formattedAddress || 'Multiple locations',
+          image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
+          benefits: []
+        };
+
+        // Create the bank benefit
         const bankBenefit: BankBenefit = {
-          bankName: bankName,
-          cardName: "Credit Card",
-          benefit: benefitDescription,
-          rewardRate: rewardRate,
-          color: "bg-blue-500",
-          icon: "CreditCard",
-          // Extract all new fields from the first beneficio, with fallbacks
-          tipo: firstBenefit?.tipo || undefined,
-          cuando: firstBenefit?.cuando || undefined,
-          valor: firstBenefit?.valor || undefined,
-          tope: firstBenefit?.tope || undefined,
-          claseDeBeneficio: firstBenefit?.claseDeBeneficio || undefined,
-          condicion: firstBenefit?.condicion || undefined,
-          requisitos: firstBenefit?.requisitos && firstBenefit.requisitos.length > 0
-            ? firstBenefit.requisitos.filter(req => req && req.trim() !== '')
-            : undefined,
-          usos: firstBenefit?.usos && firstBenefit.usos.length > 0
-            ? firstBenefit.usos.filter(uso => uso && uso.trim() !== '')
-            : undefined,
-          textoAplicacion: firstBenefit?.textoAplicacion || undefined,
+          bankName: benefit.bank,
+          cardName: benefit.cardTypes[0]?.name || 'Credit Card',
+          benefit: benefit.benefitTitle,
+          rewardRate: `${benefit.discountPercentage || 0}%`,
+          color: 'bg-blue-500',
+          icon: 'CreditCard',
+          tipo: 'descuento',
+          cuando: benefit.availableDays.join(', '),
+          valor: `${benefit.discountPercentage || 0}%`,
+          condicion: benefit.termsAndConditions || undefined,
+          requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
+          usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
+          textoAplicacion: benefit.link || undefined
         };
 
         business.benefits.push(bankBenefit);
-      });
+        businessMap.set(businessName, business);
+
+        console.log(`📝 Created business:`, {
+          id: business.id,
+          name: business.name,
+          category: business.category,
+          location: business.location,
+          benefitsCount: business.benefits.length
+        });
+      } else {
+        console.log(`➕ Adding benefit to existing business: ${businessName}`);
+        // Add additional benefit to existing business
+        const business = businessMap.get(businessName)!;
+        const bankBenefit: BankBenefit = {
+          bankName: benefit.bank,
+          cardName: benefit.cardTypes[0]?.name || 'Credit Card',
+          benefit: benefit.benefitTitle,
+          rewardRate: `${benefit.discountPercentage || 0}%`,
+          color: 'bg-blue-500',
+          icon: 'CreditCard',
+          tipo: 'descuento',
+          cuando: benefit.availableDays.join(', '),
+          valor: `${benefit.discountPercentage || 0}%`,
+          condicion: benefit.termsAndConditions || undefined,
+          requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
+          usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
+          textoAplicacion: benefit.link || undefined
+        };
+        business.benefits.push(bankBenefit);
+
+        console.log(`📈 Business now has ${business.benefits.length} benefits`);
+      }
     });
 
     const businesses = Array.from(businessMap.values());
 
-    console.log("🎯 Transformed Businesses:", {
+    console.log('🎯 fetchBusinesses: Transformation complete:', {
+      totalBenefits: benefits.length,
+      uniqueBusinesses: businesses.length,
+      businessNames: businesses.map(b => b.name),
+      totalBenefitsInBusinesses: businesses.reduce((sum, b) => sum + b.benefits.length, 0)
+    });
+
+    console.log("🎯 Transformed Businesses from MongoDB:", {
       count: businesses.length,
       sample: businesses[0],
     });
 
-    if (businesses.length === 0) {
-      console.warn(
-        "No businesses found in API response, falling back to mock data"
-      );
-      return mockBusinesses;
-    }
-
     return businesses;
   } catch (error) {
-    console.warn("Failed to fetch from API, falling back to mock data:", error);
-    return mockBusinesses;
+    console.error("❌ Failed to fetch from MongoDB API:", error);
+    return []; // Return empty array instead of mock data
   }
+}
+
+// Get a specific benefit by ID
+export async function fetchBenefitById(id: string) {
+  try {
+    return await benefitsAPI.getBenefitById(id);
+  } catch (error) {
+    console.error("Failed to fetch benefit by ID:", error);
+    throw error;
+  }
+}
+
+// Get nearby benefits based on location
+export async function fetchNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}) {
+  try {
+    return await benefitsAPI.getNearbyBenefits(lat, lng, params);
+  } catch (error) {
+    console.error("Failed to fetch nearby benefits:", error);
+    throw error;
+  }
+}
+
+// Get available categories
+export async function fetchCategories() {
+  try {
+    return await benefitsAPI.getCategories();
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    return [];
+  }
+}
+
+// Get available banks
+export async function fetchBanks() {
+  try {
+    return await benefitsAPI.getBanks();
+  } catch (error) {
+    console.error("Failed to fetch banks:", error);
+    return [];
+  }
+}
+
+// Get statistics
+export async function fetchStats() {
+  try {
+    return await benefitsAPI.getStats();
+  } catch (error) {
+    console.error("Failed to fetch stats:", error);
+    return {};
+  }
+}
+
+
+
+// Convenience functions for common use cases
+export async function fetchAllBusinesses(): Promise<Business[]> {
+  console.log('🌍 fetchAllBusinesses: Fetching ALL businesses...');
+  return fetchBusinesses({ fetchAll: true });
+}
+
+export async function fetchBusinessesWithLimit(limit: number, offset?: number): Promise<Business[]> {
+  console.log(`📊 fetchBusinessesWithLimit: Fetching up to ${limit} businesses${offset ? ` starting from ${offset}` : ''}...`);
+  return fetchBusinesses({ limit, offset });
+}
+
+export async function fetchBusinessesFrom1000(): Promise<Business[]> {
+  console.log('🎯 fetchBusinessesFrom1000: Fetching benefits starting from #1000 (no limit)...');
+  return fetchBusinesses({ offset: 1000 });
+}
+
+export async function fetchBusinessesFromStart(): Promise<Business[]> {
+  console.log('🏁 fetchBusinessesFromStart: Fetching benefits from the beginning (offset 0, no limit)...');
+  return fetchBusinesses({ offset: 0 });
+}
+
+export async function fetchBusinessesRange(offset: number, limit: number): Promise<Business[]> {
+  console.log(`📊 fetchBusinessesRange: Fetching ${limit} benefits starting from #${offset}...`);
+  return fetchBusinesses({ offset, limit });
+}
+
+export async function fetchBusinessesByCategory(category: string, limit?: number): Promise<Business[]> {
+  console.log(`🏷️ fetchBusinessesByCategory: Fetching businesses in category '${category}' (no default limit)...`);
+  return fetchBusinesses({
+    filters: { category },
+    ...(limit && { limit })
+  });
+}
+
+export async function fetchBusinessesByBank(bank: string, limit?: number): Promise<Business[]> {
+  console.log(`🏦 fetchBusinessesByBank: Fetching businesses for bank '${bank}' (no default limit)...`);
+  return fetchBusinesses({
+    filters: { bank },
+    ...(limit && { limit })
+  });
+}
+
+// ===== NEW MAIN API FUNCTIONS (using your preferred Benefit type) =====
+
+/**
+ * Main function to get benefits in your preferred format
+ * This is the recommended function to use going forward
+ */
+export async function getBenefits(options: {
+  limit?: number;
+  offset?: number;
+  fetchAll?: boolean;
+  filters?: Record<string, string>;
+} = {}): Promise<Benefit[]> {
+  try {
+    console.log('🚀 getBenefits: Starting to fetch benefits...', options);
+
+    if (options.fetchAll) {
+      console.log('📚 getBenefits: Fetching ALL benefits using pagination...');
+      return await fetchAllBenefits(options.filters || {});
+    } else {
+      const offset = options.offset || 0;
+      console.log(`📊 getBenefits: Fetching benefits starting from offset ${offset} (no limit)...`);
+
+      const params: Record<string, string> = {
+        offset: offset.toString(),
+        ...options.filters || {}
+      };
+
+      // Only add limit if explicitly specified
+      if (options.limit) {
+        params.limit = options.limit.toString();
+      }
+
+      return await fetchBenefits(params);
+    }
+  } catch (error) {
+    console.warn("Failed to fetch benefits:", error);
+    return [];
+  }
+}
+
+/**
+ * Get a specific benefit by ID
+ */
+export async function getBenefitById(id: string): Promise<Benefit | null> {
+  try {
+    return await benefitsAPI.getBenefitById(id);
+  } catch (error) {
+    console.error("Failed to fetch benefit by ID:", error);
+    return null;
+  }
+}
+
+/**
+ * Get nearby benefits
+ */
+export async function getNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
+  try {
+    return await benefitsAPI.getNearbyBenefits(lat, lng, params);
+  } catch (error) {
+    console.error("Failed to fetch nearby benefits:", error);
+    return [];
+  }
+}
+
+/**
+ * Convenience functions for common use cases
+ */
+export async function getAllBenefits(): Promise<Benefit[]> {
+  console.log('🌍 getAllBenefits: Fetching ALL benefits...');
+  return getBenefits({ fetchAll: true });
+}
+
+export async function getBenefitsWithLimit(limit: number, offset?: number): Promise<Benefit[]> {
+  console.log(`📊 getBenefitsWithLimit: Fetching up to ${limit} benefits${offset ? ` starting from ${offset}` : ''}...`);
+  return getBenefits({ limit, offset });
+}
+
+export async function getBenefitsFrom1000(): Promise<Benefit[]> {
+  console.log('🎯 getBenefitsFrom1000: Fetching benefits starting from #1000 (no limit)...');
+  return getBenefits({ offset: 1000 });
+}
+
+export async function getBenefitsFromStart(): Promise<Benefit[]> {
+  console.log('🏁 getBenefitsFromStart: Fetching benefits from the beginning (offset 0, no limit)...');
+  return getBenefits({ offset: 0 });
+}
+
+export async function getBenefitsRange(offset: number, limit: number): Promise<Benefit[]> {
+  console.log(`📊 getBenefitsRange: Fetching ${limit} benefits starting from #${offset}...`);
+  return getBenefits({ offset, limit });
+}
+
+export async function getBenefitsByCategory(category: string, limit?: number): Promise<Benefit[]> {
+  console.log(`🏷️ getBenefitsByCategory: Fetching benefits in category '${category}' (no default limit)...`);
+  return getBenefits({
+    filters: { category },
+    ...(limit && { limit })
+  });
+}
+
+export async function getBenefitsByBank(bank: string, limit?: number): Promise<Benefit[]> {
+  console.log(`🏦 getBenefitsByBank: Fetching benefits for bank '${bank}' (no default limit)...`);
+  return getBenefits({
+    filters: { bank },
+    ...(limit && { limit })
+  });
+}
+
+// Export the benefits API instance for direct use if needed
+export { benefitsAPI };
+
+// Function to get ALL benefits efficiently using total count
+export async function fetchAllBenefitsEfficient(params: Record<string, string> = {}): Promise<Benefit[]> {
+  try {
+    console.log('🚀 fetchAllBenefitsEfficient: Starting efficient fetch of ALL benefits...');
+
+    // First, get the total count from stats
+    const stats = await fetchMongoStats();
+    const totalBenefits = stats.stats?.totalBenefits || 0;
+
+    if (totalBenefits === 0) {
+      console.log('📊 No benefits found in stats');
+      return [];
+    }
+
+    console.log(`📊 Total benefits available: ${totalBenefits}`);
+
+    const allBenefits: Benefit[] = [];
+    const limit = 200; // Use larger chunks for better performance
+    const totalPages = Math.ceil(totalBenefits / limit);
+
+    console.log(`📄 Will fetch ${totalPages} pages with ${limit} benefits each`);
+
+    // Fetch all pages
+    for (let page = 0; page < totalPages; page++) {
+      const offset = page * limit;
+      console.log(`📄 Fetching page ${page + 1}/${totalPages} (offset: ${offset})...`);
+
+      const pageParams = {
+        ...params,
+        offset: offset.toString(),
+        limit: limit.toString()
+      };
+
+      try {
+        const pageBenefits = await benefitsAPI.getBenefits(pageParams);
+        allBenefits.push(...pageBenefits);
+
+        console.log(`✅ Page ${page + 1} complete: ${pageBenefits.length} benefits (Total: ${allBenefits.length})`);
+
+        // If we got fewer benefits than expected, we've reached the end
+        if (pageBenefits.length < limit) {
+          console.log('🏁 Reached end of data early');
+          break;
+        }
+      } catch (pageError) {
+        console.error(`❌ Error fetching page ${page + 1}:`, pageError);
+        // Continue with next page instead of failing completely
+        continue;
+      }
+    }
+
+    console.log(`🎯 fetchAllBenefitsEfficient: Complete! Fetched ${allBenefits.length}/${totalBenefits} benefits`);
+    return allBenefits;
+  } catch (error) {
+    console.error("❌ fetchAllBenefitsEfficient: Failed to fetch all benefits:", error);
+    console.warn("⚠️ fetchAllBenefitsEfficient: Falling back to regular pagination method");
+    return fetchAllBenefits(params);
+  }
+}
+
+// Function to get ALL businesses (using all benefits)
+export async function fetchAllBusinessesComplete(): Promise<Business[]> {
+  console.log('🌍 fetchAllBusinessesComplete: Fetching ALL businesses from ALL benefits...');
+  return fetchBusinesses({ fetchAll: true });
 }

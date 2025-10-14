@@ -8,16 +8,22 @@ interface ResponsiveBusinessGridProps {
   businesses: Business[];
   onBenefitClick?: (businessId: string, benefitIndex: number) => void;
   isLoading?: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
   variant?: "default" | "compact" | "featured";
+  setLoadingRef?: (node: HTMLDivElement | null) => void;
 }
 
 export const ResponsiveBusinessGrid: React.FC<ResponsiveBusinessGridProps> = ({
   businesses,
   onBenefitClick,
   isLoading = false,
+  isLoadingMore = false,
+  hasMore = true,
   variant = "default",
+  setLoadingRef,
 }) => {
-  const { isDesktop, isTablet } = useResponsive();
+  const { isDesktop } = useResponsive();
 
   // Auto-select variant based on screen size if default is specified
   const effectiveVariant =
@@ -72,27 +78,64 @@ export const ResponsiveBusinessGrid: React.FC<ResponsiveBusinessGridProps> = ({
       <div className="text-center py-12">
         <div className="text-gray-400 text-6xl mb-4">🏪</div>
         <h3 className="text-lg font-medium text-gray-900 mb-2">
-          No businesses found
+          No benefits found
         </h3>
         <p className="text-gray-500">
-          Try adjusting your search or filter criteria.
+          No benefits available from your MongoDB API. Try adjusting your search
+          or check if your API is running on port 3002.
         </p>
       </div>
     );
   }
 
   return (
-    <Grid cols={config.cols} gap={config.gap}>
-      {businesses.map((business) => (
-        <BusinessCard
-          key={business.id}
-          business={business}
-          variant={effectiveVariant}
-          onBenefitClick={(benefitIndex) =>
-            onBenefitClick && onBenefitClick(business.id, benefitIndex)
-          }
-        />
-      ))}
-    </Grid>
+    <div>
+      <Grid cols={config.cols} gap={config.gap}>
+        {businesses.map((business) => (
+          <BusinessCard
+            key={business.id}
+            business={business}
+            variant={effectiveVariant}
+            onBenefitClick={(benefitIndex) =>
+              onBenefitClick && onBenefitClick(business.id, benefitIndex)
+            }
+          />
+        ))}
+      </Grid>
+
+      {/* Loading More Indicator */}
+      {isLoadingMore && (
+        <div className="flex justify-center items-center py-8">
+          <div className="flex items-center space-x-2 text-gray-500">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span>Loading more benefits...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Infinite Scroll Trigger */}
+      {hasMore && !isLoading && setLoadingRef && (
+        <div
+          ref={setLoadingRef}
+          className="h-10 flex justify-center items-center"
+        >
+          {!isLoadingMore && (
+            <div className="text-gray-400 text-sm">
+              Scroll for more benefits
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* End of Results */}
+      {!hasMore && businesses.length > 0 && (
+        <div className="text-center py-8">
+          <div className="text-gray-400 text-4xl mb-2">🎉</div>
+          <p className="text-gray-500">
+            You've seen all {businesses.length} benefits!
+          </p>
+        </div>
+      )}
+    </div>
   );
 };
