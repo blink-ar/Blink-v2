@@ -1,0 +1,408 @@
+/* Featured Benefit Card Styles */
+.featured-benefit-card {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: #fff;
+}
+
+.featured-benefit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.featured-benefit-card:focus {
+  outline: 2px solid #007AFF;
+  outline-offset: 2px;
+}
+
+/* Background and gradient */
+.featured-benefit-card__background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, var(--primary-color, #007AFF) 0%, var(--secondary-color, #5856D6) 100%);
+}
+
+.featured-benefit-card__gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+/* Content container */
+.featured-benefit-card__content {
+  position: relative;
+  z-index: 2;
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: white;
+}
+
+/* Header section */
+.featured-benefit-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.featured-benefit-card__bank-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.featured-benefit-card__bank-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.featured-benefit-card__bank-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.featured-benefit-card__bank-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.featured-benefit-card__bank-name {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.featured-benefit-card__card-name {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Discount badge */
+.featured-benefit-card__discount-badge {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.featured-benefit-card__discount-percentage {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.featured-benefit-card__discount-text {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
+}
+
+/* Main content */
+.featured-benefit-card__main {
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+.featured-benefit-card__title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 8px 0;
+  color: white;
+}
+
+.featured-benefit-card__business {
+  font-size: 14px;
+  opacity: 0.8;
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.featured-benefit-card__value {
+  font-size: 13px;
+  opacity: 0.7;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Footer section */
+.featured-benefit-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.featured-benefit-card__availability,
+.featured-benefit-card__reward-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  border-radius: 20px;
+  backdrop-filter: blur(5px);
+}
+
+.featured-benefit-card__icon {
+  opacity: 0.8;
+}
+
+.featured-benefit-card__cta {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.featured-benefit-card:hover .featured-benefit-card__cta {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(2px);
+}
+
+.featured-benefit-card__arrow {
+  opacity: 0.9;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .featured-benefit-card {
+    min-height: 180px;
+  }
+  
+  .featured-benefit-card__content {
+    padding: 16px;
+  }
+  
+  .featured-benefit-card__title {
+    font-size: 16px;
+  }
+  
+  .featured-benefit-card__discount-badge {
+    padding: 6px 10px;
+    min-width: 50px;
+  }
+  
+  .featured-benefit-card__discount-percentage {
+    font-size: 18px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .featured-benefit-card {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  .featured-benefit-card:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .featured-benefit-card,
+  .featured-benefit-card__cta {
+    transition: none;
+  }
+  
+  .featured-benefit-card:hover {
+    transform: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .featured-benefit-card__background {
+    background: #000;
+  }
+  
+  .featured-benefit-card__content {
+    color: #fff;
+  }
+  
+  .featured-benefit-card__gradient {
+    display: none;
+  }
+}
+/
+* Featured Benefits Section Styles */
+.featured-benefits {
+  padding: 20px 16px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.featured-benefits__header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.featured-benefits__header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.featured-benefits__icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.featured-benefits__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.featured-benefits__subtitle {
+  font-size: 14px;
+  color: #666;
+  margin: 4px 0 0 0;
+}
+
+.featured-benefits__view-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #007AFF;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.featured-benefits__view-all:hover {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.featured-benefits__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.featured-benefits__card-wrapper {
+  animation: fadeInUp 0.6s ease forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.featured-benefits__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.featured-benefits__empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.featured-benefits__empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.featured-benefits__empty-text {
+  font-size: 14px;
+  margin: 0;
+}
+
+.featured-benefits__footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
+}
+
+.featured-benefits__expiration {
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+/* Responsive design for featured benefits */
+@media (min-width: 768px) {
+  .featured-benefits {
+    padding: 24px 20px;
+  }
+  
+  .featured-benefits__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  
+  .featured-benefits__title {
+    font-size: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .featured-benefits__cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

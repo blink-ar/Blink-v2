@@ -32,6 +32,7 @@ export interface Business {
   isFavorite?: boolean;
   lastUpdated?: number;
   imageLoaded?: boolean;
+  distance?: number; // Distance in kilometers
 }
 
 export type Category =

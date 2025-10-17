@@ -5,7 +5,6 @@ import { RawBenefit } from "../types/benefit";
 import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
 import { fetchBusinesses } from "../services/api";
 import {
-  ArrowLeft,
   DollarSign,
   AlertCircle,
   CheckCircle,
@@ -13,16 +12,24 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
+import StoreHeader from "../components/StoreHeader";
+import BenefitsFilter from "../components/BenefitsFilter";
+import ModernBenefitCard from "../components/ModernBenefitCard";
+import StoreInformation from "../components/StoreInformation";
 import {
   formatValue,
   processArrayField,
   processTextField,
   hasValidContent,
-  formatBenefitType,
   formatUsageType,
 } from "../utils/benefitFormatters";
 import { Logger } from "../services/base/Logger";
 import { DaysOfWeek } from "../components/ui/DaysOfWeek";
+import {
+  SkipToContent,
+  LoadingAnnouncement,
+  ErrorAnnouncement,
+} from "../components/ui";
 
 const logger = Logger.getInstance().createServiceLogger("BenefitPage");
 
@@ -436,6 +443,12 @@ function Benefit() {
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<
+    "all" | "active" | "upcoming" | "expired"
+  >("all");
+  const [showDetailedView, setShowDetailedView] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -530,8 +543,8 @@ function Benefit() {
         // Last resort: try to find by MongoDB ObjectId in raw benefits
         console.log("🔍 Last resort: searching in all raw benefits...");
         const allRawBenefits = await getRawBenefits({
-          limit: "1000",
-          offset: "0",
+          limit: 1000,
+          offset: 0,
         });
         console.log("📊 Got", allRawBenefits.length, "raw benefits");
 
@@ -611,188 +624,164 @@ function Benefit() {
     load();
   }, [id, benefitIndex]);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading)
+    return (
+      <LoadingSpinner
+        message="Cargando información de la tienda..."
+        type="dots"
+      />
+    );
   if (error) return <div className="text-center text-red-500">{error}</div>;
   if (!business || !benefit) return null;
 
+  const handleFavoriteToggle = () => {
+    setIsFavorite(!isFavorite);
+    // In a real app, this would update the favorite status in the backend
+  };
+
+  const handleFilterToggle = () => {
+    setIsFilterOpen(!isFilterOpen);
+  };
+
+  const handleFilterSelect = (
+    filter: "all" | "active" | "upcoming" | "expired"
+  ) => {
+    setSelectedFilter(filter);
+  };
+
+  const handleBenefitSelect = () => {
+    setShowDetailedView(true);
+  };
+
+  // Calculate counts for the filter
+  const totalBenefits = business.benefits.length;
+  const activeOffers = business.benefits.filter((b) => b.rewardRate).length; // Mock logic
+
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
-      <button
-        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4"
-        onClick={() => navigate(-1)}
-        aria-label="Go back"
-      >
-        <ArrowLeft className="h-5 w-5" />
-        <span className="font-medium">Back</span>
-      </button>
-      <h2 className="text-2xl font-bold mb-4">
-        {business.name} - {benefit.cardName}
-      </h2>
-      <img
-        src={business.image}
-        alt={business.name}
-        className="w-full h-48 object-cover rounded-xl mb-4"
+    <div className="min-h-screen bg-gray-50 safe-area-inset">
+      <SkipToContent targetId="store-content" />
+      <LoadingAnnouncement
+        isLoading={loading}
+        message="Cargando información de la tienda"
       />
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        {/* Main Benefit Information */}
-        <SafeBenefitSection
-          sectionName="Main Benefit Information"
-          fallback={
-            <div className="border-b border-gray-200 pb-6 mb-6">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-red-600">
-                  <AlertTriangle className="h-5 w-5" />
-                  <span className="text-sm">
-                    Unable to display main benefit information
-                  </span>
-                </div>
-              </div>
-            </div>
-          }
-        >
-          <div className="border-b border-gray-200 pb-6 mb-6">
-            <h3 className="text-xl font-semibold mb-3 text-gray-900">
-              {(() => {
-                try {
-                  const bankName =
-                    typeof benefit.bankName === "string"
-                      ? benefit.bankName
-                      : "Unknown Bank";
-                  const cardName =
-                    typeof benefit.cardName === "string"
-                      ? benefit.cardName
-                      : "Unknown Card";
-                  return `${bankName} ${cardName}`;
-                } catch (error) {
-                  logger.error(
-                    "Error displaying bank/card name",
-                    error as Error,
-                    { benefit }
-                  );
-                  return "Benefit Information";
-                }
-              })()}
-            </h3>
-            <p className="text-gray-700 mb-4 leading-relaxed">
-              {(() => {
-                try {
-                  const benefitText =
-                    typeof benefit.benefit === "string"
-                      ? benefit.benefit
-                      : "Benefit description not available";
-                  return benefitText || "Benefit description not available";
-                } catch (error) {
-                  logger.error(
-                    "Error displaying benefit description",
-                    error as Error,
-                    { benefit }
-                  );
-                  return "Benefit description not available";
-                }
-              })()}
-            </p>
-            <div className="flex items-center gap-3 mb-4">
-              {(() => {
-                try {
-                  const rewardRate =
-                    typeof benefit.rewardRate === "string"
-                      ? benefit.rewardRate
-                      : "Rate not available";
-                  const tipo =
-                    typeof benefit.tipo === "string" ? benefit.tipo : null;
-                  const claseDeBeneficio =
-                    typeof benefit.claseDeBeneficio === "string"
-                      ? benefit.claseDeBeneficio
-                      : null;
+      <ErrorAnnouncement error={error} />
 
-                  return (
-                    <>
-                      <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-                        {rewardRate || "Rate not available"}
-                      </div>
-                      {/* Benefit Type and Class badges */}
-                      {tipo && (
-                        <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                          {formatBenefitType(tipo)}
-                        </span>
-                      )}
-                      {claseDeBeneficio && (
-                        <span className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
-                          {formatBenefitType(claseDeBeneficio)}
-                        </span>
-                      )}
-                    </>
-                  );
-                } catch (error) {
-                  logger.error(
-                    "Error displaying benefit badges",
-                    error as Error,
-                    { benefit }
-                  );
-                  return (
-                    <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm">
-                      Benefit details unavailable
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </div>
-        </SafeBenefitSection>
+      {/* Store Header */}
+      <StoreHeader
+        business={business}
+        onBack={() => navigate(-1)}
+        onFavoriteToggle={handleFavoriteToggle}
+        isFavorite={isFavorite}
+        benefitsCount={totalBenefits}
+        activeOffersCount={activeOffers}
+      />
 
-        {/* Business Description */}
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-3">
-            About {business.name}
-          </h4>
-          <p className="text-gray-600 leading-relaxed">
-            {business.description}
-          </p>
+      <main
+        id="store-content"
+        role="main"
+        aria-label="Información de la tienda y beneficios"
+      >
+        {/* Benefits Filter Section */}
+        <BenefitsFilter
+          totalBenefits={totalBenefits}
+          activeOffers={activeOffers}
+          onFilterToggle={handleFilterToggle}
+          isFilterOpen={isFilterOpen}
+          selectedFilter={selectedFilter}
+          onFilterSelect={handleFilterSelect}
+        />
+
+        {/* Benefits List */}
+        <div className="px-6 py-4 space-y-4">
+          {business.benefits.map((benefitItem, index) => (
+            <ModernBenefitCard
+              key={index}
+              benefit={benefitItem}
+              onSelect={handleBenefitSelect}
+              variant={index === 0 ? "featured" : "active"} // Mock logic for variants
+            />
+          ))}
         </div>
 
-        {/* Benefit Details Section */}
-        <BenefitDetailsSection benefit={benefit} />
+        {/* Store Information Section */}
+        <StoreInformation
+          business={business}
+          onCallClick={() => {
+            // Handle call action
+            console.log("Call clicked");
+          }}
+          onDirectionsClick={() => {
+            // Handle directions action
+            console.log("Directions clicked");
+          }}
+        />
 
-        {/* Raw MongoDB Data Section */}
-        {rawBenefit && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">
-              📊 Raw MongoDB Data
-            </h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p>
-                <strong>ID:</strong> {rawBenefit._id.$oid}
-              </p>
-              <p>
-                <strong>Source:</strong> {rawBenefit.sourceCollection}
-              </p>
-              <p>
-                <strong>Status:</strong> {rawBenefit.processingStatus}
-              </p>
-              <p>
-                <strong>Valid Until:</strong> {rawBenefit.validUntil}
-              </p>
-              {rawBenefit.link && (
-                <p>
-                  <strong>Website:</strong>{" "}
-                  <a
-                    href={
-                      rawBenefit.link.startsWith("http")
-                        ? rawBenefit.link
-                        : `https://${rawBenefit.link}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
+        {/* Detailed Benefit View Modal/Overlay */}
+        {showDetailedView && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+            <div className="bg-white w-full max-h-[80vh] overflow-y-auto rounded-t-xl">
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Detalles del beneficio
+                  </h3>
+                  <button
+                    onClick={() => setShowDetailedView(false)}
+                    className="text-gray-500 hover:text-gray-700"
                   >
-                    {rawBenefit.link}
-                  </a>
-                </p>
-              )}
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Original detailed benefit information */}
+                <BenefitDetailsSection benefit={benefit} />
+
+                {/* Raw MongoDB Data Section */}
+                {rawBenefit && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      📊 Raw MongoDB Data
+                    </h4>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <strong>ID:</strong> {rawBenefit._id.$oid}
+                      </p>
+                      <p>
+                        <strong>Source:</strong> {rawBenefit.sourceCollection}
+                      </p>
+                      <p>
+                        <strong>Status:</strong> {rawBenefit.processingStatus}
+                      </p>
+                      <p>
+                        <strong>Valid Until:</strong> {rawBenefit.validUntil}
+                      </p>
+                      {rawBenefit.link && (
+                        <p>
+                          <strong>Website:</strong>{" "}
+                          <a
+                            href={
+                              rawBenefit.link.startsWith("http")
+                                ? rawBenefit.link
+                                : `https://${rawBenefit.link}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            {rawBenefit.link}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

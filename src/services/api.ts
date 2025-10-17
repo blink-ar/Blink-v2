@@ -2,6 +2,7 @@
 import { Business, BankBenefit } from "../types";
 import {
   Benefit,
+  RawMongoBenefit,
   MongoBenefitsResponse,
   MongoCategoriesResponse,
   MongoBanksResponse,
@@ -56,18 +57,7 @@ class BenefitsAPI {
     });
 
     if (data.benefits && data.benefits.length > 0) {
-      console.log('🎯 Sample MongoDB Benefit:', {
-        firstBenefit: data.benefits[0],
-        benefitStructure: {
-          id: data.benefits[0]._id,
-          merchant: data.benefits[0].merchant,
-          bank: data.benefits[0].bank,
-          benefitTitle: data.benefits[0].benefitTitle,
-          discountPercentage: data.benefits[0].discountPercentage,
-          categories: data.benefits[0].categories,
-          location: data.benefits[0].location
-        }
-      });
+      console.log('🎯 Sample MongoDB Benefit (exact data.benefits[0]):', data.benefits[0]);
     } else {
       console.warn('⚠️ No benefits found in MongoDB response');
     }
@@ -83,6 +73,47 @@ class BenefitsAPI {
     });
 
     return transformedBenefits;
+  }
+
+  async getRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value);
+      }
+    });
+
+    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+    console.log('🔍 MongoDB API Request (Raw):', {
+      url,
+      params,
+      timestamp: new Date().toISOString()
+    });
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error('❌ MongoDB API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url
+      });
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: MongoBenefitsResponse = await response.json();
+
+    console.log('📊 MongoDB API Raw Response (keeping original format):', {
+      success: data.success,
+      benefitsCount: data.benefits?.length || 0,
+      pagination: data.pagination,
+      filters: data.filters
+    });
+
+    // Return raw benefits without transformation
+    return data.benefits || [];
   }
 
   async getBenefitsResponse(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
@@ -655,6 +686,122 @@ export async function getBenefitsByCategory(category: string, limit?: number): P
 export async function getBenefitsByBank(bank: string, limit?: number): Promise<Benefit[]> {
   console.log(`🏦 getBenefitsByBank: Fetching benefits for bank '${bank}' (no default limit)...`);
   return getBenefits({
+    filters: { bank },
+    ...(limit && { limit })
+  });
+}
+
+// ===== RAW BENEFITS FUNCTIONS (keeping exact API format) =====
+
+/**
+ * Get raw benefits in the exact format as data.benefits from the API
+ * No transformation applied - returns MongoDB format directly
+ */
+export async function getRawBenefits(options: {
+  limit?: number;
+  offset?: number;
+  fetchAll?: boolean;
+  filters?: Record<string, string>;
+} = {}): Promise<RawMongoBenefit[]> {
+  try {
+    console.log('🚀 getRawBenefits: Starting to fetch raw benefits...', options);
+
+    if (options.fetchAll) {
+      console.log('📚 getRawBenefits: Fetching ALL raw benefits using pagination...');
+      return await fetchAllRawBenefits(options.filters || {});
+    } else {
+      const offset = options.offset || 0;
+      console.log(`📊 getRawBenefits: Fetching raw benefits starting from offset ${offset}...`);
+
+      const params: Record<string, string> = {
+        offset: offset.toString(),
+        ...options.filters || {}
+      };
+
+      // Only add limit if explicitly specified
+      if (options.limit) {
+        params.limit = options.limit.toString();
+      }
+
+      return await benefitsAPI.getRawBenefits(params);
+    }
+  } catch (error) {
+    console.warn("Failed to fetch raw benefits:", error);
+    return [];
+  }
+}
+
+/**
+ * Get ALL raw benefits using pagination
+ */
+export async function fetchAllRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
+  try {
+    console.log('🔍 fetchAllRawBenefits: Starting to fetch ALL raw benefits using pagination...');
+
+    const allBenefits: RawMongoBenefit[] = [];
+    let offset = 0;
+    const limit = 100; // Use larger chunks for efficiency
+    let hasMore = true;
+
+    while (hasMore) {
+      console.log(`📄 fetchAllRawBenefits: Fetching page at offset ${offset}...`);
+
+      const pageParams = {
+        ...params,
+        offset: offset.toString(),
+        limit: limit.toString()
+      };
+
+      const pageBenefits = await benefitsAPI.getRawBenefits(pageParams);
+
+      if (pageBenefits.length === 0 || pageBenefits.length < limit) {
+        hasMore = false;
+      }
+
+      allBenefits.push(...pageBenefits);
+      offset += pageBenefits.length;
+
+      console.log(`📊 fetchAllRawBenefits: Page complete. Total so far: ${allBenefits.length}`);
+
+      // Safety break to prevent infinite loops
+      if (offset > 10000) {
+        console.warn('⚠️ fetchAllRawBenefits: Safety limit reached, stopping at 10,000 benefits');
+        break;
+      }
+    }
+
+    console.log(`🎯 fetchAllRawBenefits: Complete! Total raw benefits: ${allBenefits.length}`);
+    return allBenefits;
+  } catch (error) {
+    console.error("❌ fetchAllRawBenefits: Failed to fetch all raw benefits:", error);
+    return [];
+  }
+}
+
+/**
+ * Convenience functions for raw benefits
+ */
+export async function getAllRawBenefits(): Promise<RawMongoBenefit[]> {
+  console.log('🌍 getAllRawBenefits: Fetching ALL raw benefits...');
+  return getRawBenefits({ fetchAll: true });
+}
+
+export async function getRawBenefitsWithLimit(limit: number, offset?: number): Promise<RawMongoBenefit[]> {
+  console.log(`📊 getRawBenefitsWithLimit: Fetching up to ${limit} raw benefits${offset ? ` starting from ${offset}` : ''}...`);
+  return getRawBenefits({ limit, offset });
+}
+
+export async function getRawBenefitsByCategory(category: string, limit?: number): Promise<RawMongoBenefit[]> {
+  console.log(`🏷️ getRawBenefitsByCategory: Fetching raw benefits in category '${category}'...`);
+  return getRawBenefits({
+    filters: { category },
+    ...(limit && { limit })
+  });
+}
+
+export async function getRawBenefitsByBank(bank: string, limit?: number): Promise<RawMongoBenefit[]> {
+  console.log(`🏦 getRawBenefitsByBank: Fetching raw benefits for bank '${bank}'...`);
+  return getRawBenefits({
     filters: { bank },
     ...(limit && { limit })
   });

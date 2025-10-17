@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { RawBenefit } from "../types/benefit";
+import { RawMongoBenefit } from "../types/mongodb";
 import { RawBenefitCard } from "../components/RawBenefitCard";
-import {
-  getRawBenefits,
-  getRawCategories,
-  getRawBanks,
-} from "../services/rawBenefitsApi";
+import { getRawBenefits } from "../services/rawBenefitsApi";
 
 /**
  * Benefits page that uses your raw MongoDB data directly
  * No transformation, no changes, just your data as-is
  */
 export const BenefitsPage: React.FC = () => {
-  const [benefits, setBenefits] = useState<RawBenefit[]>([]);
+  const [benefits, setBenefits] = useState<RawMongoBenefit[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [banks, setBanks] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,21 +27,26 @@ export const BenefitsPage: React.FC = () => {
 
       console.log("🚀 BenefitsPage: Loading data...");
 
-      // Load benefits, categories, and banks in parallel
-      const [benefitsData, categoriesData, banksData] = await Promise.all([
-        getRawBenefits({ limit: "1000", offset: "1000" }), // Gets raw benefits starting from #1000
-        getRawCategories(),
-        getRawBanks(),
-      ]);
+      // Load benefits data
+      const benefitsData = await getRawBenefits({ limit: 100 }); // Get first 100 benefits
+
+      // Extract unique categories and banks from the benefits data
+      const uniqueCategories = Array.from(
+        new Set(benefitsData.flatMap((benefit) => benefit.categories))
+      ).sort();
+
+      const uniqueBanks = Array.from(
+        new Set(benefitsData.map((benefit) => benefit.bank))
+      ).sort();
 
       setBenefits(benefitsData);
-      setCategories(categoriesData);
-      setBanks(banksData);
+      setCategories(uniqueCategories);
+      setBanks(uniqueBanks);
 
       console.log("✅ BenefitsPage: Data loaded successfully:", {
         benefits: benefitsData.length,
-        categories: categoriesData.length,
-        banks: banksData.length,
+        categories: uniqueCategories.length,
+        banks: uniqueBanks.length,
       });
     } catch (err) {
       const errorMessage =
