@@ -102,7 +102,21 @@ function Home() {
   const categoryGridData = [
     { id: "gastronomia", name: "Comida", icon: "🍽️", color: "#F59E0B" },
     { id: "moda", name: "Ropa", icon: "👕", color: "#8B5CF6" },
+    {
+      id: "entretenimiento",
+      name: "Entretenimiento",
+      icon: "🎭",
+      color: "#EF4444",
+    },
+    { id: "otros", name: "Otros", icon: "📦", color: "#6B7280" },
+    { id: "deportes", name: "Deportes", icon: "⚽", color: "#059669" },
+    { id: "regalos", name: "Regalos", icon: "🎁", color: "#DC2626" },
     { id: "viajes", name: "Viajes", icon: "✈️", color: "#06B6D4" },
+    { id: "automotores", name: "Automotores", icon: "🚗", color: "#1F2937" },
+    { id: "belleza", name: "Belleza", icon: "💄", color: "#EC4899" },
+    { id: "jugueterias", name: "Jugueterías", icon: "🧸", color: "#F97316" },
+    { id: "hogar", name: "Hogar", icon: "🏠", color: "#7C3AED" },
+    { id: "electro", name: "Electro", icon: "📱", color: "#0891B2" },
     { id: "shopping", name: "Super", icon: "🛒", color: "#10B981" },
   ];
 

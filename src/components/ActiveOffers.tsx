@@ -88,7 +88,13 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
         </button>
       </div>
 
-      <div className="overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory ml-4">
+      <div
+        className="overflow-x-auto [&::-webkit-scrollbar]:hidden scroll-smooth snap-x snap-mandatory ml-4"
+        style={{
+          scrollbarWidth: "none" /* Firefox */,
+          msOverflowStyle: "none" /* Internet Explorer 10+ */,
+        }}
+      >
         <div className="flex gap-4 pb-2">
           {businesses.slice(0, 5).map((business) => (
             <div
