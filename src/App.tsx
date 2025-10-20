@@ -3,7 +3,6 @@ import Home from "./pages/Home";
 import Benefit from "./pages/Benefit";
 import SingleBenefit from "./pages/SingleBenefit";
 import { BenefitsPage } from "./pages/BenefitsPage";
-import RawBenefitsPage from "./pages/RawBenefitsPage";
 
 function App() {
   return (
@@ -13,7 +12,6 @@ function App() {
         <Route path="/benefit/:id/:benefitIndex" element={<Benefit />} />
         <Route path="/single-benefit/:id" element={<SingleBenefit />} />
         <Route path="/benefits" element={<BenefitsPage />} />
-        <Route path="/raw-benefits" element={<RawBenefitsPage />} />
       </Routes>
     </Router>
   );

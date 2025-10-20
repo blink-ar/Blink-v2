@@ -1,6 +1,6 @@
 import React from "react";
-import { Bell, Database, User } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Bell, User } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface HeaderProps {
   title?: string;
@@ -19,8 +19,6 @@ export const Header: React.FC<HeaderProps> = ({
   onNotificationClick,
   onProfileClick,
 }) => {
-  const location = useLocation();
-
   return (
     <div className="modern-header header safe-area-top header-slide-down">
       {/* Main Header Bar */}
@@ -98,46 +96,6 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
-
-      {/* Navigation Links - Only show on certain pages */}
-      {(location.pathname === "/" || location.pathname === "/raw-benefits") && (
-        <div className="flex items-center justify-center gap-2 sm:gap-4 px-4 sm:px-6 md:px-8 py-3 bg-gray-50 border-b border-gray-200">
-          <Link
-            to="/"
-            className={`touch-target px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              location.pathname === "/"
-                ? "bg-primary-100 text-primary-700"
-                : "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
-            }`}
-            style={{
-              fontSize: "var(--text-sm)",
-              fontWeight: "var(--font-medium)",
-              borderRadius: "var(--radius-base)",
-              transition: "var(--transition-fast)",
-            }}
-          >
-            Home
-          </Link>
-          <Link
-            to="/raw-benefits"
-            className={`touch-target px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 ${
-              location.pathname === "/raw-benefits"
-                ? "bg-primary-100 text-primary-700"
-                : "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
-            }`}
-            style={{
-              fontSize: "var(--text-sm)",
-              fontWeight: "var(--font-medium)",
-              borderRadius: "var(--radius-base)",
-              transition: "var(--transition-fast)",
-            }}
-          >
-            <Database className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline">Raw API Data</span>
-            <span className="xs:hidden">API</span>
-          </Link>
-        </div>
-      )}
     </div>
   );
 };

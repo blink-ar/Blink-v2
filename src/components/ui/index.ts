@@ -13,7 +13,6 @@ export { DaysOfWeek } from './DaysOfWeek';
 // Modern UI components
 export { default as CategoryGrid } from '../CategoryGrid';
 export { default as FeaturedBenefits } from '../FeaturedBenefits';
-export { default as FeaturedBenefit } from '../FeaturedBenefit';
 export { default as ActiveOffers } from '../ActiveOffers';
 export { default as NearbyBusinesses } from '../NearbyBusinesses';
 export { default as BottomNavigation } from '../BottomNavigation';
