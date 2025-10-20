@@ -118,7 +118,7 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
           {businesses.slice(0, 5).map((business) => (
             <div
               key={business.id}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer flex-shrink-0 w-72 snap-start"
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer flex-shrink-0 w-80 snap-start"
               onClick={() => onBusinessClick(business.id)}
               role="button"
               tabIndex={0}
@@ -162,8 +162,8 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
                 {/* Business Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-base mb-1 truncate">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <h3 className="font-semibold text-gray-900 text-base mb-1 truncate max-w-full">
                         {business.name}
                       </h3>
                       <div className="flex items-center text-gray-500 text-sm mb-3">
@@ -173,7 +173,7 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
                         </span>
                       </div>
                     </div>
-                    <button className="p-2 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0">
+                    <button className="p-2 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0 ml-1">
                       <Heart className="w-5 h-5 text-gray-400" />
                     </button>
                   </div>
