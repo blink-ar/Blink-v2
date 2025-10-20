@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .env
 *.yaml
+
+# Kiro AI Assistant files
+.kiro/
+.kiro/*

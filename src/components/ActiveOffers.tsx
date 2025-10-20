@@ -76,8 +76,8 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
   };
 
   return (
-    <div className="px-4 sm:px-6 mb-8">
-      <div className="flex items-center justify-between mb-4">
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
         <h2 className="text-xl font-bold text-gray-900">Ofertas Activas</h2>
         <button
           className="text-blue-500 text-sm font-medium hover:text-blue-600 transition-colors"
@@ -88,92 +88,96 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
         </button>
       </div>
 
-      <div className="space-y-4">
-        {businesses.slice(0, 3).map((business) => (
-          <div
-            key={business.id}
-            className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer"
-            onClick={() => onBusinessClick(business.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onBusinessClick(business.id);
-              }
-            }}
-            aria-label={`Ver ofertas de ${business.name}`}
-          >
-            <div className="flex items-start gap-4">
-              {/* Business Icon */}
-              <div className="relative flex-shrink-0">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg"
-                  style={{
-                    backgroundColor:
-                      business.category === "gastronomia"
-                        ? "#F59E0B"
-                        : business.category === "moda"
-                        ? "#8B5CF6"
-                        : business.category === "viajes"
-                        ? "#06B6D4"
-                        : "#10B981",
-                  }}
-                >
-                  {business.category === "gastronomia"
-                    ? "🍽️"
-                    : business.category === "moda"
-                    ? "🛍️"
-                    : business.category === "viajes"
-                    ? "✈️"
-                    : "🛒"}
-                </div>
-                <div className="absolute -top-1 -right-1 bg-gray-700 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                  {getBenefitCount(business)}
-                </div>
-              </div>
-
-              {/* Business Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-base mb-1">
-                      {business.name}
-                    </h3>
-                    <div className="flex items-center text-gray-500 text-sm mb-3">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span>{getLocationWithDistance()}</span>
-                    </div>
+      <div className="overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory ml-4">
+        <div className="flex gap-4 pb-2">
+          {businesses.slice(0, 5).map((business) => (
+            <div
+              key={business.id}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer flex-shrink-0 w-72 snap-start"
+              onClick={() => onBusinessClick(business.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onBusinessClick(business.id);
+                }
+              }}
+              aria-label={`Ver ofertas de ${business.name}`}
+            >
+              <div className="flex items-start gap-4">
+                {/* Business Icon */}
+                <div className="relative flex-shrink-0">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+                    style={{
+                      backgroundColor:
+                        business.category === "gastronomia"
+                          ? "#F59E0B"
+                          : business.category === "moda"
+                          ? "#8B5CF6"
+                          : business.category === "viajes"
+                          ? "#06B6D4"
+                          : "#10B981",
+                    }}
+                  >
+                    {business.category === "gastronomia"
+                      ? "🍽️"
+                      : business.category === "moda"
+                      ? "🛍️"
+                      : business.category === "viajes"
+                      ? "✈️"
+                      : "🛒"}
                   </div>
-                  <button className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-                    <Heart className="w-5 h-5 text-gray-400" />
-                  </button>
+                  <div className="absolute -top-1 -right-1 bg-gray-700 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {getBenefitCount(business)}
+                  </div>
                 </div>
 
-                {/* Discount Badge */}
-                <div className="mb-3">
-                  <span className="inline-block bg-green-100 text-green-700 text-sm font-medium px-3 py-1 rounded-full">
-                    {getDiscountPercentage(business)}
-                  </span>
-                </div>
-
-                {/* Payment Methods */}
-                <div className="flex items-center gap-2">
-                  {getPaymentMethods(business).map((method, methodIndex) => (
-                    <div
-                      key={`${method.type}-${methodIndex}`}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                      style={{ backgroundColor: method.color }}
-                      title={method.type.toUpperCase()}
-                    >
-                      {method.icon}
+                {/* Business Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 text-base mb-1 truncate">
+                        {business.name}
+                      </h3>
+                      <div className="flex items-center text-gray-500 text-sm mb-3">
+                        <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                        <span className="truncate">
+                          {getLocationWithDistance()}
+                        </span>
+                      </div>
                     </div>
-                  ))}
+                    <button className="p-2 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0">
+                      <Heart className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Discount Badge */}
+                  <div className="mb-3">
+                    <span className="inline-block bg-green-100 text-green-700 text-sm font-medium px-3 py-1 rounded-full">
+                      {getDiscountPercentage(business)}
+                    </span>
+                  </div>
+
+                  {/* Payment Methods */}
+                  <div className="flex items-center gap-2">
+                    {getPaymentMethods(business).map((method, methodIndex) => (
+                      <div
+                        key={`${method.type}-${methodIndex}`}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                        style={{ backgroundColor: method.color }}
+                        title={method.type.toUpperCase()}
+                      >
+                        {method.icon}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
