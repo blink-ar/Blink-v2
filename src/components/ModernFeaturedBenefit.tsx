@@ -1,5 +1,6 @@
 import React from "react";
 import { RawMongoBenefit } from "../types/mongodb";
+import SantanderLogo from "./BankLogos/SantanderLogo";
 
 interface ModernFeaturedBenefitProps {
   benefit: RawMongoBenefit;
@@ -234,7 +235,11 @@ const ModernFeaturedBenefit: React.FC<ModernFeaturedBenefitProps> = ({
 
       {/* Bank info */}
       <div style={bankInfoStyle}>
-        <div style={bankIconStyle}>{bankIconLetter}</div>
+        {bankName === "Santander" ? (
+          <SantanderLogo size={28} />
+        ) : (
+          <div style={bankIconStyle}>{bankIconLetter}</div>
+        )}
         <span style={bankNameStyle}>{bankName}</span>
       </div>
 

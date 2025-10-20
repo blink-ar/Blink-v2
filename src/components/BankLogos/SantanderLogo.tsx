@@ -15,7 +15,7 @@ const SantanderLogo: React.FC<SantanderLogoProps> = ({
       style={{
         width: size,
         height: size,
-        borderRadius: "8px",
+        borderRadius: "50%",
         backgroundColor: "#ffffff",
         padding: "2px",
         boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
