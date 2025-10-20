@@ -36,7 +36,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
       }}
     >
       {/* Section Header */}
-      <div
+      {/* <div
         className="featured-benefits__header-section"
         style={{
           display: "flex",
@@ -142,7 +142,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
             />
           </svg>
         </button>
-      </div>
+      </div> */}
 
       {/* Featured Benefit Cards */}
       <div

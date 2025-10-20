@@ -394,6 +394,7 @@ export async function fetchBusinesses(options: {
 
       console.log(`🏪 Processing benefit ${index + 1}/${benefits.length}:`, {
         businessName,
+        raw: benefit,
         bank: benefit.bank,
         benefitTitle: benefit.benefitTitle,
         discountPercentage: benefit.discountPercentage,

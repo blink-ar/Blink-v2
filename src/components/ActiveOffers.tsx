@@ -1,10 +1,11 @@
 import React from "react";
 import { MapPin, Heart } from "lucide-react";
 import { Business } from "../types";
+import { BBVALogo, SantanderLogo, GaliciaLogo, NacionLogo } from "./BankLogos";
 
 export interface PaymentMethod {
-  type: "visa" | "mastercard" | "bbva" | "santander" | "galicia" | "nacion";
-  icon: string;
+  type: "bbva" | "santander" | "galicia" | "nacion";
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
 }
 
@@ -22,25 +23,43 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
   const getPaymentMethods = (business: Business): PaymentMethod[] => {
     const methods: PaymentMethod[] = [];
 
-    // Add payment methods based on business benefits and category
-    methods.push(
-      { type: "visa", icon: "V", color: "#1a1f71" },
-      { type: "mastercard", icon: "M", color: "#eb001b" }
-    );
+    // Get unique bank names from business benefits
+    const uniqueBanks = new Set<string>();
+    business.benefits.forEach((benefit) => {
+      if (benefit.bankName) {
+        uniqueBanks.add(benefit.bankName.toLowerCase());
+      }
+    });
 
-    // Add specific bank methods based on category
-    if (business.category === "gastronomia") {
-      methods.push({ type: "bbva", icon: "B", color: "#004481" });
-    } else if (business.category === "moda") {
-      methods.push(
-        { type: "santander", icon: "S", color: "#ec0000" },
-        { type: "galicia", icon: "G", color: "#f39200" }
-      );
-    } else if (business.category === "viajes") {
-      methods.push({ type: "nacion", icon: "N", color: "#0066cc" });
-    }
+    // Map bank names to payment method components
+    const bankMapping: Record<string, PaymentMethod> = {
+      bbva: { type: "bbva", icon: BBVALogo, color: "#004481" },
+      santander: { type: "santander", icon: SantanderLogo, color: "#ec0000" },
+      galicia: { type: "galicia", icon: GaliciaLogo, color: "#f39200" },
+      nacion: { type: "nacion", icon: NacionLogo, color: "#0066cc" },
+      "banco nacion": { type: "nacion", icon: NacionLogo, color: "#0066cc" },
+      "banco de la nacion": {
+        type: "nacion",
+        icon: NacionLogo,
+        color: "#0066cc",
+      },
+      "banco galicia": { type: "galicia", icon: GaliciaLogo, color: "#f39200" },
+      "banco santander": {
+        type: "santander",
+        icon: SantanderLogo,
+        color: "#ec0000",
+      },
+    };
 
-    return methods.slice(0, 4); // Limit to 4 methods max
+    // Add bank-specific payment methods based on actual benefits
+    uniqueBanks.forEach((bankName) => {
+      const paymentMethod = bankMapping[bankName];
+      if (paymentMethod) {
+        methods.push(paymentMethod);
+      }
+    });
+
+    return methods; // Return all methods, we'll handle display limit in render
   };
 
   const getDiscountPercentage = (business: Business): string => {
@@ -168,16 +187,39 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
 
                   {/* Payment Methods */}
                   <div className="flex items-center gap-2">
-                    {getPaymentMethods(business).map((method, methodIndex) => (
-                      <div
-                        key={`${method.type}-${methodIndex}`}
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                        style={{ backgroundColor: method.color }}
-                        title={method.type.toUpperCase()}
-                      >
-                        {method.icon}
-                      </div>
-                    ))}
+                    {(() => {
+                      const allMethods = getPaymentMethods(business);
+                      const displayMethods = allMethods.slice(0, 3);
+                      const remainingCount = allMethods.length - 3;
+
+                      return (
+                        <>
+                          {displayMethods.map((method, methodIndex) => {
+                            const IconComponent = method.icon;
+                            return (
+                              <div
+                                key={`${method.type}-${methodIndex}`}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center shadow-sm overflow-hidden"
+                                title={method.type.toUpperCase()}
+                              >
+                                <IconComponent
+                                  size={28}
+                                  className="w-full h-full"
+                                />
+                              </div>
+                            );
+                          })}
+                          {remainingCount > 0 && (
+                            <div
+                              className="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold shadow-sm"
+                              title={`${remainingCount} more payment methods`}
+                            >
+                              +{remainingCount}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
