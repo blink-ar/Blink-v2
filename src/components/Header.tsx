@@ -1,5 +1,5 @@
 import React from "react";
-import { Bell, User } from "lucide-react";
+// import { Bell, User } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface HeaderProps {
@@ -12,12 +12,12 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title = "Benefit",
-  showNotification = true,
-  showProfile = true,
-  notificationCount = 0,
-  onNotificationClick,
-  onProfileClick,
+  title = "Blink",
+  // showNotification = true,
+  // showProfile = true,
+  // notificationCount = 0,
+  // onNotificationClick,
+  // onProfileClick,
 }) => {
   return (
     <div className="modern-header header safe-area-top header-slide-down">
@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right: Notification and Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Notification Icon */}
-          {showNotification && (
+          {/* {showNotification && (
             <button
               onClick={onNotificationClick}
               className="relative touch-target touch-button p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
@@ -70,10 +70,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               )}
             </button>
-          )}
+          )} */}
 
           {/* Profile Picture */}
-          {showProfile && (
+          {/* {showProfile && (
             <button
               onClick={onProfileClick}
               className="touch-target touch-button p-1 text-gray-600 hover:text-gray-900 rounded-full transition-colors"
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
             </button>
-          )}
+          )} */}
         </div>
       </div>
     </div>
