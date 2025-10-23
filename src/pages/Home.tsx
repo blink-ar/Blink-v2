@@ -361,7 +361,6 @@ function Home() {
                     benefits={getFeaturedBenefits()}
                     onViewAll={handleViewAllBenefits}
                     onBenefitSelect={handleBenefitSelect}
-                    expirationDate="31 de diciembre"
                   />
                 </div>
 

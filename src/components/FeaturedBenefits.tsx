@@ -11,12 +11,8 @@ interface FeaturedBenefitsProps {
 
 const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
   benefits,
-  onViewAll,
   onBenefitSelect,
-  expirationDate = "31 de diciembre",
 }) => {
-  const benefitCount = benefits.length;
-
   // Get only the first benefit to feature
   const featuredBenefits = benefits.slice(0, 1);
 
@@ -179,15 +175,6 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
           </div>
         )}
       </div>
-
-      {/* Footer with expiration */}
-      {featuredBenefits.length > 0 && (
-        <div className="featured-benefits__footer">
-          <p className="featured-benefits__expiration">
-            Válido hasta el {expirationDate}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
