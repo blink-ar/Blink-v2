@@ -106,6 +106,13 @@ function Home() {
     selectedBanks.length > 0 ||
     activeTab === "beneficios";
 
+  // Auto-switch to beneficios tab when user starts typing
+  useEffect(() => {
+    if (searchTerm.trim() !== "" && activeTab !== "beneficios") {
+      setActiveTab("beneficios");
+    }
+  }, [searchTerm, activeTab]);
+
   // Transform categories for CategoryGrid component
   const categoryGridData = [
     { id: "gastronomia", name: "Comida", icon: "🍽️", color: "#F59E0B" },
@@ -346,18 +353,6 @@ function Home() {
             {shouldShowFilteredResults ? (
               /* Filtered Results View */
               <div className="px-4 sm:px-6 md:px-8 py-6">
-                {/* Header for Beneficios view */}
-                {activeTab === "beneficios" && (
-                  <div className="mb-6">
-                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
-                      Todos los Beneficios
-                    </h2>
-                    <p className="text-gray-600 text-sm md:text-base">
-                      Explora todos los descuentos y ofertas disponibles
-                    </p>
-                  </div>
-                )}
-
                 {/* Filtered Business Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
                   {filteredBusinesses.map((business, index) => (
