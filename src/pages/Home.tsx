@@ -5,6 +5,7 @@ import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
 import ActiveOffers from "../components/ActiveOffers";
 import NearbyBusinesses from "../components/NearbyBusinesses";
+import BusinessCard from "../components/BusinessCard";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -298,42 +299,15 @@ function Home() {
                 </div>
 
                 {/* Filtered Business Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 stagger-children">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
                   {filteredBusinesses.map((business, index) => (
-                    <div
+                    <BusinessCard
                       key={business.id}
-                      className="card touch-card touch-target bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer card-hover business-card micro-lift"
-                      onClick={() => handleBusinessClick(business.id)}
+                      business={business}
+                      onClick={handleBusinessClick}
+                      className="card-hover business-card micro-lift"
                       style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <img
-                        src={business.image}
-                        alt={business.name}
-                        className="w-full h-32 md:h-40 object-cover"
-                      />
-                      <div className="p-4 md:p-5">
-                        <h3 className="font-semibold text-gray-900 mb-1 text-sm md:text-base line-clamp-1">
-                          {business.name}
-                        </h3>
-                        <p className="text-xs md:text-sm text-gray-600 mb-2 line-clamp-1">
-                          {business.location.length > 0
-                            ? business.location[0].formattedAddress ||
-                              "Location not available"
-                            : "Location not available"}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500 capitalize">
-                            {business.category}
-                          </span>
-                          <div className="flex items-center">
-                            <span className="text-yellow-400 mr-1">⭐</span>
-                            <span className="text-xs md:text-sm text-gray-600">
-                              {business.rating}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    />
                   ))}
                 </div>
 
