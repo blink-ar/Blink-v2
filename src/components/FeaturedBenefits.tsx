@@ -28,7 +28,6 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
       style={{
         padding: "20px 16px",
         background: "#fff",
-        marginBottom: "8px",
       }}
     >
       {/* Section Header */}
