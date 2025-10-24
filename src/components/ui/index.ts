@@ -1,6 +1,5 @@
 export { TouchButton } from './TouchButton';
 export { TouchInput } from './TouchInput';
-export { TouchOptimizedCard } from './TouchOptimizedCard';
 
 // Animation components
 export { default as AnimatedContainer } from './AnimatedContainer';
