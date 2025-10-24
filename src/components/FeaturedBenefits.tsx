@@ -213,7 +213,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
         aria-label="Ver beneficios destacados"
       >
         <img
-          src="/assets/sardoBanner.jpeg"
+          src="src/assets/sardoBanner.jpeg"
           alt="Sardo Banner - Ver beneficios"
           style={{
             width: "100%",
