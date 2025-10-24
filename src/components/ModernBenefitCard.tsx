@@ -35,13 +35,6 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
     return match ? match[1] : rewardRate;
   };
 
-  // Mock payment methods - in a real app this would come from benefit data
-  const paymentMethods = [
-    { type: "visa", icon: "V", color: "bg-blue-600" },
-    { type: "mastercard", icon: "M", color: "bg-red-600" },
-    { type: "bbva", icon: "B", color: "bg-blue-800" },
-  ];
-
   // Mock expiration date - in a real app this would come from benefit data
   const expirationDate = "31 Dic 2024";
 
@@ -84,21 +77,6 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
         <p className="text-gray-800 text-sm leading-relaxed line-clamp-2">
           {benefit.benefit}
         </p>
-      </div>
-
-      {/* Payment Methods */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs text-gray-500">Métodos de pago:</span>
-        <div className="flex gap-1">
-          {paymentMethods.map((method, index) => (
-            <div
-              key={index}
-              className={`w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold ${method.color}`}
-            >
-              {method.icon}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Footer with Expiration and Terms */}
