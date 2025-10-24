@@ -139,8 +139,8 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
         </button>
       </div> */}
 
-      {/* Featured Benefit Cards */}
-      <div
+      {/* Featured Benefit Cards - Commented out */}
+      {/* <div
         className="featured-benefits__cards"
         style={{
           display: "flex",
@@ -173,6 +173,54 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
             </p>
           </div>
         )}
+      </div> */}
+
+      {/* Sardo Banner - Clickable with same functionality as "Ver más" */}
+      <div
+        className="featured-benefits__sardo-banner"
+        style={{
+          width: "100%",
+          borderRadius: "20px",
+          overflow: "hidden",
+          cursor: "pointer",
+          transition: "all 0.3s ease",
+          boxShadow: "0 6px 24px rgba(0, 0, 0, 0.1)",
+        }}
+        onClick={() => {
+          // Use the same functionality as "Ver más" button
+          if (featuredBenefits.length > 0) {
+            handleBenefitSelect(featuredBenefits[0]);
+          }
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.15)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 6px 24px rgba(0, 0, 0, 0.1)";
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (featuredBenefits.length > 0) {
+              handleBenefitSelect(featuredBenefits[0]);
+            }
+          }
+        }}
+        aria-label="Ver beneficios destacados"
+      >
+        <img
+          src="/assets/sardoBanner.jpeg"
+          alt="Sardo Banner - Ver beneficios"
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block",
+          }}
+        />
       </div>
     </div>
   );
