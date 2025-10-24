@@ -95,9 +95,11 @@ function Home() {
     filteredBusinesses,
   } = useBusinessFilter(paginatedBusinesses);
 
-  // Show filtered results when searching or filtering
+  // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
-    searchTerm.trim() !== "" || selectedCategory !== "all";
+    searchTerm.trim() !== "" ||
+    selectedCategory !== "all" ||
+    activeTab === "beneficios";
 
   // Transform categories for CategoryGrid component
   const categoryGridData = [
@@ -191,7 +193,8 @@ function Home() {
   };
 
   const handleViewAllBenefits = () => {
-    navigate("/benefits");
+    // Switch to beneficios tab to show all benefits
+    setActiveTab("beneficios");
   };
 
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
@@ -218,8 +221,8 @@ function Home() {
   };
 
   const handleViewMap = () => {
-    setActiveTab("mapa");
     // In a real app, this would navigate to map view
+    // For now, we'll keep the user on the current tab
   };
 
   const handleTabChange = (tab: NavigationTab) => {
@@ -227,19 +230,14 @@ function Home() {
     // Handle navigation based on tab
     switch (tab) {
       case "inicio":
-        // Already on home
+        // Clear any filters when going back to home view
+        setSearchTerm("");
+        setSelectedCategory("all");
         break;
-      case "mapa":
-        // Navigate to map view
-        break;
-      case "favoritos":
-        // Navigate to favorites
-        break;
-      case "tarjetas":
-        // Navigate to cards
-        break;
-      case "perfil":
-        // Navigate to profile
+      case "beneficios":
+        // Clear search but keep category filter available for beneficios view
+        setSearchTerm("");
+        // Don't clear category filter - let user filter within beneficios view
         break;
     }
   };
@@ -294,6 +292,18 @@ function Home() {
             {shouldShowFilteredResults ? (
               /* Filtered Results View */
               <div className="px-4 sm:px-6 md:px-8 py-6">
+                {/* Header for Beneficios view */}
+                {activeTab === "beneficios" && (
+                  <div className="mb-6">
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
+                      Todos los Beneficios
+                    </h2>
+                    <p className="text-gray-600 text-sm md:text-base">
+                      Explora todos los descuentos y ofertas disponibles
+                    </p>
+                  </div>
+                )}
+
                 {/* Filtered Business Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
                   {filteredBusinesses.map((business, index) => (

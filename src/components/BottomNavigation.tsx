@@ -1,11 +1,7 @@
 import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
-export type NavigationTab =
-  | "inicio"
-  | "mapa"
-  | "favoritos"
-  | "tarjetas"
-  | "perfil";
+export type NavigationTab = "inicio" | "beneficios";
 
 interface NavigationItem {
   id: NavigationTab;
@@ -14,14 +10,20 @@ interface NavigationItem {
 }
 
 interface BottomNavigationProps {
-  activeTab: NavigationTab;
-  onTabChange: (tab: NavigationTab) => void;
+  activeTab?: NavigationTab;
+  onTabChange?: (tab: NavigationTab) => void;
 }
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
   onTabChange,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Use the provided activeTab or default to "inicio"
+  const currentTab: NavigationTab = activeTab || "inicio";
+
   const navigationItems: NavigationItem[] = [
     {
       id: "inicio",
@@ -52,8 +54,8 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       ),
     },
     {
-      id: "mapa",
-      label: "Mapa",
+      id: "beneficios",
+      label: "Beneficios",
       icon: (
         <svg
           width="24"
@@ -63,95 +65,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            d="M21 10C21 17 12 23 12 23S3 17 3 10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      ),
-    },
-    {
-      id: "favoritos",
-      label: "Favoritos",
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L12 21.23L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      id: "tarjetas",
-      label: "Tarjetas",
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <rect
-            x="1"
-            y="4"
-            width="22"
-            height="16"
-            rx="2"
-            ry="2"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <line
-            x1="1"
-            y1="10"
-            x2="23"
-            y2="10"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      id: "perfil",
-      label: "Perfil",
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle
-            cx="12"
-            cy="7"
-            r="4"
+            d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
@@ -161,6 +75,18 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       ),
     },
   ];
+
+  const handleTabClick = (tab: NavigationTab) => {
+    // Call the provided onTabChange if available
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+
+    // Only navigate to home if we're not already there and switching to "inicio"
+    if (tab === "inicio" && location.pathname !== "/") {
+      navigate("/");
+    }
+  };
 
   return (
     <nav
@@ -177,13 +103,13 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
           <button
             key={item.id}
             className={`flex flex-col items-center justify-center py-2 px-1 sm:px-2 rounded-lg transition-all duration-200 ${
-              activeTab === item.id
+              currentTab === item.id
                 ? "text-primary-600 bg-primary-50"
                 : "text-gray-600 hover:text-primary-600 hover:bg-gray-50"
             }`}
-            onClick={() => onTabChange(item.id)}
+            onClick={() => handleTabClick(item.id)}
             aria-label={`Ir a ${item.label}`}
-            aria-current={activeTab === item.id ? "page" : undefined}
+            aria-current={currentTab === item.id ? "page" : undefined}
             style={{
               minWidth: "var(--touch-target-min)",
               minHeight: "var(--touch-target-min)",
