@@ -3,6 +3,7 @@ import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
+import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
 import NearbyBusinesses from "../components/NearbyBusinesses";
 import BusinessCard from "../components/BusinessCard";
@@ -87,18 +88,22 @@ function Home() {
 
   // Removed unused infinite scroll variables for modern UI
 
+  // State for bank filter (multiple selection)
+  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
+
   const {
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
     filteredBusinesses,
-  } = useBusinessFilter(paginatedBusinesses);
+  } = useBusinessFilter(paginatedBusinesses, selectedBanks);
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
     searchTerm.trim() !== "" ||
     selectedCategory !== "all" ||
+    selectedBanks.length > 0 ||
     activeTab === "beneficios";
 
   // Transform categories for CategoryGrid component
@@ -121,6 +126,25 @@ function Home() {
     { id: "electro", name: "Electro", icon: "📱", color: "#0891B2" },
     { id: "shopping", name: "Super", icon: "🛒", color: "#10B981" },
     { id: "otros", name: "Otros", icon: "📦", color: "#6B7280" },
+  ];
+
+  // Transform banks for BankGrid component
+  const bankGridData = [
+    { id: "santander", name: "Santander", icon: "🏦", color: "#EC0000" },
+    { id: "bbva", name: "BBVA", icon: "🏦", color: "#004481" },
+    {
+      id: "banco-de-chile",
+      name: "Banco de Chile",
+      icon: "🏦",
+      color: "#003DA5",
+    },
+    { id: "bci", name: "BCI", icon: "🏦", color: "#FF6B35" },
+    { id: "banco-estado", name: "Banco Estado", icon: "🏦", color: "#0066CC" },
+    { id: "scotiabank", name: "Scotiabank", icon: "🏦", color: "#DA020E" },
+    { id: "itau", name: "Itaú", icon: "🏦", color: "#FF6900" },
+    { id: "falabella", name: "Falabella", icon: "🏦", color: "#7B68EE" },
+    { id: "ripley", name: "Ripley", icon: "🏦", color: "#E31837" },
+    { id: "cencosud", name: "Cencosud", icon: "🏦", color: "#00A651" },
   ];
 
   // Helper to extract business name from benefit text
@@ -188,6 +212,22 @@ function Home() {
     }
   };
 
+  const handleBankSelect = (bank: {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+  }) => {
+    setSelectedBanks((prev) => {
+      // If bank is already selected, remove it
+      if (prev.includes(bank.id)) {
+        return prev.filter((id) => id !== bank.id);
+      }
+      // Otherwise, add it to the selection
+      return [...prev, bank.id];
+    });
+  };
+
   const handleBusinessClick = (businessId: string) => {
     navigate(`/benefit/${businessId}/0`);
   };
@@ -233,11 +273,12 @@ function Home() {
         // Clear any filters when going back to home view
         setSearchTerm("");
         setSelectedCategory("all");
+        setSelectedBanks([]);
         break;
       case "beneficios":
-        // Clear search but keep category filter available for beneficios view
+        // Clear search but keep category and bank filters available for beneficios view
         setSearchTerm("");
-        // Don't clear category filter - let user filter within beneficios view
+        // Don't clear category or bank filters - let user filter within beneficios view
         break;
     }
   };
@@ -266,14 +307,27 @@ function Home() {
           />
         </div>
 
-        {/* Categories Grid - Sticky */}
-        <div className="sticky top-[72px] z-10">
-          <CategoryGrid
-            categories={categoryGridData}
-            onCategorySelect={handleCategorySelect}
-            selectedCategory={selectedCategory}
-          />
-        </div>
+        {/* Categories Grid - Sticky - Only visible in Beneficios tab */}
+        {activeTab === "beneficios" && (
+          <div className="sticky top-[72px] z-10">
+            <CategoryGrid
+              categories={categoryGridData}
+              onCategorySelect={handleCategorySelect}
+              selectedCategory={selectedCategory}
+            />
+          </div>
+        )}
+
+        {/* Banks Grid - Sticky - Only visible in Beneficios tab */}
+        {activeTab === "beneficios" && (
+          <div className="sticky top-[128px] z-10">
+            <BankGrid
+              banks={bankGridData}
+              onBankSelect={handleBankSelect}
+              selectedBanks={selectedBanks}
+            />
+          </div>
+        )}
 
         {/* Error State */}
         {error && (

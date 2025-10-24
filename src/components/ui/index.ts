@@ -11,6 +11,7 @@ export { DaysOfWeek } from './DaysOfWeek';
 
 // Modern UI components
 export { default as CategoryGrid } from '../CategoryGrid';
+export { default as BankGrid } from '../BankGrid';
 export { default as FeaturedBenefits } from '../FeaturedBenefits';
 export { default as ActiveOffers } from '../ActiveOffers';
 export { default as NearbyBusinesses } from '../NearbyBusinesses';
