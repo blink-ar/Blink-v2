@@ -36,10 +36,10 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
   }, [handleKeyDown]);
 
   return (
-    <div className="category-grid px-4 sm:px-6 md:px-8 py-6">
-      <h2 className="category-grid__title text-lg sm:text-xl font-semibold text-gray-900 mb-4">
-        Categorías
-      </h2>
+    <div
+      className="category-grid px-3 sm:px-3 py-3"
+      style={{ background: "#fff" }}
+    >
       <div
         className="category-grid__container overflow-x-auto [&::-webkit-scrollbar]:hidden"
         role="group"
@@ -49,14 +49,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
           msOverflowStyle: "none" /* Internet Explorer 10+ */,
         }}
       >
-        <div className="flex gap-3 sm:gap-4 pb-2">
+        <div className="flex gap-2 sm:gap-3">
           {categories.map((category, index) => (
             <button
               key={category.id}
               ref={(el) => {
                 if (el) itemsRef.current[index] = el;
               }}
-              className={`category-grid__item category-item touch-target touch-button touch-feedback flex flex-col items-center p-3 sm:p-4 rounded-xl transition-all focus-visible:focus-visible micro-bounce flex-shrink-0 ${
+              className={`category-grid__item category-item touch-target touch-button touch-feedback flex items-center justify-center px-3 py-2 rounded-lg transition-all focus-visible:focus-visible micro-bounce flex-shrink-0 ${
                 selectedCategory === category.id
                   ? "category-grid__item--active bg-primary-50 border-2 border-primary-500"
                   : "bg-white border-2 border-gray-200 hover:border-gray-300 hover:shadow-sm"
@@ -71,19 +71,9 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               tabIndex={index === 0 ? 0 : -1} // Roving tabindex
               style={{
                 minHeight: "var(--touch-target-comfortable)",
-                minWidth: "var(--touch-target-comfortable)",
-                width: "90px", // Increased width for longer category names
               }}
             >
-              <div
-                className="category-grid__icon w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2"
-                style={{ backgroundColor: category.color }}
-              >
-                <span className="category-grid__icon-text text-lg sm:text-xl">
-                  {category.icon}
-                </span>
-              </div>
-              <span className="category-grid__label text-[10px] font-medium text-gray-700 text-center line-clamp-2 leading-[1.1] break-words hyphens-auto">
+              <span className="category-grid__label text-xs sm:text-sm font-medium text-gray-700 text-center whitespace-nowrap">
                 {category.name}
               </span>
             </button>

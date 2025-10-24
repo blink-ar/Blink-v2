@@ -109,7 +109,6 @@ function Home() {
       icon: "🎭",
       color: "#EF4444",
     },
-    { id: "otros", name: "Otros", icon: "📦", color: "#6B7280" },
     { id: "deportes", name: "Deportes", icon: "⚽", color: "#059669" },
     { id: "regalos", name: "Regalos", icon: "🎁", color: "#DC2626" },
     { id: "viajes", name: "Viajes", icon: "✈️", color: "#06B6D4" },
@@ -119,6 +118,7 @@ function Home() {
     { id: "hogar", name: "Hogar", icon: "🏠", color: "#7C3AED" },
     { id: "electro", name: "Electro", icon: "📱", color: "#0891B2" },
     { id: "shopping", name: "Super", icon: "🛒", color: "#10B981" },
+    { id: "otros", name: "Otros", icon: "📦", color: "#6B7280" },
   ];
 
   // Helper to extract business name from benefit text
@@ -178,7 +178,12 @@ function Home() {
     icon: string;
     color: string;
   }) => {
-    setSelectedCategory(category.id as Category);
+    // If clicking on the already selected category, clear the filter
+    if (selectedCategory === category.id) {
+      setSelectedCategory("all");
+    } else {
+      setSelectedCategory(category.id as Category);
+    }
   };
 
   const handleBusinessClick = (businessId: string) => {
@@ -255,11 +260,20 @@ function Home() {
         aria-label="Contenido principal"
       >
         {/* Search Bar */}
-        <div className="px-4 sm:px-6 md:px-8 py-4 bg-white">
+        <div className="sticky top-0 z-10 px-4 sm:px-6 md:px-8 py-4 bg-white">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Buscar descuentos, tiendas..."
+          />
+        </div>
+
+        {/* Categories Grid - Sticky */}
+        <div className="sticky top-[72px] z-10">
+          <CategoryGrid
+            categories={categoryGridData}
+            onCategorySelect={handleCategorySelect}
+            selectedCategory={selectedCategory}
           />
         </div>
 
@@ -280,24 +294,6 @@ function Home() {
             {shouldShowFilteredResults ? (
               /* Filtered Results View */
               <div className="px-4 sm:px-6 md:px-8 py-6">
-                <div className="mb-4 md:mb-6">
-                  <h2 className="text-lg md:text-xl lg:text-2xl font-semibold text-gray-900">
-                    {searchTerm
-                      ? `Resultados para "${searchTerm}"`
-                      : `Categoría: ${
-                          categoryGridData.find(
-                            (cat) => cat.id === selectedCategory
-                          )?.name || "Todos"
-                        }`}
-                  </h2>
-                  <p className="text-sm md:text-base text-gray-600">
-                    {filteredBusinesses.length}{" "}
-                    {filteredBusinesses.length === 1
-                      ? "resultado encontrado"
-                      : "resultados encontrados"}
-                  </p>
-                </div>
-
                 {/* Filtered Business Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
                   {filteredBusinesses.map((business, index) => (
@@ -338,18 +334,6 @@ function Home() {
                     benefits={getFeaturedBenefits()}
                     onViewAll={handleViewAllBenefits}
                     onBenefitSelect={handleBenefitSelect}
-                  />
-                </div>
-
-                {/* Categories Grid */}
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "100ms" }}
-                >
-                  <CategoryGrid
-                    categories={categoryGridData}
-                    onCategorySelect={handleCategorySelect}
-                    selectedCategory={selectedCategory}
                   />
                 </div>
 
