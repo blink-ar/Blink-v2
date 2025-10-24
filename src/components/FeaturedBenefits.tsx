@@ -1,6 +1,7 @@
 import React from "react";
 import { RawMongoBenefit } from "../types/mongodb";
-import ModernFeaturedBenefit from "./ModernFeaturedBenefit";
+// import ModernFeaturedBenefit from "./ModernFeaturedBenefit";
+import sardoBanner from "../assets/sardoBanner.jpeg";
 
 interface FeaturedBenefitsProps {
   benefits: RawMongoBenefit[];
@@ -213,7 +214,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
         aria-label="Ver beneficios destacados"
       >
         <img
-          src="src/assets/sardoBanner.jpeg"
+          src={sardoBanner}
           alt="Sardo Banner - Ver beneficios"
           style={{
             width: "100%",
