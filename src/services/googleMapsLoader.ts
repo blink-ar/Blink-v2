@@ -48,19 +48,8 @@ declare global {
 }
 
 const getEnvApiKey = (): string | undefined => {
-  if (typeof process !== 'undefined' && process.env) {
-    const candidate = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  try {
-    const meta = import.meta as unknown as { env?: Record<string, string | undefined> };
-    return meta?.env?.VITE_GOOGLE_MAPS_API_KEY || meta?.env?.GOOGLE_MAPS_API_KEY;
-  } catch {
-    return undefined;
-  }
+  // In Vite, environment variables are available through import.meta.env
+  return import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 };
 
 let loadPromise: Promise<GoogleMapsAPI> | null = null;

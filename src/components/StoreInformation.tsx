@@ -1,6 +1,7 @@
 import React from "react";
 import { MapPin, Clock, Phone, ExternalLink, Navigation } from "lucide-react";
 import { Business } from "../types";
+import LocationMap from "./LocationMap";
 
 interface StoreInformationProps {
   business: Business;
@@ -13,7 +14,6 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   onCallClick,
   onDirectionsClick,
 }) => {
-  // Mock data - in a real app this would come from business object
   const storeInfo = {
     address:
       business.location.length > 0
@@ -77,11 +77,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
             <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h4 className="font-medium text-gray-900 mb-1">Dirección</h4>
-              {/* <LocationMap
-                locations={locations}
-                onMarkerClick={handleMarkerClick}
-                className="mt-4"
-              /> */}
+              <LocationMap locations={business.location} className="mt-4" />
               <p className="text-gray-600 text-sm leading-relaxed">
                 {storeInfo.address}
               </p>
