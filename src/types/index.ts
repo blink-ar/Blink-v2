@@ -25,7 +25,7 @@ export interface Business {
   category: string;
   description: string;
   rating: number;
-  location: string;
+  location: CanonicalLocation[];
   image: string;
   benefits: BankBenefit[];
   // Enhanced fields for new functionality
@@ -71,33 +71,29 @@ export interface BenefitsResponse {
 }
 
 export type CanonicalLocation = {
-  // Stable keys and spatial info
-  placeId?: string;              // Google place_id if available
+  placeId?: string;
   lat: number;
   lng: number;
-  geohash?: string;              // or S2 cell id for fast spatial ops
-  // Human-readable
+  geohash?: string;
   formattedAddress?: string;
-  name?: string;                 // e.g., venue/store/building name
-  // Structured components
+  name?: string;
   addressComponents?: {
     streetNumber?: string;
     route?: string;
     neighborhood?: string;
     sublocality?: string;
-    locality?: string;           // city
-    adminAreaLevel1?: string;    // state/province
-    adminAreaLevel2?: string;    // county/department
+    locality?: string;
+    adminAreaLevel1?: string;
+    adminAreaLevel2?: string;
     postalCode?: string;
-    country?: string;            // full name
-    countryCode?: string;        // ISO-2
+    country?: string;
+    countryCode?: string;
   };
-  types?: string[];              // e.g., ['restaurant', 'point_of_interest']
-  // Provenance + quality
+  types?: string[];
   source: 'latlng' | 'address' | 'name';
-  provider: 'google' | 'mapbox';
-  confidence: number;            // 0..1 based on result quality
-  raw: unknown;                  // original input from the site
-  meta?: Record<string, unknown>;// e.g., viewport/bounds, partial_match flags
+  provider: 'google';
+  confidence: number;
+  raw: string | Record<string, unknown>;
+  meta?: string | Record<string, unknown> | null;
   updatedAt: string;
 };

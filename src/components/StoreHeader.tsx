@@ -113,10 +113,15 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
             </div>
 
             {/* Location */}
-            {business.location && (
+            {business.location.length > 0 && (
               <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
                 <MapPin className="h-4 w-4 text-gray-500" />
-                <span className="truncate">{business.location}</span>
+                <span className="truncate">
+                  {business.location[0].formattedAddress ||
+                    "Location not available"}
+                  {business.location.length > 1 &&
+                    ` (+${business.location.length - 1} more)`}
+                </span>
               </div>
             )}
           </div>

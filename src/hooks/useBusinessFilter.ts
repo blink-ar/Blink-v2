@@ -23,7 +23,7 @@ export const useBusinessFilter = (businesses: Business[]) => {
       return (
         business.name.toLowerCase().includes(lowerSearch) ||
         business.description.toLowerCase().includes(lowerSearch) ||
-        business.location.toLowerCase().includes(lowerSearch) ||
+        business.location.some(loc => loc.formattedAddress?.toLowerCase().includes(lowerSearch)) ||
         (typeof business.category === 'string' &&
           business.category.toLowerCase().includes(lowerSearch))
       );

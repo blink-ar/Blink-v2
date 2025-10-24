@@ -18,7 +18,32 @@ export interface RawBenefit {
     benefitTitle: string;
     description: string;
     categories: string[];
-    location: string;
+    locations: Array<{
+        lat: number;
+        lng: number;
+        formattedAddress: string;
+        source: string;
+        provider: string;
+        confidence: number;
+        raw: string;
+        updatedAt: string;
+        name: string;
+        addressComponents?: {
+            streetNumber?: string;
+            route?: string;
+            neighborhood?: string;
+            sublocality?: string;
+            locality?: string;
+            adminAreaLevel1?: string;
+            adminAreaLevel2?: string;
+            postalCode?: string;
+            country?: string;
+            countryCode?: string;
+        };
+        placeId?: string;
+        types?: string[];
+        meta?: string;
+    }>;
     online: boolean;
     availableDays: string[];
     discountPercentage: number;

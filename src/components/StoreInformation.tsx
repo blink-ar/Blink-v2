@@ -15,7 +15,10 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 }) => {
   // Mock data - in a real app this would come from business object
   const storeInfo = {
-    address: business.location || "Dirección no disponible",
+    address:
+      business.location.length > 0
+        ? business.location[0].formattedAddress || "Dirección no disponible"
+        : "Dirección no disponible",
     phone: "+1 (555) 123-4567", // This would come from business.phone
     website: "www.example.com", // This would come from business.website
     openingHours: {
@@ -28,6 +31,8 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
       sunday: "11:00 AM - 8:00 PM",
     },
   };
+
+  console.log({ business });
 
   const daysOfWeek = [
     { key: "monday", label: "Lunes" },
@@ -72,6 +77,11 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
             <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h4 className="font-medium text-gray-900 mb-1">Dirección</h4>
+              {/* <LocationMap
+                locations={locations}
+                onMarkerClick={handleMarkerClick}
+                className="mt-4"
+              /> */}
               <p className="text-gray-600 text-sm leading-relaxed">
                 {storeInfo.address}
               </p>

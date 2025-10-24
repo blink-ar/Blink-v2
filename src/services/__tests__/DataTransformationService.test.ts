@@ -209,7 +209,7 @@ describe('DataTransformationService', () => {
             expect(business.category).toBe('otros'); // fallback category
             expect(business.description).toBe('Business in otros category'); // fallback description
             expect(business.rating).toBe(4.0); // fallback rating
-            expect(business.location).toBe('Multiple locations'); // fallback location
+            expect(Array.isArray(business.location)).toBe(true); // location should be array
             expect(bankBenefit.rewardRate).toBe('N/A'); // default reward rate when no beneficios
         });
 
@@ -255,7 +255,16 @@ describe('DataTransformationService', () => {
             category: 'gastronomia',
             description: 'A test business',
             rating: 4.5,
-            location: 'Test Location',
+            location: [{
+                lat: 0,
+                lng: 0,
+                formattedAddress: 'Test Location',
+                source: 'address' as const,
+                provider: 'google' as const,
+                confidence: 1.0,
+                raw: 'Test Location',
+                updatedAt: new Date().toISOString()
+            }],
             image: 'https://example.com/image.jpg',
             benefits: []
         };

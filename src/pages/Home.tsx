@@ -316,7 +316,10 @@ function Home() {
                           {business.name}
                         </h3>
                         <p className="text-xs md:text-sm text-gray-600 mb-2 line-clamp-1">
-                          {business.location}
+                          {business.location.length > 0
+                            ? business.location[0].formattedAddress ||
+                              "Location not available"
+                            : "Location not available"}
                         </p>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500 capitalize">

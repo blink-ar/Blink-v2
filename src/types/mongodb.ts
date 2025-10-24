@@ -108,7 +108,32 @@ export interface RawMongoBenefit {
     benefitTitle: string;
     description: string;
     categories: string[];
-    location: string;
+    locations: {
+        lat: number;
+        lng: number;
+        formattedAddress: string;
+        source: string;
+        provider: string;
+        confidence: number;
+        raw: string;
+        updatedAt: string;
+        name: string;
+        addressComponents?: {
+            streetNumber?: string;
+            route?: string;
+            neighborhood?: string;
+            sublocality?: string;
+            locality?: string;
+            adminAreaLevel1?: string;
+            adminAreaLevel2?: string;
+            postalCode?: string;
+            country?: string;
+            countryCode?: string;
+        };
+        placeId?: string;
+        types?: string[];
+        meta?: string;
+    }[];
     online: boolean;
     availableDays: string[];
     discountPercentage: number;
@@ -202,17 +227,32 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             processedAtType: typeof rawBenefit.processedAt
         });
 
-        // Create a default location from the raw location string
-        const defaultLocation: CanonicalLocation = {
-            lat: 0, // You'll need to geocode this or get coordinates from your API
+        // Transform locations array from raw benefit
+        const transformedLocations: CanonicalLocation[] = rawBenefit.locations?.map(loc => ({
+            placeId: loc.placeId,
+            lat: loc.lat || 0,
+            lng: loc.lng || 0,
+            formattedAddress: loc.formattedAddress || 'Address not available',
+            name: loc.name,
+            addressComponents: loc.addressComponents,
+            types: loc.types,
+            source: (loc.source === 'latlng' || loc.source === 'address' || loc.source === 'name')
+                ? loc.source as CanonicalLocation['source'] : 'address',
+            provider: 'google' as const,
+            confidence: loc.confidence || 0.5,
+            raw: loc.raw || '',
+            meta: loc.meta || null,
+            updatedAt: loc.updatedAt || new Date().toISOString()
+        })) || [{
+            lat: 0,
             lng: 0,
-            formattedAddress: rawBenefit.location || 'Unknown location',
+            formattedAddress: 'Location not available',
             source: 'address' as const,
             provider: 'google' as const,
             confidence: 0.5,
-            raw: rawBenefit.location || 'Unknown location',
+            raw: 'Location not available',
             updatedAt: new Date().toISOString()
-        };
+        }];
 
         const transformedBenefit: Benefit = {
             id: extractId(rawBenefit._id),
@@ -236,7 +276,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
                     'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping'].includes(cat)
             ) as Category[],
             termsAndConditions: rawBenefit.termsAndConditions || null,
-            locations: [defaultLocation],
+            locations: transformedLocations,
             online: rawBenefit.online || false,
             link: rawBenefit.link || null,
             availableDays: rawBenefit.availableDays || [],

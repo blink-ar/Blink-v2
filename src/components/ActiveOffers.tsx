@@ -83,15 +83,85 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
     return `+${count}`;
   };
 
-  const getLocationWithDistance = (): string => {
-    // Simulate distance calculation
-    const distances = [
-      "Palermo +8",
-      "Recoleta +12",
-      "Belgrano +5",
-      "Centro +3",
-    ];
-    return distances[Math.floor(Math.random() * distances.length)];
+  const getLocationDisplayText = (business: Business): string => {
+    if (!business.location || business.location.length === 0) {
+      return "Ubicación no disponible";
+    }
+
+    // Helper function to extract short location name
+    const getShortLocationName = (
+      location: Business["location"][0]
+    ): string => {
+      // If we have a formatted address, use it
+      if (
+        location.formattedAddress &&
+        location.formattedAddress !== "Location not available" &&
+        location.formattedAddress !== "Address not available"
+      ) {
+        // Extract neighborhood or area from formatted address
+        const addressParts = location.formattedAddress.split(",");
+        if (addressParts.length > 1) {
+          return addressParts[0].trim(); // Return the first part (usually street or area)
+        }
+        return location.formattedAddress;
+      }
+
+      // If we have address components, try to get neighborhood or locality
+      if (location.addressComponents) {
+        const { neighborhood, sublocality, locality } =
+          location.addressComponents;
+        if (neighborhood) return neighborhood;
+        if (sublocality) return sublocality;
+        if (locality) return locality;
+      }
+
+      // If we have a name, use it
+      if (location.name) {
+        return location.name;
+      }
+
+      return "Ubicación";
+    };
+
+    // For single location, just return it
+    if (business.location.length === 1) {
+      return getShortLocationName(business.location[0]);
+    }
+
+    // For multiple locations, try to fit as many as possible
+    const locationNames = business.location.map(getShortLocationName);
+    const maxLength = 25; // Approximate character limit for the truncated display
+
+    let displayText = "";
+    let locationsShown = 0;
+
+    for (let i = 0; i < locationNames.length; i++) {
+      const locationName = locationNames[i];
+      const separator = i === 0 ? "" : ", ";
+      const remainingCount = locationNames.length - i;
+      const plusIndicator = remainingCount > 1 ? ` +${remainingCount - 1}` : "";
+
+      // Check if adding this location (plus potential +N) would exceed the limit
+      const testText =
+        displayText +
+        separator +
+        locationName +
+        (remainingCount > 1 ? plusIndicator : "");
+
+      if (testText.length <= maxLength) {
+        displayText += separator + locationName;
+        locationsShown++;
+      } else {
+        // If we can't fit this location, add the +N indicator for remaining locations
+        const remaining = locationNames.length - locationsShown;
+        if (remaining > 0) {
+          displayText += ` +${remaining}`;
+        }
+        break;
+      }
+    }
+
+    return displayText || "Múltiples ubicaciones";
   };
 
   return (
@@ -169,7 +239,7 @@ const ActiveOffers: React.FC<ActiveOffersProps> = ({
                       <div className="flex items-center text-gray-500 text-sm mb-3">
                         <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
                         <span className="truncate">
-                          {getLocationWithDistance()}
+                          {getLocationDisplayText(business)}
                         </span>
                       </div>
                     </div>

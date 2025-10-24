@@ -412,7 +412,7 @@ export async function fetchBusinesses(options: {
           category: benefit.categories[0] || 'otros',
           description: benefit.description,
           rating: 5,
-          location: benefit.locations[0]?.formattedAddress || 'Multiple locations',
+          location: [...benefit.locations], // Start with locations from first benefit
           image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
           benefits: []
         };
@@ -441,13 +441,22 @@ export async function fetchBusinesses(options: {
           id: business.id,
           name: business.name,
           category: business.category,
-          location: business.location,
+          locationCount: business.location.length,
           benefitsCount: business.benefits.length
         });
       } else {
         console.log(`➕ Adding benefit to existing business: ${businessName}`);
         // Add additional benefit to existing business
         const business = businessMap.get(businessName)!;
+
+        // Merge locations from this benefit into business locations
+        // Only add locations that don't already exist (based on formattedAddress)
+        const existingAddresses = new Set(business.location.map(loc => loc.formattedAddress));
+        const newLocations = benefit.locations.filter(loc =>
+          loc.formattedAddress && !existingAddresses.has(loc.formattedAddress)
+        );
+        business.location.push(...newLocations);
+
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
@@ -465,7 +474,7 @@ export async function fetchBusinesses(options: {
         };
         business.benefits.push(bankBenefit);
 
-        console.log(`📈 Business now has ${business.benefits.length} benefits`);
+        console.log(`📈 Business now has ${business.benefits.length} benefits and ${business.location.length} locations`);
       }
     });
 

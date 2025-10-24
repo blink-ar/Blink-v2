@@ -153,7 +153,14 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
         {/* Business Location */}
         <div className="business-location flex items-center gap-1 text-xs sm:text-sm text-gray-500 mb-3">
           <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-          <span className="line-clamp-1">{business.location}</span>
+          <span className="line-clamp-1">
+            {business.location.length > 0
+              ? business.location[0].formattedAddress ||
+                "Location not available"
+              : "Location not available"}
+            {business.location.length > 1 &&
+              ` (+${business.location.length - 1} more)`}
+          </span>
         </div>
 
         {/* Payment Methods */}

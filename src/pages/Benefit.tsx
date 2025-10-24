@@ -497,7 +497,40 @@ function Benefit() {
               category: rawBenefitData.categories[0] || "otros",
               description: rawBenefitData.description,
               rating: 5,
-              location: rawBenefitData.location,
+              location: rawBenefitData.locations?.map(
+                (loc: RawBenefit["locations"][0]) => ({
+                  placeId: loc.placeId,
+                  lat: loc.lat || 0,
+                  lng: loc.lng || 0,
+                  formattedAddress:
+                    loc.formattedAddress || "Address not available",
+                  name: loc.name,
+                  addressComponents: loc.addressComponents,
+                  types: loc.types,
+                  source:
+                    loc.source === "latlng" ||
+                    loc.source === "address" ||
+                    loc.source === "name"
+                      ? loc.source
+                      : ("address" as const),
+                  provider: "google" as const,
+                  confidence: loc.confidence || 0.5,
+                  raw: loc.raw || "",
+                  meta: loc.meta || null,
+                  updatedAt: loc.updatedAt || new Date().toISOString(),
+                })
+              ) || [
+                {
+                  lat: 0,
+                  lng: 0,
+                  formattedAddress: "Location not available",
+                  source: "address" as const,
+                  provider: "google" as const,
+                  confidence: 0.5,
+                  raw: "Location not available",
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
               image:
                 "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400",
               benefits: [convertedBenefit],
@@ -591,7 +624,40 @@ function Benefit() {
               category: benefitToShow.categories[0] || "otros",
               description: benefitToShow.description,
               rating: 5,
-              location: benefitToShow.location,
+              location: benefitToShow.locations?.map(
+                (loc: RawBenefit["locations"][0]) => ({
+                  placeId: loc.placeId,
+                  lat: loc.lat || 0,
+                  lng: loc.lng || 0,
+                  formattedAddress:
+                    loc.formattedAddress || "Address not available",
+                  name: loc.name,
+                  addressComponents: loc.addressComponents,
+                  types: loc.types,
+                  source:
+                    loc.source === "latlng" ||
+                    loc.source === "address" ||
+                    loc.source === "name"
+                      ? loc.source
+                      : ("address" as const),
+                  provider: "google" as const,
+                  confidence: loc.confidence || 0.5,
+                  raw: loc.raw || "",
+                  meta: loc.meta || null,
+                  updatedAt: loc.updatedAt || new Date().toISOString(),
+                })
+              ) || [
+                {
+                  lat: 0,
+                  lng: 0,
+                  formattedAddress: "Location not available",
+                  source: "address" as const,
+                  provider: "google" as const,
+                  confidence: 0.5,
+                  raw: "Location not available",
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
               image:
                 "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400",
               benefits: [convertedBenefit],

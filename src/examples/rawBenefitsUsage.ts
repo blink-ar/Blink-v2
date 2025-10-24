@@ -179,7 +179,7 @@ export function getBenefitDetails(rawBenefit: RawMongoBenefit) {
         },
         categories: rawBenefit.categories,
         location: {
-            address: rawBenefit.location,
+            address: rawBenefit.locations?.[0]?.formattedAddress || 'Location not available',
             online: rawBenefit.online
         },
         availability: {
