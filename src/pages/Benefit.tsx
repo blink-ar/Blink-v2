@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Business, BankBenefit } from "../types";
 import { RawBenefit } from "../types/benefit";
@@ -438,6 +438,11 @@ function Benefit() {
     benefitIndex: string;
   }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for openDetails query parameter
+  const searchParams = new URLSearchParams(location.search);
+  const shouldOpenDetails = searchParams.get("openDetails") === "true";
   const [rawBenefit, setRawBenefit] = useState<RawBenefit | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
@@ -689,6 +694,21 @@ function Benefit() {
     };
     load();
   }, [id, benefitIndex]);
+
+  // Auto-open details popup if requested via query parameter
+  useEffect(() => {
+    if (shouldOpenDetails && business && benefit && !loading) {
+      setShowDetailedView(true);
+
+      // Clean up the URL by removing the query parameter
+      const newSearchParams = new URLSearchParams(location.search);
+      newSearchParams.delete("openDetails");
+      const newUrl = `${location.pathname}${
+        newSearchParams.toString() ? "?" + newSearchParams.toString() : ""
+      }`;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [shouldOpenDetails, business, benefit, loading, location.search]);
 
   if (loading)
     return (

@@ -245,21 +245,57 @@ function Home() {
   };
 
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
-    // Get the ID in the correct format
-    const benefitId =
-      typeof benefit._id === "string" ? benefit._id : benefit._id.$oid;
+    // Find the business that matches this benefit's merchant
+    const matchingBusiness = paginatedBusinesses.find(
+      (business) =>
+        business.name
+          .toLowerCase()
+          .includes(benefit.merchant.name.toLowerCase()) ||
+        benefit.merchant.name
+          .toLowerCase()
+          .includes(business.name.toLowerCase())
+    );
 
-    // Navigate to the dedicated single benefit page
-    console.log("Selected benefit:", {
-      id: benefitId,
-      rawId: benefit._id,
-      merchant: benefit.merchant.name,
-      bank: benefit.bank,
-      title: benefit.benefitTitle,
-      discount: benefit.discountPercentage,
-    });
-    console.log("🔗 Navigating to:", `/single-benefit/${benefitId}`);
-    navigate(`/single-benefit/${benefitId}`);
+    if (matchingBusiness) {
+      // Navigate to the business page
+      console.log("Selected benefit:", {
+        merchant: benefit.merchant.name,
+        bank: benefit.bank,
+        title: benefit.benefitTitle,
+        discount: benefit.discountPercentage,
+        matchingBusiness: matchingBusiness.name,
+        businessId: matchingBusiness.id,
+      });
+      console.log(
+        "🔗 Navigating to business page with popup:",
+        `/benefit/${matchingBusiness.id}/0?openDetails=true`
+      );
+      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true`);
+    } else {
+      // Fallback: if no matching business found, navigate to the first available business
+      // or switch to the benefits tab to show all benefits
+      console.log(
+        "No matching business found for merchant:",
+        benefit.merchant.name
+      );
+      console.log(
+        "Available businesses:",
+        paginatedBusinesses.map((b) => b.name)
+      );
+
+      if (paginatedBusinesses.length > 0) {
+        // Navigate to the first business as a fallback
+        console.log(
+          "🔗 Fallback: Navigating to first business:",
+          `/benefit/${paginatedBusinesses[0].id}/0`
+        );
+        navigate(`/benefit/${paginatedBusinesses[0].id}/0`);
+      } else {
+        // If no businesses available, switch to benefits tab
+        console.log("🔗 Fallback: Switching to benefits tab");
+        setActiveTab("beneficios");
+      }
+    }
   };
 
   const handleViewAllOffers = () => {
