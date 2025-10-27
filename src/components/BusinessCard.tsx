@@ -168,7 +168,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
 
   return (
     <div
-      className={`bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
+      className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
       onClick={() => onClick(business.id)}
       role="button"
       tabIndex={0}
@@ -181,11 +181,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
       }}
       aria-label={`Ver ofertas de ${business.name}`}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         {/* Business Icon */}
         <div className="relative flex-shrink-0">
           <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-base"
             style={{
               backgroundColor:
                 business.category === "gastronomia"
@@ -205,69 +205,68 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
               ? "✈️"
               : "🛒"}
           </div>
-          <div className="absolute -top-1 -right-1 bg-gray-700 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+          <div className="absolute -top-1 -right-1 bg-gray-700 text-white text-xs font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center leading-none">
             {getBenefitCount(business)}
           </div>
         </div>
 
         {/* Business Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-1">
             <div className="flex-1 min-w-0 pr-2">
-              <h3 className="font-semibold text-gray-900 text-base mb-1 truncate max-w-full">
+              <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate max-w-full">
                 {business.name}
               </h3>
-              <div className="flex items-center text-gray-500 text-sm mb-3">
-                <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+              <div className="flex items-center text-gray-500 text-xs mb-2">
+                <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
                 <span className="truncate">
                   {getLocationDisplayText(business)}
                 </span>
               </div>
             </div>
-            <button className="p-2 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0 ml-1">
-              <Heart className="w-5 h-5 text-gray-400" />
+            <button className="p-1 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0">
+              <Heart className="w-4 h-4 text-gray-400" />
             </button>
           </div>
 
-          {/* Discount Badge */}
-          <div className="mb-3">
-            <span className="inline-block bg-green-100 text-green-700 text-sm font-medium px-3 py-1 rounded-full">
+          {/* Discount Badge and Payment Methods in same row */}
+          <div className="flex items-center justify-between">
+            <span className="inline-block bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
               {getDiscountPercentage(business)}
             </span>
-          </div>
 
-          {/* Payment Methods */}
-          <div className="flex items-center gap-2">
-            {(() => {
-              const allMethods = getPaymentMethods(business);
-              const displayMethods = allMethods.slice(0, 3);
-              const remainingCount = allMethods.length - 3;
+            <div className="flex items-center gap-1">
+              {(() => {
+                const allMethods = getPaymentMethods(business);
+                const displayMethods = allMethods.slice(0, 2);
+                const remainingCount = allMethods.length - 2;
 
-              return (
-                <>
-                  {displayMethods.map((method, methodIndex) => {
-                    const IconComponent = method.icon;
-                    return (
+                return (
+                  <>
+                    {displayMethods.map((method, methodIndex) => {
+                      const IconComponent = method.icon;
+                      return (
+                        <div
+                          key={`${method.type}-${methodIndex}`}
+                          className="w-5 h-5 rounded flex items-center justify-center shadow-sm overflow-hidden"
+                          title={method.type.toUpperCase()}
+                        >
+                          <IconComponent size={20} className="w-full h-full" />
+                        </div>
+                      );
+                    })}
+                    {remainingCount > 0 && (
                       <div
-                        key={`${method.type}-${methodIndex}`}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center shadow-sm overflow-hidden"
-                        title={method.type.toUpperCase()}
+                        className="w-5 h-5 rounded flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold shadow-sm"
+                        title={`${remainingCount} more payment methods`}
                       >
-                        <IconComponent size={28} className="w-full h-full" />
+                        +{remainingCount}
                       </div>
-                    );
-                  })}
-                  {remainingCount > 0 && (
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold shadow-sm"
-                      title={`${remainingCount} more payment methods`}
-                    >
-                      +{remainingCount}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
