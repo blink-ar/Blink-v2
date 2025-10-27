@@ -1,232 +1,280 @@
-import React, { useState } from "react";
-import { ChevronDown, Star, MapPin, CreditCard } from "lucide-react";
+import React from "react";
+import { MapPin, Heart } from "lucide-react";
 import { Business } from "../types";
-import { TouchOptimizedCard, TouchButton } from "./ui";
+import { BBVALogo, SantanderLogo, GaliciaLogo, NacionLogo } from "./BankLogos";
+
+export interface PaymentMethod {
+  type: "bbva" | "santander" | "galicia" | "nacion";
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  color: string;
+}
 
 interface BusinessCardProps {
   business: Business;
-  onBenefitClick?: (benefitIndex: number) => void;
-  onFavoriteToggle?: (businessId: string) => void;
-  isFavorite?: boolean;
-  isLoading?: boolean;
-  variant?: "default" | "compact" | "featured";
+  onClick: (businessId: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-export const BusinessCard: React.FC<BusinessCardProps> = ({
+const BusinessCard: React.FC<BusinessCardProps> = ({
   business,
-  onBenefitClick,
-  onFavoriteToggle,
-  isFavorite = false,
-  isLoading = false,
-  variant = "default",
+  onClick,
+  className = "",
+  style,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const benefits = business.benefits;
-  const hasSingleBenefit = benefits.length === 1;
+  const getPaymentMethods = (business: Business): PaymentMethod[] => {
+    const methods: PaymentMethod[] = [];
 
-  // Responsive classes based on variant and screen size
-  const getCardClasses = () => {
-    const baseClasses =
-      "bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100";
+    // Get unique bank names from business benefits
+    const uniqueBanks = new Set<string>();
+    business.benefits.forEach((benefit) => {
+      if (benefit.bankName) {
+        uniqueBanks.add(benefit.bankName.toLowerCase());
+      }
+    });
 
-    if (variant === "featured") {
-      return `${baseClasses} lg:col-span-2`;
-    }
+    // Map bank names to payment method components
+    const bankMapping: Record<string, PaymentMethod> = {
+      bbva: { type: "bbva", icon: BBVALogo, color: "#004481" },
+      santander: { type: "santander", icon: SantanderLogo, color: "#ec0000" },
+      galicia: { type: "galicia", icon: GaliciaLogo, color: "#f39200" },
+      nacion: { type: "nacion", icon: NacionLogo, color: "#0066cc" },
+      "banco nacion": { type: "nacion", icon: NacionLogo, color: "#0066cc" },
+      "banco de la nacion": {
+        type: "nacion",
+        icon: NacionLogo,
+        color: "#0066cc",
+      },
+      "banco galicia": { type: "galicia", icon: GaliciaLogo, color: "#f39200" },
+      "banco santander": {
+        type: "santander",
+        icon: SantanderLogo,
+        color: "#ec0000",
+      },
+    };
 
-    return baseClasses;
+    // Add bank-specific payment methods based on actual benefits
+    uniqueBanks.forEach((bankName) => {
+      const paymentMethod = bankMapping[bankName];
+      if (paymentMethod) {
+        methods.push(paymentMethod);
+      }
+    });
+
+    return methods;
   };
 
-  const getImageClasses = () => {
-    if (variant === "compact") {
-      return "w-full h-28 sm:h-32 lg:h-28 object-cover";
+  const getDiscountPercentage = (business: Business): string => {
+    const discounts = business.benefits
+      .map((benefit) => {
+        const match = benefit.rewardRate.match(/(\d+)%/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter((discount) => discount > 0);
+
+    if (discounts.length > 0) {
+      const maxDiscount = Math.max(...discounts);
+      return `hasta ${maxDiscount}% OFF`;
     }
 
-    if (variant === "featured") {
-      return "w-full h-48 lg:h-56 object-cover";
-    }
-
-    return "w-full h-32 sm:h-40 lg:h-32 object-cover";
+    return "hasta 15% OFF";
   };
 
-  const getContentClasses = () => {
-    if (variant === "compact") {
-      return "p-3 lg:p-3";
+  const getBenefitCount = (business: Business): string => {
+    const count = business.benefits.length;
+    return `+${count}`;
+  };
+
+  const getLocationDisplayText = (business: Business): string => {
+    if (!business.location || business.location.length === 0) {
+      return "Ubicación no disponible";
     }
 
-    return "p-4 lg:p-4";
+    // Helper function to extract short location name
+    const getShortLocationName = (
+      location: Business["location"][0]
+    ): string => {
+      // If we have a formatted address, use it
+      if (
+        location.formattedAddress &&
+        location.formattedAddress !== "Location not available" &&
+        location.formattedAddress !== "Address not available"
+      ) {
+        // Extract neighborhood or area from formatted address
+        const addressParts = location.formattedAddress.split(",");
+        if (addressParts.length > 1) {
+          return addressParts[0].trim(); // Return the first part (usually street or area)
+        }
+        return location.formattedAddress;
+      }
+
+      // If we have address components, try to get neighborhood or locality
+      if (location.addressComponents) {
+        const { neighborhood, sublocality, locality } =
+          location.addressComponents;
+        if (neighborhood) return neighborhood;
+        if (sublocality) return sublocality;
+        if (locality) return locality;
+      }
+
+      // If we have a name, use it
+      if (location.name) {
+        return location.name;
+      }
+
+      return "Ubicación";
+    };
+
+    // For single location, just return it
+    if (business.location.length === 1) {
+      return getShortLocationName(business.location[0]);
+    }
+
+    // For multiple locations, try to fit as many as possible
+    const locationNames = business.location.map(getShortLocationName);
+    const maxLength = 25; // Approximate character limit for the truncated display
+
+    let displayText = "";
+    let locationsShown = 0;
+
+    for (let i = 0; i < locationNames.length; i++) {
+      const locationName = locationNames[i];
+      const separator = i === 0 ? "" : ", ";
+      const remainingCount = locationNames.length - i;
+      const plusIndicator = remainingCount > 1 ? ` +${remainingCount - 1}` : "";
+
+      // Check if adding this location (plus potential +N) would exceed the limit
+      const testText =
+        displayText +
+        separator +
+        locationName +
+        (remainingCount > 1 ? plusIndicator : "");
+
+      if (testText.length <= maxLength) {
+        displayText += separator + locationName;
+        locationsShown++;
+      } else {
+        // If we can't fit this location, add the +N indicator for remaining locations
+        const remaining = locationNames.length - locationsShown;
+        if (remaining > 0) {
+          displayText += ` +${remaining}`;
+        }
+        break;
+      }
+    }
+
+    return displayText || "Múltiples ubicaciones";
   };
 
   return (
-    <TouchOptimizedCard className={getCardClasses()}>
-      <div className="relative">
-        <img
-          src={business.image}
-          alt={business.name}
-          className={getImageClasses()}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <div className="absolute bottom-3 left-3 lg:bottom-2 lg:left-2 text-white">
-          <h3
-            className={`font-bold mb-1 ${
-              variant === "featured"
-                ? "text-xl lg:text-2xl"
-                : "text-lg lg:text-base"
-            }`}
+    <div
+      className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
+      onClick={() => onClick(business.id)}
+      role="button"
+      tabIndex={0}
+      style={style}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(business.id);
+        }
+      }}
+      aria-label={`Ver ofertas de ${business.name}`}
+    >
+      <div className="flex items-start gap-3">
+        {/* Business Icon */}
+        <div className="relative flex-shrink-0">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-base"
+            style={{
+              backgroundColor:
+                business.category === "gastronomia"
+                  ? "#F59E0B"
+                  : business.category === "moda"
+                  ? "#8B5CF6"
+                  : business.category === "viajes"
+                  ? "#06B6D4"
+                  : "#10B981",
+            }}
           >
-            {business.name}
-          </h3>
-          <div className="flex items-center gap-2 text-xs lg:text-xs">
-            <div className="flex items-center gap-1">
-              <Star className="h-3 w-3 lg:h-3 lg:w-3 fill-yellow-400 text-yellow-400" />
-              <span>{business.rating}</span>
+            {business.category === "gastronomia"
+              ? "🍽️"
+              : business.category === "moda"
+              ? "🛍️"
+              : business.category === "viajes"
+              ? "✈️"
+              : "🛒"}
+          </div>
+          <div className="absolute -top-1 -right-1 bg-gray-700 text-white text-xs font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+            {getBenefitCount(business)}
+          </div>
+        </div>
+
+        {/* Business Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between mb-1">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate max-w-full">
+                {business.name}
+                <span className="text-gray-500 font-normal ml-1">
+                  • {business.location[0]?.types?.[0] || business.category}
+                </span>
+              </h3>
+              <div className="flex items-center text-gray-500 text-xs mb-2">
+                <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                <span className="truncate">
+                  {getLocationDisplayText(business)}
+                </span>
+              </div>
             </div>
-            <span>•</span>
+            <button className="p-1 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0">
+              <Heart className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Discount Badge and Payment Methods in same row */}
+          <div className="flex items-center justify-between">
+            <span className="inline-block bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
+              {getDiscountPercentage(business)}
+            </span>
+
             <div className="flex items-center gap-1">
-              <MapPin className="h-3 w-3 lg:h-3 lg:w-3" />
-              <span className="truncate max-w-24 lg:max-w-20">
-                {business.location}
-              </span>
+              {(() => {
+                const allMethods = getPaymentMethods(business);
+                const displayMethods = allMethods.slice(0, 2);
+                const remainingCount = allMethods.length - 2;
+
+                return (
+                  <>
+                    {displayMethods.map((method, methodIndex) => {
+                      const IconComponent = method.icon;
+                      return (
+                        <div
+                          key={`${method.type}-${methodIndex}`}
+                          className="w-5 h-5 rounded flex items-center justify-center shadow-sm overflow-hidden"
+                          title={method.type.toUpperCase()}
+                        >
+                          <IconComponent size={20} className="w-full h-full" />
+                        </div>
+                      );
+                    })}
+                    {remainingCount > 0 && (
+                      <div
+                        className="w-5 h-5 rounded flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold shadow-sm"
+                        title={`${remainingCount} more payment methods`}
+                      >
+                        +{remainingCount}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
       </div>
-
-      <div className={getContentClasses()}>
-        {hasSingleBenefit ? (
-          <TouchButton
-            variant="ghost"
-            className="w-full text-left p-0 hover:bg-gray-50 transition-colors duration-200 min-h-[44px] rounded-lg"
-            onClick={() => onBenefitClick && onBenefitClick(0)}
-          >
-            <div className="flex items-start gap-3 p-3">
-              <div
-                className={`${benefits[0].color} p-1.5 rounded-md flex-shrink-0`}
-              >
-                <CreditCard className="h-3 w-3 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold text-gray-900 text-sm">
-                    {benefits[0].bankName}
-                  </h4>
-                  <span className="text-xs text-gray-400">•</span>
-                  <span className="text-xs text-gray-600 truncate">
-                    {benefits[0].cardName}
-                  </span>
-                </div>
-                {variant !== "compact" && (
-                  <p className="text-gray-500 text-xs mb-2 line-clamp-1">
-                    {business.description}
-                  </p>
-                )}
-                <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
-                  {benefits[0].rewardRate}
-                </span>
-              </div>
-            </div>
-          </TouchButton>
-        ) : (
-          <div className="space-y-3">
-            {/* Benefits List */}
-            <div className="space-y-2">
-              {benefits.slice(0, 2).map((benefit, index) => (
-                <TouchButton
-                  key={index}
-                  variant="ghost"
-                  className="w-full text-left p-0 hover:bg-gray-50 transition-colors duration-200 min-h-[44px] rounded-lg"
-                  onClick={() => onBenefitClick && onBenefitClick(index)}
-                >
-                  <div className="flex items-center gap-3 p-3">
-                    <div
-                      className={`${benefit.color} p-1 rounded-md flex-shrink-0`}
-                    >
-                      <CreditCard className="h-3 w-3 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0 flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-gray-900 text-sm truncate">
-                            {benefit.bankName}
-                          </h4>
-                          <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-600 truncate">
-                            {benefit.cardName}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 ml-3">
-                        <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
-                          {benefit.rewardRate}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </TouchButton>
-              ))}
-            </div>
-
-            {/* Expanded Benefits */}
-            {benefits.length > 2 && isExpanded && (
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                {benefits.slice(2).map((benefit, index) => (
-                  <TouchButton
-                    key={index + 2}
-                    variant="ghost"
-                    className="w-full text-left p-0 hover:bg-gray-50 transition-colors duration-200 min-h-[44px] rounded-lg"
-                    onClick={() => onBenefitClick && onBenefitClick(index + 2)}
-                  >
-                    <div className="flex items-center gap-3 p-3">
-                      <div
-                        className={`${benefit.color} p-1 rounded-md flex-shrink-0`}
-                      >
-                        <CreditCard className="h-3 w-3 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-gray-900 text-sm truncate">
-                              {benefit.bankName}
-                            </h4>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-600 truncate">
-                              {benefit.cardName}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex-shrink-0 ml-3">
-                          <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
-                            {benefit.rewardRate}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </TouchButton>
-                ))}
-              </div>
-            )}
-
-            {/* Show More/Less Button */}
-            {benefits.length > 2 && (
-              <TouchButton
-                variant="ghost"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full text-center p-0 hover:bg-gray-50 transition-colors duration-200 min-h-[36px] rounded-lg"
-              >
-                <div className="flex items-center justify-center gap-1 py-2">
-                  <span className="text-xs font-medium text-gray-600">
-                    {isExpanded ? "Ver menos" : `+${benefits.length - 2} más`}
-                  </span>
-                  <ChevronDown
-                    className={`h-3 w-3 text-gray-600 transition-transform duration-200 ${
-                      isExpanded ? "rotate-180" : ""
-                    }`}
-                  />
-                </div>
-              </TouchButton>
-            )}
-          </div>
-        )}
-      </div>
-    </TouchOptimizedCard>
+    </div>
   );
 };
+
+export default BusinessCard;

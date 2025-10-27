@@ -94,7 +94,16 @@ export const testData = {
         category: 'gastronomia',
         description: 'A test business',
         rating: 4.5,
-        location: 'Test Location',
+        location: [{
+            lat: 0,
+            lng: 0,
+            formattedAddress: 'Test Location',
+            source: 'address' as const,
+            provider: 'google' as const,
+            confidence: 1.0,
+            raw: 'Test Location',
+            updatedAt: new Date().toISOString()
+        }],
         image: 'https://example.com/image.jpg',
         benefits: []
     },

@@ -1,14 +1,27 @@
 import { useEffect, useState, useCallback } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
-import { CategoryDropdown } from "../components/CategoryDropdown";
-import { Container, Stack, ResponsiveBusinessGrid } from "../components/layout";
-import { PullToRefresh } from "../components/ui";
+import FeaturedBenefits from "../components/FeaturedBenefits";
+import CategoryGrid from "../components/CategoryGrid";
+import BankGrid from "../components/BankGrid";
+import ActiveOffers from "../components/ActiveOffers";
+import NearbyBusinesses from "../components/NearbyBusinesses";
+import BusinessCard from "../components/BusinessCard";
+import BottomNavigation, {
+  NavigationTab,
+} from "../components/BottomNavigation";
+import {
+  SkipToContent,
+  LoadingAnnouncement,
+  ErrorAnnouncement,
+} from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
 
-import { categories as rawCategories } from "../data/mockData";
+// Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
+import { RawMongoBenefit } from "../types/mongodb";
 import { fetchAllBusinessesComplete } from "../services/api";
+import { getRawBenefits } from "../services/rawBenefitsApi";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
@@ -21,6 +34,25 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State for raw benefits from API
+  const [rawBenefits, setRawBenefits] = useState<RawMongoBenefit[]>([]);
+
+  // State for bottom navigation
+  const [activeTab, setActiveTab] = useState<NavigationTab>("inicio");
+
+  // Load raw benefits from API
+  const loadRawBenefits = useCallback(async () => {
+    try {
+      console.log("🚀 Loading raw benefits from API...");
+      const benefits = await getRawBenefits({ limit: 10 }); // Get first 10 benefits
+      setRawBenefits(benefits);
+      console.log(`✅ Loaded ${benefits.length} raw benefits!`);
+    } catch (err) {
+      console.error("❌ Error loading raw benefits:", err);
+      // Don't set error state for raw benefits, just log it
+    }
+  }, []);
+
   // Load ALL businesses at once
   const loadAllBusinesses = useCallback(async () => {
     try {
@@ -28,7 +60,12 @@ function Home() {
       setError(null);
       console.log("🚀 Loading ALL businesses from all 1,714 benefits...");
 
-      const allBusinesses = await fetchAllBusinessesComplete();
+      // Load both businesses and raw benefits
+      const [allBusinesses] = await Promise.all([
+        fetchAllBusinessesComplete(),
+        loadRawBenefits(),
+      ]);
+
       setPaginatedBusinesses(allBusinesses);
 
       console.log(
@@ -42,22 +79,17 @@ function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadRawBenefits]);
 
   // Load all businesses on mount
   useEffect(() => {
     loadAllBusinesses();
   }, [loadAllBusinesses]);
 
-  // For compatibility with infinite scroll components (not used when loading all at once)
-  const isLoadingMore = false;
-  const hasMore = false;
-  const setLoadingRef = () => {};
+  // Removed unused infinite scroll variables for modern UI
 
-  const handleRefresh = async () => {
-    // Refresh all businesses data
-    await loadAllBusinesses();
-  };
+  // State for bank filter (multiple selection)
+  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
   const {
     searchTerm,
@@ -65,58 +97,382 @@ function Home() {
     selectedCategory,
     setSelectedCategory,
     filteredBusinesses,
-  } = useBusinessFilter(paginatedBusinesses);
+  } = useBusinessFilter(paginatedBusinesses, selectedBanks);
+
+  // Show filtered results when searching, filtering, or when "beneficios" tab is active
+  const shouldShowFilteredResults =
+    searchTerm.trim() !== "" ||
+    selectedCategory !== "all" ||
+    selectedBanks.length > 0 ||
+    activeTab === "beneficios";
+
+  // Auto-switch to beneficios tab when user starts typing
+  useEffect(() => {
+    if (searchTerm.trim() !== "" && activeTab !== "beneficios") {
+      setActiveTab("beneficios");
+    }
+  }, [searchTerm, activeTab]);
+
+  // Transform categories for CategoryGrid component
+  const categoryGridData = [
+    { id: "gastronomia", name: "Comida", icon: "🍽️", color: "#F59E0B" },
+    { id: "moda", name: "Ropa", icon: "👕", color: "#8B5CF6" },
+    {
+      id: "entretenimiento",
+      name: "Entretenimiento",
+      icon: "🎭",
+      color: "#EF4444",
+    },
+    { id: "deportes", name: "Deportes", icon: "⚽", color: "#059669" },
+    { id: "regalos", name: "Regalos", icon: "🎁", color: "#DC2626" },
+    { id: "viajes", name: "Viajes", icon: "✈️", color: "#06B6D4" },
+    { id: "automotores", name: "Automotores", icon: "🚗", color: "#1F2937" },
+    { id: "belleza", name: "Belleza", icon: "💄", color: "#EC4899" },
+    { id: "jugueterias", name: "Jugueterías", icon: "🧸", color: "#F97316" },
+    { id: "hogar", name: "Hogar", icon: "🏠", color: "#7C3AED" },
+    { id: "electro", name: "Electro", icon: "📱", color: "#0891B2" },
+    { id: "shopping", name: "Super", icon: "🛒", color: "#10B981" },
+    { id: "otros", name: "Otros", icon: "📦", color: "#6B7280" },
+  ];
+
+  // Transform banks for BankGrid component
+  const bankGridData = [
+    { id: "santander", name: "Santander", icon: "🏦", color: "#EC0000" },
+    { id: "bbva", name: "BBVA", icon: "🏦", color: "#004481" },
+    {
+      id: "banco-de-chile",
+      name: "Banco de Chile",
+      icon: "🏦",
+      color: "#003DA5",
+    },
+    { id: "bci", name: "BCI", icon: "🏦", color: "#FF6B35" },
+    { id: "banco-estado", name: "Banco Estado", icon: "🏦", color: "#0066CC" },
+    { id: "scotiabank", name: "Scotiabank", icon: "🏦", color: "#DA020E" },
+    { id: "itau", name: "Itaú", icon: "🏦", color: "#FF6900" },
+    { id: "falabella", name: "Falabella", icon: "🏦", color: "#7B68EE" },
+    { id: "ripley", name: "Ripley", icon: "🏦", color: "#E31837" },
+    { id: "cencosud", name: "Cencosud", icon: "🏦", color: "#00A651" },
+  ];
+
+  // Helper to extract business name from benefit text
+  // const extractBusinessNameFromBenefit = (benefitText: string): string => {
+  //   const commonBusinesses = [
+  //     "McDonald's",
+  //     "Starbucks",
+  //     "KFC",
+  //     "Burger King",
+  //     "Subway",
+  //     "Pizza Hut",
+  //     "Falabella",
+  //     "Ripley",
+  //   ];
+  //   for (const business of commonBusinesses) {
+  //     if (benefitText.toLowerCase().includes(business.toLowerCase())) {
+  //       return business;
+  //     }
+  //   }
+  //   return "Comercio";
+  // };
+
+  // Get featured benefits from raw API data
+  const getFeaturedBenefits = (): RawMongoBenefit[] => {
+    const featured = rawBenefits.slice(0, 1); // Get first benefit as featured
+    console.log("🎯 Featured benefits:", featured);
+    return featured;
+  };
+
+  // Get active offers (businesses with high discounts)
+  const getActiveOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have benefits with good rewards
+        return business.benefits.some(
+          (benefit) =>
+            benefit.rewardRate.includes("%") || benefit.rewardRate.includes("x")
+        );
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get nearby businesses (simulate with distance)
+  const getNearbyBusinesses = (): Business[] => {
+    return paginatedBusinesses
+      .map((business) => ({
+        ...business,
+        distance: Math.random() * 5 + 0.1, // Random distance between 0.1 and 5.1 km
+      }))
+      .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+      .slice(0, 6); // Show top 6 nearest
+  };
+
+  const handleCategorySelect = (category: {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+  }) => {
+    // If clicking on the already selected category, clear the filter
+    if (selectedCategory === category.id) {
+      setSelectedCategory("all");
+    } else {
+      setSelectedCategory(category.id as Category);
+    }
+  };
+
+  const handleBankSelect = (bank: {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+  }) => {
+    setSelectedBanks((prev) => {
+      // If bank is already selected, remove it
+      if (prev.includes(bank.id)) {
+        return prev.filter((id) => id !== bank.id);
+      }
+      // Otherwise, add it to the selection
+      return [...prev, bank.id];
+    });
+  };
+
+  const handleBusinessClick = (businessId: string) => {
+    navigate(`/benefit/${businessId}/0`);
+  };
+
+  const handleViewAllBenefits = () => {
+    // Switch to beneficios tab to show all benefits
+    setActiveTab("beneficios");
+  };
+
+  const handleBenefitSelect = (benefit: RawMongoBenefit) => {
+    // Find the business that matches this benefit's merchant
+    const matchingBusiness = paginatedBusinesses.find(
+      (business) =>
+        business.name
+          .toLowerCase()
+          .includes(benefit.merchant.name.toLowerCase()) ||
+        benefit.merchant.name
+          .toLowerCase()
+          .includes(business.name.toLowerCase())
+    );
+
+    if (matchingBusiness) {
+      // Navigate to the business page
+      console.log("Selected benefit:", {
+        merchant: benefit.merchant.name,
+        bank: benefit.bank,
+        title: benefit.benefitTitle,
+        discount: benefit.discountPercentage,
+        matchingBusiness: matchingBusiness.name,
+        businessId: matchingBusiness.id,
+      });
+      console.log(
+        "🔗 Navigating to business page with popup:",
+        `/benefit/${matchingBusiness.id}/0?openDetails=true`
+      );
+      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true`);
+    } else {
+      // Fallback: if no matching business found, navigate to the first available business
+      // or switch to the benefits tab to show all benefits
+      console.log(
+        "No matching business found for merchant:",
+        benefit.merchant.name
+      );
+      console.log(
+        "Available businesses:",
+        paginatedBusinesses.map((b) => b.name)
+      );
+
+      if (paginatedBusinesses.length > 0) {
+        // Navigate to the first business as a fallback
+        console.log(
+          "🔗 Fallback: Navigating to first business:",
+          `/benefit/${paginatedBusinesses[0].id}/0`
+        );
+        navigate(`/benefit/${paginatedBusinesses[0].id}/0`);
+      } else {
+        // If no businesses available, switch to benefits tab
+        console.log("🔗 Fallback: Switching to benefits tab");
+        setActiveTab("beneficios");
+      }
+    }
+  };
+
+  const handleViewAllOffers = () => {
+    // Navigate to filtered view or show all businesses
+    setSelectedCategory("all");
+  };
+
+  const handleViewMap = () => {
+    // In a real app, this would navigate to map view
+    // For now, we'll keep the user on the current tab
+  };
+
+  const handleTabChange = (tab: NavigationTab) => {
+    setActiveTab(tab);
+    // Handle navigation based on tab
+    switch (tab) {
+      case "inicio":
+        // Clear any filters when going back to home view
+        setSearchTerm("");
+        setSelectedCategory("all");
+        setSelectedBanks([]);
+        break;
+      case "beneficios":
+        // Clear search but keep category and bank filters available for beneficios view
+        setSearchTerm("");
+        // Don't clear category or bank filters - let user filter within beneficios view
+        break;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 safe-area-inset">
+      <SkipToContent targetId="main-content" />
       <Header />
-      <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
-        <main className="py-6 sm:py-8">
-          <Container size="md">
-            <Stack spacing="lg">
-              {/* Search and Filter Controls */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex-1 max-w-md">
-                  <SearchBar value={searchTerm} onChange={setSearchTerm} />
+      <LoadingAnnouncement
+        isLoading={isLoading}
+        message="Cargando ofertas y descuentos"
+      />
+      <ErrorAnnouncement error={error} />
+      <main
+        id="main-content"
+        className="container"
+        role="main"
+        aria-label="Contenido principal"
+      >
+        {/* Search Bar */}
+        <div className="sticky top-0 z-10 px-4 sm:px-6 md:px-8 py-4 bg-white">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Buscar descuentos, tiendas..."
+          />
+        </div>
+
+        {/* Categories Grid - Sticky - Only visible in Beneficios tab */}
+        {activeTab === "beneficios" && (
+          <div className="sticky top-[72px] z-10">
+            <CategoryGrid
+              categories={categoryGridData}
+              onCategorySelect={handleCategorySelect}
+              selectedCategory={selectedCategory}
+            />
+          </div>
+        )}
+
+        {/* Banks Grid - Sticky - Only visible in Beneficios tab */}
+        {activeTab === "beneficios" && (
+          <div className="sticky top-[128px] z-10">
+            <BankGrid
+              banks={bankGridData}
+              onBankSelect={handleBankSelect}
+              selectedBanks={selectedBanks}
+            />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-8 px-4 sm:px-6 md:px-8">
+            <div className="text-red-400 text-5xl mb-4">⚠️</div>
+            <h3 className="text-lg md:text-xl font-medium text-red-900 mb-2">
+              Something went wrong
+            </h3>
+            <p className="text-red-600 text-sm md:text-base">{error}</p>
+          </div>
+        )}
+
+        {/* Main Content */}
+        {!isLoading && !error && (
+          <div className="animate-fade-in-up">
+            {shouldShowFilteredResults ? (
+              /* Filtered Results View */
+              <div className="px-4 sm:px-6 md:px-8 py-6">
+                {/* Filtered Business Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
+                  {filteredBusinesses.map((business, index) => (
+                    <BusinessCard
+                      key={business.id}
+                      business={business}
+                      onClick={handleBusinessClick}
+                      className="card-hover business-card micro-lift"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    />
+                  ))}
                 </div>
-                <div className="flex justify-center sm:justify-end">
-                  <CategoryDropdown
-                    value={selectedCategory}
-                    onChange={setSelectedCategory}
-                    options={
-                      rawCategories as { value: Category; label: string }[]
-                    }
+
+                {filteredBusinesses.length === 0 && (
+                  <div className="text-center py-12 md:py-16">
+                    <div className="text-gray-400 text-5xl md:text-6xl mb-4">
+                      🔍
+                    </div>
+                    <h3 className="text-lg md:text-xl font-medium text-gray-900 mb-2">
+                      No se encontraron resultados
+                    </h3>
+                    <p className="text-gray-600 text-sm md:text-base max-w-md mx-auto">
+                      Intenta con otros términos de búsqueda o selecciona una
+                      categoría diferente
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Default Home View */
+              <div className="stagger-children">
+                {/* Featured Benefits */}
+                <div
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: "0ms" }}
+                >
+                  <FeaturedBenefits
+                    benefits={getFeaturedBenefits()}
+                    onViewAll={handleViewAllBenefits}
+                    onBenefitSelect={handleBenefitSelect}
+                  />
+                </div>
+
+                {/* Active Offers */}
+                <div
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: "200ms" }}
+                >
+                  <ActiveOffers
+                    businesses={getActiveOffers()}
+                    onBusinessClick={handleBusinessClick}
+                    onViewAll={handleViewAllOffers}
+                  />
+                </div>
+
+                {/* Nearby Businesses */}
+                <div
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: "300ms" }}
+                >
+                  <NearbyBusinesses
+                    businesses={getNearbyBusinesses()}
+                    onBusinessClick={handleBusinessClick}
+                    onViewMap={handleViewMap}
                   />
                 </div>
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Error State */}
-              {error && (
-                <div className="text-center py-8">
-                  <div className="text-red-400 text-5xl mb-4">⚠️</div>
-                  <h3 className="text-lg font-medium text-red-900 mb-2">
-                    Something went wrong
-                  </h3>
-                  <p className="text-red-600">{error}</p>
-                </div>
-              )}
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex flex-col justify-center items-center py-12 md:py-16 animate-fade-in-scale">
+            <div className="animate-spin rounded-full h-8 w-8 md:h-10 md:w-10 border-b-2 border-primary-600 mb-4"></div>
+            <div className="text-sm text-gray-600 animate-pulse">
+              Cargando ofertas...
+            </div>
+          </div>
+        )}
+      </main>
 
-              {/* Business Grid with Infinite Scroll */}
-              <ResponsiveBusinessGrid
-                businesses={filteredBusinesses}
-                onBenefitClick={(businessId, benefitIndex) =>
-                  navigate(`/benefit/${businessId}/${benefitIndex}`)
-                }
-                isLoading={isLoading}
-                isLoadingMore={isLoadingMore}
-                hasMore={hasMore}
-                variant="default"
-                setLoadingRef={setLoadingRef}
-              />
-            </Stack>
-          </Container>
-        </main>
-      </PullToRefresh>
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );
 }

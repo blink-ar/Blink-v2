@@ -143,7 +143,16 @@ describe('APIService', () => {
                     category: 'gastronomia',
                     description: 'Cached description',
                     rating: 5,
-                    location: 'Test location',
+                    location: [{
+                        lat: 0,
+                        lng: 0,
+                        formattedAddress: 'Test location',
+                        source: 'address' as const,
+                        provider: 'google' as const,
+                        confidence: 1.0,
+                        raw: 'Test location',
+                        updatedAt: new Date().toISOString()
+                    }],
                     image: 'https://example.com/cached.jpg',
                     benefits: []
                 }

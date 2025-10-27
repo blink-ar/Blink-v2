@@ -315,7 +315,16 @@ export class DataTransformationService extends AbstractBaseService {
             name: titulo || 'Unknown Business',
             description: description || `Business in ${category} category`,
             rating: 4.0, // Default rating
-            location: 'Multiple locations',
+            location: [{
+                lat: 0,
+                lng: 0,
+                formattedAddress: 'Multiple locations',
+                source: 'address' as const,
+                provider: 'google' as const,
+                confidence: 0.5,
+                raw: 'Multiple locations',
+                updatedAt: new Date().toISOString()
+            }],
             benefit: 'Special offer available',
             rewardRate: 'Contact for details'
         };

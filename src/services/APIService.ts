@@ -1,7 +1,7 @@
 import { AbstractBaseService, Logger, NetworkError, ValidationError } from './base';
 import { CacheService } from './CacheService';
 import { HTTPClient } from './HTTPClient';
-import { Business, BankBenefit } from '../types';
+import { Business, BankBenefit, CanonicalLocation } from '../types';
 // Removed mockBusinesses import - using only real MongoDB data
 import { benefitsAPI } from './api';
 
@@ -238,21 +238,75 @@ export class APIService extends AbstractBaseService {
                 return value;
             };
 
+            // Helper function to extract locations from MongoDB benefit data
+            const extractLocations = (benefit: Record<string, unknown>): CanonicalLocation[] => {
+                const locations: CanonicalLocation[] = [];
+
+                // Check if locations array exists
+                if (Array.isArray(benefit.locations)) {
+                    benefit.locations.forEach((loc: Record<string, unknown>) => {
+                        if (loc && typeof loc === 'object') {
+                            locations.push({
+                                placeId: getString(loc.placeId),
+                                lat: typeof loc.lat === 'number' ? loc.lat : 0,
+                                lng: typeof loc.lng === 'number' ? loc.lng : 0,
+                                formattedAddress: getString(loc.formattedAddress) || 'Address not available',
+                                name: getString(loc.name),
+                                addressComponents: loc.addressComponents || undefined,
+                                types: Array.isArray(loc.types) ? loc.types : undefined,
+                                source: (loc.source === 'latlng' || loc.source === 'address' || loc.source === 'name')
+                                    ? loc.source : 'address',
+                                provider: 'google' as const,
+                                confidence: typeof loc.confidence === 'number' ? loc.confidence : 0.5,
+                                raw: loc.raw || '',
+                                meta: loc.meta || null,
+                                updatedAt: getString(loc.updatedAt) || new Date().toISOString()
+                            });
+                        }
+                    });
+                }
+
+                // Fallback if no locations found
+                if (locations.length === 0) {
+                    locations.push({
+                        lat: 0,
+                        lng: 0,
+                        formattedAddress: getStringOrDefault(benefit.location, '') ||
+                            getStringOrDefault(benefit.ubicacion, '') ||
+                            'Location not available',
+                        source: 'address' as const,
+                        provider: 'google' as const,
+                        confidence: 0.5,
+                        raw: getStringOrDefault(benefit.location, '') ||
+                            getStringOrDefault(benefit.ubicacion, '') ||
+                            'Location not available',
+                        updatedAt: new Date().toISOString()
+                    });
+                }
+
+                return locations;
+            };
+
             data.forEach((benefit) => {
                 try {
                     // Extract business information from the raw benefit data
-                    const businessName = getStringOrDefault(benefit.name, '') ||
+                    const merchantName = benefit.merchant && typeof benefit.merchant === 'object'
+                        ? getString((benefit.merchant as Record<string, unknown>).name)
+                        : '';
+
+                    const businessName = merchantName ||
+                        getStringOrDefault(benefit.name, '') ||
                         getStringOrDefault(benefit.titulo, '') ||
                         getStringOrDefault(benefit.business_name, '') ||
                         'Unknown Business';
 
-                    const category = getStringOrDefault(benefit.category, '') ||
-                        getStringOrDefault(benefit.categoria, '') ||
-                        'otros';
+                    const categories = Array.isArray(benefit.categories) ? benefit.categories : [];
+                    const category = categories.length > 0 ? getString(categories[0]) : 'otros';
 
                     const description = getStringOrDefault(benefit.description, '') ||
                         getStringOrDefault(benefit.descripcion, '') ||
                         getStringOrDefault(benefit.cabecera, '') ||
+                        getStringOrDefault(benefit.benefitTitle, '') ||
                         'No description available';
 
                     const image = getStringOrDefault(benefit.image, '') ||
@@ -260,15 +314,15 @@ export class APIService extends AbstractBaseService {
                         'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
                     if (!businessMap.has(businessName)) {
+                        const locations = extractLocations(benefit);
+
                         businessMap.set(businessName, {
                             id: getString(benefit._id) || getString(benefit.id) || businessName,
                             name: businessName,
                             category: category,
                             description: description,
                             rating: getNumber(benefit.rating),
-                            location: getStringOrDefault(benefit.location, '') ||
-                                getStringOrDefault(benefit.ubicacion, '') ||
-                                'Multiple locations',
+                            location: locations,
                             image: image,
                             benefits: [],
                         });
@@ -276,17 +330,24 @@ export class APIService extends AbstractBaseService {
 
                     // Add benefit to the business
                     const business = businessMap.get(businessName)!;
+
+                    // Extract card types information
+                    const cardTypes = Array.isArray(benefit.cardTypes) ? benefit.cardTypes : [];
+                    const cardName = cardTypes.length > 0
+                        ? getString((cardTypes[0] as Record<string, unknown>)?.name)
+                        : 'Credit Card';
+
                     const bankBenefit: BankBenefit = {
                         bankName: getStringOrDefault(benefit.bank, '') ||
                             getStringOrDefault(benefit.banco, '') ||
                             'Bank',
-                        cardName: getStringOrDefault(benefit.card, '') ||
-                            getStringOrDefault(benefit.tarjeta, '') ||
-                            'Credit Card',
-                        benefit: getStringOrDefault(benefit.benefit, '') ||
+                        cardName: cardName,
+                        benefit: getStringOrDefault(benefit.benefitTitle, '') ||
+                            getStringOrDefault(benefit.benefit, '') ||
                             getStringOrDefault(benefit.beneficio, '') ||
                             description,
-                        rewardRate: getStringOrDefault(benefit.reward_rate, '') ||
+                        rewardRate: getStringOrDefault(benefit.discountPercentage, '') ||
+                            getStringOrDefault(benefit.reward_rate, '') ||
                             getStringOrDefault(benefit.tasa_recompensa, '') ||
                             getStringOrDefault(benefit.valor, '') ||
                             'N/A',
@@ -295,12 +356,12 @@ export class APIService extends AbstractBaseService {
                         // Map additional fields from raw benefit data
                         tipo: getString(benefit.tipo) || undefined,
                         cuando: getString(benefit.cuando) || undefined,
-                        valor: getString(benefit.valor) || undefined,
+                        valor: getString(benefit.valor) || getString(benefit.discountPercentage) || undefined,
                         tope: getString(benefit.tope) || undefined,
                         claseDeBeneficio: getString(benefit.claseDeBeneficio) ||
                             getString(benefit.clase_beneficio) ||
                             undefined,
-                        condicion: getString(benefit.condicion) || undefined,
+                        condicion: getString(benefit.condicion) || getString(benefit.termsAndConditions) || undefined,
                         requisitos: getStringArray(benefit.requisitos),
                         usos: getStringArray(benefit.usos),
                         textoAplicacion: getString(benefit.textoAplicacion) ||

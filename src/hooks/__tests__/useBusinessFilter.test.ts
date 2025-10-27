@@ -1,7 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useBusinessFilter } from '../useBusinessFilter';
-import { Business, Category } from '../../types';
+import { Business, Category, CanonicalLocation } from '../../types';
+
+// Helper function to create a location object for tests
+const createTestLocation = (address: string): CanonicalLocation[] => [{
+    lat: 0,
+    lng: 0,
+    formattedAddress: address,
+    source: 'address' as const,
+    provider: 'google' as const,
+    confidence: 1.0,
+    raw: address,
+    updatedAt: new Date().toISOString()
+}];
 
 describe('useBusinessFilter', () => {
     let mockBusinesses: Business[];
@@ -14,7 +26,7 @@ describe('useBusinessFilter', () => {
                 category: 'gastronomia premium',
                 description: 'Fine dining restaurant',
                 rating: 4.5,
-                location: 'Downtown',
+                location: createTestLocation('Downtown'),
                 image: 'image1.jpg',
                 benefits: []
             },
@@ -24,7 +36,7 @@ describe('useBusinessFilter', () => {
                 category: 'moda y accesorios',
                 description: 'Fashion boutique',
                 rating: 4.2,
-                location: 'Shopping Mall',
+                location: createTestLocation('Shopping Mall'),
                 image: 'image2.jpg',
                 benefits: []
             },
@@ -34,7 +46,7 @@ describe('useBusinessFilter', () => {
                 category: 'electrodomesticos',
                 description: 'Electronics and technology',
                 rating: 4.0,
-                location: 'Tech District',
+                location: createTestLocation('Tech District'),
                 image: 'image3.jpg',
                 benefits: []
             },
@@ -44,7 +56,7 @@ describe('useBusinessFilter', () => {
                 category: 'decoracion hogar',
                 description: 'Home decoration items',
                 rating: 4.3,
-                location: 'Home Center',
+                location: createTestLocation('Home Center'),
                 image: 'image4.jpg',
                 benefits: []
             },
@@ -54,7 +66,7 @@ describe('useBusinessFilter', () => {
                 category: 'deportes extremos',
                 description: 'Sports and outdoor equipment',
                 rating: 4.1,
-                location: 'Sports Complex',
+                location: createTestLocation('Sports Complex'),
                 image: 'image5.jpg',
                 benefits: []
             }
@@ -296,7 +308,7 @@ describe('useBusinessFilter', () => {
                     category: null as any,
                     description: 'Business with null category',
                     rating: 3.0,
-                    location: 'Unknown',
+                    location: createTestLocation('Unknown'),
                     image: 'image6.jpg',
                     benefits: []
                 }

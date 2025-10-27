@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CategoryFilterServiceImpl, CategoryConfig } from '../CategoryFilterService';
-import { Business, Category } from '../../types';
+import { Business, Category, CanonicalLocation } from '../../types';
+
+// Helper function to create a location object for tests
+const createTestLocation = (address: string): CanonicalLocation[] => [{
+    lat: 0,
+    lng: 0,
+    formattedAddress: address,
+    source: 'address' as const,
+    provider: 'google' as const,
+    confidence: 1.0,
+    raw: address,
+    updatedAt: new Date().toISOString()
+}];
 
 describe('CategoryFilterService', () => {
     let service: CategoryFilterServiceImpl;
@@ -15,7 +27,7 @@ describe('CategoryFilterService', () => {
                 category: 'gastronomia premium',
                 description: 'Fine dining',
                 rating: 4.5,
-                location: 'Downtown',
+                location: createTestLocation('Downtown'),
                 image: 'image1.jpg',
                 benefits: []
             },
@@ -25,7 +37,7 @@ describe('CategoryFilterService', () => {
                 category: 'moda y accesorios',
                 description: 'Fashion store',
                 rating: 4.2,
-                location: 'Mall',
+                location: createTestLocation('Mall'),
                 image: 'image2.jpg',
                 benefits: []
             },
@@ -35,7 +47,7 @@ describe('CategoryFilterService', () => {
                 category: 'electrodomesticos',
                 description: 'Electronics',
                 rating: 4.0,
-                location: 'Tech District',
+                location: createTestLocation('Tech District'),
                 image: 'image3.jpg',
                 benefits: []
             },
@@ -45,7 +57,7 @@ describe('CategoryFilterService', () => {
                 category: 'decoracion hogar',
                 description: 'Home decoration',
                 rating: 4.3,
-                location: 'Home Center',
+                location: createTestLocation('Home Center'),
                 image: 'image4.jpg',
                 benefits: []
             },
@@ -55,7 +67,7 @@ describe('CategoryFilterService', () => {
                 category: 'deportes extremos',
                 description: 'Sports equipment',
                 rating: 4.1,
-                location: 'Sports Complex',
+                location: createTestLocation('Sports Complex'),
                 image: 'image5.jpg',
                 benefits: []
             }
@@ -118,7 +130,7 @@ describe('CategoryFilterService', () => {
                     category: null as any,
                     description: 'Invalid category',
                     rating: 3.0,
-                    location: 'Unknown',
+                    location: createTestLocation('Unknown'),
                     image: 'image6.jpg',
                     benefits: []
                 }
@@ -137,7 +149,7 @@ describe('CategoryFilterService', () => {
                 category: 'unknown_category',
                 description: 'Unknown category business',
                 rating: 3.5,
-                location: 'Unknown',
+                location: createTestLocation('Unknown'),
                 image: 'image7.jpg',
                 benefits: []
             };
@@ -154,7 +166,7 @@ describe('CategoryFilterService', () => {
                 category: 'GASTRONOMIA PREMIUM',
                 description: 'Upper case category',
                 rating: 4.0,
-                location: 'Uptown',
+                location: createTestLocation('Uptown'),
                 image: 'image8.jpg',
                 benefits: []
             };
@@ -185,7 +197,7 @@ describe('CategoryFilterService', () => {
     describe('addCategoryConfig', () => {
         it('should add new category configuration', () => {
             const newConfig: CategoryConfig = {
-                value: 'test_category' as Category,
+                value: 'otros' as Category,
                 label: 'Test Category',
                 patterns: ['test'],
                 matchType: 'includes'
@@ -193,7 +205,7 @@ describe('CategoryFilterService', () => {
 
             service.addCategoryConfig(newConfig);
             const configs = service.getCategoryConfig();
-            const addedConfig = configs.find(c => c.value === 'test_category');
+            const addedConfig = configs.find(c => c.value === 'otros');
 
             expect(addedConfig).toBeDefined();
             expect(addedConfig?.label).toBe('Test Category');

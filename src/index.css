@@ -2,8 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import modern design system */
+@import './styles/design-system.css';
+
+/* Import responsive design system */
+@import './styles/responsive.css';
+
+/* Import utility classes */
+@import './styles/utilities.css';
+
+/* Import component styles */
+@import './styles/components.css';
+
 /* Import animation system */
 @import './styles/animations.css';
 
+/* Import modern animations */
+@import './styles/modern-animations.css';
+
 /* Import mobile-specific optimizations */
 @import './styles/mobile.css';
+
+/* Import touch optimization and accessibility */
+@import './styles/touch-optimization.css';
+
+/* Import featured benefit card styles */
+@import './styles/featured-benefit.css';
