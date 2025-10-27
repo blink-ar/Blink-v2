@@ -16,8 +16,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
   onBack,
   onFavoriteToggle,
   isFavorite,
-  benefitsCount,
-  activeOffersCount,
 }) => {
   // Mock opening hours - in a real app this would come from business data
   const isOpen = true; // This would be calculated based on current time and business hours
@@ -83,7 +81,7 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
             {/* Category */}
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
-                {business.category}
+                {business.location[0]?.types?.[0] || business.category}
               </span>
 
               {/* Rating */}
@@ -124,27 +122,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
                 </span>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Benefits Count Section */}
-        <div className="bg-gray-50 rounded-xl p-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900 mb-1">
-                {benefitsCount}
-              </div>
-              <div className="text-sm text-gray-600">
-                Beneficios disponibles
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary-600 mb-1">
-                {activeOffersCount}
-              </div>
-              <div className="text-sm text-gray-600">Ofertas activas</div>
-            </div>
           </div>
         </div>
       </div>
