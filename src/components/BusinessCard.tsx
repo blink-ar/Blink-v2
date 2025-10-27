@@ -216,6 +216,9 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
             <div className="flex-1 min-w-0 pr-2">
               <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate max-w-full">
                 {business.name}
+                <span className="text-gray-500 font-normal ml-1">
+                  • {business.location[0]?.types?.[0] || business.category}
+                </span>
               </h3>
               <div className="flex items-center text-gray-500 text-xs mb-2">
                 <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
