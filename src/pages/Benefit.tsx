@@ -184,7 +184,7 @@ const LimitsSection: React.FC<LimitsSectionProps> = ({ value, limit }) => {
               </div>
               <div className="space-y-2">
                 {formattedValue && (
-                  <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white px-3 py-2 rounded border border-purple-100 gap-1">
                     <span className="text-sm font-medium text-purple-800">
                       Descuento:
                     </span>
@@ -194,11 +194,11 @@ const LimitsSection: React.FC<LimitsSectionProps> = ({ value, limit }) => {
                   </div>
                 )}
                 {processedLimit && (
-                  <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-orange-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white px-3 py-2 rounded border border-orange-100 gap-1">
                     <span className="text-sm font-medium text-orange-800">
                       Tope de reintegro:
                     </span>
-                    <span className="text-sm text-orange-700 font-bold">
+                    <span className="text-sm text-orange-700 font-bold break-words">
                       ${processedLimit}
                     </span>
                   </div>
@@ -377,25 +377,24 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
           if (!hasDetails) return null;
 
           return (
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                Detailed Information
-              </h3>
-              <div className="space-y-6">
+            <div className=" border-gray-200 pt-4 sm:pt-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Key Financial Information - Most Important */}
-                <div className="grid gap-4">
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
                     <h4 className="font-semibold text-gray-900 mb-2">
                       Beneficio
                     </h4>
-                    <p className="text-gray-700">{benefit.benefit}</p>
+                    <p className="text-gray-700 text-sm sm:text-base break-words">
+                      {benefit.benefit}
+                    </p>
                     {/* Display raw benefit description if available */}
                     {benefit?.description && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
-                        <h5 className="text-sm font-medium text-gray-600 mb-1">
+                        <h5 className="text-xs sm:text-sm font-medium text-gray-600 mb-1">
                           Descripción detallada:
                         </h5>
-                        <p className="text-gray-600 text-sm leading-relaxed">
+                        <p className="text-gray-600 text-xs sm:text-sm leading-relaxed break-words">
                           {benefit.description}
                         </p>
                       </div>
@@ -410,12 +409,12 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
                 </div>
 
                 {/* Usage and Application Information */}
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <UsageSection usageTypes={benefit.usos || []} />
                 </div>
 
                 {/* Requirements and Application Details */}
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <RequirementsSection
                     requirements={benefit.requisitos || []}
                   />
