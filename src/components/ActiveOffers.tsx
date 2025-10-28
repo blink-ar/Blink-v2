@@ -6,23 +6,25 @@ interface ActiveOffersProps {
   businesses: Business[];
   onBusinessClick: (businessId: string) => void;
   onViewAll: () => void;
+  title?: string;
 }
 
 const ActiveOffers: React.FC<ActiveOffersProps> = ({
   businesses,
   onBusinessClick,
   onViewAll,
+  title = "Ofertas Activas",
 }) => {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
-        <h2 className="text-xl font-bold text-gray-900">Ofertas Activas</h2>
+        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
         <button
           className="text-blue-500 text-sm font-medium hover:text-blue-600 transition-colors"
           onClick={onViewAll}
-          aria-label="Ver todas las ofertas activas"
+          aria-label={`Ver todas las ofertas de ${title.toLowerCase()}`}
         >
-          Ver todas
+          Ver más
         </button>
       </div>
 

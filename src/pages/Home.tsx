@@ -194,6 +194,77 @@ function Home() {
       .slice(0, 8); // Limit to 8 for horizontal scroll
   };
 
+  // Get Santander exclusive offers
+  const getSantanderOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have Santander benefits
+        return business.benefits.some((benefit) =>
+          benefit.bankName.toLowerCase().includes("santander")
+        );
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get BBVA exclusive offers
+  const getBBVAOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have BBVA benefits
+        return business.benefits.some((benefit) =>
+          benefit.bankName.toLowerCase().includes("bbva")
+        );
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get food category offers
+  const getFoodOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses in food/gastronomia category
+        return business.category.toLowerCase() === "gastronomia";
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get high-value offers (benefits with high percentages)
+  const getHighValueOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have benefits with high discount percentages
+        return business.benefits.some((benefit) => {
+          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+          if (percentageMatch) {
+            const percentage = parseInt(percentageMatch[1]);
+            return percentage >= 20; // 20% or higher discount
+          }
+          return false;
+        });
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get biggest discount offers (sorted by highest percentage)
+  const getBiggestDiscountOffers = (): Business[] => {
+    return paginatedBusinesses
+      .map((business) => {
+        // Find the highest discount percentage for each business
+        let maxDiscount = 0;
+        business.benefits.forEach((benefit) => {
+          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+          if (percentageMatch) {
+            const percentage = parseInt(percentageMatch[1]);
+            maxDiscount = Math.max(maxDiscount, percentage);
+          }
+        });
+        return { ...business, maxDiscount };
+      })
+      .filter((business) => business.maxDiscount > 0) // Only businesses with percentage discounts
+      .sort((a, b) => b.maxDiscount - a.maxDiscount) // Sort by highest discount first
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
   // Get nearby businesses (simulate with distance)
   const getNearbyBusinesses = (): Business[] => {
     return paginatedBusinesses
@@ -444,10 +515,94 @@ function Home() {
                   />
                 </div>
 
+                {/* Santander Exclusive Offers */}
+                {getSantanderOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "250ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getSantanderOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedBanks(["santander"]);
+                        setActiveTab("beneficios");
+                      }}
+                      title="Exclusivos Santander"
+                    />
+                  </div>
+                )}
+
+                {/* BBVA Exclusive Offers */}
+                {getBBVAOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "300ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getBBVAOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedBanks(["bbva"]);
+                        setActiveTab("beneficios");
+                      }}
+                      title="Exclusivos BBVA"
+                    />
+                  </div>
+                )}
+
+                {/* Food Offers */}
+                {getFoodOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "350ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getFoodOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedCategory("gastronomia");
+                        setActiveTab("beneficios");
+                      }}
+                      title="Ofertas de Comida"
+                    />
+                  </div>
+                )}
+
+                {/* High Value Offers */}
+                {getHighValueOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "375ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getHighValueOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={handleViewAllOffers}
+                      title="Descuentos Imperdibles"
+                    />
+                  </div>
+                )}
+
+                {/* Biggest Discount Offers */}
+                {getBiggestDiscountOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "400ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getBiggestDiscountOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={handleViewAllOffers}
+                      title="Mayores Descuentos"
+                    />
+                  </div>
+                )}
+
                 {/* Nearby Businesses */}
                 <div
                   className="animate-fade-in-up"
-                  style={{ animationDelay: "300ms" }}
+                  style={{ animationDelay: "450ms" }}
                 >
                   <NearbyBusinesses
                     businesses={getNearbyBusinesses()}
