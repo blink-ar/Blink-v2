@@ -5,7 +5,7 @@ import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
 import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
-import NearbyBusinesses from "../components/NearbyBusinesses";
+// import NearbyBusinesses from "../components/NearbyBusinesses";
 import BusinessCard from "../components/BusinessCard";
 import BottomNavigation, {
   NavigationTab,
@@ -266,15 +266,15 @@ function Home() {
   };
 
   // Get nearby businesses (simulate with distance)
-  const getNearbyBusinesses = (): Business[] => {
-    return paginatedBusinesses
-      .map((business) => ({
-        ...business,
-        distance: Math.random() * 5 + 0.1, // Random distance between 0.1 and 5.1 km
-      }))
-      .sort((a, b) => (a.distance || 0) - (b.distance || 0))
-      .slice(0, 6); // Show top 6 nearest
-  };
+  // const getNearbyBusinesses = (): Business[] => {
+  //   return paginatedBusinesses
+  //     .map((business) => ({
+  //       ...business,
+  //       distance: Math.random() * 5 + 0.1, // Random distance between 0.1 and 5.1 km
+  //     }))
+  //     .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+  //     .slice(0, 6); // Show top 6 nearest
+  // };
 
   const handleCategorySelect = (category: {
     id: string;
@@ -374,10 +374,10 @@ function Home() {
     setSelectedCategory("all");
   };
 
-  const handleViewMap = () => {
-    // In a real app, this would navigate to map view
-    // For now, we'll keep the user on the current tab
-  };
+  // const handleViewMap = () => {
+  //   // In a real app, this would navigate to map view
+  //   // For now, we'll keep the user on the current tab
+  // };
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
@@ -599,7 +599,7 @@ function Home() {
                   </div>
                 )}
 
-                {/* Nearby Businesses */}
+                {/* Nearby Businesses
                 <div
                   className="animate-fade-in-up"
                   style={{ animationDelay: "450ms" }}
@@ -609,7 +609,7 @@ function Home() {
                     onBusinessClick={handleBusinessClick}
                     onViewMap={handleViewMap}
                   />
-                </div>
+                </div> */}
               </div>
             )}
           </div>
