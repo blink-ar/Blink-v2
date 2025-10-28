@@ -49,9 +49,7 @@ declare global {
 
 const getEnvApiKey = (): string | undefined => {
   // In Vite, environment variables are available through import.meta.env
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  console.log('Google Maps API Key loaded:', apiKey ? 'Present' : 'Missing');
-  return apiKey;
+  return import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 };
 
 let loadPromise: Promise<GoogleMapsAPI> | null = null;
