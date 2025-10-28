@@ -1,16 +1,10 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Business, BankBenefit } from "../types";
-import { RawBenefit } from "../types/benefit";
+import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
 import { fetchBusinesses } from "../services/api";
-import {
-  DollarSign,
-  AlertCircle,
-  CheckCircle,
-  FileText,
-  AlertTriangle,
-} from "lucide-react";
+import { DollarSign, CheckCircle, FileText, AlertTriangle } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import StoreHeader from "../components/StoreHeader";
 import BenefitsFilter from "../components/BenefitsFilter";
@@ -36,6 +30,7 @@ const logger = Logger.getInstance().createServiceLogger("BenefitPage");
 // Component prop interfaces
 interface BenefitDetailsProps {
   benefit: BankBenefit;
+  rawBenefit?: RawMongoBenefit | null;
 }
 
 // Error boundary wrapper for benefit sections
@@ -233,16 +228,13 @@ const ConditionsSection: React.FC<ConditionsSectionProps> = ({ condition }) => {
           if (!hasValidContent(processedCondition)) return null;
 
           return (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                <h4 className="font-semibold text-yellow-900">Condiciones</h4>
-              </div>
-              <div className="bg-white border-l-4 border-yellow-400 px-4 py-3 rounded">
-                <p className="text-gray-700 text-sm whitespace-pre-line leading-relaxed">
-                  {processedCondition}
-                </p>
-              </div>
+            <div className="border-t border-gray-100 pt-3">
+              <h5 className="text-sm font-medium text-gray-600 mb-2">
+                Condiciones
+              </h5>
+              <p className="text-gray-600 text-xs leading-relaxed">
+                {processedCondition}
+              </p>
             </div>
           );
         } catch (error) {
@@ -389,10 +381,26 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
               <h3 className="text-lg font-semibold text-gray-900 mb-6">
                 Detailed Information
               </h3>
-
               <div className="space-y-6">
                 {/* Key Financial Information - Most Important */}
                 <div className="grid gap-4">
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Beneficio
+                    </h4>
+                    <p className="text-gray-700">{benefit.benefit}</p>
+                    {/* Display raw benefit description if available */}
+                    {benefit?.description && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <h5 className="text-sm font-medium text-gray-600 mb-1">
+                          Descripción detallada:
+                        </h5>
+                        <p className="text-gray-600 text-sm leading-relaxed">
+                          {benefit.description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   {/* Days of Week Availability */}
                   <DaysOfWeek
                     benefit={benefit}
@@ -403,7 +411,6 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
 
                 {/* Usage and Application Information */}
                 <div className="space-y-4">
-                  <ConditionsSection condition={benefit.condicion || ""} />
                   <UsageSection usageTypes={benefit.usos || []} />
                 </div>
 
@@ -415,6 +422,7 @@ const BenefitDetailsSection: React.FC<BenefitDetailsProps> = ({ benefit }) => {
                   <ApplicationTextSection
                     applicationText={benefit.textoAplicacion || ""}
                   />
+                  <ConditionsSection condition={benefit.condicion || ""} />
 
                   {/* Original Text Section for AI Analyzed Benefits */}
                 </div>
@@ -443,7 +451,7 @@ function Benefit() {
   // Check for openDetails query parameter
   const searchParams = new URLSearchParams(location.search);
   const shouldOpenDetails = searchParams.get("openDetails") === "true";
-  const [rawBenefit, setRawBenefit] = useState<RawBenefit | null>(null);
+  const [rawBenefit, setRawBenefit] = useState<RawMongoBenefit | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -468,10 +476,11 @@ function Benefit() {
         // Try to get raw benefit by ID first (if id is a MongoDB ObjectId)
         if (id && id.length === 24) {
           // MongoDB ObjectId length
-          console.log("🔍 Trying to fetch raw benefit by ID:", id);
+
           const rawBenefitData = await getRawBenefitById(id);
           if (rawBenefitData) {
             console.log("✅ Found raw benefit:", rawBenefitData);
+
             setRawBenefit(rawBenefitData);
 
             // Convert raw benefit to the format expected by the UI
@@ -493,6 +502,10 @@ function Benefit() {
                 ? ["online", "presencial"]
                 : ["presencial"],
               textoAplicacion: rawBenefitData.link,
+              description:
+                rawBenefitData.description ||
+                rawBenefitData.benefitTitle ||
+                "No description available",
             };
 
             // Create a business object for the UI
@@ -500,10 +513,10 @@ function Benefit() {
               id: rawBenefitData._id.$oid,
               name: rawBenefitData.merchant.name,
               category: rawBenefitData.categories[0] || "otros",
-              description: rawBenefitData.description,
+              description: `Business offering ${rawBenefitData.benefitTitle}`,
               rating: 5,
               location: rawBenefitData.locations?.map(
-                (loc: RawBenefit["locations"][0]) => ({
+                (loc: RawMongoBenefit["locations"][0]) => ({
                   placeId: loc.placeId,
                   lat: loc.lat || 0,
                   lng: loc.lng || 0,
@@ -549,9 +562,7 @@ function Benefit() {
         }
 
         // Fallback: try to find business by merchant name
-        console.log("🔍 Searching for business by merchant name...");
         const businesses = await fetchBusinesses();
-        console.log("📊 Got", businesses.length, "businesses");
 
         // Find business by ID (which is now merchant-name-based)
         const matchingBusiness = businesses.find(
@@ -571,6 +582,41 @@ function Benefit() {
               benefit: selectedBenefit,
             });
 
+            // Try to get description from raw benefits API if missing
+            if (!selectedBenefit.description) {
+              console.log(
+                "🔍 Benefit missing description, trying to fetch from raw API..."
+              );
+              try {
+                const rawBenefitsForDescription = await getRawBenefits({
+                  limit: 1000,
+                  offset: 0,
+                });
+
+                // Try to find matching raw benefit by merchant name and benefit title
+                const matchingRawBenefit = rawBenefitsForDescription.find(
+                  (rawBenefit) =>
+                    rawBenefit.merchant.name.toLowerCase() ===
+                      matchingBusiness.name.toLowerCase() &&
+                    rawBenefit.benefitTitle.toLowerCase() ===
+                      selectedBenefit.benefit.toLowerCase()
+                );
+
+                if (matchingRawBenefit?.description) {
+                  selectedBenefit.description = matchingRawBenefit.description;
+                  console.log(
+                    "✅ Added description from raw API:",
+                    matchingRawBenefit.description
+                  );
+                }
+              } catch (error) {
+                console.warn(
+                  "Failed to fetch description from raw API:",
+                  error
+                );
+              }
+            }
+
             setBusiness(matchingBusiness);
             setBenefit(selectedBenefit);
             setError(null);
@@ -579,12 +625,10 @@ function Benefit() {
         }
 
         // Last resort: try to find by MongoDB ObjectId in raw benefits
-        console.log("🔍 Last resort: searching in all raw benefits...");
         const allRawBenefits = await getRawBenefits({
           limit: 1000,
           offset: 0,
         });
-        console.log("📊 Got", allRawBenefits.length, "raw benefits");
 
         // Try to find by MongoDB ObjectId
         const matchingBenefits = allRawBenefits.filter(
@@ -599,7 +643,6 @@ function Benefit() {
               : matchingBenefits[0];
 
           if (benefitToShow) {
-            console.log("✅ Found matching benefit:", benefitToShow);
             setRawBenefit(benefitToShow);
 
             // Convert to UI format (same as above)
@@ -621,16 +664,20 @@ function Benefit() {
                 ? ["online", "presencial"]
                 : ["presencial"],
               textoAplicacion: benefitToShow.link,
+              description:
+                benefitToShow.description ||
+                benefitToShow.benefitTitle ||
+                "No description available",
             };
 
             const convertedBusiness: Business = {
               id: benefitToShow._id.$oid,
               name: benefitToShow.merchant.name,
               category: benefitToShow.categories[0] || "otros",
-              description: benefitToShow.description,
+              description: `Business offering ${benefitToShow.benefitTitle}`,
               rating: 5,
               location: benefitToShow.locations?.map(
-                (loc: RawBenefit["locations"][0]) => ({
+                (loc: RawMongoBenefit["locations"][0]) => ({
                   placeId: loc.placeId,
                   lat: loc.lat || 0,
                   lng: loc.lng || 0,
@@ -708,7 +755,14 @@ function Benefit() {
       }`;
       window.history.replaceState({}, "", newUrl);
     }
-  }, [shouldOpenDetails, business, benefit, loading, location.search]);
+  }, [
+    shouldOpenDetails,
+    business,
+    benefit,
+    loading,
+    location.search,
+    location.pathname,
+  ]);
 
   if (loading)
     return (
@@ -822,7 +876,10 @@ function Benefit() {
 
               <div className="p-6">
                 {/* Original detailed benefit information */}
-                <BenefitDetailsSection benefit={benefit} />
+                <BenefitDetailsSection
+                  benefit={benefit}
+                  rawBenefit={rawBenefit}
+                />
 
                 {/* Raw MongoDB Data Section */}
                 {rawBenefit && (
