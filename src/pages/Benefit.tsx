@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Business, BankBenefit } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
-import { fetchBusinesses } from "../services/api";
+import { fetchAllBusinessesComplete } from "../services/api";
 import { DollarSign, CheckCircle, FileText, AlertTriangle } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import StoreHeader from "../components/StoreHeader";
@@ -561,7 +561,8 @@ function Benefit() {
         }
 
         // Fallback: try to find business by merchant name
-        const businesses = await fetchBusinesses();
+        // Use the same function as Home page to ensure consistent data
+        const businesses = await fetchAllBusinessesComplete();
 
         // Find business by ID (which is now merchant-name-based)
         const matchingBusiness = businesses.find(
@@ -788,7 +789,8 @@ function Benefit() {
     setSelectedFilter(filter);
   };
 
-  const handleBenefitSelect = () => {
+  const handleBenefitSelect = (selectedBenefit: BankBenefit) => {
+    setBenefit(selectedBenefit);
     setShowDetailedView(true);
   };
 
@@ -834,9 +836,9 @@ function Benefit() {
         <div className="px-6 py-4 space-y-4">
           {business.benefits.map((benefitItem, index) => (
             <ModernBenefitCard
-              key={index}
+              key={`${benefitItem.bankName}-${index}`}
               benefit={benefitItem}
-              onSelect={handleBenefitSelect}
+              onSelect={() => handleBenefitSelect(benefitItem)}
               variant={index === 0 ? "featured" : "active"} // Mock logic for variants
             />
           ))}
