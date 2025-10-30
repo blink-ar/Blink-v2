@@ -5,6 +5,7 @@ import { getGoogleMaps } from "../services/googleMapsLoader";
 interface LocationMapProps {
   locations: CanonicalLocation[];
   onMarkerClick?: (location: CanonicalLocation) => void;
+  selectedLocation?: CanonicalLocation | null;
   className?: string;
 }
 
@@ -13,12 +14,13 @@ const DEFAULT_ZOOM = 13;
 const LocationMap: React.FC<LocationMapProps> = ({
   locations,
   onMarkerClick,
+  selectedLocation,
   className,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const infoWindowRef = useRef<any>(null);
+  const mapRef = useRef<unknown>(null);
+  const markersRef = useRef<unknown[]>([]);
+  const infoWindowRef = useRef<unknown>(null);
   const [error, setError] = useState<string | null>(null);
 
   const clearMarkers = () => {
@@ -49,7 +51,16 @@ const LocationMap: React.FC<LocationMapProps> = ({
             mapTypeControl: false,
             fullscreenControl: false,
             streetViewControl: false,
+            clickableIcons: false, // Disable default POI clicks
+            disableDefaultUI: false,
           });
+
+        // Prevent default map click behavior that shows blue dot
+        if (!mapRef.current) {
+          map.addListener("click", (event) => {
+            event.stop();
+          });
+        }
 
         mapRef.current = map;
         infoWindowRef.current =
@@ -60,16 +71,40 @@ const LocationMap: React.FC<LocationMapProps> = ({
         const bounds = new googleMaps.maps.LatLngBounds();
 
         markersRef.current = locations.map((location) => {
+          const isSelected =
+            selectedLocation &&
+            selectedLocation.lat === location.lat &&
+            selectedLocation.lng === location.lng;
+
+          // Create custom pin icon - larger for selected, normal for unselected
+          const pinSize = isSelected ? 40 : 28;
+          const pinColor = isSelected ? "#2563eb" : "#ef4444";
+
+          const customIcon = {
+            url:
+              "data:image/svg+xml;charset=UTF-8," +
+              encodeURIComponent(`
+            <svg width="${pinSize}" height="${pinSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${pinColor}" stroke="#ffffff" stroke-width="1"/>
+            </svg>
+          `),
+            scaledSize: new googleMaps.maps.Size(pinSize, pinSize),
+            anchor: new googleMaps.maps.Point(pinSize / 2, pinSize),
+          };
+
           const marker = new googleMaps.maps.Marker({
             position: { lat: location.lat, lng: location.lng },
             map,
             title: location.name || location.formattedAddress || "Ubicación",
+            icon: customIcon,
+            optimized: false, // Prevents default Google Maps marker behavior
+            clickable: true,
           });
 
-          marker.addListener("click", () => {
-            if (location.placeId) {
-              console.log("Marker selected:", location.placeId);
-            }
+          marker.addListener("click", (event) => {
+            // Prevent default Google Maps behavior
+            event.stop();
+
             if (onMarkerClick) {
               onMarkerClick(location);
             }
@@ -83,6 +118,11 @@ const LocationMap: React.FC<LocationMapProps> = ({
                   <span>${location.lat.toFixed(4)}, ${location.lng.toFixed(
                 4
               )}</span>
+                  ${
+                    isSelected
+                      ? '<br/><span style="color: #2563eb; font-weight: bold;">📍 Ubicación seleccionada</span>'
+                      : ""
+                  }
                 </div>
               `;
               infoWindow.setContent(content);
@@ -118,7 +158,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
       cancelled = true;
       clearMarkers();
     };
-  }, [locations, onMarkerClick]);
+  }, [locations, onMarkerClick, selectedLocation]);
 
   if (!locations?.length) {
     return null;

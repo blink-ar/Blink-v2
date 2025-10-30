@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Business, BankBenefit } from "../types";
+import { Business, BankBenefit, CanonicalLocation } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
 import { fetchAllBusinessesComplete } from "../services/api";
@@ -461,6 +461,8 @@ function Benefit() {
     "all" | "active" | "upcoming" | "expired"
   >("all");
   const [showDetailedView, setShowDetailedView] = useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    useState<CanonicalLocation | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -846,7 +848,10 @@ function Benefit() {
 
         {/* Store Information Section */}
         <StoreInformation
+          key={selectedLocation?.placeId || "default"}
           business={business}
+          selectedLocation={selectedLocation}
+          onLocationSelect={setSelectedLocation}
           onCallClick={() => {
             // Handle call action
             console.log("Call clicked");
