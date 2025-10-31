@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
@@ -16,75 +16,34 @@ import {
   ErrorAnnouncement,
 } from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
+import { useBenefitsData } from "../hooks/useBenefitsData";
+import { CacheNotification } from "../components/CacheNotification";
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { fetchAllBusinessesComplete } from "../services/api";
-import { getRawBenefits } from "../services/rawBenefitsApi";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
 
-  // State for loading all businesses at once
-  const [paginatedBusinesses, setPaginatedBusinesses] = useState<Business[]>(
-    []
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // State for raw benefits from API
-  const [rawBenefits, setRawBenefits] = useState<RawMongoBenefit[]>([]);
+  // Use the cached benefits data hook
+  const {
+    businesses: paginatedBusinesses,
+    featuredBenefits: rawBenefits,
+    isLoading,
+    error,
+  } = useBenefitsData();
 
   // State for bottom navigation
   const [activeTab, setActiveTab] = useState<NavigationTab>("inicio");
 
-  // Load raw benefits from API
-  const loadRawBenefits = useCallback(async () => {
-    try {
-      console.log("🚀 Loading raw benefits from API...");
-      const benefits = await getRawBenefits({ limit: 10 }); // Get first 10 benefits
-      setRawBenefits(benefits);
-      console.log(`✅ Loaded ${benefits.length} raw benefits!`);
-    } catch (err) {
-      console.error("❌ Error loading raw benefits:", err);
-      // Don't set error state for raw benefits, just log it
-    }
-  }, []);
-
-  // Load ALL businesses at once
-  const loadAllBusinesses = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      console.log("🚀 Loading ALL businesses from all 1,714 benefits...");
-
-      // Load both businesses and raw benefits
-      const [allBusinesses] = await Promise.all([
-        fetchAllBusinessesComplete(),
-        loadRawBenefits(),
-      ]);
-
-      setPaginatedBusinesses(allBusinesses);
-
-      console.log(
-        `✅ Loaded ${allBusinesses.length} businesses from all benefits!`
-      );
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load all businesses";
-      setError(errorMessage);
-      console.error("❌ Error loading all businesses:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadRawBenefits]);
-
-  // Load all businesses on mount
-  useEffect(() => {
-    loadAllBusinesses();
-  }, [loadAllBusinesses]);
+  // State for cache notifications
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "warning" | "error" | "info";
+  }>({ show: false, message: "", type: "info" });
 
   // Removed unused infinite scroll variables for modern UI
 
@@ -628,6 +587,14 @@ function Home() {
 
       {/* Bottom Navigation */}
       <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Cache Notification */}
+      <CacheNotification
+        show={notification.show}
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification({ ...notification, show: false })}
+      />
     </div>
   );
 }

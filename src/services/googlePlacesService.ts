@@ -1,5 +1,5 @@
 // Clean service to match your backend exactly
-const BASE_URL = 'http://localhost:3002';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Backend response structure
 interface BackendResponse {
@@ -93,6 +93,26 @@ export interface FormattedPlaceDetails {
 
 class GooglePlacesService {
     private cache = new Map<string, PlaceDetails>();
+    private placesService: any = null;
+
+    private async initializePlacesService() {
+        if (this.placesService) return this.placesService;
+
+        try {
+            // Import Google Maps loader
+            const { getGoogleMaps } = await import('./googleMapsLoader');
+            const google = await getGoogleMaps();
+
+            // Create a temporary div for the PlacesService (required by Google)
+            const tempDiv = document.createElement('div');
+            this.placesService = new google.maps.places.PlacesService(tempDiv);
+
+            return this.placesService;
+        } catch (error) {
+            console.error('Failed to initialize Places Service:', error);
+            throw error;
+        }
+    }
 
     async getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
         if (this.cache.has(placeId)) {
@@ -100,58 +120,123 @@ class GooglePlacesService {
         }
 
         try {
-            const response = await fetch(`${BASE_URL}/api/places/details`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ placeId })
-            });
-
-            if (!response.ok) {
-                console.error(`❌ API Error: ${response.status}`);
-                return null;
+            // Try backend first (for compatibility)
+            const backendResult = await this.getPlaceDetailsFromBackend(placeId);
+            if (backendResult) {
+                this.cache.set(placeId, backendResult);
+                return backendResult;
             }
+        } catch (error) {
+            console.warn('Backend API failed, trying direct Google Places API:', error);
+        }
 
-            const rawResponse = await response.text();
-            const backendResponse: BackendResponse = JSON.parse(rawResponse);
-
-            if (!backendResponse.success) {
-                return null;
+        // Fallback to direct Google Places API
+        try {
+            const directResult = await this.getPlaceDetailsFromGoogle(placeId);
+            if (directResult) {
+                this.cache.set(placeId, directResult);
+                return directResult;
             }
+        } catch (error) {
+            console.error('Direct Google Places API also failed:', error);
+        }
 
-            const googleRaw: GooglePlacesRaw = JSON.parse(backendResponse.result.raw);
+        return null;
+    }
 
-            // Transform to our clean format
-            const placeDetails: PlaceDetails = {
-                placeId: backendResponse.result.placeId,
-                name: backendResponse.result.name,
-                formattedAddress: backendResponse.result.formattedAddress,
-                lat: backendResponse.result.lat,
-                lng: backendResponse.result.lng,
-                types: backendResponse.result.types,
-                rating: googleRaw.rating,
-                userRatingsTotal: googleRaw.user_ratings_total,
-                formattedPhoneNumber: googleRaw.formatted_phone_number,
-                website: googleRaw.website,
-                openingHours: googleRaw.opening_hours?.weekday_text,
-                isOpenNow: googleRaw.opening_hours?.open_now,
-                photos: googleRaw.photos?.map(photo => ({
-                    reference: photo.photo_reference,
-                    width: photo.width,
-                    height: photo.height
-                }))
+    private async getPlaceDetailsFromBackend(placeId: string): Promise<PlaceDetails | null> {
+        const response = await fetch(`${BASE_URL}/api/places/details`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ placeId })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend API Error: ${response.status}`);
+        }
+
+        const rawResponse = await response.text();
+        const backendResponse: BackendResponse = JSON.parse(rawResponse);
+
+        if (!backendResponse.success) {
+            throw new Error('Backend returned unsuccessful response');
+        }
+
+        const googleRaw: GooglePlacesRaw = JSON.parse(backendResponse.result.raw);
+
+        return {
+            placeId: backendResponse.result.placeId,
+            name: backendResponse.result.name,
+            formattedAddress: backendResponse.result.formattedAddress,
+            lat: backendResponse.result.lat,
+            lng: backendResponse.result.lng,
+            types: backendResponse.result.types,
+            rating: googleRaw.rating,
+            userRatingsTotal: googleRaw.user_ratings_total,
+            formattedPhoneNumber: googleRaw.formatted_phone_number,
+            website: googleRaw.website,
+            openingHours: googleRaw.opening_hours?.weekday_text,
+            isOpenNow: googleRaw.opening_hours?.open_now,
+            photos: googleRaw.photos?.map(photo => ({
+                reference: photo.photo_reference,
+                width: photo.width,
+                height: photo.height
+            }))
+        };
+    }
+
+    private async getPlaceDetailsFromGoogle(placeId: string): Promise<PlaceDetails | null> {
+        const placesService = await this.initializePlacesService();
+
+        return new Promise((resolve) => {
+            const request = {
+                placeId: placeId,
+                fields: [
+                    'place_id',
+                    'name',
+                    'formatted_address',
+                    'geometry',
+                    'rating',
+                    'user_ratings_total',
+                    'formatted_phone_number',
+                    'website',
+                    'opening_hours',
+                    'types',
+                    'photos'
+                ]
             };
 
-
-
-            this.cache.set(placeId, placeDetails);
-            return placeDetails;
-
-        } catch (error) {
-            console.error('Network error:', error);
-            return null;
-        }
+            placesService.getDetails(request, (place: any, status: any) => {
+                const google = (window as any).google;
+                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                    const placeDetails: PlaceDetails = {
+                        placeId: place.place_id,
+                        name: place.name,
+                        formattedAddress: place.formatted_address,
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng(),
+                        types: place.types || [],
+                        rating: place.rating,
+                        userRatingsTotal: place.user_ratings_total,
+                        formattedPhoneNumber: place.formatted_phone_number,
+                        website: place.website,
+                        openingHours: place.opening_hours?.weekday_text,
+                        isOpenNow: place.opening_hours?.open_now,
+                        photos: place.photos?.map((photo: unknown) => ({
+                            reference: photo.getUrl({ maxWidth: 400, maxHeight: 400 }),
+                            width: 400,
+                            height: 400
+                        }))
+                    };
+                    resolve(placeDetails);
+                } else {
+                    console.error('Places service failed:', status);
+                    resolve(null);
+                }
+            });
+        });
     }
 
     formatOpeningHours(openingHours?: string[]): FormattedOpeningHours {

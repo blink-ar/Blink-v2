@@ -2,8 +2,9 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Business, BankBenefit, CanonicalLocation } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
-import { fetchAllBusinessesComplete } from "../services/api";
+import { getRawBenefitById } from "../services/rawBenefitsApi";
+import { useBusinessesData } from "../hooks/useBenefitsData";
+import { getBenefitsDataService } from "../services/BenefitsDataService";
 import { DollarSign, CheckCircle, FileText, AlertTriangle } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import StoreHeader from "../components/StoreHeader";
@@ -447,6 +448,13 @@ function Benefit() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Use cached businesses data
+  const {
+    businesses,
+    isLoading: businessesLoading,
+    error: businessesError,
+  } = useBusinessesData();
+
   // Check for openDetails query parameter
   const searchParams = new URLSearchParams(location.search);
   const shouldOpenDetails = searchParams.get("openDetails") === "true";
@@ -467,12 +475,16 @@ function Benefit() {
   useEffect(() => {
     const load = async () => {
       try {
-        console.log(
-          "🔍 Loading benefit with ID:",
-          id,
-          "and index:",
-          benefitIndex
-        );
+        // Wait for businesses to load if they haven't yet
+        if (businessesLoading) {
+          return;
+        }
+
+        if (businessesError) {
+          setError(businessesError);
+          setLoading(false);
+          return;
+        }
 
         // Try to get raw benefit by ID first (if id is a MongoDB ObjectId)
         if (id && id.length === 24) {
@@ -480,8 +492,6 @@ function Benefit() {
 
           const rawBenefitData = await getRawBenefitById(id);
           if (rawBenefitData) {
-            console.log("✅ Found raw benefit:", rawBenefitData);
-
             setRawBenefit(rawBenefitData);
 
             // Convert raw benefit to the format expected by the UI
@@ -562,9 +572,7 @@ function Benefit() {
           }
         }
 
-        // Fallback: try to find business by merchant name
-        // Use the same function as Home page to ensure consistent data
-        const businesses = await fetchAllBusinessesComplete();
+        // Use cached businesses data instead of fetching again
 
         // Find business by ID (which is now merchant-name-based)
         const matchingBusiness = businesses.find(
@@ -578,22 +586,14 @@ function Benefit() {
           const selectedBenefit = matchingBusiness.benefits[idx];
 
           if (selectedBenefit) {
-            console.log("✅ Found business and benefit:", {
-              businessName: matchingBusiness.name,
-              benefitIndex: idx,
-              benefit: selectedBenefit,
-            });
-
-            // Try to get description from raw benefits API if missing
+            // Try to get description from cached raw benefits if missing
             if (!selectedBenefit.description) {
-              console.log(
-                "🔍 Benefit missing description, trying to fetch from raw API..."
-              );
               try {
-                const rawBenefitsForDescription = await getRawBenefits({
-                  limit: 1000,
-                  offset: 0,
-                });
+                const rawBenefitsForDescription =
+                  await getBenefitsDataService().getRawBenefits({
+                    limit: 1000,
+                    offset: 0,
+                  });
 
                 // Try to find matching raw benefit by merchant name and benefit title
                 const matchingRawBenefit = rawBenefitsForDescription.find(
@@ -606,16 +606,9 @@ function Benefit() {
 
                 if (matchingRawBenefit?.description) {
                   selectedBenefit.description = matchingRawBenefit.description;
-                  console.log(
-                    "✅ Added description from raw API:",
-                    matchingRawBenefit.description
-                  );
                 }
-              } catch (error) {
-                console.warn(
-                  "Failed to fetch description from raw API:",
-                  error
-                );
+              } catch {
+                // Silent fail for description fetch
               }
             }
 
@@ -626,8 +619,8 @@ function Benefit() {
           }
         }
 
-        // Last resort: try to find by MongoDB ObjectId in raw benefits
-        const allRawBenefits = await getRawBenefits({
+        // Last resort: try to find by MongoDB ObjectId in cached raw benefits
+        const allRawBenefits = await getBenefitsDataService().getRawBenefits({
           limit: 1000,
           offset: 0,
         });
@@ -725,24 +718,21 @@ function Benefit() {
         }
 
         // If nothing found
-        console.warn(
-          "❌ No benefit found for ID:",
-          id,
-          "and index:",
-          benefitIndex
-        );
         setBusiness(null);
         setBenefit(null);
         setError("Benefit not found");
-      } catch (err) {
-        console.error("❌ Error loading benefit:", err);
+      } catch {
         setError("Failed to load benefit");
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, [id, benefitIndex]);
+
+    // Only load when businesses data is ready
+    if (!businessesLoading) {
+      load();
+    }
+  }, [id, benefitIndex, businesses, businessesLoading, businessesError]);
 
   // Auto-open details popup if requested via query parameter
   useEffect(() => {
@@ -854,11 +844,6 @@ function Benefit() {
           onLocationSelect={setSelectedLocation}
           onCallClick={() => {
             // Handle call action
-            console.log("Call clicked");
-          }}
-          onDirectionsClick={() => {
-            // Handle directions action
-            console.log("Directions clicked");
           }}
         />
 

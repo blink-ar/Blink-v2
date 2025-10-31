@@ -1,4 +1,4 @@
-import { BaseService } from '../services/base';
+import type { BaseService } from '../services/base';
 
 /**
  * Mock implementation of BaseService for testing

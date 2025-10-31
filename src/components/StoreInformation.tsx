@@ -82,6 +82,17 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
     }
   };
 
+  // Check if all locations are virtual (Nacional or Online)
+  const hasPhysicalLocations = business.location.some((location) => {
+    const locationName =
+      location.name?.toLowerCase() ||
+      location.formattedAddress?.toLowerCase() ||
+      "";
+    return (
+      !locationName.includes("nacional") && !locationName.includes("online")
+    );
+  });
+
   const handleDirectionsClick = () => {
     if (currentLocation?.placeId) {
       // Use Place ID for exact Google Maps place card
@@ -141,13 +152,15 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={handleDirectionsClick}
-            className="ml-8 flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
-          >
-            <Navigation className="h-4 w-4" />
-            <span>Cómo llegar</span>
-          </button>
+          {hasPhysicalLocations && (
+            <button
+              onClick={handleDirectionsClick}
+              className="ml-8 flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+            >
+              <Navigation className="h-4 w-4" />
+              <span>Cómo llegar</span>
+            </button>
+          )}
         </div>
 
         {/* Opening Hours Section */}
@@ -315,7 +328,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
           </div>
         )}
 
-        {/* Store Description */}
+        {/* Store Description
         {business.description && (
           <div className="pt-4 border-t border-gray-100">
             <h4 className="font-medium text-gray-900 mb-2">
@@ -325,7 +338,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
               {business.description}
             </p>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
