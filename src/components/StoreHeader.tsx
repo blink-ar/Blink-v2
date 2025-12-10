@@ -7,8 +7,6 @@ interface StoreHeaderProps {
   onBack: () => void;
   onFavoriteToggle: () => void;
   isFavorite: boolean;
-  benefitsCount: number;
-  activeOffersCount: number;
 }
 
 const StoreHeader: React.FC<StoreHeaderProps> = ({

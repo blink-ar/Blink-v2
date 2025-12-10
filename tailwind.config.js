@@ -79,6 +79,11 @@ export default {
         'gradient-primary': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         'gradient-featured': 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
         'gradient-card': 'linear-gradient(145deg, #ffffff 0%, #f9fafb 100%)',
+        // Discount badge gradients
+        'gradient-discount-active': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+        'gradient-discount-featured': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        'gradient-discount-upcoming': 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+        'gradient-discount-expired': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
       },
       // Ensure all grid column classes are available
       gridTemplateColumns: {

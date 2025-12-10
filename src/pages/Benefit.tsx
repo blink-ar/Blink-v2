@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Business, BankBenefit, CanonicalLocation } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById } from "../services/rawBenefitsApi";
@@ -11,6 +11,10 @@ import StoreHeader from "../components/StoreHeader";
 import BenefitsFilter from "../components/BenefitsFilter";
 import ModernBenefitCard from "../components/ModernBenefitCard";
 import StoreInformation from "../components/StoreInformation";
+import { TabNavigation, TabType } from "../components/TabNavigation";
+import { StatsBar } from "../components/StatsBar";
+import { BankBenefitGroup } from "../components/BankBenefitGroup";
+import ModernBenefitDetailModal from "../components/ModernBenefitDetailModal";
 import {
   formatValue,
   processArrayField,
@@ -471,6 +475,21 @@ function Benefit() {
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CanonicalLocation | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('benefits');
+
+  // Group benefits by bank
+  const groupedBenefits = useMemo(() => {
+    if (!business) return {};
+
+    return business.benefits.reduce((acc, benefit) => {
+      const bank = benefit.bankName;
+      if (!acc[bank]) {
+        acc[bank] = [];
+      }
+      acc[bank].push(benefit);
+      return acc;
+    }, {} as Record<string, BankBenefit[]>);
+  }, [business]);
 
   useEffect(() => {
     const load = async () => {
@@ -805,8 +824,13 @@ function Benefit() {
         onBack={() => navigate(-1)}
         onFavoriteToggle={handleFavoriteToggle}
         isFavorite={isFavorite}
+      />
+
+      {/* Tab Navigation */}
+      <TabNavigation
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         benefitsCount={totalBenefits}
-        activeOffersCount={activeOffers}
       />
 
       <main
@@ -814,107 +838,54 @@ function Benefit() {
         role="main"
         aria-label="Información de la tienda y beneficios"
       >
-        {/* Benefits Filter Section */}
-        <BenefitsFilter
-          totalBenefits={totalBenefits}
-          activeOffers={activeOffers}
-          onFilterToggle={handleFilterToggle}
-          isFilterOpen={isFilterOpen}
-          selectedFilter={selectedFilter}
-          onFilterSelect={handleFilterSelect}
-        />
-
-        {/* Benefits List */}
-        <div className="px-6 py-4 space-y-4">
-          {business.benefits.map((benefitItem, index) => (
-            <ModernBenefitCard
-              key={`${benefitItem.bankName}-${index}`}
-              benefit={benefitItem}
-              onSelect={() => handleBenefitSelect(benefitItem)}
-              variant={index === 0 ? "featured" : "active"} // Mock logic for variants
-            />
-          ))}
-        </div>
-
-        {/* Store Information Section */}
-        <StoreInformation
-          key={selectedLocation?.placeId || "default"}
-          business={business}
-          selectedLocation={selectedLocation}
-          onLocationSelect={setSelectedLocation}
-          onCallClick={() => {
-            // Handle call action
-          }}
-        />
-
-        {/* Detailed Benefit View Modal/Overlay */}
-        {showDetailedView && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-            <div className="bg-white w-full max-h-[80vh] overflow-y-auto rounded-t-xl">
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Detalles del beneficio
-                  </h3>
-                  <button
-                    onClick={() => setShowDetailedView(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                {/* Original detailed benefit information */}
-                <BenefitDetailsSection
-                  benefit={benefit}
-                  rawBenefit={rawBenefit}
+        {activeTab === 'benefits' ? (
+          /* Benefits Tab Content */
+          <div
+            role="tabpanel"
+            id="benefits-panel"
+            aria-labelledby="benefits-tab"
+            className="px-6 py-4 space-y-4"
+          >
+            {Object.entries(groupedBenefits)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([bankName, benefits]) => (
+                <BankBenefitGroup
+                  key={bankName}
+                  bankName={bankName}
+                  benefits={benefits}
+                  businessId={business.id}
+                  defaultExpanded={true}
+                  onBenefitSelect={handleBenefitSelect}
                 />
-
-                {/* Raw MongoDB Data Section */}
-                {rawBenefit && (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">
-                      📊 Raw MongoDB Data
-                    </h4>
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <p>
-                        <strong>ID:</strong> {rawBenefit._id.$oid}
-                      </p>
-                      <p>
-                        <strong>Source:</strong> {rawBenefit.sourceCollection}
-                      </p>
-                      <p>
-                        <strong>Status:</strong> {rawBenefit.processingStatus}
-                      </p>
-                      <p>
-                        <strong>Valid Until:</strong> {rawBenefit.validUntil}
-                      </p>
-                      {rawBenefit.link && (
-                        <p>
-                          <strong>Website:</strong>{" "}
-                          <a
-                            href={
-                              rawBenefit.link.startsWith("http")
-                                ? rawBenefit.link
-                                : `https://${rawBenefit.link}`
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            {rawBenefit.link}
-                          </a>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              ))}
+          </div>
+        ) : (
+          /* Info Tab Content */
+          <div
+            role="tabpanel"
+            id="info-panel"
+            aria-labelledby="info-tab"
+            className="px-6 py-4"
+          >
+            <StoreInformation
+              key={selectedLocation?.placeId || "default"}
+              business={business}
+              selectedLocation={selectedLocation}
+              onLocationSelect={setSelectedLocation}
+              onCallClick={() => {
+                // Handle call action
+              }}
+            />
           </div>
         )}
+
+        {/* Modern Benefit Detail Modal */}
+        <ModernBenefitDetailModal
+          benefit={benefit}
+          rawBenefit={rawBenefit}
+          isOpen={showDetailedView}
+          onClose={() => setShowDetailedView(false)}
+        />
       </main>
     </div>
   );
