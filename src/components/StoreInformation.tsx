@@ -25,10 +25,8 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   onLocationSelect,
   onCallClick,
 }) => {
-  // Use selected location or default to first location
-  const currentLocation =
-    selectedLocation ||
-    (business.location.length > 0 ? business.location[0] : null);
+  // Use only explicitly selected location (no default)
+  const currentLocation = selectedLocation || null;
 
   // Fetch place details for the current location
   const {
@@ -117,7 +115,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   };
 
   return (
-    <div className="bg-white">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900">
           Información de la tienda
@@ -163,54 +161,66 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
           )}
         </div>
 
-        {/* Opening Hours Section */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-gray-500" />
-            <h4 className="font-medium text-gray-900">
-              Horarios de atención
-              {loading && (
-                <Loader2 className="ml-2 h-4 w-4 animate-spin text-blue-500" />
-              )}
-            </h4>
-            {formattedOpeningHours?.currentStatus && (
-              <span
-                className={`text-xs px-2 py-1 rounded-full ${
-                  formattedOpeningHours.isOpen
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {formattedOpeningHours.currentStatus}
-              </span>
-            )}
-          </div>
-
-          <div className="ml-8 space-y-2">
-            {daysOfWeek.map((day) => {
-              const hours =
-                storeInfo.openingHours[
-                  day.key as keyof typeof storeInfo.openingHours
-                ];
-              const isToday =
-                new Date().getDay() === daysOfWeek.indexOf(day) + 1; // Adjust for Monday = 0
-
-              return (
-                <div
-                  key={day.key}
-                  className={`flex justify-between items-center text-sm ${
-                    isToday ? "font-medium text-gray-900" : "text-gray-600"
+        {/* Opening Hours Section - Only show when location is selected */}
+        {selectedLocation ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-gray-500" />
+              <h4 className="font-medium text-gray-900">
+                Horarios de atención
+                {loading && (
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin text-blue-500" />
+                )}
+              </h4>
+              {formattedOpeningHours?.currentStatus && (
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    formattedOpeningHours.isOpen
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
                   }`}
                 >
-                  <span>{day.label}</span>
-                  <span className={hours === "Closed" ? "text-red-600" : ""}>
-                    {hours || "No disponible"}
-                  </span>
-                </div>
-              );
-            })}
+                  {formattedOpeningHours.currentStatus}
+                </span>
+              )}
+            </div>
+
+            <div className="ml-8 space-y-2">
+              {daysOfWeek.map((day) => {
+                const hours =
+                  storeInfo.openingHours[
+                    day.key as keyof typeof storeInfo.openingHours
+                  ];
+                const isToday =
+                  new Date().getDay() === daysOfWeek.indexOf(day) + 1; // Adjust for Monday = 0
+
+                return (
+                  <div
+                    key={day.key}
+                    className={`flex justify-between items-center text-sm ${
+                      isToday ? "font-medium text-gray-900" : "text-gray-600"
+                    }`}
+                  >
+                    <span>{day.label}</span>
+                    <span className={hours === "Closed" ? "text-red-600" : ""}>
+                      {hours || "No disponible"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-blue-800 text-sm leading-relaxed break-words">
+                📍 Selecciona una ubicación en el mapa para ver horarios y
+                detalles específicos
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Contact Information */}
         {formattedDetails?.contact?.phone && (

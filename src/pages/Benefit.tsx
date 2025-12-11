@@ -475,7 +475,7 @@ function Benefit() {
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CanonicalLocation | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('benefits');
+  const [activeTab, setActiveTab] = useState<TabType>("benefits");
 
   // Group benefits by bank
   const groupedBenefits = useMemo(() => {
@@ -840,13 +840,13 @@ function Benefit() {
         role="main"
         aria-label="Información de la tienda y beneficios"
       >
-        {activeTab === 'benefits' ? (
+        {activeTab === "benefits" ? (
           /* Benefits Tab Content */
           <div
             role="tabpanel"
             id="benefits-panel"
             aria-labelledby="benefits-tab"
-            className="px-6 py-4 space-y-4"
+            className="px-4 py-4 space-y-4"
           >
             {Object.entries(groupedBenefits)
               .sort(([a], [b]) => a.localeCompare(b))
@@ -867,7 +867,7 @@ function Benefit() {
             role="tabpanel"
             id="info-panel"
             aria-labelledby="info-tab"
-            className="px-6 py-4"
+            className="px-4 py-4"
           >
             <StoreInformation
               key={selectedLocation?.placeId || "default"}

@@ -23,6 +23,11 @@ const LocationMap: React.FC<LocationMapProps> = ({
   const infoWindowRef = useRef<unknown>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter out invalid locations (0,0 coordinates)
+  const validLocations = locations.filter(
+    (location) => location.lat !== 0 || location.lng !== 0
+  );
+
   const clearMarkers = () => {
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
@@ -32,7 +37,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
     let cancelled = false;
 
     const initialiseMap = async () => {
-      if (!containerRef.current || locations.length === 0) {
+      if (!containerRef.current || validLocations.length === 0) {
         return;
       }
 
@@ -42,7 +47,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
           return;
         }
 
-        const firstLocation = locations[0];
+        const firstLocation = validLocations[0];
         const map =
           mapRef.current ||
           new googleMaps.maps.Map(containerRef.current, {
@@ -70,7 +75,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
 
         const bounds = new googleMaps.maps.LatLngBounds();
 
-        markersRef.current = locations.map((location) => {
+        markersRef.current = validLocations.map((location) => {
           const isSelected =
             selectedLocation &&
             selectedLocation.lat === location.lat &&
@@ -134,10 +139,10 @@ const LocationMap: React.FC<LocationMapProps> = ({
           return marker;
         });
 
-        if (locations.length > 1) {
+        if (validLocations.length > 1) {
           map.fitBounds(bounds);
         } else {
-          map.setCenter({ lat: locations[0].lat, lng: locations[0].lng });
+          map.setCenter({ lat: validLocations[0].lat, lng: validLocations[0].lng });
           map.setZoom(DEFAULT_ZOOM);
         }
 
@@ -158,9 +163,9 @@ const LocationMap: React.FC<LocationMapProps> = ({
       cancelled = true;
       clearMarkers();
     };
-  }, [locations, onMarkerClick, selectedLocation]);
+  }, [validLocations, onMarkerClick, selectedLocation]);
 
-  if (!locations?.length) {
+  if (!validLocations?.length) {
     return null;
   }
 
