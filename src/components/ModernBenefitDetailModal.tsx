@@ -36,6 +36,9 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
 
   const discountPercentage = getDiscountPercentage(benefit.rewardRate);
 
+  // Get installments from rawBenefit if available
+  const installments = rawBenefit?.installments;
+
   // Process all fields
   const processedValue = processTextField(benefit.valor);
   const processedLimit = processTextField(benefit.tope);
@@ -45,6 +48,29 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
   const processedUsageTypes = processArrayField(benefit.usos || []);
 
   const formattedValue = processedValue ? formatValue(processedValue) : null;
+
+  // Helper to extract installments from text
+  const extractInstallmentsFromText = (text?: string): number | null => {
+    if (!text) return null;
+    const match = text.match(/(\d+)\s*cuotas/i);
+    return match ? parseInt(match[1], 10) : null;
+  };
+
+  // Determine display value for discount section
+  let displayValue = formattedValue;
+
+  // If discount is 0%, show installments instead
+  if (formattedValue === '0%' || formattedValue === '0' || (processedValue && processedValue === '0%')) {
+    if (installments && installments > 0) {
+      displayValue = `${installments} cuotas`;
+    } else {
+      // Try to extract from benefit title
+      const extracted = extractInstallmentsFromText(benefit.benefit);
+      if (extracted && extracted > 0) {
+        displayValue = `${extracted} cuotas`;
+      }
+    }
+  }
 
   return (
     <>
@@ -91,6 +117,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
               <div className="flex-shrink-0">
                 <GradientBadge
                   percentage={discountPercentage}
+                  installments={installments}
                   variant="featured"
                   size="lg"
                 />
@@ -122,7 +149,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
               <DaysOfWeek benefit={benefit} />
 
               {/* Discount and Limits */}
-              {(formattedValue || processedLimit) && (
+              {(displayValue || processedLimit) && (
                 <section className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
@@ -133,11 +160,11 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                     </h3>
                   </div>
                   <div className="space-y-3">
-                    {formattedValue && (
+                    {displayValue && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Valor</span>
                         <span className="text-lg font-bold text-primary-600">
-                          {formattedValue}
+                          {displayValue}
                         </span>
                       </div>
                     )}

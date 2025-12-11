@@ -18,6 +18,7 @@ export interface BankBenefit {
   // AI Analysis specific fields
   originalAnalyzedText?: string;
   description?: string;
+  installments?: number | null;
 }
 
 export interface Business {

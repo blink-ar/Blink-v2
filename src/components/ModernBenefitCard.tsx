@@ -1,6 +1,7 @@
 import React from "react";
 import { BankBenefit } from "../types";
 import { GradientBadge, BadgeVariant } from "./GradientBadge";
+import { DaysOfWeek } from "./ui/DaysOfWeek";
 
 interface ModernBenefitCardProps {
   benefit: BankBenefit;
@@ -23,13 +24,15 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
 
   return (
     <div
-      className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all duration-300 cursor-pointer"
+      className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all duration-300 cursor-pointer relative"
       onClick={onSelect}
     >
       {/* Header with Discount Badge and Card Name */}
       <div className="flex items-start justify-between mb-4">
         <GradientBadge
           percentage={discountPercentage}
+          installments={benefit.installments}
+          benefitTitle={benefit.benefit}
           variant={variant as BadgeVariant}
           size="md"
         />
@@ -40,15 +43,25 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
               Destacado
             </div>
           )}
-          <div className="text-xs font-medium text-gray-600">{benefit.cardName}</div>
+          <div className="text-xs font-medium text-gray-600">
+            {benefit.cardName}
+          </div>
         </div>
       </div>
 
       {/* Benefit Description */}
-      <div>
+      <div className="pb-6">
         <p className="text-gray-800 text-sm leading-relaxed line-clamp-2">
           {benefit.benefit}
         </p>
+      </div>
+
+      {/* Days of Week Availability - Bottom Right */}
+      <div
+        className="absolute bottom-3 right-3"
+        style={{ transform: "scale(0.6)", transformOrigin: "bottom right" }}
+      >
+        <DaysOfWeek benefit={benefit} showLabel={false} />
       </div>
 
       {/* Status Indicator for Expired/Upcoming */}

@@ -5,6 +5,8 @@ export type BadgeSize = 'sm' | 'md' | 'lg';
 
 interface GradientBadgeProps {
   percentage: string | number;
+  installments?: number | null;
+  benefitTitle?: string;
   variant: BadgeVariant;
   size?: BadgeSize;
   className?: string;
@@ -12,6 +14,8 @@ interface GradientBadgeProps {
 
 export const GradientBadge: React.FC<GradientBadgeProps> = ({
   percentage,
+  installments,
+  benefitTitle,
   variant,
   size = 'md',
   className = '',
@@ -20,6 +24,35 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
   const numericValue = typeof percentage === 'string'
     ? percentage.replace(/[^0-9.]/g, '')
     : percentage;
+
+  // Helper to extract installments from text
+  const extractInstallmentsFromText = (text?: string): number | null => {
+    if (!text) return null;
+
+    // Match patterns like "6 cuotas", "12 cuotas sin interés", "hasta 3 cuotas"
+    const match = text.match(/(\d+)\s*cuotas/i);
+    return match ? parseInt(match[1], 10) : null;
+  };
+
+  // Determine what to display
+  let displayValue: string;
+
+  if (numericValue && Number(numericValue) > 0) {
+    // Show discount percentage
+    displayValue = `${numericValue}% OFF`;
+  } else if (installments && installments > 0) {
+    // Show installments from data
+    displayValue = `${installments} cuotas`;
+  } else {
+    // Fallback: try to extract installments from title
+    const extractedInstallments = extractInstallmentsFromText(benefitTitle);
+    if (extractedInstallments && extractedInstallments > 0) {
+      displayValue = `${extractedInstallments} cuotas`;
+    } else {
+      // No meaningful value to show
+      displayValue = '';
+    }
+  }
 
   // Gradient styles based on variant
   const gradientStyles: Record<BadgeVariant, string> = {
@@ -36,6 +69,11 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
     lg: 'text-base px-4 py-2',
   };
 
+  // Don't render if there's no value to display
+  if (!displayValue) {
+    return null;
+  }
+
   return (
     <div
       className={`
@@ -50,7 +88,7 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
         textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
       }}
     >
-      {numericValue}% OFF
+      {displayValue}
     </div>
   );
 };

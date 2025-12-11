@@ -14,6 +14,9 @@ const ModernFeaturedBenefit: React.FC<ModernFeaturedBenefitProps> = ({
   // Use the discountPercentage from the API data
   const discountPercentage = benefit.discountPercentage?.toString() || "25";
 
+  // Get installments from the API data
+  const installments = benefit.installments;
+
   // Use merchant name from API
   const businessDisplayName = benefit.merchant.name;
 
@@ -22,6 +25,25 @@ const ModernFeaturedBenefit: React.FC<ModernFeaturedBenefitProps> = ({
 
   // Use benefit title from API
   const benefitTitle = benefit.benefitTitle;
+
+  // Helper to extract installments from text
+  const extractInstallmentsFromText = (text: string): number | null => {
+    const match = text.match(/(\d+)\s*cuotas/i);
+    return match ? parseInt(match[1], 10) : null;
+  };
+
+  // Determine what to display (discount or installments)
+  let displayValue: string;
+
+  if (benefit.discountPercentage && benefit.discountPercentage > 0) {
+    displayValue = `${benefit.discountPercentage}% OFF`;
+  } else if (installments && installments > 0) {
+    displayValue = `${installments} cuotas`;
+  } else {
+    // Try to extract from title
+    const extracted = extractInstallmentsFromText(benefitTitle);
+    displayValue = extracted && extracted > 0 ? `${extracted} cuotas` : '';
+  }
 
   // Description is available as benefit.description if needed later
 
@@ -246,7 +268,7 @@ const ModernFeaturedBenefit: React.FC<ModernFeaturedBenefitProps> = ({
       {/* Bottom section with discount and CTA */}
       <div style={bottomSectionStyle}>
         <div style={discountSectionStyle}>
-          <div style={discountTextStyle}>{discountPercentage}% OFF</div>
+          {displayValue && <div style={discountTextStyle}>{displayValue}</div>}
           <p style={descriptionStyle}>{benefitTitle}</p>
         </div>
 

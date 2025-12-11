@@ -536,6 +536,7 @@ function Benefit() {
                 rawBenefitData.description ||
                 rawBenefitData.benefitTitle ||
                 "No description available",
+              installments: rawBenefitData.installments || null,
             };
 
             // Create a business object for the UI
@@ -682,6 +683,7 @@ function Benefit() {
                 benefitToShow.description ||
                 benefitToShow.benefitTitle ||
                 "No description available",
+              installments: benefitToShow.installments || null,
             };
 
             const convertedBusiness: Business = {

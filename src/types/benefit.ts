@@ -47,6 +47,7 @@ export interface RawBenefit {
     online: boolean;
     availableDays: string[];
     discountPercentage: number;
+    installments?: number | null;
     link: string;
     termsAndConditions: string;
     validUntil: string;

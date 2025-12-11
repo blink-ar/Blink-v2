@@ -348,3 +348,30 @@ export const formatUsageType = (usage: string): string => {
         'formatUsageType'
     );
 };
+
+/**
+ * Formats the benefit value (discount or installments) for display
+ */
+export const formatBenefitValue = (discountPercentage: number | null | undefined, installments: number | null | undefined): string => {
+    return safeFormat(
+        (data: { discount: number | null | undefined, inst: number | null | undefined }) => {
+            const { discount, inst } = data;
+
+            // If discount is greater than 0, show discount
+            if (discount && discount > 0) {
+                return `${discount}% OFF`;
+            }
+
+            // If discount is 0 or null/undefined, but installments exist and are greater than 0
+            if (inst && inst > 0) {
+                return `${inst} cuotas`;
+            }
+
+            // Fallback if neither discount nor installments are available
+            return '0% OFF';
+        },
+        { discount: discountPercentage, inst: installments },
+        '0% OFF',
+        'formatBenefitValue'
+    );
+};

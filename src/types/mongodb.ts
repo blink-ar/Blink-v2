@@ -12,6 +12,7 @@ export interface Benefit {
     description: string;
     validUntil: string | null;
     discountPercentage: number | null;
+    installments?: number | null;
     categories: Category[];
     termsAndConditions: string | null;
     locations: CanonicalLocation[];
@@ -137,6 +138,7 @@ export interface RawMongoBenefit {
     online: boolean;
     availableDays: string[];
     discountPercentage: number;
+    installments?: number | null;
     link: string;
     termsAndConditions: string;
     validUntil: string;
@@ -271,6 +273,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             description: rawBenefit.description || 'No description available',
             validUntil: rawBenefit.validUntil || null,
             discountPercentage: rawBenefit.discountPercentage || null,
+            installments: rawBenefit.installments || null,
             categories: (rawBenefit.categories || []).filter(cat =>
                 ['gastronomia', 'moda', 'entretenimiento', 'otros', 'deportes', 'regalos',
                     'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping'].includes(cat)
