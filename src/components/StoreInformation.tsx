@@ -29,13 +29,8 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   const currentLocation = selectedLocation || null;
 
   // Fetch place details for the current location
-  const {
-    placeDetails,
-    formattedDetails,
-    formattedOpeningHours,
-    loading,
-    error,
-  } = usePlaceDetails(currentLocation);
+  const { formattedDetails, formattedOpeningHours, loading, error } =
+    usePlaceDetails(currentLocation);
 
   const storeInfo = {
     address:
