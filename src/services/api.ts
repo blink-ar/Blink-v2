@@ -155,7 +155,8 @@ export async function fetchBenefits(params: Record<string, string> = {}): Promis
       filteredParams.offset = '0';
     }
     return await benefitsAPI.getBenefits(filteredParams);
-  } catch {
+  } catch (error) {
+    console.error('[API] fetchBenefits failed:', error);
     return [];
   }
 }
@@ -352,7 +353,8 @@ export async function fetchBusinesses(options: {
     });
 
     return Array.from(businessMap.values());
-  } catch {
+  } catch (error) {
+    console.error('[API] fetchBusinesses failed:', error);
     return [];
   }
 }
