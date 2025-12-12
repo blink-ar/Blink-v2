@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
 import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
-import NearbyBusinesses from "../components/NearbyBusinesses";
+// import NearbyBusinesses from "../components/NearbyBusinesses";
 import BusinessCard from "../components/BusinessCard";
 import BottomNavigation, {
   NavigationTab,
@@ -16,75 +16,34 @@ import {
   ErrorAnnouncement,
 } from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
+import { useBenefitsData } from "../hooks/useBenefitsData";
+import { CacheNotification } from "../components/CacheNotification";
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { fetchAllBusinessesComplete } from "../services/api";
-import { getRawBenefits } from "../services/rawBenefitsApi";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
 
-  // State for loading all businesses at once
-  const [paginatedBusinesses, setPaginatedBusinesses] = useState<Business[]>(
-    []
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // State for raw benefits from API
-  const [rawBenefits, setRawBenefits] = useState<RawMongoBenefit[]>([]);
+  // Use the cached benefits data hook
+  const {
+    businesses: paginatedBusinesses,
+    featuredBenefits: rawBenefits,
+    isLoading,
+    error,
+  } = useBenefitsData();
 
   // State for bottom navigation
   const [activeTab, setActiveTab] = useState<NavigationTab>("inicio");
 
-  // Load raw benefits from API
-  const loadRawBenefits = useCallback(async () => {
-    try {
-      console.log("🚀 Loading raw benefits from API...");
-      const benefits = await getRawBenefits({ limit: 10 }); // Get first 10 benefits
-      setRawBenefits(benefits);
-      console.log(`✅ Loaded ${benefits.length} raw benefits!`);
-    } catch (err) {
-      console.error("❌ Error loading raw benefits:", err);
-      // Don't set error state for raw benefits, just log it
-    }
-  }, []);
-
-  // Load ALL businesses at once
-  const loadAllBusinesses = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      console.log("🚀 Loading ALL businesses from all 1,714 benefits...");
-
-      // Load both businesses and raw benefits
-      const [allBusinesses] = await Promise.all([
-        fetchAllBusinessesComplete(),
-        loadRawBenefits(),
-      ]);
-
-      setPaginatedBusinesses(allBusinesses);
-
-      console.log(
-        `✅ Loaded ${allBusinesses.length} businesses from all benefits!`
-      );
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load all businesses";
-      setError(errorMessage);
-      console.error("❌ Error loading all businesses:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadRawBenefits]);
-
-  // Load all businesses on mount
-  useEffect(() => {
-    loadAllBusinesses();
-  }, [loadAllBusinesses]);
+  // State for cache notifications
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "warning" | "error" | "info";
+  }>({ show: false, message: "", type: "info" });
 
   // Removed unused infinite scroll variables for modern UI
 
@@ -194,16 +153,87 @@ function Home() {
       .slice(0, 8); // Limit to 8 for horizontal scroll
   };
 
-  // Get nearby businesses (simulate with distance)
-  const getNearbyBusinesses = (): Business[] => {
+  // Get Santander exclusive offers
+  const getSantanderOffers = (): Business[] => {
     return paginatedBusinesses
-      .map((business) => ({
-        ...business,
-        distance: Math.random() * 5 + 0.1, // Random distance between 0.1 and 5.1 km
-      }))
-      .sort((a, b) => (a.distance || 0) - (b.distance || 0))
-      .slice(0, 6); // Show top 6 nearest
+      .filter((business) => {
+        // Filter businesses that have Santander benefits
+        return business.benefits.some((benefit) =>
+          benefit.bankName.toLowerCase().includes("santander")
+        );
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
   };
+
+  // Get BBVA exclusive offers
+  const getBBVAOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have BBVA benefits
+        return business.benefits.some((benefit) =>
+          benefit.bankName.toLowerCase().includes("bbva")
+        );
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get food category offers
+  const getFoodOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses in food/gastronomia category
+        return business.category.toLowerCase() === "gastronomia";
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get high-value offers (benefits with high percentages)
+  const getHighValueOffers = (): Business[] => {
+    return paginatedBusinesses
+      .filter((business) => {
+        // Filter businesses that have benefits with high discount percentages
+        return business.benefits.some((benefit) => {
+          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+          if (percentageMatch) {
+            const percentage = parseInt(percentageMatch[1]);
+            return percentage >= 20; // 20% or higher discount
+          }
+          return false;
+        });
+      })
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get biggest discount offers (sorted by highest percentage)
+  const getBiggestDiscountOffers = (): Business[] => {
+    return paginatedBusinesses
+      .map((business) => {
+        // Find the highest discount percentage for each business
+        let maxDiscount = 0;
+        business.benefits.forEach((benefit) => {
+          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+          if (percentageMatch) {
+            const percentage = parseInt(percentageMatch[1]);
+            maxDiscount = Math.max(maxDiscount, percentage);
+          }
+        });
+        return { ...business, maxDiscount };
+      })
+      .filter((business) => business.maxDiscount > 0) // Only businesses with percentage discounts
+      .sort((a, b) => b.maxDiscount - a.maxDiscount) // Sort by highest discount first
+      .slice(0, 8); // Limit to 8 for horizontal scroll
+  };
+
+  // Get nearby businesses (simulate with distance)
+  // const getNearbyBusinesses = (): Business[] => {
+  //   return paginatedBusinesses
+  //     .map((business) => ({
+  //       ...business,
+  //       distance: Math.random() * 5 + 0.1, // Random distance between 0.1 and 5.1 km
+  //     }))
+  //     .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+  //     .slice(0, 6); // Show top 6 nearest
+  // };
 
   const handleCategorySelect = (category: {
     id: string;
@@ -303,10 +333,10 @@ function Home() {
     setSelectedCategory("all");
   };
 
-  const handleViewMap = () => {
-    // In a real app, this would navigate to map view
-    // For now, we'll keep the user on the current tab
-  };
+  // const handleViewMap = () => {
+  //   // In a real app, this would navigate to map view
+  //   // For now, we'll keep the user on the current tab
+  // };
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
@@ -444,17 +474,101 @@ function Home() {
                   />
                 </div>
 
-                {/* Nearby Businesses */}
+                {/* Santander Exclusive Offers */}
+                {getSantanderOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "250ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getSantanderOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedBanks(["santander"]);
+                        setActiveTab("beneficios");
+                      }}
+                      title="Exclusivos Santander"
+                    />
+                  </div>
+                )}
+
+                {/* BBVA Exclusive Offers */}
+                {getBBVAOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "300ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getBBVAOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedBanks(["bbva"]);
+                        setActiveTab("beneficios");
+                      }}
+                      title="Exclusivos BBVA"
+                    />
+                  </div>
+                )}
+
+                {/* Food Offers */}
+                {getFoodOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "350ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getFoodOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={() => {
+                        setSelectedCategory("gastronomia");
+                        setActiveTab("beneficios");
+                      }}
+                      title="Ofertas de Comida"
+                    />
+                  </div>
+                )}
+
+                {/* High Value Offers */}
+                {getHighValueOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "375ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getHighValueOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={handleViewAllOffers}
+                      title="Descuentos Imperdibles"
+                    />
+                  </div>
+                )}
+
+                {/* Biggest Discount Offers */}
+                {getBiggestDiscountOffers().length > 0 && (
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "400ms" }}
+                  >
+                    <ActiveOffers
+                      businesses={getBiggestDiscountOffers()}
+                      onBusinessClick={handleBusinessClick}
+                      onViewAll={handleViewAllOffers}
+                      title="Mayores Descuentos"
+                    />
+                  </div>
+                )}
+
+                {/* Nearby Businesses
                 <div
                   className="animate-fade-in-up"
-                  style={{ animationDelay: "300ms" }}
+                  style={{ animationDelay: "450ms" }}
                 >
                   <NearbyBusinesses
                     businesses={getNearbyBusinesses()}
                     onBusinessClick={handleBusinessClick}
                     onViewMap={handleViewMap}
                   />
-                </div>
+                </div> */}
               </div>
             )}
           </div>
@@ -473,6 +587,14 @@ function Home() {
 
       {/* Bottom Navigation */}
       <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Cache Notification */}
+      <CacheNotification
+        show={notification.show}
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification({ ...notification, show: false })}
+      />
     </div>
   );
 }

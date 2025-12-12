@@ -17,6 +17,8 @@ export interface BankBenefit {
   textoAplicacion?: string;
   // AI Analysis specific fields
   originalAnalyzedText?: string;
+  description?: string;
+  installments?: number | null;
 }
 
 export interface Business {
@@ -96,4 +98,24 @@ export type CanonicalLocation = {
   raw: string | Record<string, unknown>;
   meta?: string | Record<string, unknown> | null;
   updatedAt: string;
+  // Enhanced place details from Google Places API
+  placeDetails?: {
+    phoneNumber?: string;
+    website?: string;
+    openingHours?: {
+      monday?: string;
+      tuesday?: string;
+      wednesday?: string;
+      thursday?: string;
+      friday?: string;
+      saturday?: string;
+      sunday?: string;
+      isOpen?: boolean;
+      currentStatus?: string;
+    };
+    rating?: number;
+    priceLevel?: number;
+    businessStatus?: string;
+    photos?: string[];
+  };
 };

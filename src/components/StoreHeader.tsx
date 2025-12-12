@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, Heart, Clock, MapPin, Star } from "lucide-react";
+import { ArrowLeft, Heart, MapPin, Star } from "lucide-react";
 import { Business } from "../types";
 
 interface StoreHeaderProps {
@@ -7,8 +7,6 @@ interface StoreHeaderProps {
   onBack: () => void;
   onFavoriteToggle: () => void;
   isFavorite: boolean;
-  benefitsCount: number;
-  activeOffersCount: number;
 }
 
 const StoreHeader: React.FC<StoreHeaderProps> = ({
@@ -17,10 +15,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
   onFavoriteToggle,
   isFavorite,
 }) => {
-  // Mock opening hours - in a real app this would come from business data
-  const isOpen = true; // This would be calculated based on current time and business hours
-  const openingHours = "9:00 AM - 9:00 PM";
-
   return (
     <div className="bg-white">
       {/* Navigation Bar */}
@@ -51,9 +45,9 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
       </div>
 
       {/* Store Information */}
-      <div className="p-6">
+      <div className="p-4">
         {/* Store Logo and Basic Info */}
-        <div className="flex items-start gap-4 mb-4">
+        <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
             <img
               src={business.image}
@@ -77,7 +71,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
             <h1 className="text-xl font-bold text-gray-900 mb-1 truncate">
               {business.name}
             </h1>
-
             {/* Category */}
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
@@ -94,22 +87,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
                 </span>
               </div>
             </div>
-
-            {/* Opening Hours and Status */}
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">{openingHours}</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  isOpen
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {isOpen ? "Abierto" : "Cerrado"}
-              </span>
-            </div>
-
             {/* Location */}
             {business.location.length > 0 && (
               <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">

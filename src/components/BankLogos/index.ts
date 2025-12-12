@@ -4,3 +4,4 @@ export { default as GaliciaLogo } from './GaliciaLogo';
 export { default as NacionLogo } from './NacionLogo';
 export { default as VisaLogo } from './VisaLogo';
 export { default as MastercardLogo } from './MastercardLogo';
+export { BankLogoSelector } from './BankLogoSelector';

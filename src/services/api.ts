@@ -15,7 +15,7 @@ declare global {
   let allCategories: Set<string> | undefined;
 }
 
-const BASE_URL = 'https://benefits-backend-v2-public.onrender.com';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://benefits-backend-v2-public.onrender.com';
 
 class BenefitsAPI {
   async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
@@ -28,51 +28,15 @@ class BenefitsAPI {
     });
 
     const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-
-    console.log('🔍 MongoDB API Request:', {
-      url,
-      params,
-      timestamp: new Date().toISOString()
-    });
-
     const response = await fetch(url);
 
     if (!response.ok) {
-      console.error('❌ MongoDB API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        url
-      });
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data: MongoBenefitsResponse = await response.json();
-
-    console.log('📊 MongoDB API Raw Response:', {
-      success: data.success,
-      benefitsCount: data.benefits?.length || 0,
-      pagination: data.pagination,
-      filters: data.filters,
-      fullResponse: data
-    });
-
-    if (data.benefits && data.benefits.length > 0) {
-      console.log('🎯 Sample MongoDB Benefit (exact data.benefits[0]):', data.benefits[0]);
-    } else {
-      console.warn('⚠️ No benefits found in MongoDB response');
-    }
-
-    // Transform raw MongoDB benefits to your preferred Benefit structure
     const rawBenefits = data.benefits || [];
-    const transformedBenefits = rawBenefits.map(transformRawBenefitToBenefit);
-
-    console.log('🔄 Transformed benefits:', {
-      rawCount: rawBenefits.length,
-      transformedCount: transformedBenefits.length,
-      sampleTransformed: transformedBenefits[0]
-    });
-
-    return transformedBenefits;
+    return rawBenefits.map(transformRawBenefitToBenefit);
   }
 
   async getRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
@@ -85,34 +49,13 @@ class BenefitsAPI {
     });
 
     const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-
-    console.log('🔍 MongoDB API Request (Raw):', {
-      url,
-      params,
-      timestamp: new Date().toISOString()
-    });
-
     const response = await fetch(url);
 
     if (!response.ok) {
-      console.error('❌ MongoDB API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        url
-      });
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data: MongoBenefitsResponse = await response.json();
-
-    console.log('📊 MongoDB API Raw Response (keeping original format):', {
-      success: data.success,
-      benefitsCount: data.benefits?.length || 0,
-      pagination: data.pagination,
-      filters: data.filters
-    });
-
-    // Return raw benefits without transformation
     return data.benefits || [];
   }
 
@@ -207,23 +150,13 @@ const benefitsAPI = new BenefitsAPI();
 // New MongoDB-native functions
 export async function fetchBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
-    console.log('🔍 fetchBenefits: Called with params (no limit applied):', params);
-
-    // Remove any limit restrictions - fetch all available benefits
-    const { ...filteredParams } = params;
-
-    // If no offset specified, start from the beginning
+    const filteredParams = { ...params };
     if (!filteredParams.offset) {
       filteredParams.offset = '0';
-      console.log('🎯 fetchBenefits: No offset specified, starting from beginning');
     }
-
-    const benefits = await benefitsAPI.getBenefits(filteredParams);
-    console.log('✅ fetchBenefits: Success, returned', benefits.length, 'benefits (no limit)');
-    return benefits;
+    return await benefitsAPI.getBenefits(filteredParams);
   } catch (error) {
-    console.error("❌ fetchBenefits: Failed to fetch benefits:", error);
-    console.warn("⚠️ fetchBenefits: Falling back to empty array");
+    console.error('[API] fetchBenefits failed:', error);
     return [];
   }
 }
@@ -231,16 +164,12 @@ export async function fetchBenefits(params: Record<string, string> = {}): Promis
 // Function to get ALL benefits using pagination
 export async function fetchAllBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
-    console.log('🔍 fetchAllBenefits: Starting to fetch ALL benefits using pagination...');
-
     const allBenefits: Benefit[] = [];
     let offset = 0;
-    const limit = 100; // Use larger chunks for efficiency
+    const limit = 100;
     let hasMore = true;
 
     while (hasMore) {
-      console.log(`📄 fetchAllBenefits: Fetching page at offset ${offset}...`);
-
       const pageParams = {
         ...params,
         offset: offset.toString(),
@@ -256,20 +185,14 @@ export async function fetchAllBenefits(params: Record<string, string> = {}): Pro
       allBenefits.push(...pageBenefits);
       offset += pageBenefits.length;
 
-      console.log(`📊 fetchAllBenefits: Page complete. Total so far: ${allBenefits.length}`);
-
       // Safety break to prevent infinite loops
       if (offset > 10000) {
-        console.warn('⚠️ fetchAllBenefits: Safety limit reached, stopping at 10,000 benefits');
         break;
       }
     }
 
-    console.log(`🎯 fetchAllBenefits: Complete! Total benefits: ${allBenefits.length}`);
     return allBenefits;
-  } catch (error) {
-    console.error("❌ fetchAllBenefits: Failed to fetch all benefits:", error);
-    console.warn("⚠️ fetchAllBenefits: Falling back to regular fetch");
+  } catch {
     return fetchBenefits(params);
   }
 }
@@ -277,8 +200,7 @@ export async function fetchAllBenefits(params: Record<string, string> = {}): Pro
 export async function fetchMongoBenefitsWithPagination(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
   try {
     return await benefitsAPI.getBenefitsResponse(params);
-  } catch (error) {
-    console.warn("Failed to fetch MongoDB benefits response:", error);
+  } catch {
     return {
       success: false,
       benefits: [],
@@ -291,8 +213,7 @@ export async function fetchMongoBenefitsWithPagination(params: Record<string, st
 export async function fetchMongoBenefitById(id: string): Promise<Benefit | null> {
   try {
     return await benefitsAPI.getBenefitById(id);
-  } catch (error) {
-    console.error("Failed to fetch MongoDB benefit by ID:", error);
+  } catch {
     return null;
   }
 }
@@ -300,8 +221,7 @@ export async function fetchMongoBenefitById(id: string): Promise<Benefit | null>
 export async function fetchMongoNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
     return await benefitsAPI.getNearbyBenefits(lat, lng, params);
-  } catch (error) {
-    console.error("Failed to fetch nearby MongoDB benefits:", error);
+  } catch {
     return [];
   }
 }
@@ -309,8 +229,7 @@ export async function fetchMongoNearbyBenefits(lat: number, lng: number, params:
 export async function fetchMongoCategories(): Promise<string[]> {
   try {
     return await benefitsAPI.getCategories();
-  } catch (error) {
-    console.error("Failed to fetch MongoDB categories:", error);
+  } catch {
     return [];
   }
 }
@@ -318,8 +237,7 @@ export async function fetchMongoCategories(): Promise<string[]> {
 export async function fetchMongoBanks(): Promise<string[]> {
   try {
     return await benefitsAPI.getBanks();
-  } catch (error) {
-    console.error("Failed to fetch MongoDB banks:", error);
+  } catch {
     return [];
   }
 }
@@ -327,8 +245,7 @@ export async function fetchMongoBanks(): Promise<string[]> {
 export async function fetchMongoStats(): Promise<MongoStatsResponse> {
   try {
     return await benefitsAPI.getStats();
-  } catch (error) {
-    console.error("Failed to fetch MongoDB stats:", error);
+  } catch {
     return {
       success: false,
       stats: {
@@ -342,7 +259,6 @@ export async function fetchMongoStats(): Promise<MongoStatsResponse> {
 }
 
 // Legacy function - converts your new Benefit type to old Business format for backward compatibility
-
 export async function fetchBusinesses(options: {
   limit?: number;
   offset?: number;
@@ -350,17 +266,13 @@ export async function fetchBusinesses(options: {
   filters?: Record<string, string>
 } = {}): Promise<Business[]> {
   try {
-    console.log('🚀 fetchBusinesses: Starting to fetch from MongoDB API...', options);
-
     let benefits: Benefit[];
 
     if (options.fetchAll) {
-      console.log('📚 fetchBusinesses: Fetching ALL benefits using pagination...');
       benefits = await fetchAllBenefits(options.filters || {});
     } else {
       const offset = options.offset || 0;
-      const limit = options.limit || 50; // Default limit for pagination
-      console.log(`📊 fetchBusinesses: Fetching benefits with offset=${offset}, limit=${limit}...`);
+      const limit = options.limit || 50;
 
       const params: Record<string, string> = {
         offset: offset.toString(),
@@ -371,53 +283,28 @@ export async function fetchBusinesses(options: {
       benefits = await benefitsAPI.getBenefits(params);
     }
 
-    console.log("📊 fetchBusinesses: Benefits Retrieved:", {
-      benefitsCount: benefits.length,
-      sampleBenefit: benefits[0],
-      allBenefitIds: benefits.map(b => b.id),
-      merchantNames: benefits.map(b => b.merchant.name),
-      banks: [...new Set(benefits.map(b => b.bank))],
-      categories: [...new Set(benefits.flatMap(b => b.categories))]
-    });
-
     if (benefits.length === 0) {
-      console.warn("⚠️ fetchBusinesses: No benefits found in MongoDB API response");
-      return []; // Return empty array instead of mock data
+      return [];
     }
 
     // Group benefits by merchant name
-    console.log('🔄 fetchBusinesses: Starting transformation to Business format...');
     const businessMap = new Map<string, Business>();
 
-    benefits.forEach((benefit, index) => {
+    benefits.forEach((benefit) => {
       const businessName = benefit.merchant.name;
 
-      console.log(`🏪 Processing benefit ${index + 1}/${benefits.length}:`, {
-        businessName,
-        raw: benefit,
-        bank: benefit.bank,
-        benefitTitle: benefit.benefitTitle,
-        discountPercentage: benefit.discountPercentage,
-        categories: benefit.categories,
-        cardTypes: benefit.cardTypes.map(ct => ct.name)
-      });
-
       if (!businessMap.has(businessName)) {
-        console.log(`✨ Creating new business: ${businessName}`);
-
-        // Create a new business from the benefit
         const business: Business = {
-          id: businessName.toLowerCase().replace(/\s+/g, '-'), // Use merchant name as ID
+          id: businessName.toLowerCase().replace(/\s+/g, '-'),
           name: businessName,
           category: benefit.categories[0] || 'otros',
           description: benefit.description,
           rating: 5,
-          location: [...benefit.locations], // Start with locations from first benefit
+          location: [...benefit.locations],
           image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
           benefits: []
         };
 
-        // Create the bank benefit
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
@@ -436,21 +323,10 @@ export async function fetchBusinesses(options: {
 
         business.benefits.push(bankBenefit);
         businessMap.set(businessName, business);
-
-        console.log(`📝 Created business:`, {
-          id: business.id,
-          name: business.name,
-          category: business.category,
-          locationCount: business.location.length,
-          benefitsCount: business.benefits.length
-        });
       } else {
-        console.log(`➕ Adding benefit to existing business: ${businessName}`);
-        // Add additional benefit to existing business
         const business = businessMap.get(businessName)!;
 
         // Merge locations from this benefit into business locations
-        // Only add locations that don't already exist (based on formattedAddress)
         const existingAddresses = new Set(business.location.map(loc => loc.formattedAddress));
         const newLocations = benefit.locations.filter(loc =>
           loc.formattedAddress && !existingAddresses.has(loc.formattedAddress)
@@ -473,58 +349,31 @@ export async function fetchBusinesses(options: {
           textoAplicacion: benefit.link || undefined
         };
         business.benefits.push(bankBenefit);
-
-        console.log(`📈 Business now has ${business.benefits.length} benefits and ${business.location.length} locations`);
       }
     });
 
-    const businesses = Array.from(businessMap.values());
-
-    console.log('🎯 fetchBusinesses: Transformation complete:', {
-      totalBenefits: benefits.length,
-      uniqueBusinesses: businesses.length,
-      businessNames: businesses.map(b => b.name),
-      totalBenefitsInBusinesses: businesses.reduce((sum, b) => sum + b.benefits.length, 0)
-    });
-
-    console.log("🎯 Transformed Businesses from MongoDB:", {
-      count: businesses.length,
-      sample: businesses[0],
-    });
-
-    return businesses;
+    return Array.from(businessMap.values());
   } catch (error) {
-    console.error("❌ Failed to fetch from MongoDB API:", error);
-    return []; // Return empty array instead of mock data
+    console.error('[API] fetchBusinesses failed:', error);
+    return [];
   }
 }
 
 // Get a specific benefit by ID
 export async function fetchBenefitById(id: string) {
-  try {
-    return await benefitsAPI.getBenefitById(id);
-  } catch (error) {
-    console.error("Failed to fetch benefit by ID:", error);
-    throw error;
-  }
+  return await benefitsAPI.getBenefitById(id);
 }
 
 // Get nearby benefits based on location
 export async function fetchNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}) {
-  try {
-    return await benefitsAPI.getNearbyBenefits(lat, lng, params);
-  } catch (error) {
-    console.error("Failed to fetch nearby benefits:", error);
-    throw error;
-  }
+  return await benefitsAPI.getNearbyBenefits(lat, lng, params);
 }
 
 // Get available categories
 export async function fetchCategories() {
   try {
     return await benefitsAPI.getCategories();
-  } catch (error) {
-    console.error("Failed to fetch categories:", error);
+  } catch {
     return [];
   }
 }
@@ -533,8 +382,7 @@ export async function fetchCategories() {
 export async function fetchBanks() {
   try {
     return await benefitsAPI.getBanks();
-  } catch (error) {
-    console.error("Failed to fetch banks:", error);
+  } catch {
     return [];
   }
 }
@@ -543,8 +391,7 @@ export async function fetchBanks() {
 export async function fetchStats() {
   try {
     return await benefitsAPI.getStats();
-  } catch (error) {
-    console.error("Failed to fetch stats:", error);
+  } catch {
     return {};
   }
 }
@@ -553,32 +400,26 @@ export async function fetchStats() {
 
 // Convenience functions for common use cases
 export async function fetchAllBusinesses(): Promise<Business[]> {
-  console.log('🌍 fetchAllBusinesses: Fetching ALL businesses...');
   return fetchBusinesses({ fetchAll: true });
 }
 
 export async function fetchBusinessesWithLimit(limit: number, offset?: number): Promise<Business[]> {
-  console.log(`📊 fetchBusinessesWithLimit: Fetching up to ${limit} businesses${offset ? ` starting from ${offset}` : ''}...`);
   return fetchBusinesses({ limit, offset });
 }
 
 export async function fetchBusinessesFrom1000(): Promise<Business[]> {
-  console.log('🎯 fetchBusinessesFrom1000: Fetching benefits starting from #1000 (no limit)...');
   return fetchBusinesses({ offset: 1000 });
 }
 
 export async function fetchBusinessesFromStart(): Promise<Business[]> {
-  console.log('🏁 fetchBusinessesFromStart: Fetching benefits from the beginning (offset 0, no limit)...');
   return fetchBusinesses({ offset: 0 });
 }
 
 export async function fetchBusinessesRange(offset: number, limit: number): Promise<Business[]> {
-  console.log(`📊 fetchBusinessesRange: Fetching ${limit} benefits starting from #${offset}...`);
   return fetchBusinesses({ offset, limit });
 }
 
 export async function fetchBusinessesByCategory(category: string, limit?: number): Promise<Business[]> {
-  console.log(`🏷️ fetchBusinessesByCategory: Fetching businesses in category '${category}' (no default limit)...`);
   return fetchBusinesses({
     filters: { category },
     ...(limit && { limit })
@@ -586,7 +427,6 @@ export async function fetchBusinessesByCategory(category: string, limit?: number
 }
 
 export async function fetchBusinessesByBank(bank: string, limit?: number): Promise<Business[]> {
-  console.log(`🏦 fetchBusinessesByBank: Fetching businesses for bank '${bank}' (no default limit)...`);
   return fetchBusinesses({
     filters: { bank },
     ...(limit && { limit })
@@ -606,29 +446,22 @@ export async function getBenefits(options: {
   filters?: Record<string, string>;
 } = {}): Promise<Benefit[]> {
   try {
-    console.log('🚀 getBenefits: Starting to fetch benefits...', options);
-
     if (options.fetchAll) {
-      console.log('📚 getBenefits: Fetching ALL benefits using pagination...');
       return await fetchAllBenefits(options.filters || {});
     } else {
       const offset = options.offset || 0;
-      console.log(`📊 getBenefits: Fetching benefits starting from offset ${offset} (no limit)...`);
-
       const params: Record<string, string> = {
         offset: offset.toString(),
         ...options.filters || {}
       };
 
-      // Only add limit if explicitly specified
       if (options.limit) {
         params.limit = options.limit.toString();
       }
 
       return await fetchBenefits(params);
     }
-  } catch (error) {
-    console.warn("Failed to fetch benefits:", error);
+  } catch {
     return [];
   }
 }
@@ -639,8 +472,7 @@ export async function getBenefits(options: {
 export async function getBenefitById(id: string): Promise<Benefit | null> {
   try {
     return await benefitsAPI.getBenefitById(id);
-  } catch (error) {
-    console.error("Failed to fetch benefit by ID:", error);
+  } catch {
     return null;
   }
 }
@@ -651,8 +483,7 @@ export async function getBenefitById(id: string): Promise<Benefit | null> {
 export async function getNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
     return await benefitsAPI.getNearbyBenefits(lat, lng, params);
-  } catch (error) {
-    console.error("Failed to fetch nearby benefits:", error);
+  } catch {
     return [];
   }
 }
@@ -661,32 +492,26 @@ export async function getNearbyBenefits(lat: number, lng: number, params: Record
  * Convenience functions for common use cases
  */
 export async function getAllBenefits(): Promise<Benefit[]> {
-  console.log('🌍 getAllBenefits: Fetching ALL benefits...');
   return getBenefits({ fetchAll: true });
 }
 
 export async function getBenefitsWithLimit(limit: number, offset?: number): Promise<Benefit[]> {
-  console.log(`📊 getBenefitsWithLimit: Fetching up to ${limit} benefits${offset ? ` starting from ${offset}` : ''}...`);
   return getBenefits({ limit, offset });
 }
 
 export async function getBenefitsFrom1000(): Promise<Benefit[]> {
-  console.log('🎯 getBenefitsFrom1000: Fetching benefits starting from #1000 (no limit)...');
   return getBenefits({ offset: 1000 });
 }
 
 export async function getBenefitsFromStart(): Promise<Benefit[]> {
-  console.log('🏁 getBenefitsFromStart: Fetching benefits from the beginning (offset 0, no limit)...');
   return getBenefits({ offset: 0 });
 }
 
 export async function getBenefitsRange(offset: number, limit: number): Promise<Benefit[]> {
-  console.log(`📊 getBenefitsRange: Fetching ${limit} benefits starting from #${offset}...`);
   return getBenefits({ offset, limit });
 }
 
 export async function getBenefitsByCategory(category: string, limit?: number): Promise<Benefit[]> {
-  console.log(`🏷️ getBenefitsByCategory: Fetching benefits in category '${category}' (no default limit)...`);
   return getBenefits({
     filters: { category },
     ...(limit && { limit })
@@ -694,7 +519,6 @@ export async function getBenefitsByCategory(category: string, limit?: number): P
 }
 
 export async function getBenefitsByBank(bank: string, limit?: number): Promise<Benefit[]> {
-  console.log(`🏦 getBenefitsByBank: Fetching benefits for bank '${bank}' (no default limit)...`);
   return getBenefits({
     filters: { bank },
     ...(limit && { limit })
@@ -714,29 +538,22 @@ export async function getRawBenefits(options: {
   filters?: Record<string, string>;
 } = {}): Promise<RawMongoBenefit[]> {
   try {
-    console.log('🚀 getRawBenefits: Starting to fetch raw benefits...', options);
-
     if (options.fetchAll) {
-      console.log('📚 getRawBenefits: Fetching ALL raw benefits using pagination...');
       return await fetchAllRawBenefits(options.filters || {});
     } else {
       const offset = options.offset || 0;
-      console.log(`📊 getRawBenefits: Fetching raw benefits starting from offset ${offset}...`);
-
       const params: Record<string, string> = {
         offset: offset.toString(),
         ...options.filters || {}
       };
 
-      // Only add limit if explicitly specified
       if (options.limit) {
         params.limit = options.limit.toString();
       }
 
       return await benefitsAPI.getRawBenefits(params);
     }
-  } catch (error) {
-    console.warn("Failed to fetch raw benefits:", error);
+  } catch {
     return [];
   }
 }
@@ -746,16 +563,12 @@ export async function getRawBenefits(options: {
  */
 export async function fetchAllRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
   try {
-    console.log('🔍 fetchAllRawBenefits: Starting to fetch ALL raw benefits using pagination...');
-
     const allBenefits: RawMongoBenefit[] = [];
     let offset = 0;
-    const limit = 100; // Use larger chunks for efficiency
+    const limit = 100;
     let hasMore = true;
 
     while (hasMore) {
-      console.log(`📄 fetchAllRawBenefits: Fetching page at offset ${offset}...`);
-
       const pageParams = {
         ...params,
         offset: offset.toString(),
@@ -771,19 +584,13 @@ export async function fetchAllRawBenefits(params: Record<string, string> = {}): 
       allBenefits.push(...pageBenefits);
       offset += pageBenefits.length;
 
-      console.log(`📊 fetchAllRawBenefits: Page complete. Total so far: ${allBenefits.length}`);
-
-      // Safety break to prevent infinite loops
       if (offset > 10000) {
-        console.warn('⚠️ fetchAllRawBenefits: Safety limit reached, stopping at 10,000 benefits');
         break;
       }
     }
 
-    console.log(`🎯 fetchAllRawBenefits: Complete! Total raw benefits: ${allBenefits.length}`);
     return allBenefits;
-  } catch (error) {
-    console.error("❌ fetchAllRawBenefits: Failed to fetch all raw benefits:", error);
+  } catch {
     return [];
   }
 }
@@ -792,17 +599,14 @@ export async function fetchAllRawBenefits(params: Record<string, string> = {}): 
  * Convenience functions for raw benefits
  */
 export async function getAllRawBenefits(): Promise<RawMongoBenefit[]> {
-  console.log('🌍 getAllRawBenefits: Fetching ALL raw benefits...');
   return getRawBenefits({ fetchAll: true });
 }
 
 export async function getRawBenefitsWithLimit(limit: number, offset?: number): Promise<RawMongoBenefit[]> {
-  console.log(`📊 getRawBenefitsWithLimit: Fetching up to ${limit} raw benefits${offset ? ` starting from ${offset}` : ''}...`);
   return getRawBenefits({ limit, offset });
 }
 
 export async function getRawBenefitsByCategory(category: string, limit?: number): Promise<RawMongoBenefit[]> {
-  console.log(`🏷️ getRawBenefitsByCategory: Fetching raw benefits in category '${category}'...`);
   return getRawBenefits({
     filters: { category },
     ...(limit && { limit })
@@ -810,7 +614,6 @@ export async function getRawBenefitsByCategory(category: string, limit?: number)
 }
 
 export async function getRawBenefitsByBank(bank: string, limit?: number): Promise<RawMongoBenefit[]> {
-  console.log(`🏦 getRawBenefitsByBank: Fetching raw benefits for bank '${bank}'...`);
   return getRawBenefits({
     filters: { bank },
     ...(limit && { limit })
@@ -823,30 +626,19 @@ export { benefitsAPI };
 // Function to get ALL benefits efficiently using total count
 export async function fetchAllBenefitsEfficient(params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
-    console.log('🚀 fetchAllBenefitsEfficient: Starting efficient fetch of ALL benefits...');
-
-    // First, get the total count from stats
     const stats = await fetchMongoStats();
     const totalBenefits = stats.stats?.totalBenefits || 0;
 
     if (totalBenefits === 0) {
-      console.log('📊 No benefits found in stats');
       return [];
     }
 
-    console.log(`📊 Total benefits available: ${totalBenefits}`);
-
     const allBenefits: Benefit[] = [];
-    const limit = 200; // Use larger chunks for better performance
+    const limit = 200;
     const totalPages = Math.ceil(totalBenefits / limit);
 
-    console.log(`📄 Will fetch ${totalPages} pages with ${limit} benefits each`);
-
-    // Fetch all pages
     for (let page = 0; page < totalPages; page++) {
       const offset = page * limit;
-      console.log(`📄 Fetching page ${page + 1}/${totalPages} (offset: ${offset})...`);
-
       const pageParams = {
         ...params,
         offset: offset.toString(),
@@ -857,31 +649,21 @@ export async function fetchAllBenefitsEfficient(params: Record<string, string> =
         const pageBenefits = await benefitsAPI.getBenefits(pageParams);
         allBenefits.push(...pageBenefits);
 
-        console.log(`✅ Page ${page + 1} complete: ${pageBenefits.length} benefits (Total: ${allBenefits.length})`);
-
-        // If we got fewer benefits than expected, we've reached the end
         if (pageBenefits.length < limit) {
-          console.log('🏁 Reached end of data early');
           break;
         }
-      } catch (pageError) {
-        console.error(`❌ Error fetching page ${page + 1}:`, pageError);
-        // Continue with next page instead of failing completely
+      } catch {
         continue;
       }
     }
 
-    console.log(`🎯 fetchAllBenefitsEfficient: Complete! Fetched ${allBenefits.length}/${totalBenefits} benefits`);
     return allBenefits;
-  } catch (error) {
-    console.error("❌ fetchAllBenefitsEfficient: Failed to fetch all benefits:", error);
-    console.warn("⚠️ fetchAllBenefitsEfficient: Falling back to regular pagination method");
+  } catch {
     return fetchAllBenefits(params);
   }
 }
 
 // Function to get ALL businesses (using all benefits)
 export async function fetchAllBusinessesComplete(): Promise<Business[]> {
-  console.log('🌍 fetchAllBusinessesComplete: Fetching ALL businesses from ALL benefits...');
   return fetchBusinesses({ fetchAll: true });
 }
