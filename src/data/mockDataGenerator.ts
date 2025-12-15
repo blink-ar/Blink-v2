@@ -165,7 +165,6 @@ export class MockDataGenerator {
                 benefits,
                 // Enhanced fields for new functionality
                 lastUpdated: Date.now() - Math.floor(Math.random() * 3600000), // Random time within last hour
-                isFavorite: false,
                 imageLoaded: true
             };
 

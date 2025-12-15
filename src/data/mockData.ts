@@ -87,7 +87,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 1800000, // 30 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -145,7 +144,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 2400000, // 40 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -201,7 +199,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 900000, // 15 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -261,7 +258,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 3000000, // 50 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -315,7 +311,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 600000, // 10 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -398,7 +393,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 1200000, // 20 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -483,7 +477,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 2100000, // 35 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
   {
@@ -547,7 +540,6 @@ export const mockBusinesses: Business[] = [
       },
     ],
     lastUpdated: Date.now() - 1500000, // 25 minutes ago
-    isFavorite: false,
     imageLoaded: true
   },
 ];

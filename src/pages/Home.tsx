@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
@@ -6,7 +6,7 @@ import CategoryGrid from "../components/CategoryGrid";
 import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
 // import NearbyBusinesses from "../components/NearbyBusinesses";
-import BusinessCard from "../components/BusinessCard";
+import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -18,14 +18,19 @@ import {
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { CacheNotification } from "../components/CacheNotification";
+import {
+  SkeletonFeaturedBanner,
+  SkeletonActiveOffers,
+} from "../components/skeletons";
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Use the cached benefits data hook
   const {
@@ -35,8 +40,32 @@ function Home() {
     error,
   } = useBenefitsData();
 
-  // State for bottom navigation
-  const [activeTab, setActiveTab] = useState<NavigationTab>("inicio");
+  // State for bottom navigation - check if we're returning from a benefit page with an active tab
+  const locationState = location.state as {
+    activeTab?: NavigationTab;
+    scrollY?: number;
+    displayCount?: number;
+  } | null;
+  const initialTab = locationState?.activeTab || "inicio";
+  const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
+
+  // Scroll restoration state
+  const restoredScrollY = locationState?.scrollY;
+  const restoredDisplayCount = locationState?.displayCount;
+  const [currentDisplayCount, setCurrentDisplayCount] = useState(restoredDisplayCount || 20);
+  const hasRestoredScroll = useRef(false);
+
+  // Restore scroll position after component mounts and content is loaded
+  useEffect(() => {
+    if (restoredScrollY !== undefined && !hasRestoredScroll.current && !isLoading) {
+      // Small delay to ensure content is rendered
+      const timeoutId = setTimeout(() => {
+        window.scrollTo(0, restoredScrollY);
+        hasRestoredScroll.current = true;
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [restoredScrollY, isLoading]);
 
   // State for cache notifications
   const [notification, setNotification] = useState<{
@@ -133,96 +162,102 @@ function Home() {
   //   return "Comercio";
   // };
 
-  // Memoize featured benefits to avoid re-computation
-  const featuredBenefits = useMemo((): RawMongoBenefit[] => {
-    const featured = rawBenefits.slice(0, 1); // Get first benefit as featured
-    console.log("🎯 Featured benefits:", featured);
-    return featured;
-  }, [rawBenefits]);
+  // Memoized featured benefits - prevents re-computation on every render
+  const featuredBenefits = useMemo(
+    () => rawBenefits.slice(0, 1),
+    [rawBenefits]
+  );
 
-  // Memoize active offers to avoid filtering on every render
-  const activeOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .filter((business) => {
-        // Filter businesses that have benefits with good rewards
-        return business.benefits.some(
-          (benefit) =>
-            benefit.rewardRate.includes("%") || benefit.rewardRate.includes("x")
-        );
-      })
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized active offers (businesses with high discounts)
+  const activeOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .filter((business) =>
+          business.benefits.some(
+            (benefit) =>
+              benefit.rewardRate.includes("%") ||
+              benefit.rewardRate.includes("x")
+          )
+        )
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
-  // Memoize Santander exclusive offers
-  const santanderOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .filter((business) => {
-        // Filter businesses that have Santander benefits
-        return business.benefits.some((benefit) =>
-          benefit.bankName.toLowerCase().includes("santander")
-        );
-      })
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized Santander exclusive offers
+  const santanderOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .filter((business) =>
+          business.benefits.some((benefit) =>
+            benefit.bankName.toLowerCase().includes("santander")
+          )
+        )
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
-  // Memoize BBVA exclusive offers
-  const bbvaOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .filter((business) => {
-        // Filter businesses that have BBVA benefits
-        return business.benefits.some((benefit) =>
-          benefit.bankName.toLowerCase().includes("bbva")
-        );
-      })
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized BBVA exclusive offers
+  const bbvaOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .filter((business) =>
+          business.benefits.some((benefit) =>
+            benefit.bankName.toLowerCase().includes("bbva")
+          )
+        )
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
-  // Memoize food category offers
-  const foodOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .filter((business) => {
-        // Filter businesses in food/gastronomia category
-        return business.category.toLowerCase() === "gastronomia";
-      })
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized food category offers
+  const foodOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .filter(
+          (business) => business.category.toLowerCase() === "gastronomia"
+        )
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
-  // Memoize high-value offers
-  const highValueOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .filter((business) => {
-        // Filter businesses that have benefits with high discount percentages
-        return business.benefits.some((benefit) => {
-          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
-          if (percentageMatch) {
-            const percentage = parseInt(percentageMatch[1]);
-            return percentage >= 20; // 20% or higher discount
-          }
-          return false;
-        });
-      })
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized high-value offers (benefits with high percentages)
+  const highValueOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .filter((business) =>
+          business.benefits.some((benefit) => {
+            const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+            if (percentageMatch) {
+              const percentage = parseInt(percentageMatch[1]);
+              return percentage >= 20; // 20% or higher discount
+            }
+            return false;
+          })
+        )
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
-  // Memoize biggest discount offers
-  const biggestDiscountOffers = useMemo((): Business[] => {
-    return paginatedBusinesses
-      .map((business) => {
-        // Find the highest discount percentage for each business
-        let maxDiscount = 0;
-        business.benefits.forEach((benefit) => {
-          const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
-          if (percentageMatch) {
-            const percentage = parseInt(percentageMatch[1]);
-            maxDiscount = Math.max(maxDiscount, percentage);
-          }
-        });
-        return { ...business, maxDiscount };
-      })
-      .filter((business) => business.maxDiscount > 0) // Only businesses with percentage discounts
-      .sort((a, b) => b.maxDiscount - a.maxDiscount) // Sort by highest discount first
-      .slice(0, 8); // Limit to 8 for horizontal scroll
-  }, [paginatedBusinesses]);
+  // Memoized biggest discount offers (sorted by highest percentage)
+  const biggestDiscountOffers = useMemo(
+    () =>
+      paginatedBusinesses
+        .map((business) => {
+          let maxDiscount = 0;
+          business.benefits.forEach((benefit) => {
+            const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
+            if (percentageMatch) {
+              const percentage = parseInt(percentageMatch[1]);
+              maxDiscount = Math.max(maxDiscount, percentage);
+            }
+          });
+          return { ...business, maxDiscount };
+        })
+        .filter((business) => business.maxDiscount > 0)
+        .sort((a, b) => b.maxDiscount - a.maxDiscount)
+        .slice(0, 8),
+    [paginatedBusinesses]
+  );
 
   // Get nearby businesses (simulate with distance)
   // const getNearbyBusinesses = (): Business[] => {
@@ -265,8 +300,18 @@ function Home() {
     });
   };
 
+  // Callback to track display count changes from InfiniteScrollGrid
+  const handleDisplayCountChange = useCallback((count: number) => {
+    setCurrentDisplayCount(count);
+  }, []);
+
   const handleBusinessClick = (businessId: string) => {
-    navigate(`/benefit/${businessId}/0`);
+    // Save current scroll position and display count before navigating
+    const scrollY = window.scrollY;
+    // Pass the current tab, scroll position, and display count so we can restore them
+    navigate(`/benefit/${businessId}/0?from=${activeTab}`, {
+      state: { scrollY, displayCount: currentDisplayCount }
+    });
   };
 
   const handleViewAllBenefits = () => {
@@ -298,9 +343,12 @@ function Home() {
       });
       console.log(
         "🔗 Navigating to business page with popup:",
-        `/benefit/${matchingBusiness.id}/0?openDetails=true`
+        `/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`
       );
-      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true`);
+      const scrollY = window.scrollY;
+      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`, {
+        state: { scrollY, displayCount: currentDisplayCount }
+      });
     } else {
       // Fallback: if no matching business found, navigate to the first available business
       // or switch to the benefits tab to show all benefits
@@ -317,9 +365,12 @@ function Home() {
         // Navigate to the first business as a fallback
         console.log(
           "🔗 Fallback: Navigating to first business:",
-          `/benefit/${paginatedBusinesses[0].id}/0`
+          `/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`
         );
-        navigate(`/benefit/${paginatedBusinesses[0].id}/0`);
+        const scrollY = window.scrollY;
+        navigate(`/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`, {
+          state: { scrollY, displayCount: currentDisplayCount }
+        });
       } else {
         // If no businesses available, switch to benefits tab
         console.log("🔗 Fallback: Switching to benefits tab");
@@ -340,6 +391,17 @@ function Home() {
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
+    
+    // Update history state so reload restores the correct tab
+    navigate(".", { 
+      replace: true, 
+      state: { 
+        activeTab: tab,
+        scrollY: 0, 
+        displayCount: 20 
+      } 
+    });
+
     // Handle navigation based on tab
     switch (tab) {
       case "inicio":
@@ -417,40 +479,25 @@ function Home() {
         {!isLoading && !error && (
           <div className="animate-fade-in-up">
             {shouldShowFilteredResults ? (
-              /* Filtered Results View */
+              /* Filtered Results View with Infinite Scroll */
               <div className="px-4 sm:px-6 md:px-8 py-6">
-                {/* Filtered Business Grid - Optimized for mobile */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {filteredBusinesses.map((business) => (
-                    <BusinessCard
-                      key={business.id}
-                      business={business}
-                      onClick={handleBusinessClick}
-                      className="card-hover business-card micro-lift animate-fade-in-up"
-                    />
-                  ))}
-                </div>
-
-                {filteredBusinesses.length === 0 && (
-                  <div className="text-center py-12 md:py-16">
-                    <div className="text-gray-400 text-5xl md:text-6xl mb-4">
-                      🔍
-                    </div>
-                    <h3 className="text-lg md:text-xl font-medium text-gray-900 mb-2">
-                      No se encontraron resultados
-                    </h3>
-                    <p className="text-gray-600 text-sm md:text-base max-w-md mx-auto">
-                      Intenta con otros términos de búsqueda o selecciona una
-                      categoría diferente
-                    </p>
-                  </div>
-                )}
+                <InfiniteScrollGrid
+                  businesses={filteredBusinesses}
+                  onBusinessClick={handleBusinessClick}
+                  initialLoadCount={20}
+                  loadMoreCount={20}
+                  restoredDisplayCount={activeTab === "beneficios" ? restoredDisplayCount : undefined}
+                  onDisplayCountChange={handleDisplayCountChange}
+                />
               </div>
             ) : (
               /* Default Home View */
               <div className="stagger-children">
-                {/* Featured Benefits - Reduced animation delay for faster load */}
-                <div className="animate-fade-in-up">
+                {/* Featured Benefits */}
+                <div
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: "0ms" }}
+                >
                   <FeaturedBenefits
                     benefits={featuredBenefits}
                     onViewAll={handleViewAllBenefits}
@@ -459,7 +506,10 @@ function Home() {
                 </div>
 
                 {/* Active Offers */}
-                <div className="animate-fade-in-up">
+                <div
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: "200ms" }}
+                >
                   <ActiveOffers
                     businesses={activeOffers}
                     onBusinessClick={handleBusinessClick}
@@ -469,7 +519,10 @@ function Home() {
 
                 {/* Santander Exclusive Offers */}
                 {santanderOffers.length > 0 && (
-                  <div className="animate-fade-in-up">
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "250ms" }}
+                  >
                     <ActiveOffers
                       businesses={santanderOffers}
                       onBusinessClick={handleBusinessClick}
@@ -484,7 +537,10 @@ function Home() {
 
                 {/* BBVA Exclusive Offers */}
                 {bbvaOffers.length > 0 && (
-                  <div className="animate-fade-in-up">
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "300ms" }}
+                  >
                     <ActiveOffers
                       businesses={bbvaOffers}
                       onBusinessClick={handleBusinessClick}
@@ -499,7 +555,10 @@ function Home() {
 
                 {/* Food Offers */}
                 {foodOffers.length > 0 && (
-                  <div className="animate-fade-in-up">
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "350ms" }}
+                  >
                     <ActiveOffers
                       businesses={foodOffers}
                       onBusinessClick={handleBusinessClick}
@@ -514,7 +573,10 @@ function Home() {
 
                 {/* High Value Offers */}
                 {highValueOffers.length > 0 && (
-                  <div className="animate-fade-in-up">
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "375ms" }}
+                  >
                     <ActiveOffers
                       businesses={highValueOffers}
                       onBusinessClick={handleBusinessClick}
@@ -526,7 +588,10 @@ function Home() {
 
                 {/* Biggest Discount Offers */}
                 {biggestDiscountOffers.length > 0 && (
-                  <div className="animate-fade-in-up">
+                  <div
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: "400ms" }}
+                  >
                     <ActiveOffers
                       businesses={biggestDiscountOffers}
                       onBusinessClick={handleBusinessClick}
@@ -552,13 +617,13 @@ function Home() {
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading State - Skeleton Loaders */}
         {isLoading && (
-          <div className="flex flex-col justify-center items-center py-12 md:py-16 animate-fade-in-scale">
-            <div className="animate-spin rounded-full h-8 w-8 md:h-10 md:w-10 border-b-2 border-primary-600 mb-4"></div>
-            <div className="text-sm text-gray-600 animate-pulse">
-              Cargando ofertas...
-            </div>
+          <div className="animate-fade-in-up">
+            <SkeletonFeaturedBanner />
+            <SkeletonActiveOffers cardCount={3} />
+            <SkeletonActiveOffers cardCount={3} />
+            <SkeletonActiveOffers cardCount={3} />
           </div>
         )}
       </main>

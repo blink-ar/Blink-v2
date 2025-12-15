@@ -37,7 +37,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
 
   return (
     <div
-      className="category-grid px-3 sm:px-3 py-3"
+      className="category-grid py-3"
       style={{ background: "#fff" }}
     >
       <div
@@ -49,7 +49,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
           msOverflowStyle: "none" /* Internet Explorer 10+ */,
         }}
       >
-        <div className="flex gap-2 sm:gap-3">
+        <div className="flex gap-2 sm:gap-3 px-3">
           {categories.map((category, index) => (
             <button
               key={category.id}

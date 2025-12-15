@@ -115,6 +115,9 @@ export class BenefitsDataService {
     private cache: SimpleCache;
     private initialized = false;
 
+    // Track in-flight requests to prevent duplicate API calls
+    private pendingRequests: Map<string, Promise<any>> = new Map();
+
     // Cache keys
     private static readonly CACHE_KEYS = {
         ALL_BUSINESSES: 'all_businesses',
@@ -145,7 +148,7 @@ export class BenefitsDataService {
     }
 
     /**
-     * Get all businesses with caching
+     * Get all businesses with caching and request deduplication
      */
     public async getAllBusinesses(forceRefresh = false): Promise<Business[]> {
         if (!this.initialized) {
@@ -153,6 +156,11 @@ export class BenefitsDataService {
         }
 
         const cacheKey = BenefitsDataService.CACHE_KEYS.ALL_BUSINESSES;
+
+        // Check for in-flight request (request deduplication)
+        if (!forceRefresh && this.pendingRequests.has(cacheKey)) {
+            return this.pendingRequests.get(cacheKey)!;
+        }
 
         // Check cache first (unless force refresh is requested)
         if (!forceRefresh) {
@@ -162,58 +170,67 @@ export class BenefitsDataService {
             }
         }
 
-        try {
-            const businesses = await fetchAllBusinessesComplete();
+        // Create and track new request
+        const request = (async () => {
+            try {
+                const businesses = await fetchAllBusinessesComplete();
 
-            // Cache the data
-            this.cache.set(cacheKey, businesses, BenefitsDataService.CACHE_TTL);
+                // Cache the data
+                this.cache.set(cacheKey, businesses, BenefitsDataService.CACHE_TTL);
 
-            return businesses;
-        } catch (error) {
-            // Try to return stale cached data as fallback
-            const staleData = this.cache.get<Business[]>(cacheKey);
-            if (staleData) {
-                return staleData;
+                return businesses;
+            } catch (error) {
+                // Try to return stale cached data as fallback
+                const staleData = this.cache.get<Business[]>(cacheKey);
+                if (staleData) {
+                    return staleData;
+                }
+
+                // If no cached data and it's a CORS error, provide minimal fallback
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                    const fallbackData: Business[] = [
+                        {
+                            id: 'demo-business-1',
+                            name: 'Demo Restaurant',
+                            category: 'gastronomia',
+                            description: 'Demo business for testing cache functionality',
+                            rating: 4.5,
+                            location: [{
+                                lat: -33.4489,
+                                lng: -70.6693,
+                                formattedAddress: 'Santiago, Chile',
+                                source: 'address' as const,
+                                provider: 'google' as const,
+                                confidence: 1.0,
+                                raw: 'Santiago, Chile',
+                                updatedAt: new Date().toISOString()
+                            }],
+                            image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
+                            benefits: [{
+                                bankName: 'Demo Bank',
+                                cardName: 'Demo Card',
+                                benefit: '20% de descuento en comidas',
+                                rewardRate: '20%',
+                                color: 'bg-blue-500',
+                                icon: 'CreditCard'
+                            }]
+                        }
+                    ];
+
+                    // Cache the fallback data temporarily (5 minutes)
+                    this.cache.set(cacheKey, fallbackData, 5 * 60 * 1000);
+                    return fallbackData;
+                }
+
+                throw error;
+            } finally {
+                // Always clean up the pending request
+                this.pendingRequests.delete(cacheKey);
             }
+        })();
 
-            // If no cached data and it's a CORS error, provide minimal fallback
-            if (error instanceof TypeError && error.message.includes('fetch')) {
-                const fallbackData: Business[] = [
-                    {
-                        id: 'demo-business-1',
-                        name: 'Demo Restaurant',
-                        category: 'gastronomia',
-                        description: 'Demo business for testing cache functionality',
-                        rating: 4.5,
-                        location: [{
-                            lat: -33.4489,
-                            lng: -70.6693,
-                            formattedAddress: 'Santiago, Chile',
-                            source: 'address' as const,
-                            provider: 'google' as const,
-                            confidence: 1.0,
-                            raw: 'Santiago, Chile',
-                            updatedAt: new Date().toISOString()
-                        }],
-                        image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
-                        benefits: [{
-                            bankName: 'Demo Bank',
-                            cardName: 'Demo Card',
-                            benefit: '20% de descuento en comidas',
-                            rewardRate: '20%',
-                            color: 'bg-blue-500',
-                            icon: 'CreditCard'
-                        }]
-                    }
-                ];
-
-                // Cache the fallback data temporarily (5 minutes)
-                this.cache.set(cacheKey, fallbackData, 5 * 60 * 1000);
-                return fallbackData;
-            }
-
-            throw error;
-        }
+        this.pendingRequests.set(cacheKey, request);
+        return request;
     }
 
     /**

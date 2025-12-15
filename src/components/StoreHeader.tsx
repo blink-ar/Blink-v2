@@ -1,19 +1,15 @@
 import React from "react";
-import { ArrowLeft, Heart, MapPin, Star } from "lucide-react";
+import { ArrowLeft, MapPin, Star } from "lucide-react";
 import { Business } from "../types";
 
 interface StoreHeaderProps {
   business: Business;
   onBack: () => void;
-  onFavoriteToggle: () => void;
-  isFavorite: boolean;
 }
 
 const StoreHeader: React.FC<StoreHeaderProps> = ({
   business,
   onBack,
-  onFavoriteToggle,
-  isFavorite,
 }) => {
   return (
     <div className="bg-white">
@@ -27,21 +23,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
           <ArrowLeft className="h-5 w-5 text-gray-700" />
         </button>
 
-        <button
-          onClick={onFavoriteToggle}
-          className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-            isFavorite
-              ? "bg-red-100 hover:bg-red-200"
-              : "bg-gray-100 hover:bg-gray-200"
-          }`}
-          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart
-            className={`h-5 w-5 ${
-              isFavorite ? "text-red-500 fill-current" : "text-gray-700"
-            }`}
-          />
-        </button>
       </div>
 
       {/* Store Information */}
