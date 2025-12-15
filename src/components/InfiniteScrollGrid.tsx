@@ -7,6 +7,10 @@ interface InfiniteScrollGridProps {
   onBusinessClick: (businessId: string) => void;
   initialLoadCount?: number;
   loadMoreCount?: number;
+  /** Initial display count to restore from (for scroll restoration) */
+  restoredDisplayCount?: number;
+  /** Callback when display count changes (for state saving) */
+  onDisplayCountChange?: (count: number) => void;
 }
 
 /**
@@ -20,17 +24,29 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
   onBusinessClick,
   initialLoadCount = 20,
   loadMoreCount = 20,
+  restoredDisplayCount,
+  onDisplayCountChange,
 }) => {
-  // Track how many items to display
-  const [displayCount, setDisplayCount] = useState(initialLoadCount);
+  // Track how many items to display - use restored count if available
+  const [displayCount, setDisplayCount] = useState(
+    restoredDisplayCount || initialLoadCount
+  );
   
   // Ref for the sentinel element at the bottom
   const observerRef = useRef<HTMLDivElement>(null);
   
   // Reset display count when businesses array changes (e.g., filter applied)
+  // But only if we don't have a restored count
   useEffect(() => {
-    setDisplayCount(initialLoadCount);
-  }, [businesses.length, initialLoadCount]);
+    if (!restoredDisplayCount) {
+      setDisplayCount(initialLoadCount);
+    }
+  }, [businesses.length, initialLoadCount, restoredDisplayCount]);
+  
+  // Notify parent of display count changes
+  useEffect(() => {
+    onDisplayCountChange?.(displayCount);
+  }, [displayCount, onDisplayCountChange]);
   
   // Get the businesses to display (sliced to current display count)
   const displayedBusinesses = useMemo(

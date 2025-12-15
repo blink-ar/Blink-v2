@@ -32,9 +32,12 @@ function Benefit() {
     error: businessesError,
   } = useBusinessesData();
 
-  // Check for openDetails query parameter
+  // Check for openDetails query parameter and source tab
   const searchParams = new URLSearchParams(location.search);
   const shouldOpenDetails = searchParams.get("openDetails") === "true";
+  const sourceTab = searchParams.get("from") || (location.state as { from?: string })?.from || null;
+  // Get scroll restoration data from location state
+  const scrollRestoreData = location.state as { scrollY?: number; displayCount?: number } | null;
   const [rawBenefit, setRawBenefit] = useState<RawMongoBenefit | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
@@ -379,7 +382,20 @@ function Benefit() {
       {/* Store Header */}
       <StoreHeader
         business={business}
-        onBack={() => navigate(-1)}
+        onBack={() => {
+          // Navigate back to the source tab if we know where we came from
+          if (sourceTab === "beneficios") {
+            navigate("/", { 
+              state: { 
+                activeTab: "beneficios",
+                scrollY: scrollRestoreData?.scrollY,
+                displayCount: scrollRestoreData?.displayCount
+              } 
+            });
+          } else {
+            navigate(-1);
+          }
+        }}
         onFavoriteToggle={handleFavoriteToggle}
         isFavorite={isFavorite}
       />

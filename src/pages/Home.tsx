@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
@@ -22,10 +22,11 @@ import { CacheNotification } from "../components/CacheNotification";
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Use the cached benefits data hook
   const {
@@ -35,8 +36,32 @@ function Home() {
     error,
   } = useBenefitsData();
 
-  // State for bottom navigation
-  const [activeTab, setActiveTab] = useState<NavigationTab>("inicio");
+  // State for bottom navigation - check if we're returning from a benefit page with an active tab
+  const locationState = location.state as {
+    activeTab?: NavigationTab;
+    scrollY?: number;
+    displayCount?: number;
+  } | null;
+  const initialTab = locationState?.activeTab || "inicio";
+  const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
+
+  // Scroll restoration state
+  const restoredScrollY = locationState?.scrollY;
+  const restoredDisplayCount = locationState?.displayCount;
+  const [currentDisplayCount, setCurrentDisplayCount] = useState(restoredDisplayCount || 20);
+  const hasRestoredScroll = useRef(false);
+
+  // Restore scroll position after component mounts and content is loaded
+  useEffect(() => {
+    if (restoredScrollY !== undefined && !hasRestoredScroll.current && !isLoading) {
+      // Small delay to ensure content is rendered
+      const timeoutId = setTimeout(() => {
+        window.scrollTo(0, restoredScrollY);
+        hasRestoredScroll.current = true;
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [restoredScrollY, isLoading]);
 
   // State for cache notifications
   const [notification, setNotification] = useState<{
@@ -271,8 +296,18 @@ function Home() {
     });
   };
 
+  // Callback to track display count changes from InfiniteScrollGrid
+  const handleDisplayCountChange = useCallback((count: number) => {
+    setCurrentDisplayCount(count);
+  }, []);
+
   const handleBusinessClick = (businessId: string) => {
-    navigate(`/benefit/${businessId}/0`);
+    // Save current scroll position and display count before navigating
+    const scrollY = window.scrollY;
+    // Pass the current tab, scroll position, and display count so we can restore them
+    navigate(`/benefit/${businessId}/0?from=${activeTab}`, {
+      state: { scrollY, displayCount: currentDisplayCount }
+    });
   };
 
   const handleViewAllBenefits = () => {
@@ -304,9 +339,12 @@ function Home() {
       });
       console.log(
         "🔗 Navigating to business page with popup:",
-        `/benefit/${matchingBusiness.id}/0?openDetails=true`
+        `/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`
       );
-      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true`);
+      const scrollY = window.scrollY;
+      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`, {
+        state: { scrollY, displayCount: currentDisplayCount }
+      });
     } else {
       // Fallback: if no matching business found, navigate to the first available business
       // or switch to the benefits tab to show all benefits
@@ -323,9 +361,12 @@ function Home() {
         // Navigate to the first business as a fallback
         console.log(
           "🔗 Fallback: Navigating to first business:",
-          `/benefit/${paginatedBusinesses[0].id}/0`
+          `/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`
         );
-        navigate(`/benefit/${paginatedBusinesses[0].id}/0`);
+        const scrollY = window.scrollY;
+        navigate(`/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`, {
+          state: { scrollY, displayCount: currentDisplayCount }
+        });
       } else {
         // If no businesses available, switch to benefits tab
         console.log("🔗 Fallback: Switching to benefits tab");
@@ -430,6 +471,8 @@ function Home() {
                   onBusinessClick={handleBusinessClick}
                   initialLoadCount={20}
                   loadMoreCount={20}
+                  restoredDisplayCount={activeTab === "beneficios" ? restoredDisplayCount : undefined}
+                  onDisplayCountChange={handleDisplayCountChange}
                 />
               </div>
             ) : (
