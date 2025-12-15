@@ -43,7 +43,6 @@ function Benefit() {
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CanonicalLocation | null>(null);
@@ -349,14 +348,24 @@ function Benefit() {
     location.pathname,
   ]);
 
+  // Auto-select location when store has only one valid location
+  useEffect(() => {
+    if (business && !selectedLocation) {
+      // Filter valid locations (exclude 0,0 coordinates)
+      const validLocations = business.location.filter(
+        (loc) => loc.lat !== 0 || loc.lng !== 0
+      );
+
+      if (validLocations.length === 1) {
+        setSelectedLocation(validLocations[0]);
+      }
+    }
+  }, [business, selectedLocation]);
+
   if (loading)
     return <SkeletonBenefitPage />;
   if (error) return <div className="text-center text-red-500">{error}</div>;
   if (!business || !benefit) return null;
-
-  const handleFavoriteToggle = () => {
-    setIsFavorite(!isFavorite);
-  };
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit) => {
     setBenefit(selectedBenefit);
@@ -391,8 +400,6 @@ function Benefit() {
             navigate(-1);
           }
         }}
-        onFavoriteToggle={handleFavoriteToggle}
-        isFavorite={isFavorite}
       />
 
       {/* Tab Navigation */}

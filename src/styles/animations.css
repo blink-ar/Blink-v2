@@ -126,6 +126,33 @@
   }
 }
 
+/* Bottom Sheet Animations */
+@keyframes slideFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideToBottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.animate-slide-from-bottom {
+  animation: slideFromBottom var(--duration-medium) var(--ease-out) forwards;
+}
+
+.animate-slide-to-bottom {
+  animation: slideToBottom var(--duration-short) var(--ease-in) forwards;
+}
+
 @keyframes scaleIn {
   from {
     opacity: 0;

@@ -31,7 +31,6 @@ export interface Business {
   image: string;
   benefits: BankBenefit[];
   // Enhanced fields for new functionality
-  isFavorite?: boolean;
   lastUpdated?: number;
   imageLoaded?: boolean;
   distance?: number; // Distance in kilometers

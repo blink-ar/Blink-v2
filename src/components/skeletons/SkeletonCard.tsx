@@ -31,8 +31,6 @@ const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' }) => {
                 <Skeleton variant="text" width="60%" height={12} />
               </div>
             </div>
-            {/* Heart icon */}
-            <Skeleton variant="circular" width={24} height={24} />
           </div>
 
           {/* Discount badge and payment methods */}
