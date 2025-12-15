@@ -1,9 +1,9 @@
-import React from 'react';
-import { X, Calendar, CreditCard, CheckCircle2, Tag, MapPin, Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, CreditCard, CheckCircle2, Tag, MapPin, Info } from 'lucide-react';
 import { BankBenefit } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { BankLogoSelector } from './BankLogos';
-import { GradientBadge, BadgeVariant } from './GradientBadge';
+import { GradientBadge } from './GradientBadge';
 import { DaysOfWeek } from './ui/DaysOfWeek';
 import {
   formatValue,
@@ -26,7 +26,32 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  if (!isOpen) return null;
+  const [isClosing, setIsClosing] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  // Handle opening
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    }
+  }, [isOpen]);
+
+  // Handle close with animation
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setShouldRender(false);
+      onClose();
+    }, 250); // Match animation duration
+  }, [onClose]);
+
+  // Handle backdrop click
+  const handleBackdropClick = useCallback(() => {
+    handleClose();
+  }, [handleClose]);
+
+  if (!shouldRender) return null;
 
   // Extract discount percentage from rewardRate
   const getDiscountPercentage = (rewardRate: string) => {
@@ -76,21 +101,25 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-250 ${
+          isClosing ? 'opacity-0' : 'animate-fade-in'
+        }`}
+        onClick={handleBackdropClick}
       />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
         <div
-          className="bg-white w-full max-w-2xl max-h-[85vh] rounded-t-3xl shadow-2xl overflow-hidden pointer-events-auto animate-slide-up"
+          className={`bg-white w-full max-w-2xl max-h-[80vh] rounded-t-3xl shadow-2xl overflow-hidden pointer-events-auto ${
+            isClosing ? 'animate-slide-to-bottom' : 'animate-slide-from-bottom'
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with gradient */}
           <div className="relative bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-6">
             {/* Close button */}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               aria-label="Close"
             >
@@ -126,7 +155,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
           </div>
 
           {/* Scrollable content */}
-          <div className="overflow-y-auto max-h-[calc(85vh-120px)] px-6 py-6">
+          <div className="overflow-y-auto max-h-[calc(80vh-120px)] px-6 py-6">
             <div className="space-y-6">
               {/* Benefit description */}
               <section>

@@ -1,5 +1,5 @@
 import React from "react";
-import { MapPin, Heart } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { Business } from "../types";
 import { BBVALogo, SantanderLogo, GaliciaLogo, NacionLogo } from "./BankLogos";
 
@@ -16,7 +16,7 @@ interface BusinessCardProps {
   style?: React.CSSProperties;
 }
 
-const BusinessCard: React.FC<BusinessCardProps> = ({
+const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   business,
   onClick,
   className = "",
@@ -227,9 +227,6 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
                 </span>
               </div>
             </div>
-            <button className="p-1 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0">
-              <Heart className="w-4 h-4 text-gray-400" />
-            </button>
           </div>
 
           {/* Discount Badge and Payment Methods in same row */}
@@ -275,6 +272,9 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
       </div>
     </div>
   );
-};
+});
+
+// Display name for debugging
+BusinessCard.displayName = 'BusinessCard';
 
 export default BusinessCard;

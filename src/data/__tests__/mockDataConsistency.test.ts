@@ -56,9 +56,6 @@ describe('Mock Data Consistency', () => {
                 expect(business.lastUpdated, `Business at index ${index} should have lastUpdated`).toBeDefined();
                 expect(typeof business.lastUpdated, `Business at index ${index} lastUpdated should be number`).toBe('number');
 
-                expect(business.isFavorite, `Business at index ${index} should have isFavorite`).toBeDefined();
-                expect(typeof business.isFavorite, `Business at index ${index} isFavorite should be boolean`).toBe('boolean');
-
                 expect(business.imageLoaded, `Business at index ${index} should have imageLoaded`).toBeDefined();
                 expect(typeof business.imageLoaded, `Business at index ${index} imageLoaded should be boolean`).toBe('boolean');
             });
@@ -260,9 +257,6 @@ describe('Mock Data Consistency', () => {
                 // Check optional enhanced fields
                 if (business.lastUpdated !== undefined) {
                     expect(typeof business.lastUpdated, `Business ${index} lastUpdated should be number`).toBe('number');
-                }
-                if (business.isFavorite !== undefined) {
-                    expect(typeof business.isFavorite, `Business ${index} isFavorite should be boolean`).toBe('boolean');
                 }
                 if (business.imageLoaded !== undefined) {
                     expect(typeof business.imageLoaded, `Business ${index} imageLoaded should be boolean`).toBe('boolean');

@@ -7,6 +7,7 @@ import {
   Navigation,
   Star,
   Loader2,
+  Globe,
 } from "lucide-react";
 import { Business, CanonicalLocation } from "../types";
 import LocationMap from "./LocationMap";
@@ -81,10 +82,35 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
       location.name?.toLowerCase() ||
       location.formattedAddress?.toLowerCase() ||
       "";
-    return (
-      !locationName.includes("nacional") && !locationName.includes("online")
-    );
+    // Check for virtual location indicators
+    const isVirtual =
+      locationName.includes("nacional") ||
+      locationName.includes("online") ||
+      locationName.includes("todo el país") ||
+      locationName.includes("tienda online");
+    // Also check for invalid coordinates
+    const hasValidCoordinates = location.lat !== 0 || location.lng !== 0;
+    return !isVirtual && hasValidCoordinates;
   });
+
+  // Get the store website URL from benefits
+  const storeWebsite = React.useMemo(() => {
+    for (const benefit of business.benefits) {
+      if (benefit.textoAplicacion) {
+        // Ensure it's a valid URL
+        const url = benefit.textoAplicacion;
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+          return url;
+        } else if (url.includes(".")) {
+          return `https://${url}`;
+        }
+      }
+    }
+    return null;
+  }, [business.benefits]);
+
+  // Check if this is an online-only store
+  const isOnlineOnly = !hasPhysicalLocations;
 
   const handleDirectionsClick = () => {
     if (currentLocation?.placeId) {
@@ -109,6 +135,42 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
     }
   };
 
+  // Online-only store view
+  if (isOnlineOnly) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Tienda Online
+          </h3>
+        </div>
+
+        <div className="p-6">
+          {/* Website link */}
+          {storeWebsite ? (
+            <a
+              href={storeWebsite}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Globe className="h-5 w-5" />
+                <span className="font-medium">Visitar sitio web</span>
+              </div>
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              Sitio web no disponible
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Physical store view (existing code)
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100">

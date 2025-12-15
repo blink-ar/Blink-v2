@@ -5,7 +5,7 @@ import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById } from "../services/rawBenefitsApi";
 import { useBusinessesData } from "../hooks/useBenefitsData";
 import { getBenefitsDataService } from "../services/BenefitsDataService";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { SkeletonBenefitPage } from "../components/skeletons";
 import StoreHeader from "../components/StoreHeader";
 import StoreInformation from "../components/StoreInformation";
 import { TabNavigation, TabType } from "../components/TabNavigation";
@@ -32,15 +32,17 @@ function Benefit() {
     error: businessesError,
   } = useBusinessesData();
 
-  // Check for openDetails query parameter
+  // Check for openDetails query parameter and source tab
   const searchParams = new URLSearchParams(location.search);
   const shouldOpenDetails = searchParams.get("openDetails") === "true";
+  const sourceTab = searchParams.get("from") || (location.state as { from?: string })?.from || null;
+  // Get scroll restoration data from location state
+  const scrollRestoreData = location.state as { scrollY?: number; displayCount?: number } | null;
   const [rawBenefit, setRawBenefit] = useState<RawMongoBenefit | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CanonicalLocation | null>(null);
@@ -346,19 +348,24 @@ function Benefit() {
     location.pathname,
   ]);
 
+  // Auto-select location when store has only one valid location
+  useEffect(() => {
+    if (business && !selectedLocation) {
+      // Filter valid locations (exclude 0,0 coordinates)
+      const validLocations = business.location.filter(
+        (loc) => loc.lat !== 0 || loc.lng !== 0
+      );
+
+      if (validLocations.length === 1) {
+        setSelectedLocation(validLocations[0]);
+      }
+    }
+  }, [business, selectedLocation]);
+
   if (loading)
-    return (
-      <LoadingSpinner
-        message="Cargando información de la tienda..."
-        type="dots"
-      />
-    );
+    return <SkeletonBenefitPage />;
   if (error) return <div className="text-center text-red-500">{error}</div>;
   if (!business || !benefit) return null;
-
-  const handleFavoriteToggle = () => {
-    setIsFavorite(!isFavorite);
-  };
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit) => {
     setBenefit(selectedBenefit);
@@ -379,9 +386,20 @@ function Benefit() {
       {/* Store Header */}
       <StoreHeader
         business={business}
-        onBack={() => navigate(-1)}
-        onFavoriteToggle={handleFavoriteToggle}
-        isFavorite={isFavorite}
+        onBack={() => {
+          // Navigate back to the source tab if we know where we came from
+          if (sourceTab === "beneficios") {
+            navigate("/", { 
+              state: { 
+                activeTab: "beneficios",
+                scrollY: scrollRestoreData?.scrollY,
+                displayCount: scrollRestoreData?.displayCount
+              } 
+            });
+          } else {
+            navigate(-1);
+          }
+        }}
       />
 
       {/* Tab Navigation */}
