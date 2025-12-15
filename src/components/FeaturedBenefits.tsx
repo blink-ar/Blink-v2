@@ -1,6 +1,6 @@
 import React from "react";
 import { RawMongoBenefit } from "../types/mongodb";
-// import ModernFeaturedBenefit from "./ModernFeaturedBenefit";
+
 import sardoBanner from "../assets/sardoBanner.jpeg";
 
 interface FeaturedBenefitsProps {
@@ -140,41 +140,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
         </button>
       </div> */}
 
-      {/* Featured Benefit Cards - Commented out */}
-      {/* <div
-        className="featured-benefits__cards"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          maxWidth: "100%",
-        }}
-      >
-        {featuredBenefits.length > 0 ? (
-          featuredBenefits.map((benefit, index) => (
-            <div
-              key={`${benefit.bank}-${benefit.merchant.name}-${index}`}
-              className="featured-benefits__card-wrapper"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <ModernFeaturedBenefit
-                benefit={benefit}
-                onSelect={() => handleBenefitSelect(benefit)}
-              />
-            </div>
-          ))
-        ) : (
-          <div className="featured-benefits__empty">
-            <div className="featured-benefits__empty-icon">🎁</div>
-            <h3 className="featured-benefits__empty-title">
-              No hay beneficios destacados
-            </h3>
-            <p className="featured-benefits__empty-text">
-              Los beneficios aparecerán aquí cuando estén disponibles
-            </p>
-          </div>
-        )}
-      </div> */}
+
 
       {/* Sardo Banner - Clickable with same functionality as "Ver más" */}
       <div
