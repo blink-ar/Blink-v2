@@ -18,6 +18,10 @@ import {
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { CacheNotification } from "../components/CacheNotification";
+import {
+  SkeletonFeaturedBanner,
+  SkeletonActiveOffers,
+} from "../components/skeletons";
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
@@ -387,6 +391,17 @@ function Home() {
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
+    
+    // Update history state so reload restores the correct tab
+    navigate(".", { 
+      replace: true, 
+      state: { 
+        activeTab: tab,
+        scrollY: 0, 
+        displayCount: 20 
+      } 
+    });
+
     // Handle navigation based on tab
     switch (tab) {
       case "inicio":
@@ -602,13 +617,13 @@ function Home() {
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading State - Skeleton Loaders */}
         {isLoading && (
-          <div className="flex flex-col justify-center items-center py-12 md:py-16 animate-fade-in-scale">
-            <div className="animate-spin rounded-full h-8 w-8 md:h-10 md:w-10 border-b-2 border-primary-600 mb-4"></div>
-            <div className="text-sm text-gray-600 animate-pulse">
-              Cargando ofertas...
-            </div>
+          <div className="animate-fade-in-up">
+            <SkeletonFeaturedBanner />
+            <SkeletonActiveOffers cardCount={3} />
+            <SkeletonActiveOffers cardCount={3} />
+            <SkeletonActiveOffers cardCount={3} />
           </div>
         )}
       </main>

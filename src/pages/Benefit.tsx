@@ -5,7 +5,7 @@ import { RawMongoBenefit } from "../types/mongodb";
 import { getRawBenefitById } from "../services/rawBenefitsApi";
 import { useBusinessesData } from "../hooks/useBenefitsData";
 import { getBenefitsDataService } from "../services/BenefitsDataService";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { SkeletonBenefitPage } from "../components/skeletons";
 import StoreHeader from "../components/StoreHeader";
 import StoreInformation from "../components/StoreInformation";
 import { TabNavigation, TabType } from "../components/TabNavigation";
@@ -350,12 +350,7 @@ function Benefit() {
   ]);
 
   if (loading)
-    return (
-      <LoadingSpinner
-        message="Cargando información de la tienda..."
-        type="dots"
-      />
-    );
+    return <SkeletonBenefitPage />;
   if (error) return <div className="text-center text-red-500">{error}</div>;
   if (!business || !benefit) return null;
 
