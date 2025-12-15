@@ -1,12 +1,6 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
-import FeaturedBenefits from "../components/FeaturedBenefits";
-import CategoryGrid from "../components/CategoryGrid";
-import BankGrid from "../components/BankGrid";
-import ActiveOffers from "../components/ActiveOffers";
-// import NearbyBusinesses from "../components/NearbyBusinesses";
-import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -22,6 +16,10 @@ import {
   SkeletonFeaturedBanner,
   SkeletonActiveOffers,
 } from "../components/skeletons";
+
+// Lazy load tab components for better performance
+const InicioTab = lazy(() => import("../components/tabs/InicioTab"));
+const BeneficiosTab = lazy(() => import("../components/tabs/BeneficiosTab"));
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
@@ -442,28 +440,6 @@ function Home() {
           />
         </div>
 
-        {/* Categories Grid - Sticky - Only visible in Beneficios tab */}
-        {activeTab === "beneficios" && (
-          <div className="sticky top-[72px] z-10">
-            <CategoryGrid
-              categories={categoryGridData}
-              onCategorySelect={handleCategorySelect}
-              selectedCategory={selectedCategory}
-            />
-          </div>
-        )}
-
-        {/* Banks Grid - Sticky - Only visible in Beneficios tab */}
-        {activeTab === "beneficios" && (
-          <div className="sticky top-[128px] z-10">
-            <BankGrid
-              banks={bankGridData}
-              onBankSelect={handleBankSelect}
-              selectedBanks={selectedBanks}
-            />
-          </div>
-        )}
-
         {/* Error State */}
         {error && (
           <div className="text-center py-8 px-4 sm:px-6 md:px-8">
@@ -475,146 +451,49 @@ function Home() {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Main Content - Lazy Loaded Tabs */}
         {!isLoading && !error && (
-          <div className="animate-fade-in-up">
-            {shouldShowFilteredResults ? (
-              /* Filtered Results View with Infinite Scroll */
-              <div className="px-4 sm:px-6 md:px-8 py-6">
-                <InfiniteScrollGrid
-                  businesses={filteredBusinesses}
-                  onBusinessClick={handleBusinessClick}
-                  initialLoadCount={20}
-                  loadMoreCount={20}
+          <Suspense fallback={
+            <div className="animate-fade-in-up">
+              <SkeletonFeaturedBanner />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+            </div>
+          }>
+            <div className="animate-fade-in-up">
+              {shouldShowFilteredResults ? (
+                <BeneficiosTab
+                  filteredBusinesses={filteredBusinesses}
+                  categoryGridData={categoryGridData}
+                  bankGridData={bankGridData}
+                  selectedCategory={selectedCategory}
+                  selectedBanks={selectedBanks}
                   restoredDisplayCount={activeTab === "beneficios" ? restoredDisplayCount : undefined}
+                  onCategorySelect={handleCategorySelect}
+                  onBankSelect={handleBankSelect}
+                  onBusinessClick={handleBusinessClick}
                   onDisplayCountChange={handleDisplayCountChange}
                 />
-              </div>
-            ) : (
-              /* Default Home View */
-              <div className="stagger-children">
-                {/* Featured Benefits */}
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "0ms" }}
-                >
-                  <FeaturedBenefits
-                    benefits={featuredBenefits}
-                    onViewAll={handleViewAllBenefits}
-                    onBenefitSelect={handleBenefitSelect}
-                  />
-                </div>
-
-                {/* Active Offers */}
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "200ms" }}
-                >
-                  <ActiveOffers
-                    businesses={activeOffers}
-                    onBusinessClick={handleBusinessClick}
-                    onViewAll={handleViewAllOffers}
-                  />
-                </div>
-
-                {/* Santander Exclusive Offers */}
-                {santanderOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "250ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={santanderOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedBanks(["santander"]);
-                        setActiveTab("beneficios");
-                      }}
-                      title="Exclusivos Santander"
-                    />
-                  </div>
-                )}
-
-                {/* BBVA Exclusive Offers */}
-                {bbvaOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "300ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={bbvaOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedBanks(["bbva"]);
-                        setActiveTab("beneficios");
-                      }}
-                      title="Exclusivos BBVA"
-                    />
-                  </div>
-                )}
-
-                {/* Food Offers */}
-                {foodOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "350ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={foodOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedCategory("gastronomia");
-                        setActiveTab("beneficios");
-                      }}
-                      title="Ofertas de Comida"
-                    />
-                  </div>
-                )}
-
-                {/* High Value Offers */}
-                {highValueOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "375ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={highValueOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={handleViewAllOffers}
-                      title="Descuentos Imperdibles"
-                    />
-                  </div>
-                )}
-
-                {/* Biggest Discount Offers */}
-                {biggestDiscountOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "400ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={biggestDiscountOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={handleViewAllOffers}
-                      title="Mayores Descuentos"
-                    />
-                  </div>
-                )}
-
-                {/* Nearby Businesses
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "450ms" }}
-                >
-                  <NearbyBusinesses
-                    businesses={getNearbyBusinesses()}
-                    onBusinessClick={handleBusinessClick}
-                    onViewMap={handleViewMap}
-                  />
-                </div> */}
-              </div>
-            )}
-          </div>
+              ) : (
+                <InicioTab
+                  featuredBenefits={featuredBenefits}
+                  activeOffers={activeOffers}
+                  santanderOffers={santanderOffers}
+                  bbvaOffers={bbvaOffers}
+                  foodOffers={foodOffers}
+                  highValueOffers={highValueOffers}
+                  biggestDiscountOffers={biggestDiscountOffers}
+                  onBusinessClick={handleBusinessClick}
+                  onViewAllBenefits={handleViewAllBenefits}
+                  onBenefitSelect={handleBenefitSelect}
+                  onViewAllOffers={handleViewAllOffers}
+                  onSelectBankFilter={setSelectedBanks}
+                  onSelectCategoryFilter={setSelectedCategory}
+                  onSwitchTab={setActiveTab}
+                />
+              )}
+            </div>
+          </Suspense>
         )}
 
         {/* Loading State - Skeleton Loaders */}
