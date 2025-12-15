@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Import modern design system */
 @import './styles/design-system.css';
 
@@ -24,8 +28,3 @@
 
 /* Import featured benefit card styles */
 @import './styles/featured-benefit.css';
-
-/* Tailwind directives must come after all @import statements */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;

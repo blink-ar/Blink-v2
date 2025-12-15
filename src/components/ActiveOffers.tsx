@@ -9,7 +9,7 @@ interface ActiveOffersProps {
   title?: string;
 }
 
-const ActiveOffers: React.FC<ActiveOffersProps> = React.memo(({
+const ActiveOffers: React.FC<ActiveOffersProps> = ({
   businesses,
   onBusinessClick,
   onViewAll,
@@ -48,9 +48,6 @@ const ActiveOffers: React.FC<ActiveOffersProps> = React.memo(({
       </div>
     </div>
   );
-});
-
-// Display name for debugging
-ActiveOffers.displayName = 'ActiveOffers';
+};
 
 export default ActiveOffers;

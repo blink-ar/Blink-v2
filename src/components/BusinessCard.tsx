@@ -16,7 +16,7 @@ interface BusinessCardProps {
   style?: React.CSSProperties;
 }
 
-const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
+const BusinessCard: React.FC<BusinessCardProps> = ({
   business,
   onClick,
   className = "",
@@ -272,9 +272,6 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
       </div>
     </div>
   );
-});
-
-// Display name for debugging
-BusinessCard.displayName = 'BusinessCard';
+};
 
 export default BusinessCard;
