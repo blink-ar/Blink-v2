@@ -36,7 +36,7 @@ const BankGrid: React.FC<BankGridProps> = ({
   }, [handleKeyDown]);
 
   return (
-    <div className="bank-grid px-3 sm:px-3 py-3" style={{ background: "#fff" }}>
+    <div className="bank-grid py-3" style={{ background: "#fff" }}>
       <div
         className="bank-grid__container overflow-x-auto [&::-webkit-scrollbar]:hidden"
         role="group"
@@ -46,7 +46,7 @@ const BankGrid: React.FC<BankGridProps> = ({
           msOverflowStyle: "none" /* Internet Explorer 10+ */,
         }}
       >
-        <div className="flex gap-2 sm:gap-3">
+        <div className="flex gap-2 sm:gap-3 px-3">
           {banks.map((bank, index) => (
             <button
               key={bank.id}
