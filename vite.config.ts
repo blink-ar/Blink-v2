@@ -7,40 +7,10 @@ export default defineConfig({
     port: 5174
   },
   plugins: [
-    react({
-      // Enable automatic JSX runtime for smaller bundles
-      jsxRuntime: 'automatic',
-    }),
+    react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
-      workbox: {
-        // Aggressive caching for better mobile performance
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\./,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 5 * 60, // 5 minutes
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'image-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
-              },
-            },
-          },
-        ],
-      },
       manifest: {
         name: 'Bank Benefits Finder',
         short_name: 'BankBenefits',
@@ -66,33 +36,7 @@ export default defineConfig({
       }
     })
   ],
-  // Mobile-first optimization
-  build: {
-    target: 'es2015',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.logs in production
-        drop_debugger: true,
-      },
-    },
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Split vendor code for better caching
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-components': [
-            './src/components/BusinessCard',
-            './src/components/ModernBenefitCard',
-            './src/components/ActiveOffers',
-          ],
-        },
-      },
-    },
-    // Optimize chunk size for mobile
-    chunkSizeWarningLimit: 500,
-  },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'],
+    exclude: ['lucide-react'],
   },
 });
