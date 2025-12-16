@@ -10,8 +10,9 @@ const SkeletonFeaturedBanner: React.FC = () => {
       <Skeleton
         variant="rectangular"
         width="100%"
-        height={180}
-        className="rounded-2xl"
+        height="auto"
+        className="rounded-[20px]"
+        style={{ aspectRatio: "1344 / 704" }}
       />
     </div>
   );
