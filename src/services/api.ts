@@ -17,6 +17,62 @@ declare global {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://benefits-backend-v2-public.onrender.com';
 
+// Response type for the new /api/businesses endpoint
+export interface BusinessesApiResponse {
+  success: boolean;
+  businesses: Business[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+  filters: {
+    category?: string;
+    bank?: string;
+    search?: string;
+  };
+}
+
+/**
+ * Fetch businesses from the new /api/businesses endpoint
+ * This endpoint returns pre-grouped businesses with proper pagination
+ */
+export async function fetchBusinessesPaginated(options: {
+  limit?: number;
+  offset?: number;
+  category?: string;
+  bank?: string;
+  search?: string;
+} = {}): Promise<BusinessesApiResponse> {
+  const { limit = 20, offset = 0, category, bank, search } = options;
+
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  params.append('offset', offset.toString());
+  if (category) params.append('category', category);
+  if (bank) params.append('bank', bank);
+  if (search) params.append('search', search);
+
+  const url = `${BASE_URL}/api/businesses?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('[API] fetchBusinessesPaginated failed:', error);
+    return {
+      success: false,
+      businesses: [],
+      pagination: { total: 0, limit, offset, hasMore: false },
+      filters: {}
+    };
+  }
+}
+
 class BenefitsAPI {
   async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
     const queryParams = new URLSearchParams();
@@ -166,7 +222,7 @@ export async function fetchAllBenefits(params: Record<string, string> = {}): Pro
   try {
     const allBenefits: Benefit[] = [];
     let offset = 0;
-    const limit = 100;
+    const limit = 500; // Increased from 100 to reduce number of API calls
     let hasMore = true;
 
     while (hasMore) {
@@ -565,7 +621,7 @@ export async function fetchAllRawBenefits(params: Record<string, string> = {}): 
   try {
     const allBenefits: RawMongoBenefit[] = [];
     let offset = 0;
-    const limit = 100;
+    const limit = 500; // Increased from 100 to reduce number of API calls
     let hasMore = true;
 
     while (hasMore) {

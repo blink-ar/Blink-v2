@@ -1,88 +1,49 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { Business } from "../types";
 import BusinessCard from "./BusinessCard";
 
 interface InfiniteScrollGridProps {
   businesses: Business[];
   onBusinessClick: (businessId: string) => void;
-  initialLoadCount?: number;
-  loadMoreCount?: number;
-  /** Initial display count to restore from (for scroll restoration) */
-  restoredDisplayCount?: number;
-  /** Callback when display count changes (for state saving) */
-  onDisplayCountChange?: (count: number) => void;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  totalCount?: number;
 }
 
 /**
  * InfiniteScrollGrid - Renders a grid of businesses with infinite scroll
  *
  * Uses Intersection Observer to detect when user scrolls near the bottom
- * and loads more items incrementally for better performance with large datasets.
- *
- * Uses client-side pagination (slicing the businesses array) because:
- * - The API paginates benefits, not businesses
- * - Multiple benefits can belong to one business
- * - Server-side pagination of benefits doesn't translate cleanly to businesses
- * - All businesses are loaded once and cached for 30 minutes
+ * and triggers server-side pagination via onLoadMore callback.
  */
 const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
   businesses,
   onBusinessClick,
-  initialLoadCount = 20,
-  loadMoreCount = 20,
-  restoredDisplayCount,
-  onDisplayCountChange,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  totalCount,
 }) => {
-  // Track how many items to display - use restored count if available
-  const [displayCount, setDisplayCount] = useState(
-    restoredDisplayCount || initialLoadCount
-  );
-
   // Ref for the sentinel element at the bottom
   const observerRef = useRef<HTMLDivElement>(null);
 
-  // Reset display count when businesses array changes (e.g., filter applied)
-  // But only if we don't have a restored count
-  useEffect(() => {
-    if (!restoredDisplayCount) {
-      setDisplayCount(initialLoadCount);
-    }
-  }, [businesses.length, initialLoadCount, restoredDisplayCount]);
-
-  // Notify parent of display count changes
-  useEffect(() => {
-    onDisplayCountChange?.(displayCount);
-  }, [displayCount, onDisplayCountChange]);
-
-  // Get the businesses to display (sliced to current display count)
-  const displayedBusinesses = useMemo(
-    () => businesses.slice(0, displayCount),
-    [businesses, displayCount]
-  );
-
-  // Check if there are more items to load
-  const hasMore = displayCount < businesses.length;
-
-  // Load more items callback
+  // Load more callback with debounce protection
   const loadMore = useCallback(() => {
-    if (hasMore) {
-      setDisplayCount((prev) =>
-        Math.min(prev + loadMoreCount, businesses.length)
-      );
+    if (hasMore && !isLoadingMore) {
+      onLoadMore();
     }
-  }, [hasMore, loadMoreCount, businesses.length]);
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   // Set up Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        // When sentinel becomes visible, load more
-        if (entries[0].isIntersecting && hasMore) {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
           loadMore();
         }
       },
       {
-        // Trigger when sentinel is 200px from viewport
         rootMargin: "200px",
         threshold: 0,
       }
@@ -98,9 +59,9 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
         observer.unobserve(currentRef);
       }
     };
-  }, [hasMore, loadMore]);
+  }, [hasMore, isLoadingMore, loadMore]);
 
-  if (businesses.length === 0) {
+  if (businesses.length === 0 && !isLoadingMore) {
     return (
       <div className="text-center py-12 md:py-16">
         <div className="text-gray-400 text-5xl md:text-6xl mb-4">🔍</div>
@@ -119,7 +80,7 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
     <>
       {/* Business Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 stagger-children">
-        {displayedBusinesses.map((business, index) => (
+        {businesses.map((business, index) => (
           <BusinessCard
             key={business.id}
             business={business}
@@ -145,9 +106,11 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
       )}
 
       {/* End message */}
-      {!hasMore && businesses.length > initialLoadCount && (
+      {!hasMore && businesses.length > 0 && (
         <div className="text-center py-6 text-gray-500 text-sm">
-          Mostrando todos los {businesses.length} resultados
+          {totalCount
+            ? `Mostrando todos los ${totalCount} resultados`
+            : `Mostrando ${businesses.length} resultados`}
         </div>
       )}
     </>

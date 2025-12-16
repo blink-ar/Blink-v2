@@ -1,7 +1,7 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
-import { fetchAllBusinessesComplete } from '../services/api';
+import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
 import { getRawBenefits } from '../services/rawBenefitsApi';
 
 // Query keys for cache management
@@ -10,46 +10,57 @@ export const queryKeys = {
     featuredBenefits: ['featuredBenefits'] as const,
 };
 
+const ITEMS_PER_PAGE = 20;
+
 interface UseBenefitsDataReturn {
     businesses: Business[];
-    rawBenefits: RawMongoBenefit[];
     featuredBenefits: RawMongoBenefit[];
     isLoading: boolean;
-    isRefreshing: boolean;
+    isLoadingMore: boolean;
     error: string | null;
+    hasMore: boolean;
+    loadMore: () => void;
     refreshData: () => Promise<void>;
-    clearCache: () => void;
+    totalBusinesses: number;
 }
 
 /**
- * Hook for accessing benefits data with React Query caching
- *
- * Uses TanStack Query for:
- * - Automatic caching (in-memory)
- * - Request deduplication
- * - Background refetching
- * - Retry logic on failure
+ * Hook for accessing benefits data with React Query
+ * Uses the new /api/businesses endpoint with proper server-side pagination
  */
 export function useBenefitsData(): UseBenefitsDataReturn {
     const queryClient = useQueryClient();
 
-    // Fetch all businesses
+    // Fetch businesses with infinite query for pagination
     const {
-        data: businesses = [],
+        data,
         isLoading: isLoadingBusinesses,
-        isFetching: isFetchingBusinesses,
+        isFetchingNextPage,
         error: businessesError,
+        fetchNextPage,
+        hasNextPage,
         refetch: refetchBusinesses,
-    } = useQuery({
+    } = useInfiniteQuery({
         queryKey: queryKeys.businesses,
-        queryFn: fetchAllBusinessesComplete,
+        queryFn: async ({ pageParam = 0 }) => {
+            return fetchBusinessesPaginated({
+                limit: ITEMS_PER_PAGE,
+                offset: pageParam,
+            });
+        },
+        getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (lastPage.pagination.hasMore) {
+                return lastPage.pagination.offset + lastPage.pagination.limit;
+            }
+            return undefined;
+        },
+        initialPageParam: 0,
     });
 
-    // Fetch featured benefits (first 10)
+    // Fetch featured benefits
     const {
         data: featuredBenefits = [],
         isLoading: isLoadingFeatured,
-        isFetching: isFetchingFeatured,
         error: featuredError,
         refetch: refetchFeatured,
     } = useQuery({
@@ -57,14 +68,24 @@ export function useBenefitsData(): UseBenefitsDataReturn {
         queryFn: () => getRawBenefits({ limit: 10 }),
     });
 
+    // Flatten all pages into a single array of businesses
+    const businesses = data?.pages.flatMap(page => page.businesses) ?? [];
+    const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
+
     const isLoading = isLoadingBusinesses || isLoadingFeatured;
-    const isRefreshing = (isFetchingBusinesses || isFetchingFeatured) && !isLoading;
+    const isLoadingMore = isFetchingNextPage;
 
     const error = businessesError
         ? (businessesError as Error).message
         : featuredError
             ? (featuredError as Error).message
             : null;
+
+    const loadMore = () => {
+        if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    };
 
     const refreshData = async () => {
         await Promise.all([
@@ -73,44 +94,65 @@ export function useBenefitsData(): UseBenefitsDataReturn {
         ]);
     };
 
-    const clearCache = () => {
-        queryClient.clear();
-    };
-
     return {
         businesses,
-        rawBenefits: featuredBenefits,
         featuredBenefits,
         isLoading,
-        isRefreshing,
+        isLoadingMore,
         error,
+        hasMore: hasNextPage ?? false,
+        loadMore,
         refreshData,
-        clearCache,
+        totalBusinesses,
     };
 }
 
 /**
- * Hook for accessing only businesses data (lighter version)
+ * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
     const {
-        data: businesses = [],
+        data,
         isLoading,
+        isFetchingNextPage,
         error,
-    } = useQuery({
+        fetchNextPage,
+        hasNextPage,
+    } = useInfiniteQuery({
         queryKey: queryKeys.businesses,
-        queryFn: fetchAllBusinessesComplete,
+        queryFn: async ({ pageParam = 0 }) => {
+            return fetchBusinessesPaginated({
+                limit: ITEMS_PER_PAGE,
+                offset: pageParam,
+            });
+        },
+        getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (lastPage.pagination.hasMore) {
+                return lastPage.pagination.offset + lastPage.pagination.limit;
+            }
+            return undefined;
+        },
+        initialPageParam: 0,
     });
+
+    const businesses = data?.pages.flatMap(page => page.businesses) ?? [];
 
     return {
         businesses,
         isLoading,
+        isLoadingMore: isFetchingNextPage,
         error: error ? (error as Error).message : null,
+        hasMore: hasNextPage ?? false,
+        loadMore: () => {
+            if (hasNextPage && !isFetchingNextPage) {
+                fetchNextPage();
+            }
+        },
     };
 }
 
 /**
- * Hook for accessing only featured benefits (lighter version)
+ * Hook for accessing only featured benefits
  */
 export function useFeaturedBenefits() {
     const {

@@ -27,8 +27,8 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
 
     // Get unique bank names from business benefits
     const uniqueBanks = new Set<string>();
-    business.benefits.forEach((benefit) => {
-      if (benefit.bankName) {
+    (business.benefits || []).forEach((benefit) => {
+      if (benefit?.bankName) {
         uniqueBanks.add(benefit.bankName.toLowerCase());
       }
     });
@@ -65,9 +65,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
   };
 
   const getDiscountPercentage = (business: Business): string => {
-    const discounts = business.benefits
+    const benefits = business.benefits || [];
+    const discounts = benefits
       .map((benefit) => {
-        const match = benefit.rewardRate.match(/(\d+)%/);
+        const rate = benefit?.rewardRate || '';
+        const match = rate.match(/(\d+)%/);
         return match ? parseInt(match[1]) : 0;
       })
       .filter((discount) => discount > 0);
@@ -81,7 +83,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
   };
 
   const getBenefitCount = (business: Business): string => {
-    const count = business.benefits.length;
+    const count = (business.benefits || []).length;
     return `+${count}`;
   };
 
@@ -179,7 +181,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
           onClick(business.id);
         }
       }}
-      aria-label={`Ver ofertas de ${business.name}`}
+      aria-label={`Ver ofertas de ${business.name || 'Negocio'}`}
     >
       <div className="flex items-start gap-3">
         {/* Business Icon */}
@@ -215,9 +217,9 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
           <div className="flex items-start justify-between mb-1">
             <div className="flex-1 min-w-0 pr-2">
               <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate max-w-full">
-                {business.name}
+                {business.name || 'Sin nombre'}
                 <span className="text-gray-500 font-normal ml-1">
-                  • {business.location[0]?.types?.[0] || business.category}
+                  • {business.location?.[0]?.types?.[0] || business.category || 'otros'}
                 </span>
               </h3>
               <div className="flex items-center text-gray-500 text-xs mb-2">
