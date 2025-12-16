@@ -15,9 +15,15 @@ interface InfiniteScrollGridProps {
 
 /**
  * InfiniteScrollGrid - Renders a grid of businesses with infinite scroll
- * 
+ *
  * Uses Intersection Observer to detect when user scrolls near the bottom
- * and loads more items incrementally for better performance with 1000+ items.
+ * and loads more items incrementally for better performance with large datasets.
+ *
+ * Uses client-side pagination (slicing the businesses array) because:
+ * - The API paginates benefits, not businesses
+ * - Multiple benefits can belong to one business
+ * - Server-side pagination of benefits doesn't translate cleanly to businesses
+ * - All businesses are loaded once and cached for 30 minutes
  */
 const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
   businesses,
@@ -31,10 +37,10 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
   const [displayCount, setDisplayCount] = useState(
     restoredDisplayCount || initialLoadCount
   );
-  
+
   // Ref for the sentinel element at the bottom
   const observerRef = useRef<HTMLDivElement>(null);
-  
+
   // Reset display count when businesses array changes (e.g., filter applied)
   // But only if we don't have a restored count
   useEffect(() => {
@@ -42,21 +48,21 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
       setDisplayCount(initialLoadCount);
     }
   }, [businesses.length, initialLoadCount, restoredDisplayCount]);
-  
+
   // Notify parent of display count changes
   useEffect(() => {
     onDisplayCountChange?.(displayCount);
   }, [displayCount, onDisplayCountChange]);
-  
+
   // Get the businesses to display (sliced to current display count)
   const displayedBusinesses = useMemo(
     () => businesses.slice(0, displayCount),
     [businesses, displayCount]
   );
-  
+
   // Check if there are more items to load
   const hasMore = displayCount < businesses.length;
-  
+
   // Load more items callback
   const loadMore = useCallback(() => {
     if (hasMore) {
@@ -65,7 +71,7 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
       );
     }
   }, [hasMore, loadMoreCount, businesses.length]);
-  
+
   // Set up Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -81,12 +87,12 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
         threshold: 0,
       }
     );
-    
+
     const currentRef = observerRef.current;
     if (currentRef) {
       observer.observe(currentRef);
     }
-    
+
     return () => {
       if (currentRef) {
         observer.unobserve(currentRef);

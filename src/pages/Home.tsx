@@ -32,13 +32,7 @@ function Home() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Use the cached benefits data hook
-  const {
-    businesses: paginatedBusinesses,
-    featuredBenefits: rawBenefits,
-    isLoading,
-    error,
-  } = useBenefitsData();
+
 
   // State for bottom navigation - check if we're returning from a benefit page with an active tab
   const locationState = location.state as {
@@ -54,6 +48,14 @@ function Home() {
   const restoredDisplayCount = locationState?.displayCount;
   const [currentDisplayCount, setCurrentDisplayCount] = useState(restoredDisplayCount || 20);
   const hasRestoredScroll = useRef(false);
+
+  // Use the cached benefits data hook
+  const {
+    businesses: paginatedBusinesses,
+    featuredBenefits: rawBenefits,
+    isLoading,
+    error,
+  } = useBenefitsData();
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
