@@ -7,7 +7,6 @@ import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
 // import NearbyBusinesses from "../components/NearbyBusinesses";
 import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
-import { Globe } from "lucide-react";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -473,30 +472,11 @@ function Home() {
               banks={bankGridData}
               onBankSelect={handleBankSelect}
               selectedBanks={selectedBanks}
+              onlineOnly={onlineOnly}
+              onOnlineToggle={() => setOnlineOnly(!onlineOnly)}
             />
           </div>
         )}
-
-        {/* Online Filter - Simple toggle button visible in both tabs */}
-        <div className="px-4 sm:px-6 md:px-8 py-3 bg-white border-b border-gray-200">
-          <button
-            onClick={() => setOnlineOnly(!onlineOnly)}
-            className={`
-              inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
-              transition-all duration-200 cursor-pointer
-              ${
-                onlineOnly
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }
-            `}
-            aria-pressed={onlineOnly}
-            title="Filtrar solo beneficios online"
-          >
-            <Globe className="w-4 h-4" />
-            Beneficios Online
-          </button>
-        </div>
 
         {/* Error State */}
         {error && (

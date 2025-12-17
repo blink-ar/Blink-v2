@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from "react";
+import { Globe } from "lucide-react";
 import { useKeyboardNavigation } from "../hooks/useFocusManagement";
 
 export interface Bank {
@@ -12,12 +13,16 @@ interface BankGridProps {
   banks: Bank[];
   onBankSelect: (bank: Bank) => void;
   selectedBanks?: string[];
+  onlineOnly?: boolean;
+  onOnlineToggle?: () => void;
 }
 
 const BankGrid: React.FC<BankGridProps> = ({
   banks,
   onBankSelect,
   selectedBanks = [],
+  onlineOnly = false,
+  onOnlineToggle,
 }) => {
   const itemsRef = useRef<HTMLElement[]>([]);
   const { handleKeyDown, setCurrentIndex } = useKeyboardNavigation(
@@ -79,6 +84,26 @@ const BankGrid: React.FC<BankGridProps> = ({
               </span>
             </button>
           ))}
+
+          {/* Online Filter Button - inline with banks */}
+          {onOnlineToggle && (
+            <button
+              onClick={onOnlineToggle}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all flex-shrink-0 ${
+                onlineOnly
+                  ? 'bg-blue-500 text-white border-2 border-blue-500 shadow-sm'
+                  : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              }`}
+              aria-pressed={onlineOnly}
+              title="Filtrar solo beneficios online"
+              style={{
+                minHeight: "var(--touch-target-comfortable)",
+              }}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span className="whitespace-nowrap">Online</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
