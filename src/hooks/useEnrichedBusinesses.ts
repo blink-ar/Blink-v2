@@ -16,12 +16,11 @@ export const useEnrichedBusinesses = (
   businesses: Business[],
   options?: {
     sortByPriority?: boolean;
-    nearbyOnly?: boolean; // Filter to show only nearby (≤50km)
     onlineOnly?: boolean; // Filter to show only online
   }
 ) => {
   const { position } = useGeolocation();
-  const { sortByPriority = true, nearbyOnly = false, onlineOnly = false } = options || {};
+  const { sortByPriority = true, onlineOnly = false } = options || {};
 
   const enrichedBusinesses = useMemo(() => {
     let result = businesses.map((business) => {
@@ -66,11 +65,7 @@ export const useEnrichedBusinesses = (
       };
     });
 
-    // Apply filters if requested
-    if (nearbyOnly) {
-      result = result.filter((b) => b.isNearby);
-    }
-
+    // Apply filter if requested
     if (onlineOnly) {
       result = result.filter((b) => b.hasOnline);
     }
@@ -98,7 +93,7 @@ export const useEnrichedBusinesses = (
     }
 
     return result;
-  }, [businesses, position, sortByPriority, nearbyOnly, onlineOnly]);
+  }, [businesses, position, sortByPriority, onlineOnly]);
 
   return enrichedBusinesses;
 };

@@ -5,9 +5,9 @@ import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
 import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
-import FilterToggles from "../components/FilterToggles";
 // import NearbyBusinesses from "../components/NearbyBusinesses";
 import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
+import { Globe } from "lucide-react";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -82,17 +82,12 @@ function Home() {
   // State for bank filter (multiple selection)
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
-  // State for distance/online filters
-  const [nearbyOnly, setNearbyOnly] = useState(false);
+  // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
-
-  // Get geolocation
-  const { position } = useGeolocation();
 
   // Enrich businesses with distance and online information
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
     sortByPriority: true,
-    nearbyOnly,
     onlineOnly,
   });
 
@@ -408,15 +403,15 @@ function Home() {
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
-    
+
     // Update history state so reload restores the correct tab
-    navigate(".", { 
-      replace: true, 
-      state: { 
+    navigate(".", {
+      replace: true,
+      state: {
         activeTab: tab,
-        scrollY: 0, 
-        displayCount: 20 
-      } 
+        scrollY: 0,
+        displayCount: 20
+      }
     });
 
     // Handle navigation based on tab
@@ -426,13 +421,12 @@ function Home() {
         setSearchTerm("");
         setSelectedCategory("all");
         setSelectedBanks([]);
-        setNearbyOnly(false);
         setOnlineOnly(false);
         break;
       case "beneficios":
         // Clear search but keep category and bank filters available for beneficios view
         setSearchTerm("");
-        // Don't clear category, bank, or distance filters - let user filter within beneficios view
+        // Don't clear category, bank, or online filters - let user filter within beneficios view
         break;
     }
   };
@@ -483,18 +477,26 @@ function Home() {
           </div>
         )}
 
-        {/* Filter Toggles - Sticky - Only visible in Beneficios tab */}
-        {activeTab === "beneficios" && (
-          <div className="sticky top-[184px] z-10">
-            <FilterToggles
-              nearbyOnly={nearbyOnly}
-              onlineOnly={onlineOnly}
-              onNearbyToggle={() => setNearbyOnly(!nearbyOnly)}
-              onOnlineToggle={() => setOnlineOnly(!onlineOnly)}
-              nearbyDisabled={!position}
-            />
-          </div>
-        )}
+        {/* Online Filter - Simple toggle button visible in both tabs */}
+        <div className="px-4 sm:px-6 md:px-8 py-3 bg-white border-b border-gray-200">
+          <button
+            onClick={() => setOnlineOnly(!onlineOnly)}
+            className={`
+              inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
+              transition-all duration-200 cursor-pointer
+              ${
+                onlineOnly
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }
+            `}
+            aria-pressed={onlineOnly}
+            title="Filtrar solo beneficios online"
+          >
+            <Globe className="w-4 h-4" />
+            Beneficios Online
+          </button>
+        </div>
 
         {/* Error State */}
         {error && (
