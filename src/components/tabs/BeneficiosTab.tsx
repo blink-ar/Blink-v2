@@ -20,7 +20,6 @@ interface BeneficiosTabProps {
   }>;
   selectedCategory: Category | "all";
   selectedBanks: string[];
-  restoredDisplayCount?: number;
   onCategorySelect: (category: {
     id: string;
     name: string;
@@ -34,7 +33,10 @@ interface BeneficiosTabProps {
     color: string;
   }) => void;
   onBusinessClick: (businessId: string) => void;
-  onDisplayCountChange: (count: number) => void;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  totalCount?: number;
 }
 
 const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
@@ -43,11 +45,13 @@ const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
   bankGridData,
   selectedCategory,
   selectedBanks,
-  restoredDisplayCount,
   onCategorySelect,
   onBankSelect,
   onBusinessClick,
-  onDisplayCountChange,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  totalCount,
 }) => {
   return (
     <>
@@ -74,10 +78,10 @@ const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
         <InfiniteScrollGrid
           businesses={filteredBusinesses}
           onBusinessClick={onBusinessClick}
-          initialLoadCount={20}
-          loadMoreCount={20}
-          restoredDisplayCount={restoredDisplayCount}
-          onDisplayCountChange={onDisplayCountChange}
+          onLoadMore={onLoadMore}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          totalCount={totalCount}
         />
       </div>
     </>

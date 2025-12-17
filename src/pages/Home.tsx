@@ -33,28 +33,31 @@ function Home() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Use the cached benefits data hook
-  const {
-    businesses: paginatedBusinesses,
-    featuredBenefits: rawBenefits,
-    isLoading,
-    error,
-  } = useBenefitsData();
+
 
   // State for bottom navigation - check if we're returning from a benefit page with an active tab
   const locationState = location.state as {
     activeTab?: NavigationTab;
     scrollY?: number;
-    displayCount?: number;
   } | null;
   const initialTab = locationState?.activeTab || "inicio";
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
 
   // Scroll restoration state
   const restoredScrollY = locationState?.scrollY;
-  const restoredDisplayCount = locationState?.displayCount;
-  const [currentDisplayCount, setCurrentDisplayCount] = useState(restoredDisplayCount || 20);
   const hasRestoredScroll = useRef(false);
+
+  // Use the cached benefits data hook with server-side pagination
+  const {
+    businesses: paginatedBusinesses,
+    featuredBenefits: rawBenefits,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    loadMore,
+    totalBusinesses,
+  } = useBenefitsData();
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
@@ -216,8 +219,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits.some((benefit) =>
-            benefit.bankName.toLowerCase().includes("santander")
+          business.benefits?.some((benefit) =>
+            benefit?.bankName?.toLowerCase().includes("santander")
           )
         )
         .slice(0, 8),
@@ -229,8 +232,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits.some((benefit) =>
-            benefit.bankName.toLowerCase().includes("bbva")
+          business.benefits?.some((benefit) =>
+            benefit?.bankName?.toLowerCase().includes("bbva")
           )
         )
         .slice(0, 8),
@@ -242,7 +245,7 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter(
-          (business) => business.category.toLowerCase() === "gastronomia"
+          (business) => business.category?.toLowerCase() === "gastronomia"
         )
         .slice(0, 8),
     [enrichedBusinesses]
@@ -328,17 +331,11 @@ function Home() {
     });
   };
 
-  // Callback to track display count changes from InfiniteScrollGrid
-  const handleDisplayCountChange = useCallback((count: number) => {
-    setCurrentDisplayCount(count);
-  }, []);
-
   const handleBusinessClick = (businessId: string) => {
-    // Save current scroll position and display count before navigating
+    // Save current scroll position before navigating
     const scrollY = window.scrollY;
-    // Pass the current tab, scroll position, and display count so we can restore them
     navigate(`/benefit/${businessId}/0?from=${activeTab}`, {
-      state: { scrollY, displayCount: currentDisplayCount }
+      state: { scrollY }
     });
   };
 
@@ -352,11 +349,11 @@ function Home() {
     const matchingBusiness = paginatedBusinesses.find(
       (business) =>
         business.name
-          .toLowerCase()
-          .includes(benefit.merchant.name.toLowerCase()) ||
-        benefit.merchant.name
-          .toLowerCase()
-          .includes(business.name.toLowerCase())
+          ?.toLowerCase()
+          .includes(benefit.merchant?.name?.toLowerCase() || '') ||
+        benefit.merchant?.name
+          ?.toLowerCase()
+          .includes(business.name?.toLowerCase() || '')
     );
 
     if (matchingBusiness) {
@@ -375,7 +372,7 @@ function Home() {
       );
       const scrollY = window.scrollY;
       navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`, {
-        state: { scrollY, displayCount: currentDisplayCount }
+        state: { scrollY }
       });
     } else {
       // Fallback: if no matching business found, navigate to the first available business
@@ -397,7 +394,7 @@ function Home() {
         );
         const scrollY = window.scrollY;
         navigate(`/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`, {
-          state: { scrollY, displayCount: currentDisplayCount }
+          state: { scrollY }
         });
       } else {
         // If no businesses available, switch to benefits tab
@@ -425,8 +422,7 @@ function Home() {
       replace: true,
       state: {
         activeTab: tab,
-        scrollY: 0,
-        displayCount: 20
+        scrollY: 0
       }
     });
 
@@ -534,11 +530,13 @@ function Home() {
                   bankGridData={bankGridData}
                   selectedCategory={selectedCategory}
                   selectedBanks={selectedBanks}
-                  restoredDisplayCount={activeTab === "beneficios" ? restoredDisplayCount : undefined}
                   onCategorySelect={handleCategorySelect}
                   onBankSelect={handleBankSelect}
                   onBusinessClick={handleBusinessClick}
-                  onDisplayCountChange={handleDisplayCountChange}
+                  onLoadMore={loadMore}
+                  hasMore={hasMore}
+                  isLoadingMore={isLoadingMore}
+                  totalCount={totalBusinesses}
                 />
               ) : (
                 <InicioTab

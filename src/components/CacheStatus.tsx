@@ -1,52 +1,49 @@
 import React from "react";
-import { getBenefitsDataService } from "../services/BenefitsDataService";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
+import { queryKeys } from "../hooks/useBenefitsData";
 
 interface CacheStatusProps {
   className?: string;
 }
 
 export const CacheStatus: React.FC<CacheStatusProps> = ({ className = "" }) => {
-  const [stats, setStats] = React.useState<{
-    totalEntries: number;
-    totalSize: number;
-    hitRate: number;
-    missRate: number;
-    oldestEntry: number;
-    newestEntry: number;
-  } | null>(null);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const queryClient = useQueryClient();
+  const isFetching = useIsFetching();
+  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
+  // Update stats periodically
   React.useEffect(() => {
-    const updateStats = () => {
-      const cacheStats = getBenefitsDataService().getCacheStats();
-      setStats(cacheStats);
-    };
-
-    updateStats();
-    const interval = setInterval(updateStats, 5000); // Update every 5 seconds
-
+    const interval = setInterval(forceUpdate, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  const businessesQuery = queryClient.getQueryState(queryKeys.businesses);
+  const featuredQuery = queryClient.getQueryState(queryKeys.featuredBenefits);
+
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await getBenefitsDataService().refreshAllData();
-    } catch (error) {
-      // Silent fail
-    } finally {
-      setIsRefreshing(false);
-    }
+    await queryClient.invalidateQueries();
   };
 
   const handleClearCache = () => {
-    getBenefitsDataService().clearCache();
-    setStats(null);
+    queryClient.clear();
+    forceUpdate();
   };
 
-  if (!stats) {
-    return null;
-  }
+  const getCacheEntryCount = () => {
+    return queryClient.getQueryCache().getAll().length;
+  };
+
+  const getLastUpdated = () => {
+    const timestamps = [
+      businessesQuery?.dataUpdatedAt,
+      featuredQuery?.dataUpdatedAt,
+    ].filter(Boolean) as number[];
+
+    if (timestamps.length === 0) return null;
+    return Math.max(...timestamps);
+  };
+
+  const lastUpdated = getLastUpdated();
 
   return (
     <div
@@ -57,10 +54,10 @@ export const CacheStatus: React.FC<CacheStatusProps> = ({ className = "" }) => {
         <div className="flex gap-2">
           <button
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={isFetching > 0}
             className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
           >
-            {isRefreshing ? "Refreshing..." : "Refresh"}
+            {isFetching > 0 ? "Refreshing..." : "Refresh"}
           </button>
           <button
             onClick={handleClearCache}
@@ -73,25 +70,24 @@ export const CacheStatus: React.FC<CacheStatusProps> = ({ className = "" }) => {
 
       <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
         <div>
-          <span className="font-medium">Entries:</span> {stats.totalEntries}
+          <span className="font-medium">Cached Queries:</span> {getCacheEntryCount()}
         </div>
         <div>
-          <span className="font-medium">Size:</span>{" "}
-          {Math.round(stats.totalSize / 1024)}KB
+          <span className="font-medium">Fetching:</span> {isFetching}
         </div>
         <div>
-          <span className="font-medium">Hit Rate:</span>{" "}
-          {Math.round(stats.hitRate * 100)}%
+          <span className="font-medium">Businesses:</span>{" "}
+          {businessesQuery?.status || "none"}
         </div>
         <div>
-          <span className="font-medium">Miss Rate:</span>{" "}
-          {Math.round(stats.missRate * 100)}%
+          <span className="font-medium">Featured:</span>{" "}
+          {featuredQuery?.status || "none"}
         </div>
       </div>
 
-      {stats.newestEntry > 0 && (
+      {lastUpdated && (
         <div className="mt-2 text-xs text-gray-500">
-          Last updated: {new Date(stats.newestEntry).toLocaleTimeString()}
+          Last updated: {new Date(lastUpdated).toLocaleTimeString()}
         </div>
       )}
     </div>

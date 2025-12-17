@@ -1,257 +1,194 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
-import { getBenefitsDataService } from '../services/BenefitsDataService';
+import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
+import { getRawBenefits } from '../services/rawBenefitsApi';
+
+// Query keys for cache management
+export const queryKeys = {
+    businesses: ['businesses'] as const,
+    featuredBenefits: ['featuredBenefits'] as const,
+};
+
+const ITEMS_PER_PAGE = 20;
 
 interface UseBenefitsDataReturn {
-    // Data
     businesses: Business[];
-    rawBenefits: RawMongoBenefit[];
     featuredBenefits: RawMongoBenefit[];
-
-    // Loading states
     isLoading: boolean;
-    isRefreshing: boolean;
-
-    // Error state
+    isLoadingMore: boolean;
     error: string | null;
-
-    // Actions
+    hasMore: boolean;
+    loadMore: () => void;
     refreshData: () => Promise<void>;
-    clearCache: () => void;
-
-    // Cache info
-    isCached: boolean;
-    cacheStats: {
-        totalEntries: number;
-        totalSize: number;
-        hitRate: number;
-        missRate: number;
-        oldestEntry: number;
-        newestEntry: number;
-    } | null;
+    totalBusinesses: number;
 }
 
 /**
- * Hook for accessing cached benefits data
- * 
- * This hook provides a unified interface to all benefits data with caching,
- * preventing unnecessary API calls when navigating between pages.
+ * Hook for accessing benefits data with React Query
+ * Uses the new /api/businesses endpoint with proper server-side pagination
  */
 export function useBenefitsData(): UseBenefitsDataReturn {
-    const [businesses, setBusinesses] = useState<Business[]>([]);
-    const [rawBenefits, setRawBenefits] = useState<RawMongoBenefit[]>([]);
-    const [featuredBenefits, setFeaturedBenefits] = useState<RawMongoBenefit[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
-    // Initialize data service and load initial data
-    useEffect(() => {
-        let isMounted = true;
-
-        const initializeAndLoadData = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-
-                // Initialize the service
-                const dataService = getBenefitsDataService();
-                await dataService.initialize();
-
-                if (!isMounted) return;
-
-                // Check if we have cached data
-                const hasBusinessesCache = dataService.isDataCached('businesses');
-                const hasFeaturedCache = dataService.isDataCached('featured_benefits');
-
-                // Load data (will use cache if available)
-                const [businessesData, featuredData] = await Promise.all([
-                    dataService.getAllBusinesses(),
-                    dataService.getFeaturedBenefits()
-                ]);
-
-                if (!isMounted) return;
-
-                setBusinesses(businessesData);
-                setFeaturedBenefits(featuredData);
-                setRawBenefits(featuredData); // For now, use featured as raw benefits
-
-            } catch (err) {
-                if (!isMounted) return;
-
-                const errorMessage = err instanceof Error ? err.message : 'Failed to load benefits data';
-                setError(errorMessage);
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
+    // Fetch businesses with infinite query for pagination
+    const {
+        data,
+        isLoading: isLoadingBusinesses,
+        isFetchingNextPage,
+        error: businessesError,
+        fetchNextPage,
+        hasNextPage,
+        refetch: refetchBusinesses,
+    } = useInfiniteQuery({
+        queryKey: queryKeys.businesses,
+        queryFn: async ({ pageParam = 0 }) => {
+            return fetchBusinessesPaginated({
+                limit: ITEMS_PER_PAGE,
+                offset: pageParam,
+            });
+        },
+        getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (lastPage.pagination.hasMore) {
+                return lastPage.pagination.offset + lastPage.pagination.limit;
             }
-        };
+            return undefined;
+        },
+        initialPageParam: 0,
+    });
 
-        initializeAndLoadData();
+    // Fetch featured benefits
+    const {
+        data: featuredBenefits = [],
+        isLoading: isLoadingFeatured,
+        error: featuredError,
+        refetch: refetchFeatured,
+    } = useQuery({
+        queryKey: queryKeys.featuredBenefits,
+        queryFn: () => getRawBenefits({ limit: 10 }),
+    });
 
-        return () => {
-            isMounted = false;
-        };
-    }, []);
+    // Flatten all pages into a single array of businesses and deduplicate by ID
+    const businesses = useMemo(() => {
+        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const seenIds = new Set();
+        return allBusinesses.filter(business => {
+            if (seenIds.has(business.id)) {
+                return false;
+            }
+            seenIds.add(business.id);
+            return true;
+        });
+    }, [data?.pages]);
 
-    // Refresh data function
-    const refreshData = useCallback(async () => {
-        try {
-            setIsRefreshing(true);
-            setError(null);
+    const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
+    const isLoading = isLoadingBusinesses || isLoadingFeatured;
+    const isLoadingMore = isFetchingNextPage;
 
+    const error = businessesError
+        ? (businessesError as Error).message
+        : featuredError
+            ? (featuredError as Error).message
+            : null;
 
-            // Force refresh all data
-            const dataService = getBenefitsDataService();
-            const [businessesData, featuredData] = await Promise.all([
-                dataService.getAllBusinesses(true),
-                dataService.getFeaturedBenefits(true)
-            ]);
-
-            setBusinesses(businessesData);
-            setFeaturedBenefits(featuredData);
-            setRawBenefits(featuredData);
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to refresh benefits data';
-            setError(errorMessage);
-        } finally {
-            setIsRefreshing(false);
+    const loadMore = () => {
+        if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
         }
-    }, []);
+    };
 
-    // Clear cache function
-    const clearCache = useCallback(() => {
-        getBenefitsDataService().clearCache();
-    }, []);
-
-    // Get cache info
-    const dataService = getBenefitsDataService();
-    const isCached = dataService.isDataCached('businesses') &&
-        dataService.isDataCached('featured_benefits');
-
-    const cacheStats = dataService.getCacheStats();
+    const refreshData = async () => {
+        await Promise.all([
+            refetchBusinesses(),
+            refetchFeatured(),
+        ]);
+    };
 
     return {
-        // Data
         businesses,
-        rawBenefits,
         featuredBenefits,
-
-        // Loading states
         isLoading,
-        isRefreshing,
-
-        // Error state
+        isLoadingMore,
         error,
-
-        // Actions
+        hasMore: hasNextPage ?? false,
+        loadMore,
         refreshData,
-        clearCache,
-
-        // Cache info
-        isCached,
-        cacheStats
+        totalBusinesses,
     };
 }
 
 /**
- * Hook for accessing only businesses data (lighter version)
+ * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
-    const [businesses, setBusinesses] = useState<Business[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let isMounted = true;
-
-        const loadBusinesses = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-
-                const dataService = getBenefitsDataService();
-                await dataService.initialize();
-
-                if (!isMounted) return;
-
-                const businessesData = await dataService.getAllBusinesses();
-
-                if (!isMounted) return;
-
-                setBusinesses(businessesData);
-
-            } catch (err) {
-                if (!isMounted) return;
-
-                const errorMessage = err instanceof Error ? err.message : 'Failed to load businesses';
-                setError(errorMessage);
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
+    const {
+        data,
+        isLoading,
+        isFetchingNextPage,
+        error,
+        fetchNextPage,
+        hasNextPage,
+    } = useInfiniteQuery({
+        queryKey: queryKeys.businesses,
+        queryFn: async ({ pageParam = 0 }) => {
+            return fetchBusinessesPaginated({
+                limit: ITEMS_PER_PAGE,
+                offset: pageParam,
+            });
+        },
+        getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (lastPage.pagination.hasMore) {
+                return lastPage.pagination.offset + lastPage.pagination.limit;
             }
-        };
+            return undefined;
+        },
+        initialPageParam: 0,
+    });
 
-        loadBusinesses();
+    const businesses = useMemo(() => {
+        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const seenIds = new Set();
+        return allBusinesses.filter(business => {
+            if (seenIds.has(business.id)) {
+                return false;
+            }
+            seenIds.add(business.id);
+            return true;
+        });
+    }, [data?.pages]);
 
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    return { businesses, isLoading, error };
+    return {
+        businesses,
+        isLoading,
+        isLoadingMore: isFetchingNextPage,
+        error: error ? (error as Error).message : null,
+        hasMore: hasNextPage ?? false,
+        loadMore: () => {
+            if (hasNextPage && !isFetchingNextPage) {
+                fetchNextPage();
+            }
+        },
+    };
 }
 
 /**
- * Hook for accessing only featured benefits (lighter version)
+ * Hook for accessing only featured benefits
  */
 export function useFeaturedBenefits() {
-    const [featuredBenefits, setFeaturedBenefits] = useState<RawMongoBenefit[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const {
+        data: featuredBenefits = [],
+        isLoading,
+        error,
+    } = useQuery({
+        queryKey: queryKeys.featuredBenefits,
+        queryFn: () => getRawBenefits({ limit: 10 }),
+    });
 
-    useEffect(() => {
-        let isMounted = true;
-
-        const loadFeatured = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-
-                const dataService = getBenefitsDataService();
-                await dataService.initialize();
-
-                if (!isMounted) return;
-
-                const featuredData = await dataService.getFeaturedBenefits();
-
-                if (!isMounted) return;
-
-                setFeaturedBenefits(featuredData);
-
-            } catch (err) {
-                if (!isMounted) return;
-
-                const errorMessage = err instanceof Error ? err.message : 'Failed to load featured benefits';
-                setError(errorMessage);
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        loadFeatured();
-
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    return { featuredBenefits, isLoading, error };
+    return {
+        featuredBenefits,
+        isLoading,
+        error: error ? (error as Error).message : null,
+    };
 }
