@@ -201,7 +201,13 @@ function Benefit() {
               }
             }
 
-            setBusiness(matchingBusiness);
+            // Ensure location property is set correctly (handling potential API mismatch between location/locations)
+            const businessWithLocation = {
+              ...matchingBusiness,
+              location: matchingBusiness.location || (matchingBusiness as any).locations || []
+            };
+
+            setBusiness(businessWithLocation);
             setBenefit(selectedBenefit);
             setError(null);
             return;

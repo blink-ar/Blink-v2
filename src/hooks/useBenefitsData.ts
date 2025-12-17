@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
@@ -69,7 +70,11 @@ export function useBenefitsData(): UseBenefitsDataReturn {
     });
 
     // Flatten all pages into a single array of businesses
-    const businesses = data?.pages.flatMap(page => page.businesses) ?? [];
+    const businesses = useMemo(() =>
+        data?.pages.flatMap(page => page.businesses) ?? [],
+        [data?.pages]
+    );
+
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
     const isLoading = isLoadingBusinesses || isLoadingFeatured;
@@ -135,7 +140,10 @@ export function useBusinessesData() {
         initialPageParam: 0,
     });
 
-    const businesses = data?.pages.flatMap(page => page.businesses) ?? [];
+    const businesses = useMemo(() =>
+        data?.pages.flatMap(page => page.businesses) ?? [],
+        [data?.pages]
+    );
 
     return {
         businesses,
