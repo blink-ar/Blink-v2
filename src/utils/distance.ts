@@ -61,8 +61,7 @@ export const hasOnlineBenefits = (business: { benefits: { usos?: string[] }[] })
 
 /**
  * Calculate priority score for sorting
- * - Nearby + Online = 3 points
- * - Nearby OR Online = 2 points
+ * - Nearby OR Online (or both) = 2 points
  * - Neither = 1 point
  * @param isNearby Is the business within 50km
  * @param isOnline Does the business have online benefits
@@ -72,7 +71,6 @@ export const calculatePriorityScore = (
   isNearby: boolean,
   isOnline: boolean
 ): number => {
-  if (isNearby && isOnline) return 3;
   if (isNearby || isOnline) return 2;
   return 1;
 };
