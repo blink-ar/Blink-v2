@@ -5,6 +5,7 @@ import FeaturedBenefits from "../components/FeaturedBenefits";
 import CategoryGrid from "../components/CategoryGrid";
 import BankGrid from "../components/BankGrid";
 import ActiveOffers from "../components/ActiveOffers";
+import FilterToggles from "../components/FilterToggles";
 // import NearbyBusinesses from "../components/NearbyBusinesses";
 import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
 import BottomNavigation, {
@@ -17,6 +18,8 @@ import {
 } from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
+import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
+import { useGeolocation } from "../hooks/useGeolocation";
 import { CacheNotification } from "../components/CacheNotification";
 import {
   SkeletonFeaturedBanner,
@@ -79,13 +82,27 @@ function Home() {
   // State for bank filter (multiple selection)
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
+  // State for distance/online filters
+  const [nearbyOnly, setNearbyOnly] = useState(false);
+  const [onlineOnly, setOnlineOnly] = useState(false);
+
+  // Get geolocation
+  const { position } = useGeolocation();
+
+  // Enrich businesses with distance and online information
+  const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
+    sortByPriority: true,
+    nearbyOnly,
+    onlineOnly,
+  });
+
   const {
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
     filteredBusinesses,
-  } = useBusinessFilter(paginatedBusinesses, selectedBanks);
+  } = useBusinessFilter(enrichedBusinesses, selectedBanks);
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
@@ -168,10 +185,10 @@ function Home() {
     [rawBenefits]
   );
 
-  // Memoized active offers (businesses with high discounts)
+  // Memoized active offers (businesses with high discounts) - using enriched businesses for smart sorting
   const activeOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some(
             (benefit) =>
@@ -180,50 +197,50 @@ function Home() {
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized Santander exclusive offers
+  // Memoized Santander exclusive offers - using enriched businesses for smart sorting
   const santanderOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some((benefit) =>
             benefit.bankName.toLowerCase().includes("santander")
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized BBVA exclusive offers
+  // Memoized BBVA exclusive offers - using enriched businesses for smart sorting
   const bbvaOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some((benefit) =>
             benefit.bankName.toLowerCase().includes("bbva")
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized food category offers
+  // Memoized food category offers - using enriched businesses for smart sorting
   const foodOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter(
           (business) => business.category.toLowerCase() === "gastronomia"
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized high-value offers (benefits with high percentages)
+  // Memoized high-value offers (benefits with high percentages) - using enriched businesses for smart sorting
   const highValueOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some((benefit) => {
             const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
@@ -235,13 +252,13 @@ function Home() {
           })
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized biggest discount offers (sorted by highest percentage)
+  // Memoized biggest discount offers (sorted by highest percentage) - using enriched businesses for smart sorting
   const biggestDiscountOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .map((business) => {
           let maxDiscount = 0;
           business.benefits.forEach((benefit) => {
@@ -256,7 +273,7 @@ function Home() {
         .filter((business) => business.maxDiscount > 0)
         .sort((a, b) => b.maxDiscount - a.maxDiscount)
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
   // Get nearby businesses (simulate with distance)
@@ -409,11 +426,13 @@ function Home() {
         setSearchTerm("");
         setSelectedCategory("all");
         setSelectedBanks([]);
+        setNearbyOnly(false);
+        setOnlineOnly(false);
         break;
       case "beneficios":
         // Clear search but keep category and bank filters available for beneficios view
         setSearchTerm("");
-        // Don't clear category or bank filters - let user filter within beneficios view
+        // Don't clear category, bank, or distance filters - let user filter within beneficios view
         break;
     }
   };
@@ -460,6 +479,19 @@ function Home() {
               banks={bankGridData}
               onBankSelect={handleBankSelect}
               selectedBanks={selectedBanks}
+            />
+          </div>
+        )}
+
+        {/* Filter Toggles - Sticky - Only visible in Beneficios tab */}
+        {activeTab === "beneficios" && (
+          <div className="sticky top-[184px] z-10">
+            <FilterToggles
+              nearbyOnly={nearbyOnly}
+              onlineOnly={onlineOnly}
+              onNearbyToggle={() => setNearbyOnly(!nearbyOnly)}
+              onOnlineToggle={() => setOnlineOnly(!onlineOnly)}
+              nearbyDisabled={!position}
             />
           </div>
         )}

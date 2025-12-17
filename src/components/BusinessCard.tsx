@@ -220,11 +220,18 @@ const BusinessCard: React.FC<BusinessCardProps> = ({
                   • {business.location[0]?.types?.[0] || business.category}
                 </span>
               </h3>
-              <div className="flex items-center text-gray-500 text-xs mb-2">
-                <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
-                <span className="truncate">
-                  {getLocationDisplayText(business)}
-                </span>
+              <div className="flex items-center gap-2 text-gray-500 text-xs mb-2">
+                <div className="flex items-center">
+                  <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                  <span className="truncate">
+                    {business.distanceText || getLocationDisplayText(business)}
+                  </span>
+                </div>
+                {business.hasOnline && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium whitespace-nowrap">
+                    🌐 Online
+                  </span>
+                )}
               </div>
             </div>
           </div>
