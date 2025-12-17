@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { Globe } from "lucide-react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import FeaturedBenefits from "../components/FeaturedBenefits";
@@ -83,6 +84,24 @@ function Home() {
 
   // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
+
+  // State for filter dropdown
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFilterDropdown]);
 
   // Enrich businesses with distance and online information
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
@@ -446,12 +465,47 @@ function Home() {
         aria-label="Contenido principal"
       >
         {/* Search Bar */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 md:px-8 py-4 bg-white">
-          <SearchBar
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Buscar descuentos, tiendas..."
-          />
+        <div className="sticky top-0 z-20 bg-white">
+          <div className="px-4 sm:px-6 md:px-8 py-4">
+            <div className="relative" ref={filterDropdownRef}>
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Buscar descuentos, tiendas..."
+                onFilterClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              />
+
+              {/* Filter Dropdown */}
+              {showFilterDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-2 mx-4 sm:mx-6 md:mx-8 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-30">
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Filtros</h3>
+
+                    {/* Online Toggle */}
+                    <button
+                      onClick={() => {
+                        setOnlineOnly(!onlineOnly);
+                        setShowFilterDropdown(false);
+                      }}
+                      className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                        onlineOnly
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        <span>Beneficios Online</span>
+                      </div>
+                      {onlineOnly && (
+                        <span className="text-xs">✓</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Categories Grid - Sticky - Only visible in Beneficios tab */}
@@ -472,8 +526,6 @@ function Home() {
               banks={bankGridData}
               onBankSelect={handleBankSelect}
               selectedBanks={selectedBanks}
-              onlineOnly={onlineOnly}
-              onOnlineToggle={() => setOnlineOnly(!onlineOnly)}
             />
           </div>
         )}
