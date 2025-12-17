@@ -69,11 +69,18 @@ export function useBenefitsData(): UseBenefitsDataReturn {
         queryFn: () => getRawBenefits({ limit: 10 }),
     });
 
-    // Flatten all pages into a single array of businesses
-    const businesses = useMemo(() =>
-        data?.pages.flatMap(page => page.businesses) ?? [],
-        [data?.pages]
-    );
+    // Flatten all pages into a single array of businesses and deduplicate by ID
+    const businesses = useMemo(() => {
+        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const seenIds = new Set();
+        return allBusinesses.filter(business => {
+            if (seenIds.has(business.id)) {
+                return false;
+            }
+            seenIds.add(business.id);
+            return true;
+        });
+    }, [data?.pages]);
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
@@ -140,10 +147,17 @@ export function useBusinessesData() {
         initialPageParam: 0,
     });
 
-    const businesses = useMemo(() =>
-        data?.pages.flatMap(page => page.businesses) ?? [],
-        [data?.pages]
-    );
+    const businesses = useMemo(() => {
+        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const seenIds = new Set();
+        return allBusinesses.filter(business => {
+            if (seenIds.has(business.id)) {
+                return false;
+            }
+            seenIds.add(business.id);
+            return true;
+        });
+    }, [data?.pages]);
 
     return {
         businesses,
