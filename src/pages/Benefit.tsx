@@ -75,6 +75,18 @@ function Benefit() {
           return;
         }
 
+        // Don't re-fetch if we already have a valid business loaded
+        if (business && benefit) {
+          return;
+        }
+
+        // Wait for businesses data to be available (not just loading state)
+        // This handles the case where businesses array is still empty after initial load
+        if (!businessesLoading && businesses.length === 0 && id && id.length !== 24) {
+          // If not a MongoDB ID and businesses is empty, wait for data
+          return;
+        }
+
         // Try to get raw benefit by ID first (if id is a MongoDB ObjectId)
         if (id && id.length === 24) {
           // MongoDB ObjectId length
@@ -320,7 +332,12 @@ function Benefit() {
       } catch {
         setError("Failed to load benefit");
       } finally {
-        setLoading(false);
+        // Only set loading to false if we actually processed the data
+        // Don't set loading false if we're waiting for businesses to populate
+        const isWaitingForBusinesses = !businessesLoading && businesses.length === 0 && id && id.length !== 24;
+        if (!isWaitingForBusinesses) {
+          setLoading(false);
+        }
       }
     };
 

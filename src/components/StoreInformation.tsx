@@ -8,10 +8,12 @@ import {
   Star,
   Loader2,
   Globe,
+  ChevronDown,
 } from "lucide-react";
 import { Business, CanonicalLocation } from "../types";
 import LocationMap from "./LocationMap";
 import { usePlaceDetails } from "../hooks/usePlaceDetails";
+import { useGeolocation } from "../hooks/useGeolocation";
 
 interface StoreInformationProps {
   business: Business;
@@ -19,6 +21,26 @@ interface StoreInformationProps {
   onLocationSelect?: (location: CanonicalLocation) => void;
   onCallClick?: () => void;
 }
+
+// Calculate distance between two coordinates using Haversine formula
+const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const StoreInformation: React.FC<StoreInformationProps> = ({
   business,
@@ -32,6 +54,41 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   // Fetch place details for the current location
   const { formattedDetails, formattedOpeningHours, loading, error } =
     usePlaceDetails(currentLocation);
+
+  // Get user's location for proximity sorting
+  const { position: userPosition } = useGeolocation();
+
+  // State for dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // Memoize user coordinates to prevent unnecessary re-sorts
+  const userCoords = React.useMemo(() => {
+    if (!userPosition?.latitude || !userPosition?.longitude) {
+      return null;
+    }
+    return {
+      latitude: userPosition.latitude,
+      longitude: userPosition.longitude,
+    };
+  }, [userPosition?.latitude, userPosition?.longitude]);
 
   const storeInfo = {
     address:
@@ -76,22 +133,57 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
     }
   };
 
-  // Check if all locations are virtual (Nacional or Online)
-  const hasPhysicalLocations = business.location.some((location) => {
-    const locationName =
-      location.name?.toLowerCase() ||
-      location.formattedAddress?.toLowerCase() ||
-      "";
-    // Check for virtual location indicators
-    const isVirtual =
-      locationName.includes("nacional") ||
-      locationName.includes("online") ||
-      locationName.includes("todo el país") ||
-      locationName.includes("tienda online");
-    // Also check for invalid coordinates
-    const hasValidCoordinates = location.lat !== 0 || location.lng !== 0;
-    return !isVirtual && hasValidCoordinates;
-  });
+  // Filter physical locations (exclude virtual ones like "Online", "Nacional")
+  const physicalLocations = React.useMemo(() => {
+    // Safety check: ensure business.location exists and is an array
+    if (!business.location || !Array.isArray(business.location)) {
+      return [];
+    }
+
+    const filtered = business.location.filter((location) => {
+      // Safety check: ensure location has required properties
+      if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+        return false;
+      }
+
+      const locationName =
+        location.name?.toLowerCase() ||
+        location.formattedAddress?.toLowerCase() ||
+        "";
+      // Check for virtual location indicators
+      const isVirtual =
+        locationName.includes("nacional") ||
+        locationName.includes("online") ||
+        locationName.includes("todo el país") ||
+        locationName.includes("tienda online");
+      // Also check for invalid coordinates
+      const hasValidCoordinates = location.lat !== 0 || location.lng !== 0;
+      return !isVirtual && hasValidCoordinates;
+    });
+
+    // Sort by proximity if user position is available
+    if (userCoords) {
+      return [...filtered].sort((a, b) => {
+        const distanceA = calculateDistance(
+          userCoords.latitude,
+          userCoords.longitude,
+          a.lat,
+          a.lng
+        );
+        const distanceB = calculateDistance(
+          userCoords.latitude,
+          userCoords.longitude,
+          b.lat,
+          b.lng
+        );
+        return distanceA - distanceB;
+      });
+    }
+
+    return filtered;
+  }, [business.location, userCoords]);
+
+  const hasPhysicalLocations = physicalLocations.length > 0;
 
   // Get the store website URL from benefits
   const storeWebsite = React.useMemo(() => {
@@ -184,11 +276,11 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900 mb-1">
-                Dirección
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-gray-900 mb-1 flex items-baseline gap-2 min-w-0">
+                <span className="flex-shrink-0">Dirección</span>
                 {selectedLocation && (
-                  <span className="ml-2 text-sm font-normal text-blue-600">
+                  <span className="text-sm font-normal text-blue-600 truncate">
                     ({storeInfo.locationName})
                   </span>
                 )}
@@ -200,9 +292,108 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                 className="mt-4"
               />
               <div className="mt-3 space-y-2">
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {storeInfo.address}
-                </p>
+                {/* Show location dropdown when there are multiple locations */}
+                {physicalLocations.length > 1 ? (
+                  <div ref={dropdownRef} className="relative">
+                    <button
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-full flex items-center justify-between gap-2 p-3 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors min-w-0"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0 text-left overflow-hidden">
+                          {selectedLocation ? (
+                            <div className="min-w-0">
+                              {selectedLocation.name && (
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {selectedLocation.name}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-600 truncate">
+                                {selectedLocation.formattedAddress}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600 truncate">
+                              Selecciona una ubicación ({physicalLocations.length})
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronDown
+                        className={`h-4 w-4 text-gray-500 flex-shrink-0 transition-transform ${
+                          isDropdownOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {isDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {physicalLocations.map((location, index) => {
+                          const isSelected = selectedLocation?.placeId
+                            ? location.placeId === selectedLocation.placeId
+                            : selectedLocation?.formattedAddress === location.formattedAddress;
+
+                          // Calculate distance if user position is available
+                          const distance = userCoords
+                            ? calculateDistance(
+                                userCoords.latitude,
+                                userCoords.longitude,
+                                location.lat,
+                                location.lng
+                              )
+                            : null;
+
+                          return (
+                            <button
+                              key={location.placeId || index}
+                              onClick={() => {
+                                onLocationSelect?.(location);
+                                setIsDropdownOpen(false);
+                              }}
+                              className={`w-full text-left p-3 border-b border-gray-100 last:border-b-0 transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-50'
+                                  : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    {location.name && (
+                                      <p className={`text-sm font-medium mb-1 truncate ${
+                                        isSelected ? 'text-blue-900' : 'text-gray-900'
+                                      }`}>
+                                        {location.name}
+                                      </p>
+                                    )}
+                                    <p className={`text-xs truncate ${
+                                      isSelected ? 'text-blue-700' : 'text-gray-600'
+                                    }`}>
+                                      {location.formattedAddress}
+                                    </p>
+                                  </div>
+                                {distance !== null && (
+                                  <span className={`text-xs font-semibold flex-shrink-0 ${
+                                    isSelected ? 'text-blue-600' : 'text-gray-500'
+                                  }`}>
+                                    {distance < 1
+                                      ? `${Math.round(distance * 1000)}m`
+                                      : `${distance.toFixed(1)}km`}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {storeInfo.address}
+                  </p>
+                )}
               </div>
             </div>
           </div>
