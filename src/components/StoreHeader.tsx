@@ -12,11 +12,11 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
   onBack,
 }) => {
   // Safely handle missing location data
-  const locations = business.location || [];
+  const locations = Array.isArray(business.location) ? business.location : [];
 
   // Filter out "Online" locations for display purposes
   const physicalLocations = locations.filter(
-    (loc) => loc.formattedAddress?.toLowerCase() !== "online"
+    (loc) => loc && loc.formattedAddress && loc.formattedAddress.toLowerCase() !== "online"
   );
 
   console.log(business);
