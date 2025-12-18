@@ -44,8 +44,10 @@ export async function fetchBusinessesPaginated(options: {
   category?: string;
   bank?: string;
   search?: string;
+  lat?: number;
+  lng?: number;
 } = {}): Promise<BusinessesApiResponse> {
-  const { limit = 20, offset = 0, category, bank, search } = options;
+  const { limit = 20, offset = 0, category, bank, search, lat, lng } = options;
 
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
@@ -53,6 +55,10 @@ export async function fetchBusinessesPaginated(options: {
   if (category) params.append('category', category);
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
+  if (lat !== undefined && lng !== undefined) {
+    params.append('lat', lat.toString());
+    params.append('lng', lng.toString());
+  }
 
   const url = `${BASE_URL}/api/businesses?${params.toString()}`;
 
@@ -62,6 +68,12 @@ export async function fetchBusinessesPaginated(options: {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = await response.json();
+
+    if (data.success && Array.isArray(data.businesses)) {
+      console.log(`[API] fetchBusinessesPaginated successful: returned ${data.businesses.length} items (limit: ${limit}, offset: ${offset})`);
+    } else {
+      console.log(`[API] fetchBusinessesPaginated result: ${data.success ? 'success' : 'failed'}, businesses array: ${Array.isArray(data.businesses)}`);
+    }
 
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {

@@ -104,9 +104,9 @@ function Home() {
     }
   }, [showFilterDropdown]);
 
-  // Enrich businesses with distance and online information
+  // Enrich businesses with online information and apply filters
+  // Note: Distance calculation and proximity sorting are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
-    sortByPriority: true,
     onlineOnly,
   });
 

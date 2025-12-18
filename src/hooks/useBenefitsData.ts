@@ -4,6 +4,7 @@ import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
 import { getRawBenefits } from '../services/rawBenefitsApi';
+import { useGeolocation } from './useGeolocation';
 
 // Query keys for cache management
 export const queryKeys = {
@@ -31,8 +32,10 @@ interface UseBenefitsDataReturn {
  */
 export function useBenefitsData(): UseBenefitsDataReturn {
     const queryClient = useQueryClient();
+    const { position } = useGeolocation();
 
     // Fetch businesses with infinite query for pagination
+    // Note: Position is passed to API but not included in query key to maintain stable cache
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -47,6 +50,10 @@ export function useBenefitsData(): UseBenefitsDataReturn {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
+                ...(position && {
+                    lat: position.latitude,
+                    lng: position.longitude,
+                }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -73,13 +80,16 @@ export function useBenefitsData(): UseBenefitsDataReturn {
     const businesses = useMemo(() => {
         const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
         const seenIds = new Set();
-        return allBusinesses.filter(business => {
+        const result = allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
                 return false;
             }
             seenIds.add(business.id);
             return true;
         });
+
+        console.log(`[useBenefitsData] Loaded ${result.length} unique businesses from ${data?.pages.length || 0} pages`);
+        return result;
     }, [data?.pages]);
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
@@ -123,6 +133,8 @@ export function useBenefitsData(): UseBenefitsDataReturn {
  * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
+    const { position } = useGeolocation();
+
     const {
         data,
         isLoading,
@@ -136,6 +148,10 @@ export function useBusinessesData() {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
+                ...(position && {
+                    lat: position.latitude,
+                    lng: position.longitude,
+                }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -150,13 +166,16 @@ export function useBusinessesData() {
     const businesses = useMemo(() => {
         const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
         const seenIds = new Set();
-        return allBusinesses.filter(business => {
+        const result = allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
                 return false;
             }
             seenIds.add(business.id);
             return true;
         });
+
+        console.log(`[useBusinessesData] Loaded ${result.length} unique businesses from ${data?.pages.length || 0} pages`);
+        return result;
     }, [data?.pages]);
 
     return {
