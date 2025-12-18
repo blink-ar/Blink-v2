@@ -14,6 +14,11 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
   // Safely handle missing location data
   const locations = business.location || [];
 
+  // Filter out "Online" locations for display purposes
+  const physicalLocations = locations.filter(
+    (loc) => loc.formattedAddress?.toLowerCase() !== "online"
+  );
+
   console.log(business);
 
   return (
@@ -60,7 +65,7 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
             {/* Category */}
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
-                {locations[0]?.types?.[0] || business.category}
+                {physicalLocations[0]?.types?.[0] || business.category}
               </span>
 
               {/* Rating */}
@@ -74,15 +79,20 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
               </div>
             </div>
             {/* Location */}
-            {locations.length > 0 && (
+            {physicalLocations.length > 0 && (
               <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                <MapPin className="h-4 w-4 text-gray-500" />
-                <span className="truncate">
-                  {locations[0].formattedAddress ||
-                    "Location not available"}
-                  {locations.length > 1 &&
-                    ` (+${locations.length - 1} more)`}
-                </span>
+                <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                <div className="flex items-center min-w-0 flex-1">
+                  <span className="truncate">
+                    {physicalLocations[0].formattedAddress ||
+                      "Location not available"}
+                  </span>
+                  {physicalLocations.length > 1 && (
+                    <span className="flex-shrink-0 ml-1">
+                      (+{physicalLocations.length - 1})
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
