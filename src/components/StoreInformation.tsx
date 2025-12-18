@@ -276,11 +276,11 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900 mb-1">
-                Dirección
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-gray-900 mb-1 flex items-baseline gap-2 min-w-0">
+                <span className="flex-shrink-0">Dirección</span>
                 {selectedLocation && (
-                  <span className="ml-2 text-sm font-normal text-blue-600">
+                  <span className="text-sm font-normal text-blue-600 truncate">
                     ({storeInfo.locationName})
                   </span>
                 )}
@@ -294,16 +294,16 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
               <div className="mt-3 space-y-2">
                 {/* Show location dropdown when there are multiple locations */}
                 {physicalLocations.length > 1 ? (
-                  <div ref={dropdownRef}>
+                  <div ref={dropdownRef} className="relative">
                     <button
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="w-full flex items-center justify-between gap-2 p-3 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+                      className="w-full flex items-center justify-between gap-2 p-3 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors min-w-0"
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                         <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                        <div className="flex-1 min-w-0 text-left">
+                        <div className="flex-1 min-w-0 text-left overflow-hidden">
                           {selectedLocation ? (
-                            <>
+                            <div className="min-w-0">
                               {selectedLocation.name && (
                                 <p className="text-sm font-medium text-gray-900 truncate">
                                   {selectedLocation.name}
@@ -312,9 +312,9 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                               <p className="text-xs text-gray-600 truncate">
                                 {selectedLocation.formattedAddress}
                               </p>
-                            </>
+                            </div>
                           ) : (
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-gray-600 truncate">
                               Selecciona una ubicación ({physicalLocations.length})
                             </p>
                           )}
@@ -329,7 +329,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 
                     {/* Dropdown menu */}
                     {isDropdownOpen && (
-                      <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {physicalLocations.map((location, index) => {
                           const isSelected = selectedLocation?.placeId
                             ? location.placeId === selectedLocation.placeId
@@ -359,20 +359,20 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  {location.name && (
-                                    <p className={`text-sm font-medium mb-1 ${
-                                      isSelected ? 'text-blue-900' : 'text-gray-900'
+                                  <div className="flex-1 min-w-0">
+                                    {location.name && (
+                                      <p className={`text-sm font-medium mb-1 truncate ${
+                                        isSelected ? 'text-blue-900' : 'text-gray-900'
+                                      }`}>
+                                        {location.name}
+                                      </p>
+                                    )}
+                                    <p className={`text-xs truncate ${
+                                      isSelected ? 'text-blue-700' : 'text-gray-600'
                                     }`}>
-                                      {location.name}
+                                      {location.formattedAddress}
                                     </p>
-                                  )}
-                                  <p className={`text-xs ${
-                                    isSelected ? 'text-blue-700' : 'text-gray-600'
-                                  }`}>
-                                    {location.formattedAddress}
-                                  </p>
-                                </div>
+                                  </div>
                                 {distance !== null && (
                                   <span className={`text-xs font-semibold flex-shrink-0 ${
                                     isSelected ? 'text-blue-600' : 'text-gray-500'
