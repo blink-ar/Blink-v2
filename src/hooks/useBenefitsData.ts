@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
@@ -31,11 +31,10 @@ interface UseBenefitsDataReturn {
  * Uses the new /api/businesses endpoint with proper server-side pagination
  */
 export function useBenefitsData(): UseBenefitsDataReturn {
-    const queryClient = useQueryClient();
-    const { position } = useGeolocation();
+    const { position, loading: positionLoading } = useGeolocation();
 
     // Fetch businesses with infinite query for pagination
-    // Note: Position is passed to API but not included in query key to maintain stable cache
+    // Wait for position to finish loading before starting the query
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -63,7 +62,11 @@ export function useBenefitsData(): UseBenefitsDataReturn {
             return undefined;
         },
         initialPageParam: 0,
+        enabled: !positionLoading, // Wait for position to finish loading
+        staleTime: 0,
     });
+
+    // No need for refetch useEffect - enabled option handles waiting for position
 
     // Fetch featured benefits
     const {
@@ -80,16 +83,13 @@ export function useBenefitsData(): UseBenefitsDataReturn {
     const businesses = useMemo(() => {
         const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
         const seenIds = new Set();
-        const result = allBusinesses.filter(business => {
+        return allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
                 return false;
             }
             seenIds.add(business.id);
             return true;
         });
-
-        console.log(`[useBenefitsData] Loaded ${result.length} unique businesses from ${data?.pages.length || 0} pages`);
-        return result;
     }, [data?.pages]);
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
@@ -133,7 +133,7 @@ export function useBenefitsData(): UseBenefitsDataReturn {
  * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
-    const { position } = useGeolocation();
+    const { position, loading: positionLoading } = useGeolocation();
 
     const {
         data,
@@ -161,21 +161,20 @@ export function useBusinessesData() {
             return undefined;
         },
         initialPageParam: 0,
+        enabled: !positionLoading, // Wait for position to finish loading
+        staleTime: 0,
     });
 
     const businesses = useMemo(() => {
         const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
         const seenIds = new Set();
-        const result = allBusinesses.filter(business => {
+        return allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
                 return false;
             }
             seenIds.add(business.id);
             return true;
         });
-
-        console.log(`[useBusinessesData] Loaded ${result.length} unique businesses from ${data?.pages.length || 0} pages`);
-        return result;
     }, [data?.pages]);
 
     return {
