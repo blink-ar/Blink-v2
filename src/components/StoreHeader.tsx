@@ -11,6 +11,11 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
   business,
   onBack,
 }) => {
+  // Safely handle missing location data
+  const locations = business.location || [];
+
+  console.log(business);
+
   return (
     <div className="bg-white">
       {/* Navigation Bar */}
@@ -55,7 +60,7 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
             {/* Category */}
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
-                {business.location[0]?.types?.[0] || business.category}
+                {locations[0]?.types?.[0] || business.category}
               </span>
 
               {/* Rating */}
@@ -69,14 +74,14 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
               </div>
             </div>
             {/* Location */}
-            {business.location.length > 0 && (
+            {locations.length > 0 && (
               <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
                 <MapPin className="h-4 w-4 text-gray-500" />
                 <span className="truncate">
-                  {business.location[0].formattedAddress ||
+                  {locations[0].formattedAddress ||
                     "Location not available"}
-                  {business.location.length > 1 &&
-                    ` (+${business.location.length - 1} more)`}
+                  {locations.length > 1 &&
+                    ` (+${locations.length - 1} more)`}
                 </span>
               </div>
             )}

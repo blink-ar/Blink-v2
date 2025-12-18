@@ -1,12 +1,7 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
+import { Globe } from "lucide-react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
-import FeaturedBenefits from "../components/FeaturedBenefits";
-import CategoryGrid from "../components/CategoryGrid";
-import BankGrid from "../components/BankGrid";
-import ActiveOffers from "../components/ActiveOffers";
-// import NearbyBusinesses from "../components/NearbyBusinesses";
-import InfiniteScrollGrid from "../components/InfiniteScrollGrid";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -17,11 +12,17 @@ import {
 } from "../components/ui";
 import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
+import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
+import { useGeolocation } from "../hooks/useGeolocation";
 import { CacheNotification } from "../components/CacheNotification";
 import {
   SkeletonFeaturedBanner,
   SkeletonActiveOffers,
 } from "../components/skeletons";
+
+// Lazy load tab components for better performance
+const InicioTab = lazy(() => import("../components/tabs/InicioTab"));
+const BeneficiosTab = lazy(() => import("../components/tabs/BeneficiosTab"));
 
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
@@ -32,28 +33,31 @@ function Home() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Use the cached benefits data hook
-  const {
-    businesses: paginatedBusinesses,
-    featuredBenefits: rawBenefits,
-    isLoading,
-    error,
-  } = useBenefitsData();
+
 
   // State for bottom navigation - check if we're returning from a benefit page with an active tab
   const locationState = location.state as {
     activeTab?: NavigationTab;
     scrollY?: number;
-    displayCount?: number;
   } | null;
   const initialTab = locationState?.activeTab || "inicio";
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
 
   // Scroll restoration state
   const restoredScrollY = locationState?.scrollY;
-  const restoredDisplayCount = locationState?.displayCount;
-  const [currentDisplayCount, setCurrentDisplayCount] = useState(restoredDisplayCount || 20);
   const hasRestoredScroll = useRef(false);
+
+  // Use the cached benefits data hook with server-side pagination
+  const {
+    businesses: paginatedBusinesses,
+    featuredBenefits: rawBenefits,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    loadMore,
+    totalBusinesses,
+  } = useBenefitsData();
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
@@ -79,13 +83,40 @@ function Home() {
   // State for bank filter (multiple selection)
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
+  // State for online filter
+  const [onlineOnly, setOnlineOnly] = useState(false);
+
+  // State for filter dropdown
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFilterDropdown]);
+
+  // Enrich businesses with online information and apply filters
+  // Note: Distance calculation and proximity sorting are now handled by the backend
+  const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
+    onlineOnly,
+  });
+
   const {
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
     filteredBusinesses,
-  } = useBusinessFilter(paginatedBusinesses, selectedBanks);
+  } = useBusinessFilter(enrichedBusinesses, selectedBanks);
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
@@ -168,10 +199,10 @@ function Home() {
     [rawBenefits]
   );
 
-  // Memoized active offers (businesses with high discounts)
+  // Memoized active offers (businesses with high discounts) - using enriched businesses for smart sorting
   const activeOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some(
             (benefit) =>
@@ -180,50 +211,50 @@ function Home() {
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized Santander exclusive offers
+  // Memoized Santander exclusive offers - using enriched businesses for smart sorting
   const santanderOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
-          business.benefits.some((benefit) =>
-            benefit.bankName.toLowerCase().includes("santander")
+          business.benefits?.some((benefit) =>
+            benefit?.bankName?.toLowerCase().includes("santander")
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized BBVA exclusive offers
+  // Memoized BBVA exclusive offers - using enriched businesses for smart sorting
   const bbvaOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
-          business.benefits.some((benefit) =>
-            benefit.bankName.toLowerCase().includes("bbva")
+          business.benefits?.some((benefit) =>
+            benefit?.bankName?.toLowerCase().includes("bbva")
           )
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized food category offers
+  // Memoized food category offers - using enriched businesses for smart sorting
   const foodOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter(
-          (business) => business.category.toLowerCase() === "gastronomia"
+          (business) => business.category?.toLowerCase() === "gastronomia"
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized high-value offers (benefits with high percentages)
+  // Memoized high-value offers (benefits with high percentages) - using enriched businesses for smart sorting
   const highValueOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .filter((business) =>
           business.benefits.some((benefit) => {
             const percentageMatch = benefit.rewardRate.match(/(\d+)%/);
@@ -235,13 +266,13 @@ function Home() {
           })
         )
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
-  // Memoized biggest discount offers (sorted by highest percentage)
+  // Memoized biggest discount offers (sorted by highest percentage) - using enriched businesses for smart sorting
   const biggestDiscountOffers = useMemo(
     () =>
-      paginatedBusinesses
+      enrichedBusinesses
         .map((business) => {
           let maxDiscount = 0;
           business.benefits.forEach((benefit) => {
@@ -256,7 +287,7 @@ function Home() {
         .filter((business) => business.maxDiscount > 0)
         .sort((a, b) => b.maxDiscount - a.maxDiscount)
         .slice(0, 8),
-    [paginatedBusinesses]
+    [enrichedBusinesses]
   );
 
   // Get nearby businesses (simulate with distance)
@@ -300,17 +331,11 @@ function Home() {
     });
   };
 
-  // Callback to track display count changes from InfiniteScrollGrid
-  const handleDisplayCountChange = useCallback((count: number) => {
-    setCurrentDisplayCount(count);
-  }, []);
-
   const handleBusinessClick = (businessId: string) => {
-    // Save current scroll position and display count before navigating
+    // Save current scroll position before navigating
     const scrollY = window.scrollY;
-    // Pass the current tab, scroll position, and display count so we can restore them
     navigate(`/benefit/${businessId}/0?from=${activeTab}`, {
-      state: { scrollY, displayCount: currentDisplayCount }
+      state: { scrollY }
     });
   };
 
@@ -324,11 +349,11 @@ function Home() {
     const matchingBusiness = paginatedBusinesses.find(
       (business) =>
         business.name
-          .toLowerCase()
-          .includes(benefit.merchant.name.toLowerCase()) ||
-        benefit.merchant.name
-          .toLowerCase()
-          .includes(business.name.toLowerCase())
+          ?.toLowerCase()
+          .includes(benefit.merchant?.name?.toLowerCase() || '') ||
+        benefit.merchant?.name
+          ?.toLowerCase()
+          .includes(business.name?.toLowerCase() || '')
     );
 
     if (matchingBusiness) {
@@ -347,7 +372,7 @@ function Home() {
       );
       const scrollY = window.scrollY;
       navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`, {
-        state: { scrollY, displayCount: currentDisplayCount }
+        state: { scrollY }
       });
     } else {
       // Fallback: if no matching business found, navigate to the first available business
@@ -369,7 +394,7 @@ function Home() {
         );
         const scrollY = window.scrollY;
         navigate(`/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`, {
-          state: { scrollY, displayCount: currentDisplayCount }
+          state: { scrollY }
         });
       } else {
         // If no businesses available, switch to benefits tab
@@ -391,15 +416,14 @@ function Home() {
 
   const handleTabChange = (tab: NavigationTab) => {
     setActiveTab(tab);
-    
+
     // Update history state so reload restores the correct tab
-    navigate(".", { 
-      replace: true, 
-      state: { 
+    navigate(".", {
+      replace: true,
+      state: {
         activeTab: tab,
-        scrollY: 0, 
-        displayCount: 20 
-      } 
+        scrollY: 0
+      }
     });
 
     // Handle navigation based on tab
@@ -409,11 +433,12 @@ function Home() {
         setSearchTerm("");
         setSelectedCategory("all");
         setSelectedBanks([]);
+        setOnlineOnly(false);
         break;
       case "beneficios":
         // Clear search but keep category and bank filters available for beneficios view
         setSearchTerm("");
-        // Don't clear category or bank filters - let user filter within beneficios view
+        // Don't clear category, bank, or online filters - let user filter within beneficios view
         break;
     }
   };
@@ -434,35 +459,48 @@ function Home() {
         aria-label="Contenido principal"
       >
         {/* Search Bar */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 md:px-8 py-4 bg-white">
-          <SearchBar
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Buscar descuentos, tiendas..."
-          />
+        <div className="sticky top-0 z-20 bg-white">
+          <div className="px-4 sm:px-6 md:px-8 py-4">
+            <div className="relative" ref={filterDropdownRef}>
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Buscar descuentos, tiendas..."
+                onFilterClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              />
+
+              {/* Filter Dropdown */}
+              {showFilterDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-2 mx-4 sm:mx-6 md:mx-8 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-30">
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Filtros</h3>
+
+                    {/* Online Toggle */}
+                    <button
+                      onClick={() => {
+                        setOnlineOnly(!onlineOnly);
+                        setShowFilterDropdown(false);
+                      }}
+                      className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                        onlineOnly
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        <span>Beneficios Online</span>
+                      </div>
+                      {onlineOnly && (
+                        <span className="text-xs">✓</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-
-        {/* Categories Grid - Sticky - Only visible in Beneficios tab */}
-        {activeTab === "beneficios" && (
-          <div className="sticky top-[72px] z-10">
-            <CategoryGrid
-              categories={categoryGridData}
-              onCategorySelect={handleCategorySelect}
-              selectedCategory={selectedCategory}
-            />
-          </div>
-        )}
-
-        {/* Banks Grid - Sticky - Only visible in Beneficios tab */}
-        {activeTab === "beneficios" && (
-          <div className="sticky top-[128px] z-10">
-            <BankGrid
-              banks={bankGridData}
-              onBankSelect={handleBankSelect}
-              selectedBanks={selectedBanks}
-            />
-          </div>
-        )}
 
         {/* Error State */}
         {error && (
@@ -475,146 +513,51 @@ function Home() {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Main Content - Lazy Loaded Tabs */}
         {!isLoading && !error && (
-          <div className="animate-fade-in-up">
-            {shouldShowFilteredResults ? (
-              /* Filtered Results View with Infinite Scroll */
-              <div className="px-4 sm:px-6 md:px-8 py-6">
-                <InfiniteScrollGrid
-                  businesses={filteredBusinesses}
+          <Suspense fallback={
+            <div className="animate-fade-in-up">
+              <SkeletonFeaturedBanner />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+            </div>
+          }>
+            <div className="animate-fade-in-up">
+              {shouldShowFilteredResults ? (
+                <BeneficiosTab
+                  filteredBusinesses={filteredBusinesses}
+                  categoryGridData={categoryGridData}
+                  bankGridData={bankGridData}
+                  selectedCategory={selectedCategory}
+                  selectedBanks={selectedBanks}
+                  onCategorySelect={handleCategorySelect}
+                  onBankSelect={handleBankSelect}
                   onBusinessClick={handleBusinessClick}
-                  initialLoadCount={20}
-                  loadMoreCount={20}
-                  restoredDisplayCount={activeTab === "beneficios" ? restoredDisplayCount : undefined}
-                  onDisplayCountChange={handleDisplayCountChange}
+                  onLoadMore={loadMore}
+                  hasMore={hasMore}
+                  isLoadingMore={isLoadingMore}
+                  totalCount={totalBusinesses}
                 />
-              </div>
-            ) : (
-              /* Default Home View */
-              <div className="stagger-children">
-                {/* Featured Benefits */}
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "0ms" }}
-                >
-                  <FeaturedBenefits
-                    benefits={featuredBenefits}
-                    onViewAll={handleViewAllBenefits}
-                    onBenefitSelect={handleBenefitSelect}
-                  />
-                </div>
-
-                {/* Active Offers */}
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "200ms" }}
-                >
-                  <ActiveOffers
-                    businesses={activeOffers}
-                    onBusinessClick={handleBusinessClick}
-                    onViewAll={handleViewAllOffers}
-                  />
-                </div>
-
-                {/* Santander Exclusive Offers */}
-                {santanderOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "250ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={santanderOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedBanks(["santander"]);
-                        setActiveTab("beneficios");
-                      }}
-                      title="Exclusivos Santander"
-                    />
-                  </div>
-                )}
-
-                {/* BBVA Exclusive Offers */}
-                {bbvaOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "300ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={bbvaOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedBanks(["bbva"]);
-                        setActiveTab("beneficios");
-                      }}
-                      title="Exclusivos BBVA"
-                    />
-                  </div>
-                )}
-
-                {/* Food Offers */}
-                {foodOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "350ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={foodOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={() => {
-                        setSelectedCategory("gastronomia");
-                        setActiveTab("beneficios");
-                      }}
-                      title="Ofertas de Comida"
-                    />
-                  </div>
-                )}
-
-                {/* High Value Offers */}
-                {highValueOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "375ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={highValueOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={handleViewAllOffers}
-                      title="Descuentos Imperdibles"
-                    />
-                  </div>
-                )}
-
-                {/* Biggest Discount Offers */}
-                {biggestDiscountOffers.length > 0 && (
-                  <div
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: "400ms" }}
-                  >
-                    <ActiveOffers
-                      businesses={biggestDiscountOffers}
-                      onBusinessClick={handleBusinessClick}
-                      onViewAll={handleViewAllOffers}
-                      title="Mayores Descuentos"
-                    />
-                  </div>
-                )}
-
-                {/* Nearby Businesses
-                <div
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "450ms" }}
-                >
-                  <NearbyBusinesses
-                    businesses={getNearbyBusinesses()}
-                    onBusinessClick={handleBusinessClick}
-                    onViewMap={handleViewMap}
-                  />
-                </div> */}
-              </div>
-            )}
-          </div>
+              ) : (
+                <InicioTab
+                  featuredBenefits={featuredBenefits}
+                  activeOffers={activeOffers}
+                  santanderOffers={santanderOffers}
+                  bbvaOffers={bbvaOffers}
+                  foodOffers={foodOffers}
+                  highValueOffers={highValueOffers}
+                  biggestDiscountOffers={biggestDiscountOffers}
+                  onBusinessClick={handleBusinessClick}
+                  onViewAllBenefits={handleViewAllBenefits}
+                  onBenefitSelect={handleBenefitSelect}
+                  onViewAllOffers={handleViewAllOffers}
+                  onSelectBankFilter={setSelectedBanks}
+                  onSelectCategoryFilter={setSelectedCategory}
+                  onSwitchTab={setActiveTab}
+                />
+              )}
+            </div>
+          </Suspense>
         )}
 
         {/* Loading State - Skeleton Loaders */}

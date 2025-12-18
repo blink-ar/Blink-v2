@@ -2,9 +2,8 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import { Business, BankBenefit, CanonicalLocation } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
-import { getRawBenefitById } from "../services/rawBenefitsApi";
+import { getRawBenefitById, getRawBenefits } from "../services/rawBenefitsApi";
 import { useBusinessesData } from "../hooks/useBenefitsData";
-import { getBenefitsDataService } from "../services/BenefitsDataService";
 import { SkeletonBenefitPage } from "../components/skeletons";
 import StoreHeader from "../components/StoreHeader";
 import StoreInformation from "../components/StoreInformation";
@@ -177,14 +176,13 @@ function Benefit() {
           const selectedBenefit = matchingBusiness.benefits[idx];
 
           if (selectedBenefit) {
-            // Try to get description from cached raw benefits if missing
+            // Try to get description from raw benefits if missing
             if (!selectedBenefit.description) {
               try {
-                const rawBenefitsForDescription =
-                  await getBenefitsDataService().getRawBenefits({
-                    limit: 1000,
-                    offset: 0,
-                  });
+                const rawBenefitsForDescription = await getRawBenefits({
+                  limit: 1000,
+                  offset: 0,
+                });
 
                 // Try to find matching raw benefit by merchant name and benefit title
                 const matchingRawBenefit = rawBenefitsForDescription.find(
@@ -203,15 +201,21 @@ function Benefit() {
               }
             }
 
-            setBusiness(matchingBusiness);
+            // Ensure location property is set correctly (handling potential API mismatch between location/locations)
+            const businessWithLocation = {
+              ...matchingBusiness,
+              location: matchingBusiness.location || (matchingBusiness as any).locations || []
+            };
+
+            setBusiness(businessWithLocation);
             setBenefit(selectedBenefit);
             setError(null);
             return;
           }
         }
 
-        // Last resort: try to find by MongoDB ObjectId in cached raw benefits
-        const allRawBenefits = await getBenefitsDataService().getRawBenefits({
+        // Last resort: try to find by MongoDB ObjectId in raw benefits
+        const allRawBenefits = await getRawBenefits({
           limit: 1000,
           offset: 0,
         });

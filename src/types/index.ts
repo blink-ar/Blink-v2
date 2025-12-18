@@ -34,6 +34,10 @@ export interface Business {
   lastUpdated?: number;
   imageLoaded?: boolean;
   distance?: number; // Distance in kilometers
+  distanceText?: string; // Formatted distance (e.g., "1.2km", "350m")
+  isNearby?: boolean; // Within 50km
+  hasOnline?: boolean; // Has online benefits
+  priorityScore?: number; // 3 = nearby+online, 2 = nearby OR online, 1 = neither
 }
 
 export type Category =
