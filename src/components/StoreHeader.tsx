@@ -68,15 +68,6 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
                 {physicalLocations[0]?.types?.[0] || business.category}
               </span>
 
-              {/* Rating */}
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                <span className="text-sm font-medium text-gray-700">
-                  {typeof business.rating === "number"
-                    ? business.rating.toFixed(1)
-                    : "5.0"}
-                </span>
-              </div>
             </div>
             {/* Location */}
             {physicalLocations.length > 0 && (

@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
-import { Globe } from "lucide-react";
+import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
+import { FilterMenu } from "../components/FilterMenu";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -10,14 +10,13 @@ import {
   LoadingAnnouncement,
   ErrorAnnouncement,
 } from "../components/ui";
-import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
-import { useGeolocation } from "../hooks/useGeolocation";
 import { CacheNotification } from "../components/CacheNotification";
 import {
   SkeletonFeaturedBanner,
   SkeletonActiveOffers,
+  SkeletonBeneficiosTab,
 } from "../components/skeletons";
 
 // Lazy load tab components for better performance
@@ -43,11 +42,37 @@ function Home() {
   const initialTab = locationState?.activeTab || "inicio";
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
 
+  // Track if we've loaded data at least once to avoid showing filter skeletons on filter changes
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
   // Scroll restoration state
   const restoredScrollY = locationState?.scrollY;
   const hasRestoredScroll = useRef(false);
 
-  // Use the cached benefits data hook with server-side pagination
+  // State for search and filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<Category>("all");
+  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
+
+  // New filter states
+  const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
+  const [maxDistance, setMaxDistance] = useState<number | undefined>(undefined);
+  const [availableDay, setAvailableDay] = useState<string | undefined>(undefined);
+  const [selectedNetwork, setSelectedNetwork] = useState<string | undefined>(undefined);
+  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
+  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
+
+  // Debounce search term to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Use the cached benefits data hook with server-side pagination and filtering
   const {
     businesses: paginatedBusinesses,
     featuredBenefits: rawBenefits,
@@ -57,7 +82,24 @@ function Home() {
     hasMore,
     loadMore,
     totalBusinesses,
-  } = useBenefitsData();
+  } = useBenefitsData({
+    search: debouncedSearchTerm.trim() || undefined,
+    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+    bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    network: selectedNetwork,
+    cardMode,
+    hasInstallments,
+  });
+
+  // Track when data has loaded at least once
+  useEffect(() => {
+    if (!isLoading && paginatedBusinesses.length > 0) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoading, paginatedBusinesses.length]);
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
@@ -77,11 +119,6 @@ function Home() {
     message: string;
     type: "success" | "warning" | "error" | "info";
   }>({ show: false, message: "", type: "info" });
-
-  // Removed unused infinite scroll variables for modern UI
-
-  // State for bank filter (multiple selection)
-  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
   // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
@@ -104,25 +141,48 @@ function Home() {
     }
   }, [showFilterDropdown]);
 
-  // Enrich businesses with online information and apply filters
-  // Note: Distance calculation and proximity sorting are now handled by the backend
+  // Enrich businesses with online information and apply client-side only filters (like onlineOnly)
+  // Note: Distance calculation, proximity sorting, search, category, and bank filters are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
     onlineOnly,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    network: selectedNetwork,
+    cardMode,
+    hasInstallments,
   });
 
-  const {
-    searchTerm,
-    setSearchTerm,
-    selectedCategory,
-    setSelectedCategory,
-    filteredBusinesses,
-  } = useBusinessFilter(enrichedBusinesses, selectedBanks);
+  // Since search, category, and bank filters are now server-side, we only need client-side online filter
+  const filteredBusinesses = enrichedBusinesses;
+
+  // Calculate active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (onlineOnly) count++;
+    if (minDiscount !== undefined) count++;
+    if (maxDistance !== undefined) count++;
+    if (availableDay !== undefined) count++;
+    if (selectedNetwork !== undefined) count++;
+    if (cardMode !== undefined) count++;
+    if (hasInstallments !== undefined) count++;
+    return count;
+  };
+
+  const activeFilterCount = getActiveFilterCount();
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
     searchTerm.trim() !== "" ||
     selectedCategory !== "all" ||
     selectedBanks.length > 0 ||
+    onlineOnly ||
+    minDiscount !== undefined ||
+    maxDistance !== undefined ||
+    availableDay !== undefined ||
+    selectedNetwork !== undefined ||
+    cardMode !== undefined ||
+    hasInstallments !== undefined ||
     activeTab === "beneficios";
 
   // Auto-switch to beneficios tab when user starts typing
@@ -219,7 +279,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits?.some((benefit) =>
+          business.benefits?.length > 0 &&
+          business.benefits.every((benefit) =>
             benefit?.bankName?.toLowerCase().includes("santander")
           )
         )
@@ -232,7 +293,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits?.some((benefit) =>
+          business.benefits?.length > 0 &&
+          business.benefits.every((benefit) =>
             benefit?.bankName?.toLowerCase().includes("bbva")
           )
         )
@@ -347,7 +409,7 @@ function Home() {
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
     // Find the business that matches this benefit's merchant
     const matchingBusiness = paginatedBusinesses.find(
-      (business) =>
+      (business: Business) =>
         business.name
           ?.toLowerCase()
           .includes(benefit.merchant?.name?.toLowerCase() || '') ||
@@ -383,7 +445,7 @@ function Home() {
       );
       console.log(
         "Available businesses:",
-        paginatedBusinesses.map((b) => b.name)
+        paginatedBusinesses.map((b: Business) => b.name)
       );
 
       if (paginatedBusinesses.length > 0) {
@@ -434,6 +496,12 @@ function Home() {
         setSelectedCategory("all");
         setSelectedBanks([]);
         setOnlineOnly(false);
+        setMinDiscount(undefined);
+        setMaxDistance(undefined);
+        setAvailableDay(undefined);
+        setSelectedNetwork(undefined);
+        setCardMode(undefined);
+        setHasInstallments(undefined);
         break;
       case "beneficios":
         // Clear search but keep category and bank filters available for beneficios view
@@ -467,36 +535,30 @@ function Home() {
                 onChange={setSearchTerm}
                 placeholder="Buscar descuentos, tiendas..."
                 onFilterClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                activeFilterCount={activeFilterCount}
+                isFilterOpen={showFilterDropdown}
+                showFilter={activeTab !== "inicio"}
               />
 
               {/* Filter Dropdown */}
               {showFilterDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-2 mx-4 sm:mx-6 md:mx-8 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-30">
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-semibold text-gray-700">Filtros</h3>
-
-                    {/* Online Toggle */}
-                    <button
-                      onClick={() => {
-                        setOnlineOnly(!onlineOnly);
-                        setShowFilterDropdown(false);
-                      }}
-                      className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                        onlineOnly
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4" />
-                        <span>Beneficios Online</span>
-                      </div>
-                      {onlineOnly && (
-                        <span className="text-xs">✓</span>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <FilterMenu
+                  onlineOnly={onlineOnly}
+                  onOnlineChange={setOnlineOnly}
+                  maxDistance={maxDistance}
+                  onMaxDistanceChange={setMaxDistance}
+                  minDiscount={minDiscount}
+                  onMinDiscountChange={setMinDiscount}
+                  availableDay={availableDay}
+                  onAvailableDayChange={setAvailableDay}
+                  cardMode={cardMode}
+                  onCardModeChange={setCardMode}
+                  network={selectedNetwork}
+                  onNetworkChange={setSelectedNetwork}
+                  hasInstallments={hasInstallments}
+                  onHasInstallmentsChange={setHasInstallments}
+                  onClose={() => setShowFilterDropdown(false)}
+                />
               )}
             </div>
           </div>
@@ -514,18 +576,25 @@ function Home() {
         )}
 
         {/* Main Content - Lazy Loaded Tabs */}
-        {!isLoading && !error && (
+        {/* Show content when not loading OR when we've loaded once (to keep filters visible) */}
+        {(!isLoading || hasLoadedOnce) && !error && (
           <Suspense fallback={
-            <div className="animate-fade-in-up">
-              <SkeletonFeaturedBanner />
-              <SkeletonActiveOffers cardCount={3} />
-              <SkeletonActiveOffers cardCount={3} />
-            </div>
+            shouldShowFilteredResults ? (
+              <div className="animate-fade-in-up">
+                <SkeletonBeneficiosTab />
+              </div>
+            ) : (
+              <div className="animate-fade-in-up">
+                <SkeletonFeaturedBanner />
+                <SkeletonActiveOffers cardCount={3} />
+                <SkeletonActiveOffers cardCount={3} />
+              </div>
+            )
           }>
             <div className="animate-fade-in-up">
               {shouldShowFilteredResults ? (
                 <BeneficiosTab
-                  filteredBusinesses={filteredBusinesses}
+                  filteredBusinesses={isLoading ? [] : filteredBusinesses}
                   categoryGridData={categoryGridData}
                   bankGridData={bankGridData}
                   selectedCategory={selectedCategory}
@@ -535,7 +604,7 @@ function Home() {
                   onBusinessClick={handleBusinessClick}
                   onLoadMore={loadMore}
                   hasMore={hasMore}
-                  isLoadingMore={isLoadingMore}
+                  isLoadingMore={isLoadingMore || isLoading}
                   totalCount={totalBusinesses}
                 />
               ) : (
@@ -552,22 +621,28 @@ function Home() {
                   onBenefitSelect={handleBenefitSelect}
                   onViewAllOffers={handleViewAllOffers}
                   onSelectBankFilter={setSelectedBanks}
-                  onSelectCategoryFilter={setSelectedCategory}
-                  onSwitchTab={setActiveTab}
+                  onSelectCategoryFilter={(category) => setSelectedCategory(category as Category)}
+                  onSwitchTab={(tab) => setActiveTab(tab)}
                 />
               )}
             </div>
           </Suspense>
         )}
 
-        {/* Loading State - Skeleton Loaders */}
-        {isLoading && (
-          <div className="animate-fade-in-up">
-            <SkeletonFeaturedBanner />
-            <SkeletonActiveOffers cardCount={3} />
-            <SkeletonActiveOffers cardCount={3} />
-            <SkeletonActiveOffers cardCount={3} />
-          </div>
+        {/* Loading State - Skeleton Loaders (only on initial load) */}
+        {isLoading && !hasLoadedOnce && (
+          activeTab === "beneficios" || shouldShowFilteredResults ? (
+            <div className="animate-fade-in-up">
+              <SkeletonBeneficiosTab />
+            </div>
+          ) : (
+            <div className="animate-fade-in-up">
+              <SkeletonFeaturedBanner />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+            </div>
+          )
         )}
       </main>
 

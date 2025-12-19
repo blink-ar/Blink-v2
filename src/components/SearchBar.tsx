@@ -8,6 +8,8 @@ interface SearchBarProps {
   placeholder?: string;
   onFilterClick?: () => void;
   showFilter?: boolean;
+  activeFilterCount?: number;
+  isFilterOpen?: boolean;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -16,6 +18,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = "Buscar descuentos, tiendas...",
   onFilterClick,
   showFilter = true,
+  activeFilterCount = 0,
+  isFilterOpen = false,
 }) => {
   return (
     <div className="w-full search-bar">
@@ -40,7 +44,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {showFilter && (
           <button
             onClick={onFilterClick}
-            className="modern-filter-button touch-target touch-button absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center text-gray-400 hover:text-primary-600 transition-colors"
+            className={`modern-filter-button touch-target touch-button absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center transition-colors ${
+              activeFilterCount > 0 || isFilterOpen
+                ? 'text-blue-600 hover:text-blue-700'
+                : 'text-gray-400 hover:text-primary-600'
+            }`}
             aria-label="Filtrar resultados"
             type="button"
             style={{
@@ -48,7 +56,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               minHeight: "var(--touch-target-min)",
             }}
           >
-            <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="relative">
+              <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </div>
           </button>
         )}
       </div>

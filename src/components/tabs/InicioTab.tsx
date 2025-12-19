@@ -48,15 +48,6 @@ const InicioTab: React.FC<InicioTabProps> = ({
         />
       </div>
 
-      {/* Active Offers */}
-      <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
-        <ActiveOffers
-          businesses={activeOffers}
-          onBusinessClick={onBusinessClick}
-          onViewAll={onViewAllOffers}
-        />
-      </div>
-
       {/* Santander Exclusive Offers */}
       {santanderOffers.length > 0 && (
         <div className="animate-fade-in-up" style={{ animationDelay: "250ms" }}>
@@ -101,6 +92,15 @@ const InicioTab: React.FC<InicioTabProps> = ({
           />
         </div>
       )}
+
+      {/* Active Offers */}
+      <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
+        <ActiveOffers
+          businesses={activeOffers}
+          onBusinessClick={onBusinessClick}
+          onViewAll={onViewAllOffers}
+        />
+      </div>
 
       {/* High Value Offers */}
       {highValueOffers.length > 0 && (

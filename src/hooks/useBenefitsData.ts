@@ -26,11 +26,24 @@ interface UseBenefitsDataReturn {
     totalBusinesses: number;
 }
 
+export interface BenefitsFilters {
+    search?: string;
+    category?: string;
+    bank?: string;
+    // New filters
+    minDiscount?: number; // Minimum discount percentage
+    maxDistance?: number; // Maximum distance in km
+    availableDay?: string; // Specific day of the week (e.g., 'monday', 'today')
+    network?: string; // Payment network (VISA, Mastercard, etc.)
+    cardMode?: 'credit' | 'debit'; // Card type
+    hasInstallments?: boolean; // Filter for installment availability
+}
+
 /**
  * Hook for accessing benefits data with React Query
- * Uses the new /api/businesses endpoint with proper server-side pagination
+ * Uses the new /api/businesses endpoint with proper server-side pagination and filtering
  */
-export function useBenefitsData(): UseBenefitsDataReturn {
+export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
 
     // Fetch businesses with infinite query for pagination
@@ -44,7 +57,7 @@ export function useBenefitsData(): UseBenefitsDataReturn {
         hasNextPage,
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
-        queryKey: queryKeys.businesses,
+        queryKey: [...queryKeys.businesses, filters], // Include filters in cache key
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
@@ -53,6 +66,9 @@ export function useBenefitsData(): UseBenefitsDataReturn {
                     lat: position.latitude,
                     lng: position.longitude,
                 }),
+                ...(filters?.search && { search: filters.search }),
+                ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
+                ...(filters?.bank && { bank: filters.bank }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {

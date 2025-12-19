@@ -98,6 +98,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
             streetViewControl: false,
             clickableIcons: false, // Disable default POI clicks
             disableDefaultUI: true,
+            gestureHandling: 'greedy', // Allow one-finger panning
             styles: MAP_STYLE,
           });
 

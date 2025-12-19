@@ -9,8 +9,7 @@ const SkeletonBenefitPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50" aria-hidden="true">
       {/* Navigation Bar */}
       <div className="bg-white">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <Skeleton variant="circular" width={40} height={40} />
+        <div className="flex items-center p-4 border-b border-gray-100">
           <Skeleton variant="circular" width={40} height={40} />
         </div>
 
