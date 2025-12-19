@@ -313,13 +313,8 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
           <div className="flex items-start gap-3">
             <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-gray-900 mb-1 flex items-baseline gap-2 min-w-0">
-                <span className="flex-shrink-0">Dirección</span>
-                {selectedLocation && (
-                  <span className="text-sm font-normal text-blue-600 truncate">
-                    ({storeInfo.locationName})
-                  </span>
-                )}
+              <h4 className="font-medium text-gray-900 mb-1">
+                Dirección
               </h4>
               <LocationMap
                 locations={business.location}
