@@ -10,7 +10,6 @@ import {
   LoadingAnnouncement,
   ErrorAnnouncement,
 } from "../components/ui";
-import { useBusinessFilter } from "../hooks/useBusinessFilter";
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
 import { useGeolocation } from "../hooks/useGeolocation";
@@ -47,7 +46,22 @@ function Home() {
   const restoredScrollY = locationState?.scrollY;
   const hasRestoredScroll = useRef(false);
 
-  // Use the cached benefits data hook with server-side pagination
+  // State for search and filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<Category>("all");
+  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
+
+  // Debounce search term to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Use the cached benefits data hook with server-side pagination and filtering
   const {
     businesses: paginatedBusinesses,
     featuredBenefits: rawBenefits,
@@ -57,7 +71,11 @@ function Home() {
     hasMore,
     loadMore,
     totalBusinesses,
-  } = useBenefitsData();
+  } = useBenefitsData({
+    search: debouncedSearchTerm.trim() || undefined,
+    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+    bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
+  });
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
@@ -77,11 +95,6 @@ function Home() {
     message: string;
     type: "success" | "warning" | "error" | "info";
   }>({ show: false, message: "", type: "info" });
-
-  // Removed unused infinite scroll variables for modern UI
-
-  // State for bank filter (multiple selection)
-  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
   // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
@@ -104,19 +117,14 @@ function Home() {
     }
   }, [showFilterDropdown]);
 
-  // Enrich businesses with online information and apply filters
-  // Note: Distance calculation and proximity sorting are now handled by the backend
+  // Enrich businesses with online information and apply client-side only filters (like onlineOnly)
+  // Note: Distance calculation, proximity sorting, search, category, and bank filters are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
     onlineOnly,
   });
 
-  const {
-    searchTerm,
-    setSearchTerm,
-    selectedCategory,
-    setSelectedCategory,
-    filteredBusinesses,
-  } = useBusinessFilter(enrichedBusinesses, selectedBanks);
+  // Since search, category, and bank filters are now server-side, we only need client-side online filter
+  const filteredBusinesses = enrichedBusinesses;
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
