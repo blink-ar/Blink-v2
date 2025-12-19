@@ -329,7 +329,17 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 
                     {/* Dropdown menu */}
                     {isDropdownOpen && (
-                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        onWheel={(e) => {
+                          // Prevent scroll from bubbling to parent
+                          e.stopPropagation();
+                        }}
+                        onTouchMove={(e) => {
+                          // Prevent scroll from bubbling on touch devices
+                          e.stopPropagation();
+                        }}
+                      >
                         {physicalLocations.map((location, index) => {
                           const isSelected = selectedLocation?.placeId
                             ? location.placeId === selectedLocation.placeId
