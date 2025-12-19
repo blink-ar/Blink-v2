@@ -518,7 +518,7 @@ function Home() {
         {/* Search Bar */}
         <div className="sticky top-0 z-20 bg-white">
           <div className="px-4 sm:px-6 md:px-8 py-4">
-            <div className="relative">
+            <div className="relative" ref={filterDropdownRef}>
               <SearchBar
                 value={searchTerm}
                 onChange={setSearchTerm}
@@ -526,30 +526,29 @@ function Home() {
                 onFilterClick={() => setShowFilterDropdown(!showFilterDropdown)}
                 activeFilterCount={activeFilterCount}
                 isFilterOpen={showFilterDropdown}
+                showFilter={activeTab !== "inicio"}
               />
 
               {/* Filter Dropdown */}
-              <div ref={filterDropdownRef}>
-                {showFilterDropdown && (
-                  <FilterMenu
-                    onlineOnly={onlineOnly}
-                    onOnlineChange={setOnlineOnly}
-                    maxDistance={maxDistance}
-                    onMaxDistanceChange={setMaxDistance}
-                    minDiscount={minDiscount}
-                    onMinDiscountChange={setMinDiscount}
-                    availableDay={availableDay}
-                    onAvailableDayChange={setAvailableDay}
-                    cardMode={cardMode}
-                    onCardModeChange={setCardMode}
-                    network={selectedNetwork}
-                    onNetworkChange={setSelectedNetwork}
-                    hasInstallments={hasInstallments}
-                    onHasInstallmentsChange={setHasInstallments}
-                    onClose={() => setShowFilterDropdown(false)}
-                  />
-                )}
-              </div>
+              {showFilterDropdown && (
+                <FilterMenu
+                  onlineOnly={onlineOnly}
+                  onOnlineChange={setOnlineOnly}
+                  maxDistance={maxDistance}
+                  onMaxDistanceChange={setMaxDistance}
+                  minDiscount={minDiscount}
+                  onMinDiscountChange={setMinDiscount}
+                  availableDay={availableDay}
+                  onAvailableDayChange={setAvailableDay}
+                  cardMode={cardMode}
+                  onCardModeChange={setCardMode}
+                  network={selectedNetwork}
+                  onNetworkChange={setSelectedNetwork}
+                  hasInstallments={hasInstallments}
+                  onHasInstallmentsChange={setHasInstallments}
+                  onClose={() => setShowFilterDropdown(false)}
+                />
+              )}
             </div>
           </div>
         </div>
