@@ -16,6 +16,7 @@ import { CacheNotification } from "../components/CacheNotification";
 import {
   SkeletonFeaturedBanner,
   SkeletonActiveOffers,
+  SkeletonBeneficiosTab,
 } from "../components/skeletons";
 
 // Lazy load tab components for better performance
@@ -567,11 +568,17 @@ function Home() {
         {/* Main Content - Lazy Loaded Tabs */}
         {!isLoading && !error && (
           <Suspense fallback={
-            <div className="animate-fade-in-up">
-              <SkeletonFeaturedBanner />
-              <SkeletonActiveOffers cardCount={3} />
-              <SkeletonActiveOffers cardCount={3} />
-            </div>
+            shouldShowFilteredResults ? (
+              <div className="animate-fade-in-up">
+                <SkeletonBeneficiosTab />
+              </div>
+            ) : (
+              <div className="animate-fade-in-up">
+                <SkeletonFeaturedBanner />
+                <SkeletonActiveOffers cardCount={3} />
+                <SkeletonActiveOffers cardCount={3} />
+              </div>
+            )
           }>
             <div className="animate-fade-in-up">
               {shouldShowFilteredResults ? (
@@ -613,12 +620,18 @@ function Home() {
 
         {/* Loading State - Skeleton Loaders */}
         {isLoading && (
-          <div className="animate-fade-in-up">
-            <SkeletonFeaturedBanner />
-            <SkeletonActiveOffers cardCount={3} />
-            <SkeletonActiveOffers cardCount={3} />
-            <SkeletonActiveOffers cardCount={3} />
-          </div>
+          activeTab === "beneficios" ? (
+            <div className="animate-fade-in-up">
+              <SkeletonBeneficiosTab />
+            </div>
+          ) : (
+            <div className="animate-fade-in-up">
+              <SkeletonFeaturedBanner />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+              <SkeletonActiveOffers cardCount={3} />
+            </div>
+          )
         )}
       </main>
 
