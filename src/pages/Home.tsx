@@ -1,5 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
-import { Globe } from "lucide-react";
+import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
 import { FilterMenu } from "../components/FilterMenu";
@@ -13,7 +12,6 @@ import {
 } from "../components/ui";
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
-import { useGeolocation } from "../hooks/useGeolocation";
 import { CacheNotification } from "../components/CacheNotification";
 import {
   SkeletonFeaturedBanner,
@@ -270,7 +268,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits?.some((benefit) =>
+          business.benefits?.length > 0 &&
+          business.benefits.every((benefit) =>
             benefit?.bankName?.toLowerCase().includes("santander")
           )
         )
@@ -283,7 +282,8 @@ function Home() {
     () =>
       enrichedBusinesses
         .filter((business) =>
-          business.benefits?.some((benefit) =>
+          business.benefits?.length > 0 &&
+          business.benefits.every((benefit) =>
             benefit?.bankName?.toLowerCase().includes("bbva")
           )
         )
@@ -398,7 +398,7 @@ function Home() {
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
     // Find the business that matches this benefit's merchant
     const matchingBusiness = paginatedBusinesses.find(
-      (business) =>
+      (business: Business) =>
         business.name
           ?.toLowerCase()
           .includes(benefit.merchant?.name?.toLowerCase() || '') ||
@@ -434,7 +434,7 @@ function Home() {
       );
       console.log(
         "Available businesses:",
-        paginatedBusinesses.map((b) => b.name)
+        paginatedBusinesses.map((b: Business) => b.name)
       );
 
       if (paginatedBusinesses.length > 0) {
@@ -604,8 +604,8 @@ function Home() {
                   onBenefitSelect={handleBenefitSelect}
                   onViewAllOffers={handleViewAllOffers}
                   onSelectBankFilter={setSelectedBanks}
-                  onSelectCategoryFilter={setSelectedCategory}
-                  onSwitchTab={setActiveTab}
+                  onSelectCategoryFilter={(category) => setSelectedCategory(category as Category)}
+                  onSwitchTab={(tab) => setActiveTab(tab)}
                 />
               )}
             </div>
