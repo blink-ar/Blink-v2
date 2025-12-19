@@ -30,6 +30,13 @@ export interface BenefitsFilters {
     search?: string;
     category?: string;
     bank?: string;
+    // New filters
+    minDiscount?: number; // Minimum discount percentage
+    maxDistance?: number; // Maximum distance in km
+    availableDay?: string; // Specific day of the week (e.g., 'monday', 'today')
+    network?: string; // Payment network (VISA, Mastercard, etc.)
+    cardMode?: 'credit' | 'debit'; // Card type
+    hasInstallments?: boolean; // Filter for installment availability
 }
 
 /**

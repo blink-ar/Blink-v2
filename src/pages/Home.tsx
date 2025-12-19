@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } fro
 import { Globe } from "lucide-react";
 import { Header } from "../components/Header";
 import { SearchBar } from "../components/SearchBar";
+import { FilterMenu } from "../components/FilterMenu";
 import BottomNavigation, {
   NavigationTab,
 } from "../components/BottomNavigation";
@@ -52,6 +53,14 @@ function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>("all");
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
+  // New filter states
+  const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
+  const [maxDistance, setMaxDistance] = useState<number | undefined>(undefined);
+  const [availableDay, setAvailableDay] = useState<string | undefined>(undefined);
+  const [selectedNetwork, setSelectedNetwork] = useState<string | undefined>(undefined);
+  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
+  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
+
   // Debounce search term to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -75,6 +84,12 @@ function Home() {
     search: debouncedSearchTerm.trim() || undefined,
     category: selectedCategory !== 'all' ? selectedCategory : undefined,
     bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    network: selectedNetwork,
+    cardMode,
+    hasInstallments,
   });
 
   // Restore scroll position after component mounts and content is loaded
@@ -121,16 +136,44 @@ function Home() {
   // Note: Distance calculation, proximity sorting, search, category, and bank filters are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
     onlineOnly,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    network: selectedNetwork,
+    cardMode,
+    hasInstallments,
   });
 
   // Since search, category, and bank filters are now server-side, we only need client-side online filter
   const filteredBusinesses = enrichedBusinesses;
+
+  // Calculate active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (onlineOnly) count++;
+    if (minDiscount !== undefined) count++;
+    if (maxDistance !== undefined) count++;
+    if (availableDay !== undefined) count++;
+    if (selectedNetwork !== undefined) count++;
+    if (cardMode !== undefined) count++;
+    if (hasInstallments !== undefined) count++;
+    return count;
+  };
+
+  const activeFilterCount = getActiveFilterCount();
 
   // Show filtered results when searching, filtering, or when "beneficios" tab is active
   const shouldShowFilteredResults =
     searchTerm.trim() !== "" ||
     selectedCategory !== "all" ||
     selectedBanks.length > 0 ||
+    onlineOnly ||
+    minDiscount !== undefined ||
+    maxDistance !== undefined ||
+    availableDay !== undefined ||
+    selectedNetwork !== undefined ||
+    cardMode !== undefined ||
+    hasInstallments !== undefined ||
     activeTab === "beneficios";
 
   // Auto-switch to beneficios tab when user starts typing
@@ -442,6 +485,12 @@ function Home() {
         setSelectedCategory("all");
         setSelectedBanks([]);
         setOnlineOnly(false);
+        setMinDiscount(undefined);
+        setMaxDistance(undefined);
+        setAvailableDay(undefined);
+        setSelectedNetwork(undefined);
+        setCardMode(undefined);
+        setHasInstallments(undefined);
         break;
       case "beneficios":
         // Clear search but keep category and bank filters available for beneficios view
@@ -469,43 +518,38 @@ function Home() {
         {/* Search Bar */}
         <div className="sticky top-0 z-20 bg-white">
           <div className="px-4 sm:px-6 md:px-8 py-4">
-            <div className="relative" ref={filterDropdownRef}>
+            <div className="relative">
               <SearchBar
                 value={searchTerm}
                 onChange={setSearchTerm}
                 placeholder="Buscar descuentos, tiendas..."
                 onFilterClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                activeFilterCount={activeFilterCount}
+                isFilterOpen={showFilterDropdown}
               />
 
               {/* Filter Dropdown */}
-              {showFilterDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-2 mx-4 sm:mx-6 md:mx-8 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-30">
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-semibold text-gray-700">Filtros</h3>
-
-                    {/* Online Toggle */}
-                    <button
-                      onClick={() => {
-                        setOnlineOnly(!onlineOnly);
-                        setShowFilterDropdown(false);
-                      }}
-                      className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                        onlineOnly
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4" />
-                        <span>Beneficios Online</span>
-                      </div>
-                      {onlineOnly && (
-                        <span className="text-xs">✓</span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div ref={filterDropdownRef}>
+                {showFilterDropdown && (
+                  <FilterMenu
+                    onlineOnly={onlineOnly}
+                    onOnlineChange={setOnlineOnly}
+                    maxDistance={maxDistance}
+                    onMaxDistanceChange={setMaxDistance}
+                    minDiscount={minDiscount}
+                    onMinDiscountChange={setMinDiscount}
+                    availableDay={availableDay}
+                    onAvailableDayChange={setAvailableDay}
+                    cardMode={cardMode}
+                    onCardModeChange={setCardMode}
+                    network={selectedNetwork}
+                    onNetworkChange={setSelectedNetwork}
+                    hasInstallments={hasInstallments}
+                    onHasInstallmentsChange={setHasInstallments}
+                    onClose={() => setShowFilterDropdown(false)}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>
