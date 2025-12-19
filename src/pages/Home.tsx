@@ -42,6 +42,9 @@ function Home() {
   const initialTab = locationState?.activeTab || "inicio";
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialTab);
 
+  // Track if we've loaded data at least once to avoid showing filter skeletons on filter changes
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
   // Scroll restoration state
   const restoredScrollY = locationState?.scrollY;
   const hasRestoredScroll = useRef(false);
@@ -90,6 +93,13 @@ function Home() {
     cardMode,
     hasInstallments,
   });
+
+  // Track when data has loaded at least once
+  useEffect(() => {
+    if (!isLoading && paginatedBusinesses.length > 0) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoading, paginatedBusinesses.length]);
 
   // Restore scroll position after component mounts and content is loaded
   useEffect(() => {
@@ -566,7 +576,8 @@ function Home() {
         )}
 
         {/* Main Content - Lazy Loaded Tabs */}
-        {!isLoading && !error && (
+        {/* Show content when not loading OR when we've loaded once (to keep filters visible) */}
+        {(!isLoading || hasLoadedOnce) && !error && (
           <Suspense fallback={
             shouldShowFilteredResults ? (
               <div className="animate-fade-in-up">
@@ -583,7 +594,7 @@ function Home() {
             <div className="animate-fade-in-up">
               {shouldShowFilteredResults ? (
                 <BeneficiosTab
-                  filteredBusinesses={filteredBusinesses}
+                  filteredBusinesses={isLoading ? [] : filteredBusinesses}
                   categoryGridData={categoryGridData}
                   bankGridData={bankGridData}
                   selectedCategory={selectedCategory}
@@ -593,7 +604,7 @@ function Home() {
                   onBusinessClick={handleBusinessClick}
                   onLoadMore={loadMore}
                   hasMore={hasMore}
-                  isLoadingMore={isLoadingMore}
+                  isLoadingMore={isLoadingMore || isLoading}
                   totalCount={totalBusinesses}
                 />
               ) : (
@@ -618,9 +629,9 @@ function Home() {
           </Suspense>
         )}
 
-        {/* Loading State - Skeleton Loaders */}
-        {isLoading && (
-          activeTab === "beneficios" ? (
+        {/* Loading State - Skeleton Loaders (only on initial load) */}
+        {isLoading && !hasLoadedOnce && (
+          activeTab === "beneficios" || shouldShowFilteredResults ? (
             <div className="animate-fade-in-up">
               <SkeletonBeneficiosTab />
             </div>

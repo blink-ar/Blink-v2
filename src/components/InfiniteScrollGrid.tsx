@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { Business } from "../types";
 import BusinessCard from "./BusinessCard";
+import SkeletonCard from "./skeletons/SkeletonCard";
 
 interface InfiniteScrollGridProps {
   businesses: Business[];
@@ -61,6 +62,7 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
     };
   }, [hasMore, isLoadingMore, loadMore]);
 
+  // Show empty state only when not loading
   if (businesses.length === 0 && !isLoadingMore) {
     return (
       <div className="text-center py-12 md:py-16">
@@ -72,6 +74,17 @@ const InfiniteScrollGrid: React.FC<InfiniteScrollGridProps> = ({
           Intenta con otros términos de búsqueda o selecciona una categoría
           diferente
         </p>
+      </div>
+    );
+  }
+
+  // Show skeleton cards when loading with no businesses
+  if (businesses.length === 0 && isLoadingMore) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <SkeletonCard key={`skeleton-${index}`} />
+        ))}
       </div>
     );
   }
