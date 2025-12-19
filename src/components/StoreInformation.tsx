@@ -61,6 +61,42 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
   // State for dropdown
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const dropdownMenuRef = React.useRef<HTMLDivElement>(null);
+  const [dropdownMaxHeight, setDropdownMaxHeight] = React.useState<number>(240);
+
+  // Calculate dropdown max height based on available space below
+  React.useEffect(() => {
+    if (isDropdownOpen && dropdownRef.current) {
+      const calculateMaxHeight = () => {
+        const buttonRect = dropdownRef.current?.getBoundingClientRect();
+        if (!buttonRect) return;
+
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - buttonRect.bottom;
+
+        // Reserve 24px total: 16px from viewport edge + 8px for bottom padding
+        // Cap at 60vh for better UX, but never exceed available space
+        const maxHeight = Math.min(
+          Math.max(spaceBelow - 24, 0), // Use available space below (never negative)
+          viewportHeight * 0.6 // Maximum 60% of viewport height
+        );
+
+        setDropdownMaxHeight(maxHeight);
+      };
+
+      // Calculate on open
+      calculateMaxHeight();
+
+      // Recalculate on resize or scroll
+      window.addEventListener('resize', calculateMaxHeight);
+      window.addEventListener('scroll', calculateMaxHeight, true);
+
+      return () => {
+        window.removeEventListener('resize', calculateMaxHeight);
+        window.removeEventListener('scroll', calculateMaxHeight, true);
+      };
+    }
+  }, [isDropdownOpen]);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -330,7 +366,9 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                     {/* Dropdown menu */}
                     {isDropdownOpen && (
                       <div
-                        className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        ref={dropdownMenuRef}
+                        className="absolute top-full z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto pb-2"
+                        style={{ maxHeight: `${dropdownMaxHeight}px` }}
                         onWheel={(e) => {
                           // Prevent scroll from bubbling to parent
                           e.stopPropagation();
