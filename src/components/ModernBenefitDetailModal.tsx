@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, CreditCard, CheckCircle2, Tag, MapPin, Info } from 'lucide-react';
 import { BankBenefit } from '../types';
-import { RawMongoBenefit } from '../types/mongodb';
 import { BankLogoSelector } from './BankLogos';
 import { GradientBadge } from './GradientBadge';
 import { DaysOfWeek } from './ui/DaysOfWeek';
@@ -15,14 +14,12 @@ import {
 
 interface ModernBenefitDetailModalProps {
   benefit: BankBenefit;
-  rawBenefit?: RawMongoBenefit | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
 const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
   benefit,
-  rawBenefit,
   isOpen,
   onClose,
 }) => {
@@ -61,8 +58,8 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
 
   const discountPercentage = getDiscountPercentage(benefit.rewardRate);
 
-  // Get installments from rawBenefit if available
-  const installments = rawBenefit?.installments;
+  // Get installments from benefit
+  const installments = benefit.installments;
 
   // Process all fields
   const processedValue = processTextField(benefit.valor);
@@ -101,18 +98,16 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-250 ${
-          isClosing ? 'opacity-0' : 'animate-fade-in'
-        }`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-250 ${isClosing ? 'opacity-0' : 'animate-fade-in'
+          }`}
         onClick={handleBackdropClick}
       />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
         <div
-          className={`bg-white w-full max-w-2xl max-h-[80vh] rounded-t-3xl shadow-2xl overflow-hidden pointer-events-auto ${
-            isClosing ? 'animate-slide-to-bottom' : 'animate-slide-from-bottom'
-          }`}
+          className={`bg-white w-full max-w-2xl max-h-[80vh] rounded-t-3xl shadow-2xl overflow-hidden pointer-events-auto ${isClosing ? 'animate-slide-to-bottom' : 'animate-slide-from-bottom'
+            }`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with gradient */}
@@ -292,45 +287,24 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                 </section>
               )}
 
-              {/* Raw MongoDB Data Section - For development/debug */}
-              {rawBenefit && (
+              {/* Info Section - For development/debug or extra info */}
+              {(benefit.id || benefit.validUntil) && (
                 <section className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                     <span>📊</span>
-                    <span>Información técnica</span>
+                    <span>Información adicional</span>
                   </h4>
                   <div className="space-y-2 text-xs text-gray-600">
-                    <div className="flex justify-between">
-                      <span className="font-medium">ID:</span>
-                      <span className="text-gray-500 font-mono">{rawBenefit._id.$oid}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Fuente:</span>
-                      <span>{rawBenefit.sourceCollection}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Estado:</span>
-                      <span>{rawBenefit.processingStatus}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Válido hasta:</span>
-                      <span>{rawBenefit.validUntil}</span>
-                    </div>
-                    {rawBenefit.link && (
-                      <div className="pt-2 border-t border-gray-200">
-                        <a
-                          href={
-                            rawBenefit.link.startsWith('http')
-                              ? rawBenefit.link
-                              : `https://${rawBenefit.link}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-                        >
-                          <span>Ver más información</span>
-                          <span>→</span>
-                        </a>
+                    {benefit.id && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">ID:</span>
+                        <span className="text-gray-500 font-mono">{benefit.id}</span>
+                      </div>
+                    )}
+                    {benefit.validUntil && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Válido hasta:</span>
+                        <span>{benefit.validUntil}</span>
                       </div>
                     )}
                   </div>
