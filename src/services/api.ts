@@ -34,6 +34,37 @@ export interface BusinessesApiResponse {
   };
 }
 
+export function normalizeBusinesses(businesses: any[]): Business[] {
+  return businesses.map((raw) => {
+    const rawLocations = raw.location || raw.locations || [];
+
+    const uniqueLocations: any[] = [];
+    const seenAddresses = new Set();
+
+    if (Array.isArray(rawLocations)) {
+      for (const loc of rawLocations) {
+        const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
+
+        if (!seenAddresses.has(key)) {
+          seenAddresses.add(key);
+          uniqueLocations.push(loc);
+        }
+      }
+    }
+
+    const business: any = {
+      ...raw,
+      location: uniqueLocations
+    };
+
+    if ("locations" in business) {
+      delete business.locations;
+    }
+
+    return business as Business;
+  });
+}
+
 /**
  * Fetch businesses from the new /api/businesses endpoint
  * This endpoint returns pre-grouped businesses with proper pagination
@@ -77,39 +108,7 @@ export async function fetchBusinessesPaginated(options: {
 
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {
-      data.businesses = data.businesses.map((b: any) => {
-        // Create a new object with location property
-        const rawLocations = b.location || b.locations || [];
-
-        // Deduplicate locations by formattedAddress
-        const uniqueLocations: any[] = [];
-        const seenAddresses = new Set();
-
-        if (Array.isArray(rawLocations)) {
-          for (const loc of rawLocations) {
-            // Create a unique key for the location (prefer formattedAddress, fallback to lat/lng)
-            const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
-
-            if (!seenAddresses.has(key)) {
-              seenAddresses.add(key);
-              uniqueLocations.push(loc);
-            }
-          }
-        }
-
-        const business = {
-          ...b,
-          // Ensure location property exists and is deduplicated
-          location: uniqueLocations
-        };
-
-        // Explicitly remove locations property if it exists
-        if ('locations' in business) {
-          delete business.locations;
-        }
-
-        return business;
-      });
+      data.businesses = normalizeBusinesses(data.businesses);
     }
 
     return data;

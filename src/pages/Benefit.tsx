@@ -12,7 +12,25 @@ import {
   LoadingAnnouncement,
   ErrorAnnouncement,
 } from "../components/ui";
-import { fetchBusinessesPaginated } from "../services/api";
+import { fetchBusinessesPaginated, normalizeBusinesses } from "../services/api";
+
+const LOCALHOST_ID = "localhost";
+const LOCALHOST_BUSINESSES_ENDPOINT = import.meta.env.VITE_LOCALHOST_BUSINESSES_ENDPOINT;
+
+const fetchBusinessesFromEndpoint = async (endpoint: string): Promise<Business[]> => {
+  const response = await fetch(endpoint);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  const data = await response.json();
+  const rawBusinesses = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.businesses)
+      ? data.businesses
+      : [];
+
+  return normalizeBusinesses(rawBusinesses);
+};
 
 function Benefit() {
   const { id, benefitIndex } = useParams<{
@@ -59,13 +77,27 @@ function Benefit() {
         setLoading(true);
         setError(null);
 
-        const response = await fetchBusinessesPaginated({
-          search: id.replace(/[-\s]+/g, '[-\\s]+'),
-          limit: 1
-        });
+        let businesses: Business[] = [];
 
-        if (response.success && response.businesses.length > 0) {
-          const matchingBusiness = response.businesses[0];
+        if (id === LOCALHOST_ID) {
+          if (!LOCALHOST_BUSINESSES_ENDPOINT) {
+            setError("Endpoint local no configurado");
+            return;
+          }
+          businesses = await fetchBusinessesFromEndpoint(LOCALHOST_BUSINESSES_ENDPOINT);
+        } else {
+          const response = await fetchBusinessesPaginated({
+            search: id.replace(/[-\s]+/g, '[-\\s]+'),
+            limit: 1
+          });
+
+          if (response.success && Array.isArray(response.businesses)) {
+            businesses = response.businesses;
+          }
+        }
+
+        if (businesses.length > 0) {
+          const matchingBusiness = businesses[0];
 
           let selectedBenefit = matchingBusiness.benefits[0];
           if (benefitIndex !== undefined) {
