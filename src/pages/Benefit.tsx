@@ -17,15 +17,14 @@ import { fetchBusinessesPaginated } from "../services/api";
 function Benefit() {
   const { id, benefitIndex } = useParams<{
     id: string;
-    benefitIndex: string;
+    benefitIndex?: string;
   }>();
   const navigate = useNavigate();
   const location = useLocation();
 
 
-  // Check for openDetails query parameter and source tab
   const searchParams = new URLSearchParams(location.search);
-  const shouldOpenDetails = searchParams.get("openDetails") === "true";
+  const shouldOpenDetails = benefitIndex !== undefined;
   const sourceTab = searchParams.get("from") || (location.state as { from?: string })?.from || null;
   // Get scroll restoration data from location state
   const scrollRestoreData = location.state as { scrollY?: number; displayCount?: number } | null;
@@ -92,26 +91,12 @@ function Benefit() {
     load();
   }, [id, benefitIndex]);
 
-  // Auto-open details popup if requested via query parameter
+  // Auto-open details popup when a benefit index is provided
   useEffect(() => {
     if (shouldOpenDetails && business && benefit && !loading) {
       setShowDetailedView(true);
-
-      // Clean up the URL by removing the query parameter
-      const newSearchParams = new URLSearchParams(location.search);
-      newSearchParams.delete("openDetails");
-      const newUrl = `${location.pathname}${newSearchParams.toString() ? "?" + newSearchParams.toString() : ""
-        }`;
-      window.history.replaceState({}, "", newUrl);
     }
-  }, [
-    shouldOpenDetails,
-    business,
-    benefit,
-    loading,
-    location.search,
-    location.pathname,
-  ]);
+  }, [shouldOpenDetails, business, benefit, loading]);
 
   // Auto-select location when store has only one valid location
   useEffect(() => {

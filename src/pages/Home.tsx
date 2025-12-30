@@ -396,7 +396,7 @@ function Home() {
   const handleBusinessClick = (businessId: string) => {
     // Save current scroll position before navigating
     const scrollY = window.scrollY;
-    navigate(`/benefit/${businessId}/0?from=${activeTab}`, {
+    navigate(`/benefit/${businessId}?from=${activeTab}`, {
       state: { scrollY }
     });
   };
@@ -430,10 +430,10 @@ function Home() {
       });
       console.log(
         "🔗 Navigating to business page with popup:",
-        `/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`
+        `/benefit/${matchingBusiness.id}/0?from=${activeTab}`
       );
       const scrollY = window.scrollY;
-      navigate(`/benefit/${matchingBusiness.id}/0?openDetails=true&from=${activeTab}`, {
+      navigate(`/benefit/${matchingBusiness.id}/0?from=${activeTab}`, {
         state: { scrollY }
       });
     } else {
@@ -452,10 +452,10 @@ function Home() {
         // Navigate to the first business as a fallback
         console.log(
           "🔗 Fallback: Navigating to first business:",
-          `/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`
+          `/benefit/${paginatedBusinesses[0].id}?from=${activeTab}`
         );
         const scrollY = window.scrollY;
-        navigate(`/benefit/${paginatedBusinesses[0].id}/0?from=${activeTab}`, {
+        navigate(`/benefit/${paginatedBusinesses[0].id}?from=${activeTab}`, {
           state: { scrollY }
         });
       } else {
