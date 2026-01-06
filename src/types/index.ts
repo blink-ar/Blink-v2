@@ -15,6 +15,7 @@ export interface BankBenefit {
   requisitos?: string[];
   usos?: string[];
   textoAplicacion?: string;
+  otherDiscounts?: string; // For non-percentage discounts like "2x1", "3x2", etc.
   // AI Analysis specific fields
   originalAnalyzedText?: string;
   description?: string;

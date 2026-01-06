@@ -33,6 +33,7 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
           percentage={discountPercentage}
           installments={benefit.installments}
           benefitTitle={benefit.benefit}
+          otherDiscounts={benefit.otherDiscounts}
           variant={variant as BadgeVariant}
           size="md"
         />

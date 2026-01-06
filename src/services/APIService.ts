@@ -367,6 +367,10 @@ export class APIService extends AbstractBaseService {
                         textoAplicacion: getString(benefit.textoAplicacion) ||
                             getString(benefit.texto_aplicacion) ||
                             undefined,
+                        otherDiscounts: getString(benefit.otherDiscounts) ||
+                            getString(benefit.otrosDescuentos) ||
+                            getString(benefit.otros_descuentos) ||
+                            undefined,
                     };
 
                     business.benefits.push(bankBenefit);

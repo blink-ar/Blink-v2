@@ -78,19 +78,42 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
     return match ? parseInt(match[1], 10) : null;
   };
 
-  // Determine display value for discount section
-  let displayValue = formattedValue;
+  // Determine display value for discount section - follows same pattern as GradientBadge
+  let displayValue: string | null = null;
 
-  // If discount is 0%, show installments instead
-  if (formattedValue === '0%' || formattedValue === '0' || (processedValue && processedValue === '0%')) {
-    if (installments && installments > 0) {
-      displayValue = `${installments} cuotas`;
+  // Debug logging
+  console.log('ModernBenefitDetailModal Debug:', {
+    formattedValue,
+    installments,
+    otherDiscounts: benefit.otherDiscounts,
+    otherDiscountsType: typeof benefit.otherDiscounts,
+    otherDiscountsTrimmed: benefit.otherDiscounts?.trim(),
+    benefit: benefit.benefit
+  });
+
+  // Check if we have a valid percentage discount
+  const hasValidPercentage = formattedValue &&
+    formattedValue !== '0%' &&
+    formattedValue !== '0' &&
+    formattedValue !== 'N/A';
+
+  if (hasValidPercentage) {
+    // Show the percentage discount
+    displayValue = formattedValue;
+  } else if (installments && installments > 0) {
+    // Show installments from data
+    displayValue = `${installments} cuotas`;
+  } else if (benefit.otherDiscounts && benefit.otherDiscounts.trim()) {
+    // Show other discounts (e.g., "2x1", "3x2")
+    displayValue = benefit.otherDiscounts.trim();
+  } else {
+    // Try to extract installments from benefit title
+    const extracted = extractInstallmentsFromText(benefit.benefit);
+    if (extracted && extracted > 0) {
+      displayValue = `${extracted} cuotas`;
     } else {
-      // Try to extract from benefit title
-      const extracted = extractInstallmentsFromText(benefit.benefit);
-      if (extracted && extracted > 0) {
-        displayValue = `${extracted} cuotas`;
-      }
+      // Final fallback
+      displayValue = 'Ver detalles';
     }
   }
 
@@ -142,6 +165,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                 <GradientBadge
                   percentage={discountPercentage}
                   installments={installments}
+                  otherDiscounts={benefit.otherDiscounts}
                   variant="featured"
                   size="lg"
                 />
@@ -180,7 +204,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                       <Tag className="h-4 w-4 text-primary-600" />
                     </div>
                     <h3 className="text-base font-semibold text-gray-900">
-                      Descuento
+                      ooooo
                     </h3>
                   </div>
                   <div className="space-y-3">

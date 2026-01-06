@@ -7,6 +7,7 @@ interface GradientBadgeProps {
   percentage: string | number;
   installments?: number | null;
   benefitTitle?: string;
+  otherDiscounts?: string;
   variant: BadgeVariant;
   size?: BadgeSize;
   className?: string;
@@ -16,6 +17,7 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
   percentage,
   installments,
   benefitTitle,
+  otherDiscounts,
   variant,
   size = 'md',
   className = '',
@@ -37,20 +39,42 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
   // Determine what to display
   let displayValue: string;
 
-  if (numericValue && Number(numericValue) > 0) {
+  // Debug logging
+  console.log('GradientBadge Debug:', {
+    percentage,
+    numericValue,
+    installments,
+    otherDiscounts,
+    otherDiscountsType: typeof otherDiscounts,
+    otherDiscountsTrimmed: otherDiscounts?.trim(),
+    benefitTitle
+  });
+
+  // Check if we have a valid percentage discount (similar to modal logic)
+  const percentageStr = String(percentage);
+  const hasValidPercentage = numericValue &&
+    Number(numericValue) > 0 &&
+    percentageStr !== '0' &&
+    percentageStr !== '0%' &&
+    percentageStr !== 'N/A';
+
+  if (hasValidPercentage) {
     // Show discount percentage
     displayValue = `${numericValue}% OFF`;
   } else if (installments && installments > 0) {
     // Show installments from data
     displayValue = `${installments} cuotas`;
+  } else if (otherDiscounts && otherDiscounts.trim()) {
+    // Show other discounts (e.g., "2x1", "3x2")
+    displayValue = otherDiscounts.trim();
   } else {
     // Fallback: try to extract installments from title
     const extractedInstallments = extractInstallmentsFromText(benefitTitle);
     if (extractedInstallments && extractedInstallments > 0) {
       displayValue = `${extractedInstallments} cuotas`;
     } else {
-      // No meaningful value to show
-      displayValue = '';
+      // Final fallback
+      displayValue = 'Ver detalles';
     }
   }
 
@@ -69,10 +93,8 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
     lg: 'text-base px-4 py-2',
   };
 
-  // Don't render if there's no value to display
-  if (!displayValue) {
-    return null;
-  }
+  // Always render, even if it's just 'Ver detalles'
+  // (removed the null check since we now have a fallback)
 
   return (
     <div
