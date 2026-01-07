@@ -78,42 +78,26 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
     return match ? parseInt(match[1], 10) : null;
   };
 
-  // Determine display value for discount section - follows same pattern as GradientBadge
-  let displayValue: string | null = null;
-
-  // Debug logging
-  console.log('ModernBenefitDetailModal Debug:', {
-    formattedValue,
-    installments,
-    otherDiscounts: benefit.otherDiscounts,
-    otherDiscountsType: typeof benefit.otherDiscounts,
-    otherDiscountsTrimmed: benefit.otherDiscounts?.trim(),
-    benefit: benefit.benefit
-  });
+  // Determine display value for discount section
+  let displayValue = formattedValue;
 
   // Check if we have a valid percentage discount
-  const hasValidPercentage = formattedValue &&
+  const hasValidPercentageDiscount = formattedValue &&
     formattedValue !== '0%' &&
     formattedValue !== '0' &&
-    formattedValue !== 'N/A';
+    formattedValue !== 'N/A' &&
+    (formattedValue.includes('%') || !isNaN(Number(formattedValue)));
 
-  if (hasValidPercentage) {
-    // Show the percentage discount
-    displayValue = formattedValue;
-  } else if (installments && installments > 0) {
-    // Show installments from data
-    displayValue = `${installments} cuotas`;
-  } else if (benefit.otherDiscounts && benefit.otherDiscounts.trim()) {
-    // Show other discounts (e.g., "2x1", "3x2")
-    displayValue = benefit.otherDiscounts.trim();
-  } else {
-    // Try to extract installments from benefit title
-    const extracted = extractInstallmentsFromText(benefit.benefit);
-    if (extracted && extracted > 0) {
-      displayValue = `${extracted} cuotas`;
+  // If discount is 0%, show installments instead
+  if (formattedValue === '0%' || formattedValue === '0' || (processedValue && processedValue === '0%')) {
+    if (installments && installments > 0) {
+      displayValue = `${installments} cuotas`;
     } else {
-      // Final fallback
-      displayValue = 'Ver detalles';
+      // Try to extract from benefit title
+      const extracted = extractInstallmentsFromText(benefit.benefit);
+      if (extracted && extracted > 0) {
+        displayValue = `${extracted} cuotas`;
+      }
     }
   }
 
@@ -204,26 +188,33 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                       <Tag className="h-4 w-4 text-primary-600" />
                     </div>
                     <h3 className="text-base font-semibold text-gray-900">
-                      ooooo
+                      Beneficio
                     </h3>
                   </div>
                   <div className="space-y-3">
                     {displayValue && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Valor</span>
+                        {/* <span className="text-sm text-gray-600">Valor</span> */}
                         <span className="text-lg font-bold text-primary-600">
                           {displayValue}
                         </span>
                       </div>
                     )}
-                    {processedLimit && (
+                    {processedLimit ? (
                       <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                         <span className="text-sm text-gray-600">Tope de reintegro</span>
                         <span className="text-base font-semibold text-gray-900">
                           ${processedLimit}
                         </span>
                       </div>
-                    )}
+                    ) : hasValidPercentageDiscount ? (
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">Tope de reintegro</span>
+                        <span className="text-base font-semibold text-gray-900">
+                          Sin tope de reintegro.
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 </section>
               )}

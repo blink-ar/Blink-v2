@@ -56,7 +56,8 @@ export const GradientBadge: React.FC<GradientBadgeProps> = ({
     Number(numericValue) > 0 &&
     percentageStr !== '0' &&
     percentageStr !== '0%' &&
-    percentageStr !== 'N/A';
+    percentageStr !== 'N/A' &&
+    (percentageStr.includes('%') || !isNaN(Number(percentage))); // Must contain % or be a pure number
 
   if (hasValidPercentage) {
     // Show discount percentage
