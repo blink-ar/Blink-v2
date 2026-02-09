@@ -13,7 +13,7 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
   onBenefitSelect,
 }) => {
   const featuredBenefit = benefits[0];
-  if (!featuredBenefit) return null;
+  if (!featuredBenefit?.merchant) return null;
 
   return (
     <View style={styles.container}>
@@ -31,13 +31,13 @@ const FeaturedBenefits: React.FC<FeaturedBenefitsProps> = ({
             </Text>
           </View>
           <Text style={styles.merchantName} numberOfLines={1}>
-            {featuredBenefit.merchant.name}
+            {featuredBenefit.merchant?.name || 'Comercio'}
           </Text>
           <Text style={styles.benefitTitle} numberOfLines={2}>
-            {featuredBenefit.benefitTitle}
+            {featuredBenefit.benefitTitle || 'Beneficio disponible'}
           </Text>
           <Text style={styles.bankName}>
-            {featuredBenefit.bank}
+            {featuredBenefit.bank || ''}
           </Text>
         </View>
       </TouchableOpacity>
