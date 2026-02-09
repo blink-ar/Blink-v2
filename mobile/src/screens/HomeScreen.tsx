@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import { Header } from '../components/Header';
@@ -32,8 +32,28 @@ type ActiveTab = 'inicio' | 'beneficios';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('inicio');
+  // Derive initial tab from the bottom tab route name
+  const tabFromRoute: ActiveTab = route.name === 'Beneficios' ? 'beneficios' : 'inicio';
+  const [activeTab, setActiveTab] = useState<ActiveTab>(tabFromRoute);
+
+  // Sync activeTab whenever this tab screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      setActiveTab(tabFromRoute);
+      // Clear filters when switching back to Inicio tab
+      if (tabFromRoute === 'inicio') {
+        setSearchTerm('');
+        setSelectedCategory('all');
+        setSelectedBanks([]);
+        setOnlineOnly(false);
+        setMinDiscount(undefined);
+        setCardMode(undefined);
+        setHasInstallments(undefined);
+      }
+    }, [tabFromRoute])
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
