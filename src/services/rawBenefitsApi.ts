@@ -49,7 +49,7 @@ export async function getRawBenefitsResponse(params: Record<string, string> = {}
 export async function getRawBenefitById(id: string): Promise<RawMongoBenefit | null> {
   try {
     const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://benefits-backend-v2-public.onrender.com';
-    const response = await fetch(`${BASE_URL}/api/benefits/${id}`);
+    const response = await fetch(`${BASE_URL}/api/benefits/${id}?collection=confirmed-benefits`);
 
     if (!response.ok) {
       return null;

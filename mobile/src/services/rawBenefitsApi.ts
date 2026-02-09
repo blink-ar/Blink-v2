@@ -12,7 +12,7 @@ export async function getRawBenefits(options: {
 
 export async function getRawBenefitById(id: string): Promise<RawMongoBenefit | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/benefits/${id}`);
+    const response = await fetch(`${API_BASE_URL}/api/benefits/${id}?collection=confirmed-benefits`);
     if (!response.ok) return null;
 
     const data = await response.json();

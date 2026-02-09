@@ -16,6 +16,7 @@ declare global {
 }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://benefits-backend-v2-public.onrender.com';
+const COLLECTION = 'confirmed-benefits';
 
 // Response type for the new /api/businesses endpoint
 export interface BusinessesApiResponse {
@@ -52,6 +53,7 @@ export async function fetchBusinessesPaginated(options: {
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
   params.append('offset', offset.toString());
+  params.append('collection', COLLECTION);
   if (category) params.append('category', category);
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
@@ -127,6 +129,7 @@ export async function fetchBusinessesPaginated(options: {
 class BenefitsAPI {
   async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
 
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -134,7 +137,7 @@ class BenefitsAPI {
       }
     });
 
-    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -148,6 +151,7 @@ class BenefitsAPI {
 
   async getRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
 
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -155,7 +159,7 @@ class BenefitsAPI {
       }
     });
 
-    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -168,13 +172,14 @@ class BenefitsAPI {
 
   async getBenefitsResponse(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(key, value);
       }
     });
 
-    const url = `${BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -185,7 +190,7 @@ class BenefitsAPI {
   }
 
   async getBenefitById(id: string): Promise<Benefit | null> {
-    const response = await fetch(`${BASE_URL}/api/benefits/${id}`);
+    const response = await fetch(`${BASE_URL}/api/benefits/${id}?collection=${COLLECTION}`);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -209,6 +214,7 @@ class BenefitsAPI {
     const queryParams = new URLSearchParams({
       lat: lat.toString(),
       lng: lng.toString(),
+      collection: COLLECTION,
       ...params
     });
 
@@ -226,7 +232,7 @@ class BenefitsAPI {
   }
 
   async getCategories(): Promise<string[]> {
-    const response = await fetch(`${BASE_URL}/api/categories`);
+    const response = await fetch(`${BASE_URL}/api/categories?collection=${COLLECTION}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -235,7 +241,7 @@ class BenefitsAPI {
   }
 
   async getBanks(): Promise<string[]> {
-    const response = await fetch(`${BASE_URL}/api/banks`);
+    const response = await fetch(`${BASE_URL}/api/banks?collection=${COLLECTION}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -244,7 +250,7 @@ class BenefitsAPI {
   }
 
   async getStats(): Promise<MongoStatsResponse> {
-    const response = await fetch(`${BASE_URL}/api/stats`);
+    const response = await fetch(`${BASE_URL}/api/stats?collection=${COLLECTION}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

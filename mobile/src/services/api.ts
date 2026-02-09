@@ -11,6 +11,8 @@ import {
 import type { CanonicalLocation } from '../types';
 import { API_BASE_URL } from '../constants';
 
+const COLLECTION = 'confirmed-benefits';
+
 export interface BusinessesApiResponse {
   success: boolean;
   businesses: Business[];
@@ -41,6 +43,7 @@ export async function fetchBusinessesPaginated(options: {
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
   params.append('offset', offset.toString());
+  params.append('collection', COLLECTION);
   if (category) params.append('category', category);
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
@@ -97,13 +100,14 @@ export async function fetchBusinessesPaginated(options: {
 class BenefitsAPI {
   async getBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(key, value);
       }
     });
 
-    const url = `${API_BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -113,13 +117,14 @@ class BenefitsAPI {
 
   async getRawBenefits(params: Record<string, string> = {}): Promise<RawMongoBenefit[]> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(key, value);
       }
     });
 
-    const url = `${API_BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -129,20 +134,21 @@ class BenefitsAPI {
 
   async getBenefitsResponse(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
     const queryParams = new URLSearchParams();
+    queryParams.append('collection', COLLECTION);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(key, value);
       }
     });
 
-    const url = `${API_BASE_URL}/api/benefits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/api/benefits?${queryParams.toString()}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
   }
 
   async getBenefitById(id: string): Promise<Benefit | null> {
-    const response = await fetch(`${API_BASE_URL}/api/benefits/${id}`);
+    const response = await fetch(`${API_BASE_URL}/api/benefits/${id}?collection=${COLLECTION}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
     const data = await response.json();
@@ -155,7 +161,7 @@ class BenefitsAPI {
   }
 
   async getNearbyBenefits(lat: number, lng: number, params: Record<string, string> = {}): Promise<Benefit[]> {
-    const queryParams = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), ...params });
+    const queryParams = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), collection: COLLECTION, ...params });
     const response = await fetch(`${API_BASE_URL}/api/benefits/nearby?${queryParams.toString()}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -164,21 +170,21 @@ class BenefitsAPI {
   }
 
   async getCategories(): Promise<string[]> {
-    const response = await fetch(`${API_BASE_URL}/api/categories`);
+    const response = await fetch(`${API_BASE_URL}/api/categories?collection=${COLLECTION}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data: MongoCategoriesResponse = await response.json();
     return data.categories || [];
   }
 
   async getBanks(): Promise<string[]> {
-    const response = await fetch(`${API_BASE_URL}/api/banks`);
+    const response = await fetch(`${API_BASE_URL}/api/banks?collection=${COLLECTION}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data: MongoBanksResponse = await response.json();
     return data.banks || [];
   }
 
   async getStats(): Promise<MongoStatsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/stats`);
+    const response = await fetch(`${API_BASE_URL}/api/stats?collection=${COLLECTION}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
   }
