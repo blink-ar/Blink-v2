@@ -22,7 +22,7 @@ export interface APIServiceConfig {
  * Default API service configuration
  */
 const DEFAULT_API_CONFIG: Required<APIServiceConfig> = {
-    baseURL: 'https://benefits-backend-v2-public.onrender.com',
+    baseURL: 'http://localhost:3003',
     cacheTimeout: 3600000, // 1 hour
     backgroundRefreshThreshold: 1800000, // 30 minutes
     retryAttempts: 3,
