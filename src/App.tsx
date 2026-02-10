@@ -18,7 +18,7 @@ function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/benefit/:id/:benefitIndex" element={<Benefit />} />
+          <Route path="/benefit/:id/:benefitIndex?" element={<Benefit />} />
         </Routes>
       </Suspense>
     </Router>

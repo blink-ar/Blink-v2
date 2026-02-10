@@ -19,6 +19,8 @@ export interface BankBenefit {
   originalAnalyzedText?: string;
   description?: string;
   installments?: number | null;
+  validUntil?: string | null;
+  id?: string;
 }
 
 export interface Business {
