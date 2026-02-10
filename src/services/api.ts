@@ -15,8 +15,8 @@ declare global {
   let allCategories: Set<string> | undefined;
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://benefits-backend-v2-public.onrender.com';
-const COLLECTION = 'confirmed-benefits';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003';
+const COLLECTION = 'confirmed_benefits';
 
 // Response type for the new /api/businesses endpoint
 export interface BusinessesApiResponse {

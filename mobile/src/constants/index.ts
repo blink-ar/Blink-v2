@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'https://benefits-backend-v2-public.onrender.com';
+export const API_BASE_URL = 'http://192.168.100.54:3003';
 
 export const ITEMS_PER_PAGE = 20;
 

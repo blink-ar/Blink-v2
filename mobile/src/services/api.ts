@@ -11,7 +11,7 @@ import {
 import type { CanonicalLocation } from '../types';
 import { API_BASE_URL } from '../constants';
 
-const COLLECTION = 'confirmed-benefits';
+const COLLECTION = 'confirmed_benefits';
 
 export interface BusinessesApiResponse {
   success: boolean;
