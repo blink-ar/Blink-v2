@@ -418,21 +418,21 @@ body {
 
 /* Business card responsive behavior */
 .business-card {
-  padding: var(--space-4);
-  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 @media (min-width: 640px) {
   .business-card {
-    padding: var(--space-5);
-    margin-bottom: var(--space-4);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
   }
 }
 
 @media (min-width: 768px) {
   .business-card {
-    padding: var(--space-6);
-    margin-bottom: var(--space-6);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
   }
 }
 

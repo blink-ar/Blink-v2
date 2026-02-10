@@ -170,7 +170,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
 
   return (
     <div
-      className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
+      className={`bg-white rounded-xl p-2.5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
       onClick={() => onClick(business.id)}
       role="button"
       tabIndex={0}
@@ -183,7 +183,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
       }}
       aria-label={`Ver ofertas de ${business.name || 'Negocio'}`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         {/* Business Icon */}
         <div className="relative flex-shrink-0">
           <div
@@ -214,15 +214,15 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
 
         {/* Business Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-1">
+          <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-2">
-              <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate max-w-full">
+              <h3 className="font-semibold text-gray-900 text-sm mb-0.5 truncate max-w-full">
                 {business.name || 'Sin nombre'}
                 <span className="text-gray-500 font-normal ml-1">
                   • {business.location?.[0]?.types?.[0] || business.category || 'otros'}
                 </span>
               </h3>
-              <div className="flex items-center gap-2 text-gray-500 text-xs mb-2">
+              <div className="flex items-center gap-2 text-gray-500 text-xs mb-1">
                 <div className="flex items-center">
                   <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
                   <span className="truncate">

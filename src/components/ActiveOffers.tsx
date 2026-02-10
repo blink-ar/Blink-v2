@@ -41,7 +41,7 @@ const ActiveOffers: React.FC<ActiveOffersProps> = React.memo(({
               key={business.id}
               business={business}
               onClick={onBusinessClick}
-              className="flex-shrink-0 w-80 snap-start"
+              className="flex-shrink-0 w-72 sm:w-80 snap-start business-card"
             />
           ))}
         </div>
