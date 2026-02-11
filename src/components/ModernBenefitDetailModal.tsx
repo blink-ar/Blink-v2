@@ -63,7 +63,9 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
 
   // Process all fields
   const processedValue = processTextField(benefit.valor);
-  const processedLimit = processTextField(benefit.tope);
+  const processedLimit = typeof benefit.tope === 'number'
+    ? benefit.tope.toLocaleString('es-AR')
+    : processTextField(benefit.tope);
   const processedCondition = processTextField(benefit.condicion);
   const processedApplicationText = processTextField(benefit.textoAplicacion);
   const processedRequirements = processArrayField(benefit.requisitos || []);
@@ -79,21 +81,30 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
   };
 
   // Determine display value for discount section
-  let displayValue = formattedValue;
+  let displayValue: string | null = null;
 
-  // If discount is 0%, show installments instead
-  if (formattedValue === '0%' || formattedValue === '0' || (processedValue && processedValue === '0%')) {
-    if (installments && installments > 0) {
-      displayValue = `${installments} cuotas`;
+  // If otherDiscounts is available, use it instead
+  if (benefit.otherDiscounts) {
+    displayValue = benefit.otherDiscounts;
+  } else if (formattedValue === '0%' || formattedValue === '0' || (processedValue && processedValue === '0%')) {
+    // If discount is 0%, show installments instead (only if > 1)
+    if (installments && installments > 1) {
+      displayValue = `${installments} cuotas sin interés`;
     } else {
       // Try to extract from benefit title
       const extracted = extractInstallmentsFromText(benefit.benefit);
-      if (extracted && extracted > 0) {
-        displayValue = `${extracted} cuotas`;
+      if (extracted && extracted > 1) {
+        displayValue = `${extracted} cuotas sin interés`;
       }
     }
+  } else if (installments && installments > 1 && formattedValue) {
+    // Has both discount > 0 AND installments - show combined value
+    displayValue = `${formattedValue} + ${installments} cuotas sin interés`;
+  } else {
+    displayValue = formattedValue;
   }
 
+  console.log({benefit})
   return (
     <>
       {/* Backdrop */}
@@ -138,14 +149,14 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                 </p>
               </div>
 
-              <div className="flex-shrink-0">
+              {/* <div className="flex-shrink-0">
                 <GradientBadge
                   percentage={discountPercentage}
                   installments={installments}
                   variant="featured"
                   size="lg"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -169,9 +180,6 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                 )}
               </section>
 
-              {/* Days of week availability */}
-              <DaysOfWeek benefit={benefit} />
-
               {/* Discount and Limits */}
               {(displayValue || processedLimit) && (
                 <section className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-5">
@@ -186,17 +194,27 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                   <div className="space-y-3">
                     {displayValue && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Valor</span>
                         <span className="text-lg font-bold text-primary-600">
                           {displayValue}
                         </span>
                       </div>
                     )}
                     {processedLimit && (
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Tope de reintegro</span>
                         <span className="text-base font-semibold text-gray-900">
                           ${processedLimit}
+                        </span>
+                      </div>
+                    )}
+                    {/* Days of week availability */}
+                    
+                      <DaysOfWeek benefit={benefit} />
+                    {benefit.validUntil && (
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">Válido hasta</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {benefit.validUntil}
                         </span>
                       </div>
                     )}
@@ -218,8 +236,8 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                       const formattedUsage = formatUsageType(usage);
                       return (
                         <span
-                          key={index}
-                          className="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-full text-sm font-medium hover:border-primary-300 transition-colors"
+                        key={index}
+                        className="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-full text-sm font-medium"
                         >
                           {formattedUsage}
                         </span>
@@ -257,17 +275,28 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
 
               {/* How to Apply */}
               {hasValidContent(processedApplicationText) && (
-                <section>
+                <section className="overflow-hidden">
                   <div className="flex items-center gap-2 mb-3">
-                    <CreditCard className="h-5 w-5 text-gray-500" />
+                    <CreditCard className="h-5 w-5 text-gray-500 flex-shrink-0" />
                     <h3 className="text-base font-semibold text-gray-900">
                       Cómo aplicar
                     </h3>
                   </div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                      {processedApplicationText}
-                    </p>
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 overflow-hidden">
+                    {/^https?:\/\//i.test(processedApplicationText || '') ? (
+                      <a
+                        href={processedApplicationText}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 text-sm font-medium hover:underline break-words [overflow-wrap:anywhere]"
+                      >
+                        Ver más información
+                      </a>
+                    ) : (
+                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                        {processedApplicationText}
+                      </p>
+                    )}
                   </div>
                 </section>
               )}
@@ -284,30 +313,6 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                   <p className="text-gray-600 text-sm leading-relaxed">
                     {processedCondition}
                   </p>
-                </section>
-              )}
-
-              {/* Info Section - For development/debug or extra info */}
-              {(benefit.id || benefit.validUntil) && (
-                <section className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <span>📊</span>
-                    <span>Información adicional</span>
-                  </h4>
-                  <div className="space-y-2 text-xs text-gray-600">
-                    {benefit.id && (
-                      <div className="flex justify-between">
-                        <span className="font-medium">ID:</span>
-                        <span className="text-gray-500 font-mono">{benefit.id}</span>
-                      </div>
-                    )}
-                    {benefit.validUntil && (
-                      <div className="flex justify-between">
-                        <span className="font-medium">Válido hasta:</span>
-                        <span>{benefit.validUntil}</span>
-                      </div>
-                    )}
-                  </div>
                 </section>
               )}
             </div>

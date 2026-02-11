@@ -15,8 +15,6 @@ interface DaysOfWeekProps {
   benefit?: BankBenefit;
   /** Additional CSS classes */
   className?: string;
-  /** Show label and icon (default: true) */
-  showLabel?: boolean;
 }
 
 interface DayInfo {
@@ -44,7 +42,6 @@ export const DaysOfWeek: React.FC<DaysOfWeekProps> = ({
   availability,
   benefit,
   className = "",
-  showLabel = true,
 }) => {
   const dayAvailability = useMemo(() => {
     // Prefer multi-field parsing if benefit object is provided
@@ -60,29 +57,10 @@ export const DaysOfWeek: React.FC<DaysOfWeekProps> = ({
     return null;
   }
 
-  // Show "Todos los días" for benefits available all days (only when label is shown)
-  if (dayAvailability.allDays && showLabel) {
-    return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <span className="text-sm font-medium text-gray-700">
-          📅 Disponible:
-        </span>
-        <span className="text-sm text-green-600 font-medium">
-          Todos los días
-        </span>
-      </div>
-    );
-  }
-
   // Show custom text if no specific days were parsed
   if (dayAvailability.customText && !hasAnyDayAvailable(dayAvailability)) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        {showLabel && (
-          <span className="text-sm font-medium text-gray-700">
-            📅 Disponible:
-          </span>
-        )}
         <span className="text-sm text-gray-600">
           {dayAvailability.customText}
         </span>
@@ -96,10 +74,7 @@ export const DaysOfWeek: React.FC<DaysOfWeekProps> = ({
   }
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      {showLabel && (
-        <span className="text-sm font-medium text-gray-700">📅 Disponible:</span>
-      )}
+    <div className={`flex items-center ${className}`}>
       <div className="flex gap-1">
         {DAYS.map((day) => (
           <DayIndicator

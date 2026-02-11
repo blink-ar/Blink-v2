@@ -25,9 +25,9 @@ export const DayIndicator: React.FC<DayIndicatorProps> = ({
     "inline-flex",
     "items-center",
     "justify-center",
-    "w-8",
-    "h-8",
-    "text-xs",
+    "w-6",
+    "h-6",
+    "text-[10px]",
     "font-medium",
     "rounded-full",
     "transition-all",
@@ -35,9 +35,9 @@ export const DayIndicator: React.FC<DayIndicatorProps> = ({
     "ease-in-out",
     "cursor-default",
     // Responsive sizing
-    "sm:w-9",
-    "sm:h-9",
-    "sm:text-sm",
+    "sm:w-7",
+    "sm:h-7",
+    "sm:text-xs",
   ].join(" ");
 
   const availableClasses = [

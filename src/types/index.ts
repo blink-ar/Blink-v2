@@ -9,7 +9,7 @@ export interface BankBenefit {
   tipo?: string;
   cuando?: string;
   valor?: string;
-  tope?: string;
+  tope?: string | number | null;
   claseDeBeneficio?: string;
   condicion?: string;
   requisitos?: string[];
@@ -21,6 +21,8 @@ export interface BankBenefit {
   installments?: number | null;
   validUntil?: string | null;
   id?: string;
+  caps?: { amount: number; resetsEvery: string }[] | null;
+  otherDiscounts?: string | null;
 }
 
 export interface Business {
