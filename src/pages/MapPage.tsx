@@ -9,9 +9,9 @@ import FilterPanel from '../components/neo/FilterPanel';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
-// ~1km in degrees (used to create a 2km-wide bounding box)
-const KM_IN_LAT = 0.009; // ~1km
-const kmInLng = (lat: number) => 0.009 / Math.cos((lat * Math.PI) / 180);
+// ~5km in degrees (used to create a 10km-wide bounding box)
+const KM5_IN_LAT = 0.045;
+const km5InLng = (lat: number) => 0.045 / Math.cos((lat * Math.PI) / 180);
 
 const MAP_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e9f2fe' }] },
@@ -413,10 +413,10 @@ function MapPage() {
         // Browse mode with user location: 2km-wide view centered on user
         const lat = position.latitude;
         const lng = position.longitude;
-        const lngOff = kmInLng(lat);
+        const lngOff = km5InLng(lat);
         const bounds = new google.maps.LatLngBounds(
-          { lat: lat - KM_IN_LAT, lng: lng - lngOff },
-          { lat: lat + KM_IN_LAT, lng: lng + lngOff },
+          { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
+          { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
         );
         mapRef.current.fitBounds(bounds);
       }
@@ -558,10 +558,10 @@ function MapPage() {
             if (!mapRef.current || !googleRef.current) return;
             const lat = position.latitude;
             const lng = position.longitude;
-            const lngOff = kmInLng(lat);
+            const lngOff = km5InLng(lat);
             const bounds = new googleRef.current.maps.LatLngBounds(
-              { lat: lat - KM_IN_LAT, lng: lng - lngOff },
-              { lat: lat + KM_IN_LAT, lng: lng + lngOff },
+              { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
+              { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
             );
             mapRef.current.fitBounds(bounds);
           }}
