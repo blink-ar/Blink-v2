@@ -1,14 +1,17 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 
-// Lazy load routes for code splitting
-const Home = lazy(() => import("./pages/Home"));
-const Benefit = lazy(() => import("./pages/Benefit"));
+const HomePage = lazy(() => import('./pages/HomePage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const BusinessDetailPage = lazy(() => import('./pages/BusinessDetailPage'));
+const BenefitDetailPage = lazy(() => import('./pages/BenefitDetailPage'));
+const SavedPage = lazy(() => import('./pages/SavedPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const MapPage = lazy(() => import('./pages/MapPage'));
 
-// Minimal loading fallback
 const PageLoader = () => (
-  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+  <div className="min-h-screen bg-blink-bg flex items-center justify-center">
+    <div className="w-12 h-12 border-4 border-blink-ink border-t-primary animate-spin" />
   </div>
 );
 
@@ -17,8 +20,14 @@ function App() {
     <Router>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/benefit/:id/:benefitIndex?" element={<Benefit />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/business/:id" element={<BusinessDetailPage />} />
+          <Route path="/benefit/:id/:benefitIndex?" element={<BenefitDetailPage />} />
+          <Route path="/saved" element={<SavedPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/map" element={<MapPage />} />
         </Routes>
       </Suspense>
     </Router>

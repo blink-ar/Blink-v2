@@ -2,29 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import modern design system */
-@import './styles/design-system.css';
+/* Neo-brutalist base styles */
+@layer base {
+  body {
+    @apply bg-blink-bg text-blink-ink font-body antialiased;
+    min-height: 100dvh;
+  }
 
-/* Import responsive design system */
-@import './styles/responsive.css';
+  * {
+    border-radius: 0;
+  }
 
-/* Import utility classes */
-@import './styles/utilities.css';
+  ::selection {
+    @apply bg-primary text-blink-ink;
+  }
+}
 
-/* Import component styles */
-@import './styles/components.css';
+@layer components {
+  /* Hide scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 
-/* Import animation system */
-@import './styles/animations.css';
+  /* Grayscale image that reveals color on hover */
+  .grayscale-img {
+    filter: grayscale(100%);
+    transition: filter 0.3s ease;
+  }
+  .group:hover .grayscale-img {
+    filter: grayscale(0%);
+  }
 
-/* Import modern animations */
-@import './styles/modern-animations.css';
+  /* Neo-brutalist interactive press effect */
+  .neo-press {
+    @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all;
+  }
 
-/* Import mobile-specific optimizations */
-@import './styles/mobile.css';
-
-/* Import touch optimization and accessibility */
-@import './styles/touch-optimization.css';
-
-/* Import featured benefit card styles */
-@import './styles/featured-benefit.css';
+  /* Safe area padding for bottom nav */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
