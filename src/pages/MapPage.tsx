@@ -40,12 +40,6 @@ interface MapMarker {
   address: string;
 }
 
-// One entry per business (for bottom sheet list)
-interface ListBusiness {
-  business: Business;
-  address: string;
-  locationCount: number;
-}
 
 function MapPage() {
   const navigate = useNavigate();
@@ -132,24 +126,6 @@ function MapPage() {
     return markers;
   }, [businesses, isSingleBusinessMode, focusedBusiness]);
 
-  // Deduplicated list for bottom sheet (one per business)
-  const listBusinesses: ListBusiness[] = useMemo(() => {
-    const source = isSingleBusinessMode && focusedBusiness
-      ? [focusedBusiness]
-      : businesses;
-
-    return source
-      .map((biz) => {
-        const validLocs = biz.location.filter((l) => l.lat !== 0 || l.lng !== 0);
-        if (validLocs.length === 0) return null;
-        return {
-          business: biz,
-          address: validLocs[0].formattedAddress || validLocs[0].name || '',
-          locationCount: validLocs.length,
-        };
-      })
-      .filter(Boolean) as ListBusiness[];
-  }, [businesses, isSingleBusinessMode, focusedBusiness]);
 
   // Helpers
   const getMaxDiscount = (biz: Business) => {
@@ -584,7 +560,7 @@ function MapPage() {
               {isSingleBusinessMode ? 'Sucursales' : 'Cerca de tu ubicación'}
             </h3>
             <span className="font-mono text-xs font-bold bg-primary px-2 py-1 border-2 border-blink-ink whitespace-nowrap">
-              {isSingleBusinessMode ? `${mapMarkers.length} SUCURSALES` : `${totalBusinesses} LUGARES`}
+              {mapMarkers.length} {isSingleBusinessMode ? 'SUCURSALES' : 'LUGARES'}
             </span>
           </div>
         </div>
@@ -598,108 +574,73 @@ function MapPage() {
               </div>
             )}
 
-            {isSingleBusinessMode && focusedBusiness ? (
-              /* ── Single-business mode: list each location/branch ── */
-              mapMarkers.map(({ lat, lng, address }, idx) => (
+            {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
+              const isSelected = selectedBusiness?.id === biz.id;
+              return (
                 <div
-                  key={`${focusedBusiness.id}-${idx}`}
+                  key={`${biz.id}-${idx}`}
+                  data-biz-id={biz.id}
                   onClick={() => {
-                    setSelectedBusiness(focusedBusiness);
+                    setSelectedBusiness(biz);
                     mapRef.current?.panTo({ lat, lng });
-                    mapRef.current?.setZoom(16);
+                    if ((mapRef.current?.getZoom() || 0) < 15) mapRef.current?.setZoom(15);
                   }}
-                  className="border-b-2 border-blink-ink p-4 bg-white active:bg-gray-50 transition-colors cursor-pointer"
+                  className={`border-b-2 border-blink-ink p-4 transition-colors cursor-pointer relative ${
+                    isSelected ? 'bg-primary/10 active:bg-primary/20' : 'bg-white active:bg-gray-50'
+                  }`}
                 >
+                  {isSelected && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary border-r-2 border-blink-ink" />
+                  )}
+
                   <div className="flex gap-4 items-center">
-                    <div className="w-10 h-10 shrink-0 border-2 border-blink-ink bg-primary/10 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 20 }}>location_on</span>
+                    {/* Logo */}
+                    <div className="w-16 h-16 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-1 shadow-hard-sm">
+                      {biz.image ? (
+                        <img
+                          alt={biz.name}
+                          className={`w-full h-full object-contain ${isSelected ? '' : 'grayscale'}`}
+                          src={biz.image}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="font-display text-xl text-blink-muted">
+                          {biz.name?.charAt(0)}
+                        </span>
+                      )}
                     </div>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs text-gray-600 truncate">
-                        {address || `Sucursal ${idx + 1}`}
+                      <h4 className="font-display text-base uppercase truncate">{biz.name}</h4>
+                      <p className="font-mono text-xs text-gray-600 truncate mb-1">
+                        {address}{biz.distanceText ? ` · ${biz.distanceText}` : ''}
                       </p>
+                      {isSelected ? (
+                        <div className="bg-blink-ink text-primary px-2 py-0.5 w-fit border border-primary transform -rotate-1 inline-block">
+                          <span className="font-display text-sm leading-none">{getBestBenefitText(biz)}</span>
+                        </div>
+                      ) : (
+                        <div className="bg-white text-blink-ink border-2 border-blink-ink px-2 py-0.5 w-fit inline-block">
+                          <span className="font-bold text-xs font-mono">{getBestBenefitText(biz)}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Arrow */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        mapRef.current?.panTo({ lat, lng });
-                        mapRef.current?.setZoom(17);
+                        navigate(`/business/${biz.id}`, { state: { business: biz } });
                       }}
                       className="w-10 h-10 border-2 border-blink-ink bg-white flex items-center justify-center shadow-hard-sm hover:bg-blink-ink hover:text-white transition-colors shrink-0"
                     >
-                      <span className="material-symbols-outlined">near_me</span>
+                      <span className="material-symbols-outlined">arrow_forward</span>
                     </button>
                   </div>
                 </div>
-              ))
-            ) : (
-              /* ── Browse mode: list businesses ── */
-              listBusinesses.map(({ business: biz, address, locationCount }) => {
-                const isSelected = selectedBusiness?.id === biz.id;
-                return (
-                  <div
-                    key={biz.id}
-                    data-biz-id={biz.id}
-                    onClick={() => handleSelectFromList(biz)}
-                    className={`border-b-2 border-blink-ink p-4 transition-colors cursor-pointer relative ${
-                      isSelected ? 'bg-primary/10 active:bg-primary/20' : 'bg-white active:bg-gray-50'
-                    }`}
-                  >
-                    {/* Left accent bar for selected */}
-                    {isSelected && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary border-r-2 border-blink-ink" />
-                    )}
-
-                    <div className="flex gap-4 items-center">
-                      {/* Logo */}
-                      <div className="w-16 h-16 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-1 shadow-hard-sm">
-                        {biz.image ? (
-                          <img
-                            alt={biz.name}
-                            className={`w-full h-full object-contain ${isSelected ? '' : 'grayscale'}`}
-                            src={biz.image}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <span className="font-display text-xl text-blink-muted">
-                            {biz.name?.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-display text-base uppercase truncate">{biz.name}</h4>
-                        <p className="font-mono text-xs text-gray-600 truncate mb-1">
-                          {address}{biz.distanceText ? ` · ${biz.distanceText}` : ''}
-                          {locationCount > 1 ? ` · ${locationCount} suc.` : ''}
-                        </p>
-                        {isSelected ? (
-                          <div className="bg-blink-ink text-primary px-2 py-0.5 w-fit border border-primary transform -rotate-1 inline-block">
-                            <span className="font-display text-sm leading-none">{getBestBenefitText(biz)}</span>
-                          </div>
-                        ) : (
-                          <div className="bg-white text-blink-ink border-2 border-blink-ink px-2 py-0.5 w-fit inline-block">
-                            <span className="font-bold text-xs font-mono">{getBestBenefitText(biz)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Arrow */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/business/${biz.id}`, { state: { business: biz } });
-                        }}
-                        className="w-10 h-10 border-2 border-blink-ink bg-white flex items-center justify-center shadow-hard-sm hover:bg-blink-ink hover:text-white transition-colors shrink-0"
-                      >
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+              );
+            })}
           </div>
         )}
       </div>
