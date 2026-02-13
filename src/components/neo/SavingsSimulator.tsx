@@ -15,7 +15,7 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
     // Parse cap if provided (e.g., "$4.500" -> 4500)
     let cap = Infinity;
     if (maxCap) {
-      const numStr = maxCap.replace(/[^0-9]/g, '');
+      const numStr = String(maxCap).replace(/[^0-9]/g, '');
       if (numStr) cap = parseInt(numStr, 10);
     }
     const capped = Math.min(raw, cap);
