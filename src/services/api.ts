@@ -399,6 +399,18 @@ export async function fetchBusinesses(options: {
       return [];
     }
 
+    // Abbreviate day names and collapse full week to "Todos los días"
+    const DAY_ABBR: Record<string, string> = {
+      lunes: 'Lun', martes: 'Mar', miércoles: 'Mié', miercoles: 'Mié',
+      jueves: 'Jue', viernes: 'Vie', sábado: 'Sáb', sabado: 'Sáb', domingo: 'Dom',
+    };
+    const formatDays = (days: string[]): string => {
+      if (days.length >= 7) return 'Todos los días';
+      return days
+        .map((d) => DAY_ABBR[d.toLowerCase().trim()] || d)
+        .join(', ');
+    };
+
     // Group benefits by merchant name
     const businessMap = new Map<string, Business>();
 
@@ -425,7 +437,7 @@ export async function fetchBusinesses(options: {
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
-          cuando: benefit.availableDays.join(', '),
+          cuando: formatDays(benefit.availableDays),
           valor: `${benefit.discountPercentage || 0}%`,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
@@ -453,7 +465,7 @@ export async function fetchBusinesses(options: {
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
-          cuando: benefit.availableDays.join(', '),
+          cuando: formatDays(benefit.availableDays),
           valor: `${benefit.discountPercentage || 0}%`,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
