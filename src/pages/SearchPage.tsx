@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import FilterPanel from '../components/neo/FilterPanel';
@@ -9,26 +9,38 @@ import { Business, Category } from '../types';
 function SearchPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Init from URL params
-  const initialQuery = searchParams.get('q') || '';
-  const initialCategory = searchParams.get('category') || '';
-  const initialBank = searchParams.get('bank') || '';
 
-  const [searchTerm, setSearchTerm] = useState(initialQuery);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialQuery);
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [selectedBanks, setSelectedBanks] = useState(initialBank ? [initialBank] : []);
-  
+  // Init all state from URL params so filters survive navigation
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('q') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedBanks, setSelectedBanks] = useState(searchParams.get('bank') ? [searchParams.get('bank')!] : []);
+
   // Filter panel state
   const [showFilters, setShowFilters] = useState(false);
-  const [onlineOnly, setOnlineOnly] = useState(false);
-  const [maxDistance, setMaxDistance] = useState<number | undefined>(undefined);
-  const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
-  const [availableDay, setAvailableDay] = useState<string | undefined>(undefined);
-  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
-  const [network, setNetwork] = useState<string | undefined>(undefined);
-  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
+  const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
+  const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
+  const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
+  const [availableDay, setAvailableDay] = useState<string | undefined>(searchParams.get('day') || undefined);
+  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(searchParams.get('card') as 'credit' | 'debit' | undefined);
+  const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
+  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
+
+  // Sync filter state back to URL params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('q', debouncedSearch);
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedBanks.length > 0) params.set('bank', selectedBanks.join(','));
+    if (onlineOnly) params.set('online', '1');
+    if (maxDistance !== undefined) params.set('distance', String(maxDistance));
+    if (minDiscount !== undefined) params.set('discount', String(minDiscount));
+    if (availableDay) params.set('day', availableDay);
+    if (cardMode) params.set('card', cardMode);
+    if (network) params.set('network', network);
+    if (hasInstallments) params.set('installments', '1');
+    setSearchParams(params, { replace: true });
+  }, [debouncedSearch, selectedCategory, selectedBanks, onlineOnly, maxDistance, minDiscount, availableDay, cardMode, network, hasInstallments, setSearchParams]);
 
   // Debounce search
   useEffect(() => {
