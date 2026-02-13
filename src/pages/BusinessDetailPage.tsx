@@ -159,7 +159,7 @@ function BusinessDetailPage() {
                       </div>
                       {benefit.cardName && (
                         <span className="font-mono text-xs font-bold bg-gray-200 text-blink-ink px-1 border border-blink-ink">
-                          {benefit.cardName.toUpperCase()}
+                          {String(benefit.cardName).toUpperCase()}
                         </span>
                       )}
                     </div>
@@ -171,7 +171,7 @@ function BusinessDetailPage() {
                           </span>
                           {benefit.tope && (
                             <span className="font-display text-xl leading-none block text-blink-accent decoration-2 underline decoration-wavy">
-                              {benefit.tope.toUpperCase().includes('SIN TOPE') ? 'SIN TOPE' : `TOPE: ${benefit.tope}`}
+                              {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'SIN TOPE' : `TOPE: ${benefit.tope}`}
                             </span>
                           )}
                         </>
