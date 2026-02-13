@@ -32,7 +32,7 @@ const BottomNav: React.FC = () => {
             <Link
               key={tab.id}
               to={tab.path}
-              className={`flex flex-col items-center justify-center gap-1 w-1/4 group active:scale-95 transition-transform ${
+              className={`flex items-center justify-center w-1/4 group active:scale-95 transition-transform ${
                 isActive ? '' : 'opacity-60 hover:opacity-100'
               }`}
             >
@@ -45,7 +45,6 @@ const BottomNav: React.FC = () => {
                   {tab.icon}
                 </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wide">{tab.label}</span>
             </Link>
           );
         })}
