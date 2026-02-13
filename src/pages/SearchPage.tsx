@@ -161,51 +161,79 @@ function SearchPage() {
               <span className="material-symbols-outlined text-sm">tune</span>
               Filtros
             </button>
-            <button
-              onClick={() => {
-                if (selectedBanks.length > 0) setSelectedBanks([]);
-              }}
-              className={`px-4 py-1.5 rounded-full border-2 border-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap transition-colors ${
-                selectedBanks.length > 0
-                  ? 'bg-blink-ink text-white'
-                  : 'bg-white text-blink-ink hover:bg-primary/20'
-              }`}
-            >
-              Bancos
-            </button>
             {getCategoryLabel() ? (
               <button
                 onClick={() => setSelectedCategory('')}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-blink-ink text-white font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap"
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
               >
-                Categoría: {getCategoryLabel()}
+                {getCategoryLabel()}
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
               </button>
             ) : (
               <button
+                onClick={() => setShowFilters(true)}
                 className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
               >
                 Categoría
               </button>
             )}
-            {availableDay ? (
+            {minDiscount !== undefined ? (
               <button
-                onClick={() => setAvailableDay(undefined)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-blink-ink text-white font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap"
+                onClick={() => setMinDiscount(undefined)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
               >
-                Día: {availableDay === 'today' ? 'Hoy' : availableDay}
+                {minDiscount}%+
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
               </button>
             ) : (
               <button
+                onClick={() => setShowFilters(true)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
+              >
+                Descuento
+              </button>
+            )}
+            {availableDay ? (
+              <button
+                onClick={() => setAvailableDay(undefined)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
+              >
+                {availableDay === 'today' ? 'Hoy' : availableDay.charAt(0).toUpperCase() + availableDay.slice(1)}
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowFilters(true)}
                 className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
               >
                 Día
               </button>
             )}
-            <button
-              className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-            >
-              Tarjetas
-            </button>
+            {cardMode ? (
+              <button
+                onClick={() => setCardMode(undefined)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
+              >
+                {cardMode === 'credit' ? 'Crédito' : 'Débito'}
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowFilters(true)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
+              >
+                Tarjeta
+              </button>
+            )}
+            {onlineOnly && (
+              <button
+                onClick={() => setOnlineOnly(false)}
+                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
+              >
+                Online
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
