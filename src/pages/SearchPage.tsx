@@ -163,7 +163,7 @@ function SearchPage() {
           </div>
         </div>
 
-        {/* Filter Pills */}
+        {/* Filter Pills — active filters sort to the front */}
         <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-white py-3">
           <div className="flex px-4 gap-3 min-w-max">
             <button
@@ -173,79 +173,36 @@ function SearchPage() {
               <span className="material-symbols-outlined text-sm">tune</span>
               Filtros
             </button>
-            {getCategoryLabel() ? (
-              <button
-                onClick={() => setSelectedCategory('')}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-              >
-                {getCategoryLabel()}
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowFilters(true)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-              >
-                Categoría
-              </button>
-            )}
-            {minDiscount !== undefined ? (
-              <button
-                onClick={() => setMinDiscount(undefined)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-              >
-                {minDiscount}%+
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowFilters(true)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-              >
-                Descuento
-              </button>
-            )}
-            {availableDay ? (
-              <button
-                onClick={() => setAvailableDay(undefined)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-              >
-                {availableDay === 'today' ? 'Hoy' : availableDay.charAt(0).toUpperCase() + availableDay.slice(1)}
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowFilters(true)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-              >
-                Día
-              </button>
-            )}
-            {cardMode ? (
-              <button
-                onClick={() => setCardMode(undefined)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-              >
-                {cardMode === 'credit' ? 'Crédito' : 'Débito'}
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowFilters(true)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-              >
-                Tarjeta
-              </button>
-            )}
-            {onlineOnly && (
-              <button
-                onClick={() => setOnlineOnly(false)}
-                className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-              >
-                Online
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            )}
+            {[
+              { key: 'category', active: !!getCategoryLabel(), label: 'Categoría', activeLabel: getCategoryLabel() || '', onClear: () => setSelectedCategory('') },
+              { key: 'discount', active: minDiscount !== undefined, label: 'Descuento', activeLabel: `${minDiscount}%+`, onClear: () => setMinDiscount(undefined) },
+              { key: 'day', active: !!availableDay, label: 'Día', activeLabel: availableDay === 'today' ? 'Hoy' : availableDay ? availableDay.charAt(0).toUpperCase() + availableDay.slice(1) : '', onClear: () => setAvailableDay(undefined) },
+              { key: 'card', active: !!cardMode, label: 'Tarjeta', activeLabel: cardMode === 'credit' ? 'Crédito' : cardMode === 'debit' ? 'Débito' : '', onClear: () => setCardMode(undefined) },
+              { key: 'online', active: onlineOnly, label: 'Online', activeLabel: 'Online', onClear: () => setOnlineOnly(false) },
+              { key: 'network', active: !!network, label: 'Red', activeLabel: network?.toUpperCase() || '', onClear: () => setNetwork(undefined) },
+              { key: 'installments', active: !!hasInstallments, label: 'Cuotas', activeLabel: 'Cuotas S/Int', onClear: () => setHasInstallments(undefined) },
+            ]
+              .sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1))
+              .map((pill) =>
+                pill.active ? (
+                  <button
+                    key={pill.key}
+                    onClick={pill.onClear}
+                    className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
+                  >
+                    {pill.activeLabel}
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                ) : (
+                  <button
+                    key={pill.key}
+                    onClick={() => setShowFilters(true)}
+                    className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
+                  >
+                    {pill.label}
+                  </button>
+                ),
+              )}
           </div>
         </div>
       </header>
