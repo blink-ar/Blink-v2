@@ -104,7 +104,7 @@ function MapPage() {
     return businesses.find((b) => b.id === focusBusinessId) || null;
   }, [focusBusinessId, businesses]);
 
-  // ALL markers: one entry per valid location across all businesses
+  // ALL markers: one entry per valid location across all businesses, sorted by distance
   const mapMarkers: MapMarker[] = useMemo(() => {
     const source = isSingleBusinessMode && focusedBusiness
       ? [focusedBusiness]
@@ -123,8 +123,20 @@ function MapPage() {
         }
       });
     });
+
+    // Sort by distance to user location (closest first)
+    if (position) {
+      const userLat = position.latitude;
+      const userLng = position.longitude;
+      markers.sort((a, b) => {
+        const dA = (a.lat - userLat) ** 2 + (a.lng - userLng) ** 2;
+        const dB = (b.lat - userLat) ** 2 + (b.lng - userLng) ** 2;
+        return dA - dB;
+      });
+    }
+
     return markers;
-  }, [businesses, isSingleBusinessMode, focusedBusiness]);
+  }, [businesses, isSingleBusinessMode, focusedBusiness, position]);
 
 
   // Helpers
