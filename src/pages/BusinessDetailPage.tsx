@@ -1,22 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 
 function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const passedBusiness = (location.state as { business?: Business } | null)?.business;
+  const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
+  const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
+    if (passedBusiness) return;
     const load = async () => {
       if (!id) return;
       try {
         setLoading(true);
-        const response = await fetchBusinessesPaginated({ search: id, limit: 1 });
+        // Convert slug back to searchable name (e.g., "burger-king" -> "burger king")
+        const searchName = id.replace(/-/g, ' ');
+        const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
         if (response.success && response.businesses.length > 0) {
           setBusiness(response.businesses[0]);
         } else {
@@ -29,7 +34,7 @@ function BusinessDetailPage() {
       }
     };
     load();
-  }, [id]);
+  }, [id, passedBusiness]);
 
   // Sort benefits by discount (highest first)
   const sortedBenefits = useMemo(() => {

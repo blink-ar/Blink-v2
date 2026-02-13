@@ -135,7 +135,7 @@ function HomePage() {
               : top5.map((item, idx) => (
                     <article
                       key={`${item.business.id}-${idx}`}
-                      onClick={() => navigate(`/benefit/${item.business.id}/${item.benefitIndex}`)}
+                      onClick={() => navigate(`/benefit/${item.business.id}/${item.benefitIndex}`, { state: { business: item.business } })}
                       className="group relative flex-shrink-0 w-[260px] snap-center bg-blink-surface border-2 border-blink-ink shadow-hard active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer"
                     >
                       {/* Image */}

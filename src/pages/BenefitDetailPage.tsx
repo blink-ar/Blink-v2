@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
@@ -7,19 +7,28 @@ import SavingsSimulator from '../components/neo/SavingsSimulator';
 function BenefitDetailPage() {
   const { id, benefitIndex } = useParams<{ id: string; benefitIndex?: string }>();
   const navigate = useNavigate();
-  const [business, setBusiness] = useState<Business | null>(null);
+  const location = useLocation();
+  const passedBusiness = (location.state as { business?: Business } | null)?.business;
+  const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
 
   useEffect(() => {
+    if (passedBusiness) {
+      const idx = benefitIndex !== undefined ? parseInt(benefitIndex, 10) : 0;
+      setBenefit(passedBusiness.benefits[idx] || passedBusiness.benefits[0] || null);
+      return;
+    }
     const load = async () => {
       if (!id) return;
       try {
         setLoading(true);
-        const response = await fetchBusinessesPaginated({ search: id, limit: 1 });
+        // Convert slug back to searchable name (e.g., "burger-king" -> "burger king")
+        const searchName = id.replace(/-/g, ' ');
+        const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
         if (response.success && response.businesses.length > 0) {
           const biz = response.businesses[0];
           setBusiness(biz);
@@ -35,7 +44,7 @@ function BenefitDetailPage() {
       }
     };
     load();
-  }, [id, benefitIndex]);
+  }, [id, benefitIndex, passedBusiness]);
 
   if (loading) {
     return (

@@ -239,7 +239,7 @@ function SearchPage() {
             return (
               <div
                 key={business.id}
-                onClick={() => navigate(`/business/${business.id}`)}
+                onClick={() => navigate(`/business/${business.id}`, { state: { business } })}
                 className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
               >
                 <div className="flex p-4 gap-4 items-center">
