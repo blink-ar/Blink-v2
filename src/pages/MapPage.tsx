@@ -32,12 +32,19 @@ const CATEGORY_CHIPS = [
   { id: 'electro', label: 'Electro' },
 ];
 
-// One entry per business (using first valid location)
-interface MapBusiness {
+// One entry per location (a business with N branches = N markers)
+interface MapMarker {
   business: Business;
   lat: number;
   lng: number;
   address: string;
+}
+
+// One entry per business (for bottom sheet list)
+interface ListBusiness {
+  business: Business;
+  address: string;
+  locationCount: number;
 }
 
 function MapPage() {
@@ -94,21 +101,55 @@ function MapPage() {
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Build deduplicated list: one entry per business using first valid location
-  const mapBusinesses: MapBusiness[] = useMemo(() => {
-    return businesses
+  // Single-business mode: when coming from a business/benefit detail page
+  const isSingleBusinessMode = !!focusBusinessId;
+
+  // Find the focused business from loaded data
+  const focusedBusiness = useMemo(() => {
+    if (!focusBusinessId) return null;
+    return businesses.find((b) => b.id === focusBusinessId) || null;
+  }, [focusBusinessId, businesses]);
+
+  // ALL markers: one entry per valid location across all businesses
+  const mapMarkers: MapMarker[] = useMemo(() => {
+    const source = isSingleBusinessMode && focusedBusiness
+      ? [focusedBusiness]
+      : businesses;
+
+    const markers: MapMarker[] = [];
+    source.forEach((biz) => {
+      biz.location.forEach((loc) => {
+        if (loc.lat !== 0 || loc.lng !== 0) {
+          markers.push({
+            business: biz,
+            lat: loc.lat,
+            lng: loc.lng,
+            address: loc.formattedAddress || loc.name || '',
+          });
+        }
+      });
+    });
+    return markers;
+  }, [businesses, isSingleBusinessMode, focusedBusiness]);
+
+  // Deduplicated list for bottom sheet (one per business)
+  const listBusinesses: ListBusiness[] = useMemo(() => {
+    const source = isSingleBusinessMode && focusedBusiness
+      ? [focusedBusiness]
+      : businesses;
+
+    return source
       .map((biz) => {
-        const loc = biz.location.find((l) => l.lat !== 0 || l.lng !== 0);
-        if (!loc) return null;
+        const validLocs = biz.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+        if (validLocs.length === 0) return null;
         return {
           business: biz,
-          lat: loc.lat,
-          lng: loc.lng,
-          address: loc.formattedAddress || loc.name || '',
+          address: validLocs[0].formattedAddress || validLocs[0].name || '',
+          locationCount: validLocs.length,
         };
       })
-      .filter(Boolean) as MapBusiness[];
-  }, [businesses]);
+      .filter(Boolean) as ListBusiness[];
+  }, [businesses, isSingleBusinessMode, focusedBusiness]);
 
   // Helpers
   const getMaxDiscount = (biz: Business) => {
@@ -254,8 +295,8 @@ function MapPage() {
       }
     }
 
-    // Create overlays
-    mapBusinesses.forEach(({ business: biz, lat, lng }) => {
+    // Create overlays — one per location
+    mapMarkers.forEach(({ business: biz, lat, lng }) => {
       const isSelected = selected?.id === biz.id;
       const pos = new google.maps.LatLng(lat, lng);
       const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
@@ -266,7 +307,7 @@ function MapPage() {
       (overlay as any).__businessId = biz.id;
       overlaysRef.current.push(overlay);
     });
-  }, [mapBusinesses, clearOverlays]);
+  }, [mapMarkers, clearOverlays]);
 
   // ─── User location overlay ─────────────────────────────────────
 
@@ -364,18 +405,22 @@ function MapPage() {
       buildOverlays(google, mapRef.current, selectedBusiness);
 
       // Fit bounds
-      if (focusBusinessId) {
-        const target = mapBusinesses.find((m) => m.business.id === focusBusinessId);
-        if (target) {
-          mapRef.current.setCenter({ lat: target.lat, lng: target.lng });
-          mapRef.current.setZoom(16);
-          setSelectedBusiness(target.business);
-        }
-      } else if (mapBusinesses.length > 0) {
+      if (mapMarkers.length > 0) {
         const bounds = new google.maps.LatLngBounds();
-        mapBusinesses.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
-        if (position) bounds.extend({ lat: position.latitude, lng: position.longitude });
-        mapRef.current.fitBounds(bounds);
+        mapMarkers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+        if (!isSingleBusinessMode && position) {
+          bounds.extend({ lat: position.latitude, lng: position.longitude });
+        }
+        if (mapMarkers.length === 1) {
+          mapRef.current.setCenter({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
+          mapRef.current.setZoom(16);
+        } else {
+          mapRef.current.fitBounds(bounds);
+        }
+        // Pre-select the focused business
+        if (isSingleBusinessMode && focusedBusiness) {
+          setSelectedBusiness(focusedBusiness);
+        }
       }
 
       setMapError(null);
@@ -383,7 +428,7 @@ function MapPage() {
       console.error('Map init failed', err);
       setMapError(err.message || 'No se pudo cargar el mapa');
     }
-  }, [position, mapBusinesses, focusBusinessId, buildOverlays, createUserLocationOverlay]);
+  }, [position, mapMarkers, isSingleBusinessMode, focusedBusiness, buildOverlays, createUserLocationOverlay]);
 
   // Init map when data is ready
   useEffect(() => {
@@ -409,10 +454,10 @@ function MapPage() {
     }
   }, [selectedBusiness]);
 
-  // Select business from list & pan map
+  // Select business from list & pan map to its first location
   const handleSelectFromList = (biz: Business) => {
     setSelectedBusiness(biz);
-    const target = mapBusinesses.find((m) => m.business.id === biz.id);
+    const target = mapMarkers.find((m) => m.business.id === biz.id);
     if (target && mapRef.current) {
       mapRef.current.panTo({ lat: target.lat, lng: target.lng });
       if ((mapRef.current.getZoom() || 0) < 15) mapRef.current.setZoom(15);
@@ -432,47 +477,63 @@ function MapPage() {
             <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>arrow_back</span>
           </button>
 
-          {/* Search */}
-          <div className="flex-1 h-12 relative">
-            <input
-              className="w-full h-full border-2 border-blink-ink bg-white px-3 font-display uppercase tracking-tight text-blink-ink placeholder-gray-400 focus:outline-none focus:ring-0 shadow-hard text-sm"
-              placeholder="BUSCAR TIENDAS..."
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <button className="absolute right-0 top-0 h-full w-12 flex items-center justify-center bg-blink-ink border-l-2 border-blink-ink">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>search</span>
-            </button>
-          </div>
+          {isSingleBusinessMode ? (
+            /* Single business mode: show business name + location count */
+            <div className="flex-1 h-12 border-2 border-blink-ink bg-white shadow-hard flex items-center px-3 gap-2 min-w-0">
+              <span className="font-display uppercase tracking-tight text-blink-ink text-sm truncate">
+                {focusedBusiness?.name || 'Cargando...'}
+              </span>
+              <span className="font-mono text-[10px] font-bold bg-primary px-2 py-0.5 border border-blink-ink whitespace-nowrap shrink-0">
+                {mapMarkers.length} {mapMarkers.length === 1 ? 'SUCURSAL' : 'SUCURSALES'}
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* Search */}
+              <div className="flex-1 h-12 relative">
+                <input
+                  className="w-full h-full border-2 border-blink-ink bg-white px-3 font-display uppercase tracking-tight text-blink-ink placeholder-gray-400 focus:outline-none focus:ring-0 shadow-hard text-sm"
+                  placeholder="BUSCAR TIENDAS..."
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button className="absolute right-0 top-0 h-full w-12 flex items-center justify-center bg-blink-ink border-l-2 border-blink-ink">
+                  <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>search</span>
+                </button>
+              </div>
 
-          {/* Filter toggle */}
-          <button
-            onClick={() => setShowFilters(true)}
-            className="flex items-center justify-center w-12 h-12 bg-blink-warning border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0"
-          >
-            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>tune</span>
-          </button>
-        </div>
-
-        {/* Category chips */}
-        <div className="pointer-events-auto w-full overflow-x-auto no-scrollbar mt-3">
-          <div className="flex gap-2 min-w-max pb-1">
-            {CATEGORY_CHIPS.map((chip) => (
+              {/* Filter toggle */}
               <button
-                key={chip.id}
-                onClick={() => setActiveChip(chip.id)}
-                className={`px-3 py-1.5 border-2 border-blink-ink font-bold uppercase text-xs shadow-hard-sm whitespace-nowrap transition-colors ${
-                  activeChip === chip.id
-                    ? 'bg-blink-ink text-primary'
-                    : 'bg-white text-blink-ink hover:bg-primary/20'
-                }`}
+                onClick={() => setShowFilters(true)}
+                className="flex items-center justify-center w-12 h-12 bg-blink-warning border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0"
               >
-                {chip.label}
+                <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>tune</span>
               </button>
-            ))}
-          </div>
+            </>
+          )}
         </div>
+
+        {/* Category chips — only in browse mode */}
+        {!isSingleBusinessMode && (
+          <div className="pointer-events-auto w-full overflow-x-auto no-scrollbar mt-3">
+            <div className="flex gap-2 min-w-max pb-1">
+              {CATEGORY_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => setActiveChip(chip.id)}
+                  className={`px-3 py-1.5 border-2 border-blink-ink font-bold uppercase text-xs shadow-hard-sm whitespace-nowrap transition-colors ${
+                    activeChip === chip.id
+                      ? 'bg-blink-ink text-primary'
+                      : 'bg-white text-blink-ink hover:bg-primary/20'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ─── Map ─── */}
@@ -519,86 +580,126 @@ function MapPage() {
         >
           <div className="w-12 h-1.5 bg-blink-ink mx-auto mb-3 rounded-full" />
           <div className="flex justify-between items-center mb-1">
-            <h3 className="font-display text-lg uppercase leading-tight">Cerca de tu ubicación</h3>
+            <h3 className="font-display text-lg uppercase leading-tight">
+              {isSingleBusinessMode ? 'Sucursales' : 'Cerca de tu ubicación'}
+            </h3>
             <span className="font-mono text-xs font-bold bg-primary px-2 py-1 border-2 border-blink-ink whitespace-nowrap">
-              {totalBusinesses} LUGARES
+              {isSingleBusinessMode ? `${mapMarkers.length} SUCURSALES` : `${totalBusinesses} LUGARES`}
             </span>
           </div>
         </div>
 
-        {/* Business list */}
+        {/* List */}
         {sheetExpanded && (
           <div ref={listRef} className="bg-blink-bg overflow-y-auto pb-20 border-t-2 border-blink-ink">
-            {mapBusinesses.length === 0 && !isLoading && (
+            {mapMarkers.length === 0 && !isLoading && (
               <div className="py-8 text-center">
                 <p className="font-mono text-sm text-blink-muted">Sin resultados en esta zona</p>
               </div>
             )}
 
-            {mapBusinesses.map(({ business: biz, address }) => {
-              const isSelected = selectedBusiness?.id === biz.id;
-              return (
+            {isSingleBusinessMode && focusedBusiness ? (
+              /* ── Single-business mode: list each location/branch ── */
+              mapMarkers.map(({ lat, lng, address }, idx) => (
                 <div
-                  key={biz.id}
-                  data-biz-id={biz.id}
-                  onClick={() => handleSelectFromList(biz)}
-                  className={`border-b-2 border-blink-ink p-4 transition-colors cursor-pointer relative ${
-                    isSelected ? 'bg-primary/10 active:bg-primary/20' : 'bg-white active:bg-gray-50'
-                  }`}
+                  key={`${focusedBusiness.id}-${idx}`}
+                  onClick={() => {
+                    setSelectedBusiness(focusedBusiness);
+                    mapRef.current?.panTo({ lat, lng });
+                    mapRef.current?.setZoom(16);
+                  }}
+                  className="border-b-2 border-blink-ink p-4 bg-white active:bg-gray-50 transition-colors cursor-pointer"
                 >
-                  {/* Left accent bar for selected */}
-                  {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary border-r-2 border-blink-ink" />
-                  )}
-
                   <div className="flex gap-4 items-center">
-                    {/* Logo */}
-                    <div className="w-16 h-16 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-1 shadow-hard-sm">
-                      {biz.image ? (
-                        <img
-                          alt={biz.name}
-                          className={`w-full h-full object-contain ${isSelected ? '' : 'grayscale'}`}
-                          src={biz.image}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span className="font-display text-xl text-blink-muted">
-                          {biz.name?.charAt(0)}
-                        </span>
-                      )}
+                    <div className="w-10 h-10 shrink-0 border-2 border-blink-ink bg-primary/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 20 }}>location_on</span>
                     </div>
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-display text-base uppercase truncate">{biz.name}</h4>
-                      <p className="font-mono text-xs text-gray-600 truncate mb-1">
-                        {address ? `${address}` : ''}{biz.distanceText ? ` · ${biz.distanceText}` : ''}
+                      <p className="font-mono text-xs text-gray-600 truncate">
+                        {address || `Sucursal ${idx + 1}`}
                       </p>
-                      {isSelected ? (
-                        <div className="bg-blink-ink text-primary px-2 py-0.5 w-fit border border-primary transform -rotate-1 inline-block">
-                          <span className="font-display text-sm leading-none">{getBestBenefitText(biz)}</span>
-                        </div>
-                      ) : (
-                        <div className="bg-white text-blink-ink border-2 border-blink-ink px-2 py-0.5 w-fit inline-block">
-                          <span className="font-bold text-xs font-mono">{getBestBenefitText(biz)}</span>
-                        </div>
-                      )}
                     </div>
-
-                    {/* Arrow */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/business/${biz.id}`, { state: { business: biz } });
+                        mapRef.current?.panTo({ lat, lng });
+                        mapRef.current?.setZoom(17);
                       }}
                       className="w-10 h-10 border-2 border-blink-ink bg-white flex items-center justify-center shadow-hard-sm hover:bg-blink-ink hover:text-white transition-colors shrink-0"
                     >
-                      <span className="material-symbols-outlined">arrow_forward</span>
+                      <span className="material-symbols-outlined">near_me</span>
                     </button>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              /* ── Browse mode: list businesses ── */
+              listBusinesses.map(({ business: biz, address, locationCount }) => {
+                const isSelected = selectedBusiness?.id === biz.id;
+                return (
+                  <div
+                    key={biz.id}
+                    data-biz-id={biz.id}
+                    onClick={() => handleSelectFromList(biz)}
+                    className={`border-b-2 border-blink-ink p-4 transition-colors cursor-pointer relative ${
+                      isSelected ? 'bg-primary/10 active:bg-primary/20' : 'bg-white active:bg-gray-50'
+                    }`}
+                  >
+                    {/* Left accent bar for selected */}
+                    {isSelected && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary border-r-2 border-blink-ink" />
+                    )}
+
+                    <div className="flex gap-4 items-center">
+                      {/* Logo */}
+                      <div className="w-16 h-16 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-1 shadow-hard-sm">
+                        {biz.image ? (
+                          <img
+                            alt={biz.name}
+                            className={`w-full h-full object-contain ${isSelected ? '' : 'grayscale'}`}
+                            src={biz.image}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="font-display text-xl text-blink-muted">
+                            {biz.name?.charAt(0)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-display text-base uppercase truncate">{biz.name}</h4>
+                        <p className="font-mono text-xs text-gray-600 truncate mb-1">
+                          {address}{biz.distanceText ? ` · ${biz.distanceText}` : ''}
+                          {locationCount > 1 ? ` · ${locationCount} suc.` : ''}
+                        </p>
+                        {isSelected ? (
+                          <div className="bg-blink-ink text-primary px-2 py-0.5 w-fit border border-primary transform -rotate-1 inline-block">
+                            <span className="font-display text-sm leading-none">{getBestBenefitText(biz)}</span>
+                          </div>
+                        ) : (
+                          <div className="bg-white text-blink-ink border-2 border-blink-ink px-2 py-0.5 w-fit inline-block">
+                            <span className="font-bold text-xs font-mono">{getBestBenefitText(biz)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Arrow */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/business/${biz.id}`, { state: { business: biz } });
+                        }}
+                        className="w-10 h-10 border-2 border-blink-ink bg-white flex items-center justify-center shadow-hard-sm hover:bg-blink-ink hover:text-white transition-colors shrink-0"
+                      >
+                        <span className="material-symbols-outlined">arrow_forward</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>
