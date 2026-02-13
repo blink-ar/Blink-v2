@@ -4,6 +4,24 @@ import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 
+const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
+const DAY_ABBR: Record<string, string> = {
+  lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié',
+  jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom',
+};
+
+const formatCuando = (cuando?: string): string => {
+  if (!cuando) return 'Todos los días';
+  const lower = cuando.toLowerCase();
+  const uniqueDays = new Set(ALL_DAYS.filter((d) => lower.includes(d)).map((d) => DAY_ABBR[d]));
+  if (uniqueDays.size >= 7) return 'Todos los días';
+  let result = cuando;
+  Object.entries(DAY_ABBR).forEach(([full, abbr]) => {
+    result = result.replace(new RegExp(full, 'gi'), abbr);
+  });
+  return result;
+};
+
 function BenefitDetailPage() {
   const { id, benefitIndex } = useParams<{ id: string; benefitIndex?: string }>();
   const navigate = useNavigate();
@@ -158,7 +176,7 @@ function BenefitDetailPage() {
           )}
           <div className="w-full h-0.5 bg-blink-ink mb-4" />
           <p className="text-sm font-bold leading-tight max-w-[80%] mx-auto">
-            {benefit.cuando || 'Todos los días'}.{' '}
+            {formatCuando(benefit.cuando)}.{' '}
             {benefit.tope ? `Tope de reintegro: ${benefit.tope}.` : ''}
             {benefit.description || ''}
           </p>

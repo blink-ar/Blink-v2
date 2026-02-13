@@ -3,6 +3,26 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 
+const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
+const DAY_ABBR: Record<string, string> = {
+  lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié',
+  jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom',
+};
+
+const formatCuando = (cuando?: string): string => {
+  if (!cuando) return 'Todos los días';
+  const lower = cuando.toLowerCase();
+  // Check if all days of the week are mentioned
+  const uniqueDays = new Set(ALL_DAYS.filter((d) => lower.includes(d)).map((d) => DAY_ABBR[d]));
+  if (uniqueDays.size >= 7) return 'Todos los días';
+  // Replace full day names with abbreviations
+  let result = cuando;
+  Object.entries(DAY_ABBR).forEach(([full, abbr]) => {
+    result = result.replace(new RegExp(full, 'gi'), abbr);
+  });
+  return result;
+};
+
 function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -196,7 +216,7 @@ function BusinessDetailPage() {
                     <div className="flex flex-col">
                       <span className="font-mono text-[10px] text-gray-500 uppercase">Días Válidos</span>
                       <span className="font-mono text-sm font-bold uppercase">
-                        {benefit.cuando || 'Todos los días'}
+                        {formatCuando(benefit.cuando)}
                       </span>
                     </div>
                     <button className="bg-blink-ink text-primary border-2 border-transparent hover:border-primary px-3 py-1 font-mono text-xs font-bold uppercase transition-colors">
@@ -239,7 +259,7 @@ function BusinessDetailPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-xs font-bold">{benefit.cuando?.toUpperCase() || 'TODOS'}</p>
+                      <p className="font-mono text-xs font-bold">{formatCuando(benefit.cuando).toUpperCase()}</p>
                     </div>
                   </div>
                 );
