@@ -579,7 +579,7 @@ function MapPage() {
             mapRef.current.fitBounds(bounds);
           }}
           className="absolute right-4 z-20 bg-white border-2 border-blink-ink p-3 shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
-          style={{ bottom: sheetExpanded ? 'calc(45vh + 16px)' : '140px' }}
+          style={{ bottom: sheetExpanded ? 'calc(45vh + 16px)' : 'calc(64px + 56px + 12px)' }}
         >
           <span className="material-symbols-outlined text-blink-ink">my_location</span>
         </button>
@@ -587,8 +587,11 @@ function MapPage() {
 
       {/* ─── Bottom Sheet ─── */}
       <div
-        className="absolute bottom-0 left-0 w-full z-30 flex flex-col transition-all duration-300"
-        style={{ maxHeight: sheetExpanded ? '45vh' : '80px' }}
+        className="absolute left-0 w-full z-30 flex flex-col transition-all duration-300"
+        style={{
+          bottom: 64,
+          maxHeight: sheetExpanded ? 'calc(45vh - 64px)' : '56px',
+        }}
       >
         {/* Handle + Header */}
         <div
