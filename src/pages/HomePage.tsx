@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
@@ -28,61 +28,21 @@ function HomePage() {
     navigate('/search');
   };
 
-  // Top 5 highest discount businesses
+  // Top 5 individual benefits by discount
   const top5 = useMemo(() => {
-    return businesses
-      .map((business) => {
-        let maxDiscount = 0;
-        business.benefits.forEach((b) => {
-          const match = b.rewardRate.match(/(\d+)%/);
-          if (match) maxDiscount = Math.max(maxDiscount, parseInt(match[1]));
-        });
-        return { ...business, maxDiscount };
-      })
-      .filter((b) => b.maxDiscount > 0)
-      .sort((a, b) => b.maxDiscount - a.maxDiscount)
+    const allBenefits: { business: Business; benefit: typeof businesses[0]['benefits'][0]; discount: number }[] = [];
+    businesses.forEach((business) => {
+      business.benefits.forEach((b) => {
+        const match = String(b.rewardRate).match(/(\d+)%/);
+        if (match) {
+          allBenefits.push({ business, benefit: b, discount: parseInt(match[1]) });
+        }
+      });
+    });
+    return allBenefits
+      .sort((a, b) => b.discount - a.discount)
       .slice(0, 5);
   }, [businesses]);
-
-  // Get best bank info for a business
-  const getBestBenefit = (business: Business) => {
-    let best = business.benefits[0];
-    let bestDiscount = 0;
-    business.benefits.forEach((b) => {
-      const match = b.rewardRate.match(/(\d+)%/);
-      if (match) {
-        const d = parseInt(match[1]);
-        if (d > bestDiscount) {
-          bestDiscount = d;
-          best = b;
-        }
-      }
-    });
-    return { benefit: best, discount: bestDiscount };
-  };
-
-  // Get unique bank names (short)
-  const getBankNames = (business: Business) => {
-    const banks = new Set<string>();
-    business.benefits.forEach((b) => {
-      if (b.bankName) {
-        // Shorten bank names
-        const short = b.bankName
-          .replace(/banco\s*/i, '')
-          .replace(/de chile/i, 'Chile')
-          .substring(0, 10);
-        banks.add(short);
-      }
-    });
-    return Array.from(banks).slice(0, 3).join(' / ');
-  };
-
-  // Get day label for a benefit
-  const getDayLabel = (business: Business) => {
-    const best = business.benefits[0];
-    if (best?.cuando) return best.cuando.toUpperCase().substring(0, 10);
-    return 'HOY';
-  };
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
@@ -172,51 +132,49 @@ function HomePage() {
               ? Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex-shrink-0 w-[260px] h-[220px] bg-blink-surface border-2 border-blink-ink shadow-hard animate-pulse" />
                 ))
-              : top5.map((business) => {
-                  const { discount } = getBestBenefit(business);
-                  return (
+              : top5.map((item, idx) => (
                     <article
-                      key={business.id}
-                      onClick={() => navigate(`/business/${business.id}`)}
+                      key={`${item.business.id}-${idx}`}
+                      onClick={() => navigate(`/business/${item.business.id}`)}
                       className="group relative flex-shrink-0 w-[260px] snap-center bg-blink-surface border-2 border-blink-ink shadow-hard active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer"
                     >
                       {/* Image */}
                       <div className="h-32 w-full overflow-hidden border-b-2 border-blink-ink relative bg-gray-100">
-                        {business.image && (
+                        {item.business.image && (
                           <img
-                            alt={business.name}
+                            alt={item.business.name}
                             className="w-full h-full object-cover grayscale-img"
-                            src={business.image}
+                            src={item.business.image}
                             loading="lazy"
                           />
                         )}
-                        {!business.image && (
+                        {!item.business.image && (
                           <div className="w-full h-full flex items-center justify-center bg-gray-200 font-display text-2xl text-blink-muted">
-                            {business.name?.charAt(0) || '?'}
+                            {item.business.name?.charAt(0) || '?'}
                           </div>
                         )}
                       </div>
                       {/* Content */}
                       <div className="p-3 flex flex-col gap-1">
                         <div className="flex items-start justify-between">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-lg leading-tight uppercase">
-                              {business.name}
+                          <div className="flex flex-col min-w-0 mr-2">
+                            <span className="font-bold text-sm leading-tight uppercase truncate">
+                              {item.business.name}
                             </span>
-                            <span className="text-xs font-mono text-blink-muted">
-                              {getBankNames(business)}
+                            <span className="text-xs font-mono text-blink-muted truncate">
+                              {item.benefit.bankName} · {item.benefit.cardName}
                             </span>
                           </div>
-                          <div className="flex flex-col items-end leading-none">
+                          <div className="flex flex-col items-end leading-none flex-shrink-0">
                             <span className="font-display text-3xl text-blink-accent">
-                              {discount}%
+                              {item.discount}%
                             </span>
                             <span className="font-display text-xs text-blink-ink -mt-1">OFF</span>
                           </div>
                         </div>
                         <div className="mt-2 pt-2 border-t-2 border-dashed border-blink-ink/20 flex justify-between items-center">
                           <span className="text-[10px] font-mono bg-blink-warning px-1 border border-blink-ink">
-                            {getDayLabel(business)}
+                            {item.benefit.cuando ? String(item.benefit.cuando).toUpperCase().substring(0, 10) : 'HOY'}
                           </span>
                           <span
                             className="material-symbols-outlined text-blink-ink hover:text-primary cursor-pointer"
@@ -227,8 +185,7 @@ function HomePage() {
                         </div>
                       </div>
                     </article>
-                  );
-                })}
+                  ))}
           </div>
         </section>
 
