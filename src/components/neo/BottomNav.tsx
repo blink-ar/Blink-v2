@@ -25,7 +25,7 @@ const BottomNav: React.FC = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 w-full bg-blink-surface border-t-2 border-blink-ink z-50 pb-safe">
-      <div className="flex justify-around items-end h-16 pb-2 px-2">
+      <div className="flex justify-around items-center h-16 px-2 overflow-hidden">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -37,7 +37,7 @@ const BottomNav: React.FC = () => {
               }`}
             >
               <div
-                className={`border-2 border-blink-ink p-1 shadow-hard-sm group-hover:-translate-y-1 transition-transform ${
+                className={`border-2 border-blink-ink p-1 shadow-hard-sm transition-transform ${
                   isActive ? 'bg-blink-warning' : 'bg-white'
                 }`}
               >
