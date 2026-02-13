@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getGoogleMaps } from '../services/googleMapsLoader';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
+import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { Business } from '../types';
 import BottomNav from '../components/neo/BottomNav';
 import FilterPanel from '../components/neo/FilterPanel';
@@ -83,7 +84,18 @@ function MapPage() {
     hasInstallments,
   }), [debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
 
-  const { businesses, isLoading, totalBusinesses } = useBenefitsData(filters);
+  const { businesses: rawBusinesses, isLoading, totalBusinesses } = useBenefitsData(filters);
+
+  // Apply client-side filters (discount, distance, day, network, card mode, installments, online)
+  const businesses = useEnrichedBusinesses(rawBusinesses, {
+    onlineOnly,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    network,
+    cardMode,
+    hasInstallments,
+  });
 
   // Map refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -430,10 +442,10 @@ function MapPage() {
 
   // Init map when data is ready
   useEffect(() => {
-    if (!isLoading && businesses.length > 0) {
+    if (!isLoading && rawBusinesses.length > 0) {
       initMap();
     }
-  }, [isLoading, businesses.length, initMap]);
+  }, [isLoading, rawBusinesses.length, initMap]);
 
   // Update overlays when selection changes (without reinitializing map)
   useEffect(() => {
