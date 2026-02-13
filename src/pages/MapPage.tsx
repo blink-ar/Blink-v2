@@ -109,6 +109,7 @@ function MapPage() {
   const [mapError, setMapError] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
 
   // Single-business mode: when coming from a business/benefit detail page
   const isSingleBusinessMode = !!focusBusinessId;
@@ -591,9 +592,20 @@ function MapPage() {
       >
         {/* Handle + Header */}
         <div
-          className="bg-white border-t-2 border-blink-ink px-4 pt-3 pb-2 shadow-[0_-4px_0_0_rgba(0,0,0,1)] relative z-40 cursor-pointer"
+          className="bg-white border-t-2 border-blink-ink px-4 pt-3 pb-2 shadow-[0_-4px_0_0_rgba(0,0,0,1)] relative z-40 cursor-pointer touch-none"
           style={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
           onClick={() => setSheetExpanded(!sheetExpanded)}
+          onTouchStart={(e) => {
+            touchStartY.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartY.current === null) return;
+            const dy = e.changedTouches[0].clientY - touchStartY.current;
+            touchStartY.current = null;
+            // Swipe up → expand, swipe down → collapse (30px threshold)
+            if (dy < -30) setSheetExpanded(true);
+            else if (dy > 30) setSheetExpanded(false);
+          }}
         >
           <div className="w-12 h-1.5 bg-blink-ink mx-auto mb-3 rounded-full" />
           <div className="flex justify-between items-center mb-1">
