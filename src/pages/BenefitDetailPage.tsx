@@ -161,18 +161,21 @@ function BenefitDetailPage() {
             <>
               <div className="text-6xl font-display tracking-tighter leading-none mb-2">{discount}%</div>
               <div className="text-2xl font-display tracking-tighter uppercase mb-4">DE AHORRO</div>
-            </>
-          ) : (
-            <>
-              <div className="text-4xl font-display tracking-tighter leading-none mb-2">
-                {benefit.rewardRate || benefit.benefit}
-              </div>
               {benefit.installments && benefit.installments > 0 && (
-                <div className="text-2xl font-display tracking-tighter uppercase mb-4">
-                  {benefit.installments} CUOTAS S/INT
+                <div className="text-lg font-display tracking-tighter uppercase mb-2 text-gray-600">
+                  + {benefit.installments} CUOTAS S/INT
                 </div>
               )}
             </>
+          ) : benefit.installments && benefit.installments > 0 ? (
+            <>
+              <div className="text-6xl font-display tracking-tighter leading-none mb-2">{benefit.installments}</div>
+              <div className="text-2xl font-display tracking-tighter uppercase mb-4">CUOTAS SIN INTERÉS</div>
+            </>
+          ) : (
+            <div className="text-3xl font-display tracking-tighter leading-none mb-4">
+              {benefit.benefit}
+            </div>
           )}
           <div className="w-full h-0.5 bg-blink-ink mb-4" />
           <p className="text-sm font-bold leading-tight max-w-[80%] mx-auto">

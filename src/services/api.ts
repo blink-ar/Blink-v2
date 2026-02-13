@@ -429,16 +429,18 @@ export async function fetchBusinesses(options: {
           benefits: []
         };
 
+        const discountPct = benefit.discountPercentage || 0;
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
           benefit: benefit.benefitTitle,
-          rewardRate: `${benefit.discountPercentage || 0}%`,
+          rewardRate: discountPct > 0 ? `${discountPct}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
           cuando: formatDays(benefit.availableDays),
-          valor: `${benefit.discountPercentage || 0}%`,
+          valor: discountPct > 0 ? `${discountPct}%` : undefined,
+          installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
@@ -457,16 +459,18 @@ export async function fetchBusinesses(options: {
         );
         business.location.push(...newLocations);
 
+        const discountPct2 = benefit.discountPercentage || 0;
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
           benefit: benefit.benefitTitle,
-          rewardRate: `${benefit.discountPercentage || 0}%`,
+          rewardRate: discountPct2 > 0 ? `${discountPct2}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
           cuando: formatDays(benefit.availableDays),
-          valor: `${benefit.discountPercentage || 0}%`,
+          valor: discountPct2 > 0 ? `${discountPct2}%` : undefined,
+          installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],

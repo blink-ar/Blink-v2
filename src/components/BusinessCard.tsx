@@ -79,7 +79,13 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
       return `hasta ${maxDiscount}% OFF`;
     }
 
-    return "hasta 15% OFF";
+    // Fallback to installments if no discount
+    const withInstallments = benefits.find((b) => b.installments && b.installments > 0);
+    if (withInstallments) {
+      return `${withInstallments.installments} cuotas s/int`;
+    }
+
+    return "Ver beneficios";
   };
 
   const getBenefitCount = (business: Business): string => {

@@ -62,7 +62,11 @@ function BusinessDetailPage() {
     return [...business.benefits].sort((a, b) => {
       const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
       const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
-      return dB - dA;
+      if (dB !== dA) return dB - dA;
+      // If discount is the same (e.g. both 0), prefer benefits with installments
+      const iA = a.installments || 0;
+      const iB = b.installments || 0;
+      return iB - iA;
     });
   }, [business]);
 
@@ -189,7 +193,7 @@ function BusinessDetailPage() {
                       )}
                     </div>
                     <div className="space-y-1">
-                      {discount ? (
+                      {discount && parseInt(discount) > 0 ? (
                         <>
                           <span className={`font-display ${isFirst ? 'text-5xl' : 'text-4xl'} leading-none block text-blink-ink`}>
                             {discount}% OFF
@@ -199,15 +203,24 @@ function BusinessDetailPage() {
                               {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'SIN TOPE' : `TOPE: ${benefit.tope}`}
                             </span>
                           )}
+                          {benefit.installments && benefit.installments > 0 && (
+                            <span className="font-display text-lg leading-none block text-blink-ink">
+                              + {benefit.installments} CUOTAS
+                            </span>
+                          )}
+                        </>
+                      ) : benefit.installments && benefit.installments > 0 ? (
+                        <>
+                          <span className={`font-display ${isFirst ? 'text-5xl' : 'text-4xl'} leading-none block text-blink-ink`}>
+                            {benefit.installments} CUOTAS
+                          </span>
+                          <span className="font-display text-xl leading-none block text-blink-accent">
+                            SIN INTERÉS
+                          </span>
                         </>
                       ) : (
-                        <span className="font-display text-4xl leading-none block text-blink-ink">
-                          {benefit.rewardRate || benefit.benefit}
-                        </span>
-                      )}
-                      {benefit.installments && benefit.installments > 0 && (
-                        <span className="font-display text-lg leading-none block text-blink-ink">
-                          + {benefit.installments} CUOTAS
+                        <span className="font-display text-2xl leading-none block text-blink-ink">
+                          {benefit.benefit}
                         </span>
                       )}
                     </div>
@@ -251,7 +264,11 @@ function BusinessDetailPage() {
                       </div>
                       <div>
                         <p className="font-display text-lg leading-none">
-                          {discount ? `${discount}% OFF` : benefit.rewardRate || benefit.benefit}
+                          {discount && parseInt(discount) > 0
+                            ? `${discount}% OFF`
+                            : benefit.installments && benefit.installments > 0
+                              ? `${benefit.installments} CUOTAS S/INT`
+                              : benefit.benefit}
                         </p>
                         <p className="font-mono text-[10px] text-gray-500">
                           {benefit.tope || benefit.condicion || ''}
