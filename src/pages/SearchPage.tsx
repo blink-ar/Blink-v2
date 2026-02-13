@@ -22,7 +22,7 @@ function SearchPage() {
   const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
   const [availableDay, setAvailableDay] = useState<string | undefined>(searchParams.get('day') || undefined);
-  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(searchParams.get('card') as 'credit' | 'debit' | undefined);
+  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
 
