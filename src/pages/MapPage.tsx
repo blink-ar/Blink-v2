@@ -8,7 +8,10 @@ import BottomNav from '../components/neo/BottomNav';
 import FilterPanel from '../components/neo/FilterPanel';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
-const DEFAULT_ZOOM = 14;
+
+// ~1km in degrees (used to create a 2km-wide bounding box)
+const KM_IN_LAT = 0.009; // ~1km
+const kmInLng = (lat: number) => 0.009 / Math.cos((lat * Math.PI) / 180);
 
 const MAP_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e9f2fe' }] },
@@ -368,7 +371,7 @@ function MapPage() {
       if (!mapRef.current) {
         mapRef.current = new google.maps.Map(mapContainerRef.current, {
           center,
-          zoom: DEFAULT_ZOOM,
+          zoom: 15,
           mapTypeControl: false,
           fullscreenControl: false,
           streetViewControl: false,
@@ -393,22 +396,29 @@ function MapPage() {
       buildOverlays(google, mapRef.current, selectedBusiness);
 
       // Fit bounds
-      if (mapMarkers.length > 0) {
-        const bounds = new google.maps.LatLngBounds();
-        mapMarkers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
-        if (!isSingleBusinessMode && position) {
-          bounds.extend({ lat: position.latitude, lng: position.longitude });
+      if (isSingleBusinessMode) {
+        // Single-business mode: fit all of that business's locations
+        if (mapMarkers.length > 0) {
+          const bounds = new google.maps.LatLngBounds();
+          mapMarkers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+          if (mapMarkers.length === 1) {
+            mapRef.current.setCenter({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
+            mapRef.current.setZoom(16);
+          } else {
+            mapRef.current.fitBounds(bounds);
+          }
+          if (focusedBusiness) setSelectedBusiness(focusedBusiness);
         }
-        if (mapMarkers.length === 1) {
-          mapRef.current.setCenter({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
-          mapRef.current.setZoom(16);
-        } else {
-          mapRef.current.fitBounds(bounds);
-        }
-        // Pre-select the focused business
-        if (isSingleBusinessMode && focusedBusiness) {
-          setSelectedBusiness(focusedBusiness);
-        }
+      } else if (position) {
+        // Browse mode with user location: 2km-wide view centered on user
+        const lat = position.latitude;
+        const lng = position.longitude;
+        const lngOff = kmInLng(lat);
+        const bounds = new google.maps.LatLngBounds(
+          { lat: lat - KM_IN_LAT, lng: lng - lngOff },
+          { lat: lat + KM_IN_LAT, lng: lng + lngOff },
+        );
+        mapRef.current.fitBounds(bounds);
       }
 
       setMapError(null);
@@ -545,8 +555,15 @@ function MapPage() {
       {position && (
         <button
           onClick={() => {
-            mapRef.current?.panTo({ lat: position.latitude, lng: position.longitude });
-            mapRef.current?.setZoom(15);
+            if (!mapRef.current || !googleRef.current) return;
+            const lat = position.latitude;
+            const lng = position.longitude;
+            const lngOff = kmInLng(lat);
+            const bounds = new googleRef.current.maps.LatLngBounds(
+              { lat: lat - KM_IN_LAT, lng: lng - lngOff },
+              { lat: lat + KM_IN_LAT, lng: lng + lngOff },
+            );
+            mapRef.current.fitBounds(bounds);
           }}
           className="absolute right-4 z-20 bg-white border-2 border-blink-ink p-3 shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
           style={{ bottom: sheetExpanded ? 'calc(45vh + 16px)' : '140px' }}
