@@ -30,12 +30,12 @@ function HomePage() {
 
   // Top 5 individual benefits by discount
   const top5 = useMemo(() => {
-    const allBenefits: { business: Business; benefit: typeof businesses[0]['benefits'][0]; discount: number }[] = [];
+    const allBenefits: { business: Business; benefit: typeof businesses[0]['benefits'][0]; benefitIndex: number; discount: number }[] = [];
     businesses.forEach((business) => {
-      business.benefits.forEach((b) => {
+      business.benefits.forEach((b, bIdx) => {
         const match = String(b.rewardRate).match(/(\d+)%/);
         if (match) {
-          allBenefits.push({ business, benefit: b, discount: parseInt(match[1]) });
+          allBenefits.push({ business, benefit: b, benefitIndex: bIdx, discount: parseInt(match[1]) });
         }
       });
     });
@@ -135,7 +135,7 @@ function HomePage() {
               : top5.map((item, idx) => (
                     <article
                       key={`${item.business.id}-${idx}`}
-                      onClick={() => navigate(`/business/${item.business.id}`)}
+                      onClick={() => navigate(`/benefit/${item.business.id}/${item.benefitIndex}`)}
                       className="group relative flex-shrink-0 w-[260px] snap-center bg-blink-surface border-2 border-blink-ink shadow-hard active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer"
                     >
                       {/* Image */}
