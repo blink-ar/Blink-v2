@@ -120,7 +120,7 @@ function BenefitDetailPage() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+      <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
         {/* Store Info */}
         <div className="flex flex-col items-center">
           <div className="w-24 h-24 border-2 border-blink-ink shadow-hard bg-white flex items-center justify-center p-2 mb-4">
