@@ -106,6 +106,7 @@ function MapPage() {
 
   // UI state
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
@@ -300,18 +301,22 @@ function MapPage() {
     }
 
     // Create overlays — one per location
-    mapMarkers.forEach(({ business: biz, lat, lng }) => {
-      const isSelected = selected?.id === biz.id;
+    mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
+      const isSelected = isSingleBusinessMode
+        ? selected?.id === biz.id && idx === 0
+        : selected?.id === biz.id;
       const pos = new google.maps.LatLng(lat, lng);
       const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
         setSelectedBusiness(biz);
+        setSelectedMarkerIdx(idx);
         map.panTo(pos);
       });
       overlay.setMap(map);
       (overlay as any).__businessId = biz.id;
+      (overlay as any).__markerIdx = idx;
       overlaysRef.current.push(overlay);
     });
-  }, [mapMarkers, clearOverlays]);
+  }, [mapMarkers, clearOverlays, isSingleBusinessMode]);
 
   // ─── User location overlay ─────────────────────────────────────
 
@@ -420,7 +425,12 @@ function MapPage() {
           } else {
             mapRef.current.fitBounds(bounds);
           }
-          if (focusedBusiness) setSelectedBusiness(focusedBusiness);
+          // Auto-select the first location (closest to user) by default
+          if (focusedBusiness) {
+            setSelectedBusiness(focusedBusiness);
+            setSelectedMarkerIdx(0);
+            mapRef.current.panTo({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
+          }
         }
       } else if (position) {
         // Browse mode with user location: 2km-wide view centered on user
@@ -452,18 +462,26 @@ function MapPage() {
   useEffect(() => {
     overlaysRef.current.forEach((o: any) => {
       if (typeof o.updateSelection === 'function') {
-        o.updateSelection(selectedBusiness?.id === o.__businessId);
+        const isSelected = isSingleBusinessMode
+          ? selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx
+          : selectedBusiness?.id === o.__businessId;
+        o.updateSelection(isSelected);
       }
     });
-  }, [selectedBusiness]);
+  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
 
-  // Scroll bottom sheet to selected business
+  // Scroll bottom sheet to selected business/marker
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
-      const el = listRef.current.querySelector(`[data-biz-id="${selectedBusiness.id}"]`);
+      let el;
+      if (isSingleBusinessMode && selectedMarkerIdx !== null) {
+        el = listRef.current.querySelector(`[data-marker-idx="${selectedMarkerIdx}"]`);
+      } else {
+        el = listRef.current.querySelector(`[data-biz-id="${selectedBusiness.id}"]`);
+      }
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [selectedBusiness]);
+  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
 
   // Select business from list & pan map to its first location
   const handleSelectFromList = (biz: Business) => {
@@ -631,13 +649,17 @@ function MapPage() {
             )}
 
             {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
-              const isSelected = selectedBusiness?.id === biz.id;
+              const isSelected = isSingleBusinessMode
+                ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
+                : selectedBusiness?.id === biz.id;
               return (
                 <div
                   key={`${biz.id}-${idx}`}
                   data-biz-id={biz.id}
+                  data-marker-idx={idx}
                   onClick={() => {
                     setSelectedBusiness(biz);
+                    setSelectedMarkerIdx(idx);
                     mapRef.current?.panTo({ lat, lng });
                     if ((mapRef.current?.getZoom() || 0) < 15) mapRef.current?.setZoom(15);
                   }}
