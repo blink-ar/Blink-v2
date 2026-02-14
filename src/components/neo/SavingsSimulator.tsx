@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 interface SavingsSimulatorProps {
   discountPercentage: number;
@@ -8,6 +8,8 @@ interface SavingsSimulatorProps {
 const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage, maxCap }) => {
   const [amount, setAmount] = useState(12000);
   const [customInput, setCustomInput] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const presets = [5000, 10000, 15000, 25000];
 
@@ -33,12 +35,58 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
         <span className="material-symbols-outlined text-lg">calculate</span>
       </div>
 
-      {/* Preset amounts */}
-      <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+      {/* Amount selection row */}
+      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+        {/* Custom amount toggle/input */}
+        {isEditing ? (
+          <div className="flex-shrink-0 flex items-center border-2 border-blink-ink bg-white">
+            <span className="pl-2 font-mono text-xs font-bold text-blink-muted">$</span>
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              autoFocus
+              value={customInput}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^0-9]/g, '');
+                setCustomInput(raw);
+                if (raw) setAmount(parseInt(raw, 10));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customInput) setIsEditing(false);
+              }}
+              onBlur={() => {
+                if (!customInput) { setIsEditing(false); }
+              }}
+              className="w-20 px-1 py-1 font-mono text-xs font-bold bg-transparent focus:outline-none"
+              placeholder="Monto"
+            />
+            <button
+              onClick={() => { if (customInput) setIsEditing(false); }}
+              className="px-2 py-1 text-blink-ink hover:bg-primary/20"
+            >
+              <span className="material-symbols-outlined text-sm">check</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setIsEditing(true); setCustomInput(''); }}
+            className={`flex-shrink-0 px-3 py-1 border-2 border-blink-ink font-mono text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              customInput
+                ? 'bg-blink-ink text-white'
+                : 'bg-white text-blink-ink hover:bg-primary/20'
+            }`}
+          >
+            {customInput ? formatCurrency(amount) : 'Tu monto'}
+            <span className="material-symbols-outlined text-sm">edit</span>
+          </button>
+        )}
+
+        {/* Preset amounts */}
         {presets.map((p) => (
           <button
             key={p}
-            onClick={() => { setAmount(p); setCustomInput(''); }}
+            onClick={() => { setAmount(p); setCustomInput(''); setIsEditing(false); }}
             className={`flex-shrink-0 px-3 py-1 border-2 border-blink-ink font-mono text-xs font-bold transition-colors ${
               amount === p && !customInput
                 ? 'bg-blink-ink text-white'
@@ -48,23 +96,6 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
             {formatCurrency(p)}
           </button>
         ))}
-      </div>
-
-      {/* Custom amount input */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="font-mono text-sm font-bold text-blink-muted">$</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          placeholder="Ingresá tu monto"
-          value={customInput}
-          onChange={(e) => {
-            const raw = e.target.value.replace(/[^0-9]/g, '');
-            setCustomInput(raw);
-            if (raw) setAmount(parseInt(raw, 10));
-          }}
-          className="flex-1 px-3 py-1.5 border-2 border-blink-ink font-mono text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-        />
       </div>
 
       <div className="space-y-3 font-mono text-sm">
