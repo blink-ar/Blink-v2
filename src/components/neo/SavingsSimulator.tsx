@@ -58,7 +58,7 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
               onBlur={() => {
                 if (!customInput) { setIsEditing(false); }
               }}
-              className="w-20 px-1 py-1 font-mono text-xs font-bold bg-transparent focus:outline-none"
+              className="w-24 px-1 py-1 font-mono text-base font-bold bg-transparent focus:outline-none"
               placeholder="Monto"
             />
             <button
