@@ -3,24 +3,17 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
+import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
 
-const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
-const DAY_ABBR: Record<string, string> = {
-  lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié',
-  jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom',
-};
-
-const formatCuando = (cuando?: string): string => {
-  if (!cuando) return 'Todos los días';
-  const lower = cuando.toLowerCase();
-  const uniqueDays = new Set(ALL_DAYS.filter((d) => lower.includes(d)).map((d) => DAY_ABBR[d]));
-  if (uniqueDays.size >= 7) return 'Todos los días';
-  let result = cuando;
-  Object.entries(DAY_ABBR).forEach(([full, abbr]) => {
-    result = result.replace(new RegExp(full, 'gi'), abbr);
-  });
-  return result;
-};
+const BENEFIT_DAYS = [
+  { key: 'monday' as const, abbr: 'L' },
+  { key: 'tuesday' as const, abbr: 'M' },
+  { key: 'wednesday' as const, abbr: 'M' },
+  { key: 'thursday' as const, abbr: 'J' },
+  { key: 'friday' as const, abbr: 'V' },
+  { key: 'saturday' as const, abbr: 'S' },
+  { key: 'sunday' as const, abbr: 'D' },
+];
 
 function BenefitDetailPage() {
   const { id, benefitIndex } = useParams<{ id: string; benefitIndex?: string }>();
@@ -97,6 +90,9 @@ function BenefitDetailPage() {
 
   const validUntilFormatted = formatDate(benefit.validUntil);
 
+  // Parse day availability for visual indicators
+  const dayAvailability = parseDayAvailabilityFromBenefit(benefit);
+
   // Build terms text
   const termsText = [
     benefit.condicion,
@@ -148,19 +144,40 @@ function BenefitDetailPage() {
         </div>
 
         {/* Main Benefit Card */}
-        <div className="border-2 border-blink-ink shadow-hard bg-white p-6 text-center relative overflow-hidden">
+        <div className="border-2 border-blink-ink shadow-hard bg-white p-6 pt-10 text-center relative overflow-hidden">
           {validUntilFormatted && (
             <div className="absolute top-0 right-0 bg-blink-ink text-white px-2 py-1 text-xs font-mono border-b-2 border-l-2 border-blink-ink">
               VÁLIDO HASTA {validUntilFormatted}
             </div>
           )}
-          <p className="font-mono text-sm text-gray-500 mb-1 mt-4">
-            CON {benefit.bankName.toUpperCase()}
+
+          {/* Days of Week */}
+          <div className="flex flex-col items-center gap-2 mb-4">
+            <span className="text-[10px] font-bold font-mono uppercase text-gray-400">Días de vigencia</span>
+            <div className="flex gap-1">
+              {BENEFIT_DAYS.map((day) => {
+                const isActive = dayAvailability?.allDays || dayAvailability?.[day.key] || false;
+                return (
+                  <div
+                    key={day.key}
+                    className={`w-7 h-7 flex items-center justify-center border-2 border-blink-ink font-bold text-xs ${
+                      isActive ? 'bg-primary shadow-hard-sm' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {day.abbr}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <p className="font-mono text-xs text-gray-500 mb-1 uppercase tracking-tight">
+            Con {benefit.bankName}
           </p>
           {discount > 0 ? (
             <>
-              <div className="text-6xl font-display tracking-tighter leading-none mb-2">{discount}%</div>
-              <div className="text-2xl font-display tracking-tighter uppercase mb-4">DE AHORRO</div>
+              <div className="text-6xl font-display tracking-tighter leading-none mb-1">{discount}%</div>
+              <div className="text-2xl font-display tracking-tighter uppercase mb-2">DE AHORRO</div>
               {benefit.installments && benefit.installments > 0 && (
                 <div className="text-lg font-display tracking-tighter uppercase mb-2 text-gray-600">
                   + {benefit.installments} CUOTAS S/INT
@@ -169,19 +186,36 @@ function BenefitDetailPage() {
             </>
           ) : benefit.installments && benefit.installments > 0 ? (
             <>
-              <div className="text-6xl font-display tracking-tighter leading-none mb-2">{benefit.installments}</div>
-              <div className="text-2xl font-display tracking-tighter uppercase mb-4">CUOTAS SIN INTERÉS</div>
+              <div className="text-6xl font-display tracking-tighter leading-none mb-1">{benefit.installments}</div>
+              <div className="text-2xl font-display tracking-tighter uppercase mb-2">CUOTAS SIN INTERÉS</div>
             </>
           ) : (
-            <div className="text-3xl font-display tracking-tighter leading-none mb-4">
+            <div className="text-3xl font-display tracking-tighter leading-none mb-2">
               {benefit.benefit}
             </div>
           )}
-          <div className="w-full h-0.5 bg-blink-ink mb-4" />
-          <p className="text-sm font-bold leading-tight max-w-[80%] mx-auto">
-            {formatCuando(benefit.cuando)}.{' '}
-            {benefit.tope ? `Tope de reintegro: ${benefit.tope}.` : ''}
-            {benefit.description || ''}
+
+          {/* Tope de Reintegro + Description */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-0.5 bg-black/10" />
+            {benefit.tope && (
+              <div className="font-bold text-sm tracking-tight flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">payments</span>
+                <span>TOPE DE REINTEGRO: {benefit.tope}</span>
+              </div>
+            )}
+            {benefit.description && (
+              <div className="px-2">
+                <p className="text-sm font-medium leading-relaxed text-gray-800">
+                  {benefit.description}
+                </p>
+              </div>
+            )}
+            <div className="w-16 h-0.5 bg-black/10" />
+          </div>
+
+          <p className="text-[11px] font-medium text-gray-500 mt-4 leading-tight italic">
+            * Por transacción. Consultar bases legales.
           </p>
         </div>
 
