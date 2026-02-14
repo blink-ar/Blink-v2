@@ -173,7 +173,7 @@ function BusinessDetailPage() {
               return (
                 <div
                   key={`${benefit.bankName}-${idx}`}
-                  onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`)}
+                  onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`, { state: { business } })}
                   className={`w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col relative overflow-hidden group active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer`}
                 >
                   {isFirst && (
@@ -255,7 +255,7 @@ function BusinessDetailPage() {
                 return (
                   <div
                     key={`other-${benefit.bankName}-${idx}`}
-                    onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`)}
+                    onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`, { state: { business } })}
                     className="bg-white border-2 border-blink-ink shadow-hard-sm p-3 flex items-center justify-between active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
