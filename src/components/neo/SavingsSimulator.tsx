@@ -7,6 +7,7 @@ interface SavingsSimulatorProps {
 
 const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage, maxCap }) => {
   const [amount, setAmount] = useState(12000);
+  const [customInput, setCustomInput] = useState('');
 
   const presets = [5000, 10000, 15000, 25000];
 
@@ -33,13 +34,13 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
       </div>
 
       {/* Preset amounts */}
-      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+      <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
         {presets.map((p) => (
           <button
             key={p}
-            onClick={() => setAmount(p)}
+            onClick={() => { setAmount(p); setCustomInput(''); }}
             className={`flex-shrink-0 px-3 py-1 border-2 border-blink-ink font-mono text-xs font-bold transition-colors ${
-              amount === p
+              amount === p && !customInput
                 ? 'bg-blink-ink text-white'
                 : 'bg-white text-blink-ink hover:bg-primary/20'
             }`}
@@ -47,6 +48,23 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
             {formatCurrency(p)}
           </button>
         ))}
+      </div>
+
+      {/* Custom amount input */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="font-mono text-sm font-bold text-blink-muted">$</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Ingresá tu monto"
+          value={customInput}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^0-9]/g, '');
+            setCustomInput(raw);
+            if (raw) setAmount(parseInt(raw, 10));
+          }}
+          className="flex-1 px-3 py-1.5 border-2 border-blink-ink font-mono text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+        />
       </div>
 
       <div className="space-y-3 font-mono text-sm">
