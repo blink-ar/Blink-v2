@@ -11,6 +11,12 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
   const presets = [5000, 10000, 15000, 25000];
 
   const { savings, total, cappedSavings } = useMemo(() => {
