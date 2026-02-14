@@ -178,7 +178,7 @@ function BenefitDetailPage() {
             <>
               <div className="text-6xl font-display tracking-tighter leading-none mb-1">{discount}%</div>
               <div className="text-2xl font-display tracking-tighter uppercase mb-2">DE AHORRO</div>
-              {benefit.installments && benefit.installments > 0 && (
+              {benefit.installments != null && benefit.installments > 0 && (
                 <div className="text-lg font-display tracking-tighter uppercase mb-2 text-gray-600">
                   + {benefit.installments} CUOTAS S/INT
                 </div>
