@@ -115,7 +115,6 @@ export async function fetchBusinessesPaginated(options: {
 
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {
-      console.log('[API] Raw business from backend:', JSON.stringify(data.businesses[0], null, 2));
       data.businesses = normalizeBusinesses(data.businesses);
     }
 
@@ -285,9 +284,7 @@ export async function fetchBankSubscriptions(): Promise<BankSubscription[]> {
     }
 
     const data = await response.json();
-    console.log('[API] fetchBankSubscriptions raw response:', data);
     const rawSubscriptions = data.benefits || [];
-    console.log('[API] fetchBankSubscriptions first item:', rawSubscriptions[0]);
 
     return rawSubscriptions.map((raw: any) => ({
       id: raw._id?.$oid || raw._id || raw.id,

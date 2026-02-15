@@ -77,8 +77,6 @@ function BenefitDetailPage() {
   }
 
   const subscriptionName = getSubscriptionName(benefit.subscription);
-  console.log('[BenefitDetailPage] benefit.subscription:', benefit.subscription);
-  console.log('[BenefitDetailPage] subscriptionName:', subscriptionName);
 
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const isOnline = business.hasOnline;
@@ -177,14 +175,16 @@ function BenefitDetailPage() {
             </div>
           </div>
 
-          <p className="font-mono text-xs text-gray-500 mb-1 uppercase tracking-tight">
-            Con {benefit.bankName}
-            {getSubscriptionName(benefit.subscription) && (
-              <span className="ml-2 bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize">
-                {getSubscriptionName(benefit.subscription)}
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="font-mono text-xs text-gray-500 uppercase tracking-tight">
+              Con {benefit.bankName}
+            </span>
+            {subscriptionName && (
+              <span className="bg-blink-accent text-white px-2 py-0.5 text-[10px] font-bold border-2 border-blink-ink uppercase tracking-tight">
+                {subscriptionName}
               </span>
             )}
-          </p>
+          </div>
           {discount > 0 ? (
             <>
               <div className="text-6xl font-display tracking-tighter leading-none mb-1">{discount}%</div>

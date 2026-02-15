@@ -32,7 +32,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Create a lookup map for O(1) access
     const subscriptionMap = useMemo(() => {
-        console.log('[useSubscriptions] All subscriptions:', subscriptions);
         return new Map(subscriptions.map(sub => [sub.id, sub]));
     }, [subscriptions]);
 
@@ -55,7 +54,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     const getSubscriptionName = useCallback((id: string | null | undefined): string | null => {
         if (!id) return null;
         const subscription = subscriptionMap.get(id);
-        console.log('[useSubscriptions] Looking for ID:', id, '| Found:', subscription, '| Map size:', subscriptionMap.size);
         return subscription?.name || null;
     }, [subscriptionMap]);
 
