@@ -270,9 +270,11 @@ function BusinessDetailPage() {
                               ? `${benefit.installments} CUOTAS S/INT`
                               : benefit.benefit}
                         </p>
-                        <p className="font-mono text-[10px] text-gray-500">
-                          {benefit.tope || benefit.condicion || ''}
-                        </p>
+                        {benefit.tope && (
+                          <p className="font-mono text-[10px] text-gray-500">
+                            {benefit.tope}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
