@@ -2,6 +2,7 @@ import React from "react";
 import { BankBenefit } from "../types";
 import { GradientBadge, BadgeVariant } from "./GradientBadge";
 import { DaysOfWeek } from "./ui/DaysOfWeek";
+import { useSubscriptions } from "../hooks/useSubscriptions";
 
 interface ModernBenefitCardProps {
   benefit: BankBenefit;
@@ -14,6 +15,8 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
   onSelect,
   variant = "active",
 }) => {
+  const { getSubscriptionName } = useSubscriptions();
+
   // Extract discount percentage from rewardRate
   const getDiscountPercentage = (rewardRate: string) => {
     const match = rewardRate.match(/(\d+)%/);
@@ -21,6 +24,7 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
   };
 
   const discountPercentage = getDiscountPercentage(benefit.rewardRate);
+  const subscriptionName = getSubscriptionName(benefit.subscription);
 
   return (
     <div
@@ -41,6 +45,11 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
           {variant === "featured" && (
             <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
               Destacado
+            </div>
+          )}
+          {subscriptionName && (
+            <div className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium capitalize">
+              {subscriptionName}
             </div>
           )}
           <div className="text-xs font-medium text-gray-600">

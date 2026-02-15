@@ -19,6 +19,7 @@ export interface Benefit {
     online: boolean;
     link: string | null;
     availableDays: string[];
+    subscription?: string | null; // Reference to bank_subscriptions collection ID
     sourceMeta?: {
         type: 'json' | 'text';
         payload: string;
@@ -93,6 +94,23 @@ export interface MongoDate {
     $date: string;
 }
 
+/**
+ * Bank Subscription from bank_subscriptions collection
+ */
+export interface BankSubscription {
+    id: string;
+    bank: string;
+    name: string;
+    icon: string | null;
+}
+
+export interface RawBankSubscription {
+    _id: MongoObjectId;
+    bank: string;
+    name: string;
+    icon: string | null;
+}
+
 export interface RawMongoBenefit {
     _id: MongoObjectId;
     merchant: {
@@ -146,6 +164,7 @@ export interface RawMongoBenefit {
     sourceCollection: string;
     processedAt: MongoDate;
     processingStatus: string;
+    subscription?: MongoObjectId | null; // Reference to bank_subscriptions collection
 }
 
 export interface MongoBenefitsResponse {
@@ -283,6 +302,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             online: rawBenefit.online || false,
             link: rawBenefit.link || null,
             availableDays: rawBenefit.availableDays || [],
+            subscription: rawBenefit.subscription ? extractId(rawBenefit.subscription) : null,
             sourceMeta: {
                 type: 'json',
                 payload: JSON.stringify(rawBenefit),
@@ -330,6 +350,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             online: false,
             link: null,
             availableDays: [],
+            subscription: null,
             sourceMeta: {
                 type: 'json',
                 payload: JSON.stringify(rawBenefit),

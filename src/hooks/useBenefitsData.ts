@@ -10,6 +10,7 @@ import { useGeolocation } from './useGeolocation';
 export const queryKeys = {
     businesses: ['businesses'] as const,
     featuredBenefits: ['featuredBenefits'] as const,
+    subscriptions: ['bankSubscriptions'] as const,
 };
 
 const ITEMS_PER_PAGE = 20;
@@ -30,6 +31,7 @@ export interface BenefitsFilters {
     search?: string;
     category?: string;
     bank?: string;
+    subscription?: string; // Bank subscription ID from bank_subscriptions collection
     // New filters
     minDiscount?: number; // Minimum discount percentage
     maxDistance?: number; // Maximum distance in km
@@ -69,6 +71,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
                 ...(filters?.search && { search: filters.search }),
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),
+                ...(filters?.subscription && { subscription: filters.subscription }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {

@@ -4,6 +4,7 @@ import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
+import { useSubscriptions } from '../hooks/useSubscriptions';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -26,6 +27,7 @@ function BenefitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
+  const { getSubscriptionName } = useSubscriptions();
 
   useEffect(() => {
     if (passedBusiness) {
@@ -73,6 +75,10 @@ function BenefitDetailPage() {
       </div>
     );
   }
+
+  const subscriptionName = getSubscriptionName(benefit.subscription);
+  console.log('[BenefitDetailPage] benefit.subscription:', benefit.subscription);
+  console.log('[BenefitDetailPage] subscriptionName:', subscriptionName);
 
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const isOnline = business.hasOnline;
@@ -173,6 +179,11 @@ function BenefitDetailPage() {
 
           <p className="font-mono text-xs text-gray-500 mb-1 uppercase tracking-tight">
             Con {benefit.bankName}
+            {getSubscriptionName(benefit.subscription) && (
+              <span className="ml-2 bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize">
+                {getSubscriptionName(benefit.subscription)}
+              </span>
+            )}
           </p>
           {discount > 0 ? (
             <>
