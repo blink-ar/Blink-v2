@@ -211,6 +211,7 @@ function SearchPage() {
 
   const bankOptions = useMemo<BankFilterOption[]>(() => {
     const optionMap = new Map<string, BankFilterOption>();
+    const knownOrder = new Map(KNOWN_BANKS.map((bank, index) => [bank.token, index]));
 
     const addOption = (bankName: unknown) => {
       const descriptor = toBankDescriptor(bankName);
@@ -223,7 +224,14 @@ function SearchPage() {
     businessBankNames.forEach(addOption);
     selectedBanks.forEach(addOption);
 
-    return Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    return Array.from(optionMap.values()).sort((a, b) => {
+      const orderA = knownOrder.get(a.token);
+      const orderB = knownOrder.get(b.token);
+      if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
+      if (orderA !== undefined) return -1;
+      if (orderB !== undefined) return 1;
+      return a.label.localeCompare(b.label, 'es');
+    });
   }, [availableBankNames, businessBankNames, selectedBanks]);
 
   const bankMap = useMemo(
@@ -286,6 +294,8 @@ function SearchPage() {
     setDebouncedSearch('');
   };
 
+  const cartItemsCount = 3;
+
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
@@ -315,19 +325,25 @@ function SearchPage() {
               </button>
             )}
           </div>
+          <button className="flex items-center justify-center w-10 h-10 bg-blink-warning border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all relative">
+            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>shopping_bag</span>
+            <span className="absolute -top-2 -right-2 bg-blink-accent text-white font-mono text-xs border-2 border-blink-ink h-5 w-5 flex items-center justify-center rounded-full">
+              {cartItemsCount}
+            </span>
+          </button>
         </div>
 
         {/* Compact filter controls */}
-        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-blink-bg py-3">
+        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-white py-3">
           <div className="flex px-4 gap-3 min-w-max items-center">
             <button
               onClick={() => setShowFilters(true)}
-              className="relative w-12 h-12 border-2 border-blink-ink bg-blink-ink text-white shadow-hard-sm flex items-center justify-center"
+              className="relative w-10 h-10 flex items-center justify-center border-2 border-blink-ink bg-blink-ink text-white shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all mr-2"
               aria-label="Abrir filtros"
             >
               <span className="material-symbols-outlined text-xl">tune</span>
               {activeFilterCount > 0 && (
-                <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 border-2 border-blink-ink bg-primary text-blink-ink font-mono text-[10px] leading-none flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 h-5 min-w-5 px-1 border-2 border-blink-ink bg-primary text-blink-ink font-mono text-[10px] leading-none flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -335,38 +351,44 @@ function SearchPage() {
 
             <button
               onClick={() => setShowBankSheet(true)}
-              className="h-12 border-2 border-blink-ink bg-white shadow-hard-sm flex items-center shrink-0"
+              className="flex items-center border-2 border-blink-ink bg-blink-bg shadow-hard-sm px-1 py-1 gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all h-10 shrink-0"
             >
               {selectedBanks.length > 0 ? (
-                <div className="flex items-center h-full">
-                  {selectedBankPreview.map((bank) => (
-                    <span
+                <>
+                  <div className="flex items-center -space-x-2 pl-1">
+                    {selectedBankPreview.map((bank, index) => (
+                      <div
                       key={bank.token}
-                      className="h-full min-w-10 px-2 border-r border-blink-ink flex items-center justify-center font-display text-sm tracking-tight"
+                      className={`w-6 h-6 border-2 border-blink-ink flex items-center justify-center relative shadow-sm ${
+                        index === 0 ? 'bg-blink-warning z-30' : index === 1 ? 'bg-white z-20' : 'bg-white z-10'
+                      }`}
                     >
-                      {bank.code}
-                    </span>
+                      <span className="font-display text-[7px] uppercase leading-none text-blink-ink">
+                        {bank.code}
+                      </span>
+                    </div>
                   ))}
-                  <span className="h-full px-2 border-r border-blink-ink bg-primary flex items-center justify-center font-display text-sm">
+                </div>
+                <div className="w-6 h-6 border-2 border-blink-ink bg-primary flex items-center justify-center ml-1">
+                  <span className="font-mono text-[11px] font-bold text-blink-ink leading-none">
                     {selectedBanks.length}
                   </span>
                 </div>
-              ) : (
-                <span className="px-3 font-display text-sm uppercase">Bancos</span>
-              )}
-              <span className="w-10 h-full flex items-center justify-center border-l border-blink-ink">
-                <span className="material-symbols-outlined text-xl">expand_more</span>
-              </span>
+                </>
+              ) : <span className="px-2 font-display text-sm uppercase">Bancos</span>}
+              <div className="h-full flex items-center justify-center px-1">
+                <span className="material-symbols-outlined text-blink-ink text-lg">expand_more</span>
+              </div>
             </button>
 
-            <span className="h-8 w-px bg-blink-ink/20" />
+            <div className="w-px h-8 bg-gray-300 mx-1" />
 
             <button
               onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
-              className={`h-12 px-4 border-2 border-blink-ink shadow-hard-sm font-mono text-sm uppercase ${
+              className={`h-10 min-w-[92px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
                 hasInstallments === true
                   ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink'
+                  : 'bg-white text-blink-ink hover:bg-gray-50'
               }`}
             >
               Cuotas
@@ -374,10 +396,10 @@ function SearchPage() {
 
             <button
               onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
-              className={`h-12 px-4 border-2 border-blink-ink shadow-hard-sm font-mono text-sm uppercase ${
+              className={`h-10 min-w-[118px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
                 minDiscount !== undefined
                   ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink'
+                  : 'bg-white text-blink-ink hover:bg-gray-50'
               }`}
             >
               Descuento
