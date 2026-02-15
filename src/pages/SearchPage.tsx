@@ -150,7 +150,7 @@ function SearchPage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
+              autoFocus={false}
             />
             {searchTerm && (
               <button
