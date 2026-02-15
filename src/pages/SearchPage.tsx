@@ -1,10 +1,113 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
+import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
 import FilterPanel from '../components/neo/FilterPanel';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
-import { Business, Category } from '../types';
+import { fetchBanks } from '../services/api';
+import { Business } from '../types';
+
+interface BankDescriptor {
+  token: string;
+  code: string;
+  label: string;
+}
+
+const KNOWN_BANKS: BankDescriptor[] = [
+  { token: 'galicia', code: 'GAL', label: 'GALICIA' },
+  { token: 'santander', code: 'SAN', label: 'SANTANDER' },
+  { token: 'bbva', code: 'BBVA', label: 'BBVA' },
+  { token: 'macro', code: 'MAC', label: 'MACRO' },
+  { token: 'modo', code: 'MODO', label: 'MODO' },
+  { token: 'icbc', code: 'ICBC', label: 'ICBC' },
+  { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
+  { token: 'amex', code: 'AMEX', label: 'AMEX' },
+  { token: 'naranja', code: 'NX', label: 'NARANJA X' },
+  { token: 'nacion', code: 'BNA', label: 'NACION' },
+  { token: 'ciudad', code: 'CIU', label: 'CIUDAD' },
+  { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
+  { token: 'visa', code: 'VISA', label: 'VISA' },
+  { token: 'mastercard', code: 'MC', label: 'MASTERCARD' },
+];
+
+const asBankText = (value: unknown): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    const candidates = [
+      objectValue.bank,
+      objectValue.name,
+      objectValue.label,
+      objectValue.code,
+      objectValue.value,
+      objectValue.id,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' || typeof candidate === 'number') {
+        return String(candidate);
+      }
+    }
+  }
+  return '';
+};
+
+const normalizeText = (value: unknown) =>
+  asBankText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const sanitizeBankName = (value: unknown) =>
+  normalizeText(value)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
+  if (normalized.includes('galic')) return KNOWN_BANKS[0];
+  if (normalized.includes('santand')) return KNOWN_BANKS[1];
+  if (normalized.includes('bbva')) return KNOWN_BANKS[2];
+  if (normalized.includes('macro')) return KNOWN_BANKS[3];
+  if (normalized.includes('modo')) return KNOWN_BANKS[4];
+  if (normalized.includes('icbc')) return KNOWN_BANKS[5];
+  if (normalized.includes('hsbc')) return KNOWN_BANKS[6];
+  if (normalized.includes('amex') || normalized.includes('american express')) return KNOWN_BANKS[7];
+  if (normalized.includes('naranja x') || normalized.includes('naranjax') || normalized === 'nx') return KNOWN_BANKS[8];
+  if (normalized.includes('nacion')) return KNOWN_BANKS[9];
+  if (normalized.includes('ciudad')) return KNOWN_BANKS[10];
+  if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
+  if (normalized.includes('visa')) return KNOWN_BANKS[12];
+  if (normalized.includes('master')) return KNOWN_BANKS[13];
+  return null;
+};
+
+const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
+  const sanitized = sanitizeBankName(bankValue).replace(/^banco\s+/, '').trim();
+  if (!sanitized) {
+    return {
+      token: 'bank',
+      code: 'BANK',
+      label: 'BANCO',
+    };
+  }
+
+  const known = getKnownDescriptor(sanitized);
+  if (known) return known;
+
+  const words = sanitized.split(' ').filter(Boolean);
+  const token = words[0];
+  const codeSource = words.length > 1 ? words.map((word) => word[0]).join('') : words[0];
+  const code = codeSource.slice(0, 4).toUpperCase();
+
+  return {
+    token,
+    code,
+    label: sanitized.toUpperCase().slice(0, 18),
+  };
+};
 
 function SearchPage() {
   const navigate = useNavigate();
@@ -13,11 +116,22 @@ function SearchPage() {
   // Init all state from URL params so filters survive navigation
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('q') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
-  const [selectedBanks, setSelectedBanks] = useState(searchParams.get('bank') ? [searchParams.get('bank')!] : []);
+  const [selectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedBanks, setSelectedBanks] = useState<string[]>(() => {
+    const bankParam = searchParams.get('bank');
+    if (!bankParam) return [];
+
+    const parsedTokens = bankParam
+      .split(',')
+      .map((bank) => toBankDescriptor(bank).token)
+      .filter(Boolean);
+
+    return Array.from(new Set(parsedTokens));
+  });
 
   // Filter panel state
   const [showFilters, setShowFilters] = useState(false);
+  const [showBankSheet, setShowBankSheet] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
   const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
@@ -25,6 +139,12 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
+
+  const { data: availableBankNames = [] } = useQuery({
+    queryKey: ['availableBanks'],
+    queryFn: fetchBanks,
+    staleTime: 1000 * 60 * 30,
+  });
 
   // Sync filter state back to URL params
   useEffect(() => {
@@ -77,12 +197,64 @@ function SearchPage() {
     hasInstallments,
   });
 
+  const businessBankNames = useMemo(() => {
+    const names = new Set<string>();
+    businesses.forEach((business) => {
+      business.benefits.forEach((benefit) => {
+        if (benefit.bankName) {
+          names.add(benefit.bankName);
+        }
+      });
+    });
+    return Array.from(names);
+  }, [businesses]);
+
+  const bankOptions = useMemo<BankFilterOption[]>(() => {
+    const optionMap = new Map<string, BankFilterOption>();
+
+    const addOption = (bankName: unknown) => {
+      const descriptor = toBankDescriptor(bankName);
+      if (!optionMap.has(descriptor.token)) {
+        optionMap.set(descriptor.token, descriptor);
+      }
+    };
+
+    availableBankNames.forEach(addOption);
+    businessBankNames.forEach(addOption);
+    selectedBanks.forEach(addOption);
+
+    return Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }, [availableBankNames, businessBankNames, selectedBanks]);
+
+  const bankMap = useMemo(
+    () => new Map(bankOptions.map((option) => [option.token, option])),
+    [bankOptions],
+  );
+
+  const selectedBankPreview = selectedBanks
+    .slice(0, 3)
+    .map((token) => ({
+      token,
+      code: bankMap.get(token)?.code || toBankDescriptor(token).code,
+    }));
+
+  const activeFilterCount = [
+    selectedCategory && selectedCategory !== 'all',
+    onlineOnly,
+    maxDistance !== undefined,
+    minDiscount !== undefined,
+    availableDay !== undefined,
+    cardMode !== undefined,
+    network !== undefined,
+    hasInstallments !== undefined,
+  ].filter(Boolean).length;
+
   // Get max discount for a business
   const getMaxDiscount = (business: Business) => {
     let max = 0;
-    business.benefits.forEach((b) => {
-      const m = b.rewardRate.match(/(\d+)%/);
-      if (m) max = Math.max(max, parseInt(m[1]));
+    business.benefits.forEach((benefit) => {
+      const match = benefit.rewardRate.match(/(\d+)%/);
+      if (match) max = Math.max(max, parseInt(match[1], 10));
     });
     return max;
   };
@@ -91,8 +263,7 @@ function SearchPage() {
   const getBestBenefitText = (business: Business) => {
     const max = getMaxDiscount(business);
     if (max > 0) return `HASTA ${max}% OFF`;
-    // Check for installments
-    const withInstallments = business.benefits.find((b) => b.installments && b.installments > 0);
+    const withInstallments = business.benefits.find((benefit) => benefit.installments && benefit.installments > 0);
     if (withInstallments) return `${withInstallments.installments} CUOTAS S/INT`;
     return 'VER BENEFICIOS';
   };
@@ -101,30 +272,13 @@ function SearchPage() {
   const getBankBadges = (business: Business) => {
     const seen = new Set<string>();
     const badges: string[] = [];
-    business.benefits.forEach((b) => {
-      if (b.bankName && !seen.has(b.bankName)) {
-        seen.add(b.bankName);
-        // Abbreviate to 3-4 chars
-        const abbr = b.bankName
-          .replace(/banco\s*/i, '')
-          .substring(0, 4)
-          .toUpperCase();
-        badges.push(abbr);
+    business.benefits.forEach((benefit) => {
+      if (benefit.bankName && !seen.has(benefit.bankName)) {
+        seen.add(benefit.bankName);
+        badges.push(toBankDescriptor(benefit.bankName).code);
       }
     });
     return badges;
-  };
-
-  // Active filter pills info
-  const getCategoryLabel = () => {
-    if (!selectedCategory || selectedCategory === 'all') return null;
-    const labels: Record<string, string> = {
-      gastronomia: 'Gastronomía', moda: 'Moda', entretenimiento: 'Entretenimiento',
-      deportes: 'Deportes', regalos: 'Regalos', viajes: 'Viajes',
-      automotores: 'Automotores', belleza: 'Belleza', jugueterias: 'Jugueterías',
-      hogar: 'Hogar', electro: 'Electro', shopping: 'Supermercado', otros: 'Otros',
-    };
-    return labels[selectedCategory] || selectedCategory;
   };
 
   const clearSearch = () => {
@@ -149,7 +303,7 @@ function SearchPage() {
               placeholder="BUSCAR..."
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event) => setSearchTerm(event.target.value)}
               autoFocus={false}
             />
             {searchTerm && (
@@ -163,46 +317,71 @@ function SearchPage() {
           </div>
         </div>
 
-        {/* Filter Pills — active filters sort to the front */}
-        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-white py-3">
-          <div className="flex px-4 gap-3 min-w-max">
+        {/* Compact filter controls */}
+        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-blink-bg py-3">
+          <div className="flex px-4 gap-3 min-w-max items-center">
             <button
               onClick={() => setShowFilters(true)}
-              className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-blink-ink text-white font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
+              className="relative w-12 h-12 border-2 border-blink-ink bg-blink-ink text-white shadow-hard-sm flex items-center justify-center"
+              aria-label="Abrir filtros"
             >
-              <span className="material-symbols-outlined text-sm">tune</span>
-              Filtros
-            </button>
-            {[
-              { key: 'category', active: !!getCategoryLabel(), label: 'Categoría', activeLabel: getCategoryLabel() || '', onClear: () => setSelectedCategory('') },
-              { key: 'discount', active: minDiscount !== undefined, label: 'Descuento', activeLabel: `${minDiscount}%+`, onClear: () => setMinDiscount(undefined) },
-              { key: 'day', active: !!availableDay, label: 'Día', activeLabel: availableDay === 'today' ? 'Hoy' : availableDay ? availableDay.charAt(0).toUpperCase() + availableDay.slice(1) : '', onClear: () => setAvailableDay(undefined) },
-              { key: 'card', active: !!cardMode, label: 'Tarjeta', activeLabel: cardMode === 'credit' ? 'Crédito' : cardMode === 'debit' ? 'Débito' : '', onClear: () => setCardMode(undefined) },
-              { key: 'online', active: onlineOnly, label: 'Online', activeLabel: 'Online', onClear: () => setOnlineOnly(false) },
-              { key: 'network', active: !!network, label: 'Red', activeLabel: network?.toUpperCase() || '', onClear: () => setNetwork(undefined) },
-              { key: 'installments', active: !!hasInstallments, label: 'Cuotas', activeLabel: 'Cuotas S/Int', onClear: () => setHasInstallments(undefined) },
-            ]
-              .sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1))
-              .map((pill) =>
-                pill.active ? (
-                  <button
-                    key={pill.key}
-                    onClick={pill.onClear}
-                    className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-primary text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap flex items-center gap-1"
-                  >
-                    {pill.activeLabel}
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                  </button>
-                ) : (
-                  <button
-                    key={pill.key}
-                    onClick={() => setShowFilters(true)}
-                    className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-white text-blink-ink font-bold uppercase text-sm shadow-hard-sm whitespace-nowrap hover:bg-primary/20 transition-colors"
-                  >
-                    {pill.label}
-                  </button>
-                ),
+              <span className="material-symbols-outlined text-xl">tune</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 border-2 border-blink-ink bg-primary text-blink-ink font-mono text-[10px] leading-none flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setShowBankSheet(true)}
+              className="h-12 border-2 border-blink-ink bg-white shadow-hard-sm flex items-center shrink-0"
+            >
+              {selectedBanks.length > 0 ? (
+                <div className="flex items-center h-full">
+                  {selectedBankPreview.map((bank) => (
+                    <span
+                      key={bank.token}
+                      className="h-full min-w-10 px-2 border-r border-blink-ink flex items-center justify-center font-display text-sm tracking-tight"
+                    >
+                      {bank.code}
+                    </span>
+                  ))}
+                  <span className="h-full px-2 border-r border-blink-ink bg-primary flex items-center justify-center font-display text-sm">
+                    {selectedBanks.length}
+                  </span>
+                </div>
+              ) : (
+                <span className="px-3 font-display text-sm uppercase">Bancos</span>
+              )}
+              <span className="w-10 h-full flex items-center justify-center border-l border-blink-ink">
+                <span className="material-symbols-outlined text-xl">expand_more</span>
+              </span>
+            </button>
+
+            <span className="h-8 w-px bg-blink-ink/20" />
+
+            <button
+              onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
+              className={`h-12 px-4 border-2 border-blink-ink shadow-hard-sm font-mono text-sm uppercase ${
+                hasInstallments === true
+                  ? 'bg-primary text-blink-ink'
+                  : 'bg-white text-blink-ink'
+              }`}
+            >
+              Cuotas
+            </button>
+
+            <button
+              onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
+              className={`h-12 px-4 border-2 border-blink-ink shadow-hard-sm font-mono text-sm uppercase ${
+                minDiscount !== undefined
+                  ? 'bg-primary text-blink-ink'
+                  : 'bg-white text-blink-ink'
+              }`}
+            >
+              Descuento
+            </button>
           </div>
         </div>
       </header>
@@ -217,15 +396,14 @@ function SearchPage() {
         </div>
 
         {isLoading && !enrichedBusinesses.length ? (
-          // Loading skeletons
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard h-40 animate-pulse" />
+          Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard h-40 animate-pulse" />
           ))
         ) : enrichedBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 64 }}>search_off</span>
             <p className="font-display text-xl uppercase mt-4">Sin resultados</p>
-            <p className="font-mono text-sm text-blink-muted mt-2">Probá con otro término o filtro</p>
+            <p className="font-mono text-sm text-blink-muted mt-2">Proba con otro termino o filtro</p>
           </div>
         ) : (
           enrichedBusinesses.map((business) => {
@@ -266,9 +444,9 @@ function SearchPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
-                      {visibleBadges.map((badge, i) => (
+                      {visibleBadges.map((badge) => (
                         <div
-                          key={i}
+                          key={`${business.id}-${badge}`}
                           className="h-6 w-10 border border-blink-ink flex items-center justify-center bg-gray-100 text-[10px] font-bold font-mono"
                         >
                           {badge}
@@ -302,7 +480,7 @@ function SearchPage() {
             disabled={isLoadingMore}
             className="w-full py-3 border-2 border-dashed border-blink-ink font-mono text-sm font-bold uppercase hover:bg-gray-100 transition-colors disabled:opacity-50"
           >
-            {isLoadingMore ? 'Cargando...' : 'Cargar más tiendas'}
+            {isLoadingMore ? 'Cargando...' : 'Cargar mas tiendas'}
           </button>
         )}
       </main>
@@ -317,6 +495,17 @@ function SearchPage() {
           <span className="font-display uppercase tracking-wider text-sm">Mapa</span>
         </button>
       </div>
+
+      <BankFilterSheet
+        isOpen={showBankSheet}
+        options={bankOptions}
+        selectedTokens={selectedBanks}
+        onClose={() => setShowBankSheet(false)}
+        onApply={(tokens) => {
+          setSelectedBanks(tokens);
+          setShowBankSheet(false);
+        }}
+      />
 
       {/* Filter Panel */}
       <FilterPanel
