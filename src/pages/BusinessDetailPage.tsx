@@ -182,12 +182,12 @@ function BusinessDetailPage() {
                     </div>
                   )}
                   <div className="p-5 border-b-2 border-blink-ink bg-white">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className={`flex justify-between items-start mb-4 ${isFirst ? 'pr-28' : ''}`}>
                       <div className={`h-10 w-16 border-2 border-blink-ink flex items-center justify-center ${bankColor(benefit.bankName)} text-white shadow-hard-sm`}>
                         <span className="font-display text-sm tracking-tighter">{bankAbbr(benefit.bankName)}</span>
                       </div>
                       {benefit.cardName && (
-                        <span className="font-mono text-xs font-bold bg-gray-200 text-blink-ink px-1 border border-blink-ink">
+                        <span className="font-mono text-xs font-bold bg-gray-200 text-blink-ink px-1 border border-blink-ink truncate max-w-[50%]">
                           {String(benefit.cardName).toUpperCase()}
                         </span>
                       )}
