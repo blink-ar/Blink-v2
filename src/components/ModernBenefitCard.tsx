@@ -2,6 +2,7 @@ import React from "react";
 import { BankBenefit } from "../types";
 import { GradientBadge, BadgeVariant } from "./GradientBadge";
 import { DaysOfWeek } from "./ui/DaysOfWeek";
+import { useSubscriptions } from "../hooks/useSubscriptions";
 
 interface ModernBenefitCardProps {
   benefit: BankBenefit;
@@ -14,6 +15,8 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
   onSelect,
   variant = "active",
 }) => {
+  const { getSubscriptionName } = useSubscriptions();
+
   // Extract discount percentage from rewardRate
   const getDiscountPercentage = (rewardRate: string) => {
     const match = rewardRate.match(/(\d+)%/);
@@ -21,6 +24,7 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
   };
 
   const discountPercentage = getDiscountPercentage(benefit.rewardRate);
+  const subscriptionName = getSubscriptionName(benefit.subscription);
 
   return (
     <div
@@ -37,15 +41,17 @@ const ModernBenefitCard: React.FC<ModernBenefitCardProps> = ({
           size="md"
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {variant === "featured" && (
-            <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
+            <span className="bg-blink-warning text-blink-ink px-1.5 py-0.5 text-[10px] font-bold border border-blink-ink uppercase">
               Destacado
-            </div>
+            </span>
           )}
-          <div className="text-xs font-medium text-gray-600">
-            {benefit.cardName}
-          </div>
+          {subscriptionName && (
+            <span className="bg-blink-accent text-white px-1.5 py-0.5 text-[10px] font-bold border border-blink-ink uppercase">
+              {subscriptionName}
+            </span>
+          )}
         </div>
       </div>
 

@@ -21,6 +21,8 @@ export interface BankBenefit {
   installments?: number | null;
   validUntil?: string | null;
   id?: string;
+  // Subscription reference (ID from bank_subscriptions collection)
+  subscription?: string | null;
 }
 
 export interface Business {

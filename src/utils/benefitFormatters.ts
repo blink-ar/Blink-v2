@@ -368,10 +368,10 @@ export const formatBenefitValue = (discountPercentage: number | null | undefined
             }
 
             // Fallback if neither discount nor installments are available
-            return '0% OFF';
+            return '';
         },
         { discount: discountPercentage, inst: installments },
-        '0% OFF',
+        '',
         'formatBenefitValue'
     );
 };

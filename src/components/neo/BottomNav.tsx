@@ -1,0 +1,56 @@
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+
+export type NavTab = 'home' | 'search' | 'saved' | 'profile';
+
+const tabs = [
+  { id: 'home' as NavTab, label: 'Inicio', icon: 'home', path: '/home' },
+  { id: 'search' as NavTab, label: 'Buscar', icon: 'search', path: '/search' },
+  { id: 'saved' as NavTab, label: 'Guardados', icon: 'favorite', path: '/saved' },
+  { id: 'profile' as NavTab, label: 'Perfil', icon: 'person', path: '/profile' },
+];
+
+const BottomNav: React.FC = () => {
+  const location = useLocation();
+
+  const getActiveTab = (): NavTab => {
+    const path = location.pathname;
+    if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/saved')) return 'saved';
+    if (path.startsWith('/profile')) return 'profile';
+    return 'home';
+  };
+
+  const activeTab = getActiveTab();
+
+  return (
+    <nav className="fixed bottom-0 left-0 w-full bg-blink-surface border-t-2 border-blink-ink z-50 pb-safe">
+      <div className="flex justify-around items-center h-16 px-2 overflow-hidden">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <Link
+              key={tab.id}
+              to={tab.path}
+              className={`flex items-center justify-center w-1/4 group active:scale-95 transition-transform ${
+                isActive ? '' : 'opacity-60 hover:opacity-100'
+              }`}
+            >
+              <div
+                className={`border-2 border-blink-ink p-1 shadow-hard-sm transition-transform ${
+                  isActive ? 'bg-blink-warning' : 'bg-white'
+                }`}
+              >
+                <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>
+                  {tab.icon}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
+
+export default BottomNav;

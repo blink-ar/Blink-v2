@@ -7,7 +7,9 @@ import {
   MongoCategoriesResponse,
   MongoBanksResponse,
   MongoStatsResponse,
-  transformRawBenefitToBenefit
+  transformRawBenefitToBenefit,
+  BankSubscription,
+  RawBankSubscription
 } from '../types/mongodb';
 
 declare global {
@@ -17,6 +19,7 @@ declare global {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003';
 const COLLECTION = 'confirmed_benefits';
+const SUBSCRIPTIONS_COLLECTION = 'bank_subscriptions';
 
 // Response type for the new /api/businesses endpoint
 export interface BusinessesApiResponse {
@@ -76,10 +79,11 @@ export async function fetchBusinessesPaginated(options: {
   category?: string;
   bank?: string;
   search?: string;
+  subscription?: string;
   lat?: number;
   lng?: number;
 } = {}): Promise<BusinessesApiResponse> {
-  const { limit = 20, offset = 0, category, bank, search, lat, lng } = options;
+  const { limit = 20, offset = 0, category, bank, search, subscription, lat, lng } = options;
 
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
@@ -88,6 +92,7 @@ export async function fetchBusinessesPaginated(options: {
   if (category) params.append('category', category);
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
+  if (subscription) params.append('subscription', subscription);
   if (lat !== undefined && lng !== undefined) {
     params.append('lat', lat.toString());
     params.append('lng', lng.toString());
@@ -259,6 +264,47 @@ class BenefitsAPI {
 
 const benefitsAPI = new BenefitsAPI();
 
+// ===== BANK SUBSCRIPTIONS API =====
+
+interface BankSubscriptionsResponse {
+  success: boolean;
+  subscriptions: RawBankSubscription[];
+}
+
+/**
+ * Fetch all bank subscriptions from the bank_subscriptions collection
+ */
+export async function fetchBankSubscriptions(): Promise<BankSubscription[]> {
+  try {
+    const url = `${BASE_URL}/api/benefits?collection=${SUBSCRIPTIONS_COLLECTION}&limit=1000`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rawSubscriptions = data.benefits || [];
+
+    return rawSubscriptions.map((raw: any) => ({
+      id: raw._id?.$oid || raw._id || raw.id,
+      bank: raw.bank,
+      name: raw.name,
+      icon: raw.icon
+    }));
+  } catch (error) {
+    console.error('[API] fetchBankSubscriptions failed:', error);
+    return [];
+  }
+}
+
+/**
+ * Create a lookup map from subscription ID to subscription details
+ */
+export function createSubscriptionLookup(subscriptions: BankSubscription[]): Map<string, BankSubscription> {
+  return new Map(subscriptions.map(sub => [sub.id, sub]));
+}
+
 // New MongoDB-native functions
 export async function fetchBenefits(params: Record<string, string> = {}): Promise<Benefit[]> {
   try {
@@ -399,6 +445,18 @@ export async function fetchBusinesses(options: {
       return [];
     }
 
+    // Abbreviate day names and collapse full week to "Todos los días"
+    const DAY_ABBR: Record<string, string> = {
+      lunes: 'Lun', martes: 'Mar', miércoles: 'Mié', miercoles: 'Mié',
+      jueves: 'Jue', viernes: 'Vie', sábado: 'Sáb', sabado: 'Sáb', domingo: 'Dom',
+    };
+    const formatDays = (days: string[]): string => {
+      if (days.length >= 7) return 'Todos los días';
+      return days
+        .map((d) => DAY_ABBR[d.toLowerCase().trim()] || d)
+        .join(', ');
+    };
+
     // Group benefits by merchant name
     const businessMap = new Map<string, Business>();
 
@@ -417,20 +475,23 @@ export async function fetchBusinesses(options: {
           benefits: []
         };
 
+        const discountPct = benefit.discountPercentage || 0;
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
           benefit: benefit.benefitTitle,
-          rewardRate: `${benefit.discountPercentage || 0}%`,
+          rewardRate: discountPct > 0 ? `${discountPct}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
-          cuando: benefit.availableDays.join(', '),
-          valor: `${benefit.discountPercentage || 0}%`,
+          cuando: formatDays(benefit.availableDays),
+          valor: discountPct > 0 ? `${discountPct}%` : undefined,
+          installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
-          textoAplicacion: benefit.link || undefined
+          textoAplicacion: benefit.link || undefined,
+          subscription: benefit.subscription || null
         };
 
         business.benefits.push(bankBenefit);
@@ -445,20 +506,23 @@ export async function fetchBusinesses(options: {
         );
         business.location.push(...newLocations);
 
+        const discountPct2 = benefit.discountPercentage || 0;
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
           benefit: benefit.benefitTitle,
-          rewardRate: `${benefit.discountPercentage || 0}%`,
+          rewardRate: discountPct2 > 0 ? `${discountPct2}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
           tipo: 'descuento',
-          cuando: benefit.availableDays.join(', '),
-          valor: `${benefit.discountPercentage || 0}%`,
+          cuando: formatDays(benefit.availableDays),
+          valor: discountPct2 > 0 ? `${discountPct2}%` : undefined,
+          installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
-          textoAplicacion: benefit.link || undefined
+          textoAplicacion: benefit.link || undefined,
+          subscription: benefit.subscription || null
         };
         business.benefits.push(bankBenefit);
       }

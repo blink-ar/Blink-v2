@@ -69,41 +69,63 @@ export const useEnrichedBusinesses = (
       });
     }
 
-    // Apply available day filter
+    // Apply available day filter using benefit.cuando field
     if (availableDay !== undefined) {
-      result = result.filter((b) => {
-        // For "today", we need to check current day of week
-        let dayToCheck = availableDay;
-        if (availableDay === 'today') {
-          const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-          const today = new Date().getDay();
-          dayToCheck = days[today];
-        }
+      const dayMap: Record<string, string[]> = {
+        monday: ['lunes', 'lun'],
+        tuesday: ['martes', 'mar'],
+        wednesday: ['miércoles', 'miercoles', 'mié', 'mie'],
+        thursday: ['jueves', 'jue'],
+        friday: ['viernes', 'vie'],
+        saturday: ['sábado', 'sabado', 'sáb', 'sab'],
+        sunday: ['domingo', 'dom'],
+      };
 
-        // Check if any benefit is available on this day
-        // Note: availableDays field is not on BankBenefit, so we'll check if the business
-        // has benefits (if no availableDays, assume it's available all days)
-        // This filter might need backend support to work properly
-        return true; // For now, allow all until we have proper data structure
-      });
+      let dayToCheck = availableDay;
+      if (availableDay === 'today') {
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        dayToCheck = days[new Date().getDay()];
+      }
+
+      const keywords = dayMap[dayToCheck] || [];
+
+      result = result.filter((b) =>
+        b.benefits.some((benefit) => {
+          if (!benefit.cuando) return true; // No schedule info = assume always available
+          const cuando = benefit.cuando.toLowerCase();
+          // "todos los días" means every day
+          if (cuando.includes('todos los d') || cuando.includes('todos los dias')) return true;
+          return keywords.some((kw) => cuando.includes(kw));
+        }),
+      );
     }
 
-    // Apply network filter
+    // Apply network filter using benefit.cardName field
     if (network !== undefined) {
-      result = result.filter((b) => {
-        // Check if any benefit matches the network
-        // Note: BankBenefit doesn't have network field, this would need backend support
-        return true; // For now, allow all until we have proper data structure
-      });
+      const networkLower = network.toLowerCase();
+      result = result.filter((b) =>
+        b.benefits.some((benefit) => {
+          const card = (benefit.cardName || '').toLowerCase();
+          const desc = (benefit.description || '').toLowerCase();
+          const cond = (benefit.condicion || '').toLowerCase();
+          return card.includes(networkLower) || desc.includes(networkLower) || cond.includes(networkLower);
+        }),
+      );
     }
 
-    // Apply card mode filter (credit/debit)
+    // Apply card mode filter (credit/debit) using benefit.cardName field
     if (cardMode !== undefined) {
-      result = result.filter((b) => {
-        // Check if any benefit supports the card mode
-        // Note: BankBenefit doesn't have cardMode field, this would need backend support
-        return true; // For now, allow all until we have proper data structure
-      });
+      const creditKeywords = ['crédito', 'credito', 'credit'];
+      const debitKeywords = ['débito', 'debito', 'debit'];
+      const keywords = cardMode === 'credit' ? creditKeywords : debitKeywords;
+
+      result = result.filter((b) =>
+        b.benefits.some((benefit) => {
+          const card = (benefit.cardName || '').toLowerCase();
+          const cond = (benefit.condicion || '').toLowerCase();
+          return keywords.some((kw) => card.includes(kw) || cond.includes(kw));
+        }),
+      );
     }
 
     // Apply installments filter
