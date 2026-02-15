@@ -15,6 +15,8 @@ interface BankDescriptor {
   label: string;
 }
 
+const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
+
 const KNOWN_BANKS: BankDescriptor[] = [
   { token: 'galicia', code: 'GAL', label: 'GALICIA' },
   { token: 'santander', code: 'SAN', label: 'SANTANDER' },
@@ -109,6 +111,28 @@ const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
   };
 };
 
+const readStoredBanks = (): string[] => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const stored = window.localStorage.getItem(BANK_STORAGE_KEY);
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return Array.from(
+      new Set(
+        parsed
+          .map((bank) => toBankDescriptor(bank).token)
+          .filter(Boolean),
+      ),
+    );
+  } catch {
+    return [];
+  }
+};
+
 function SearchPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -119,7 +143,7 @@ function SearchPage() {
   const [selectedCategory] = useState(searchParams.get('category') || '');
   const [selectedBanks, setSelectedBanks] = useState<string[]>(() => {
     const bankParam = searchParams.get('bank');
-    if (!bankParam) return [];
+    if (!bankParam) return readStoredBanks();
 
     const parsedTokens = bankParam
       .split(',')
@@ -167,6 +191,18 @@ function SearchPage() {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Persist selected banks between sessions
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (selectedBanks.length === 0) {
+      window.localStorage.removeItem(BANK_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
+  }, [selectedBanks]);
 
   const {
     businesses,
