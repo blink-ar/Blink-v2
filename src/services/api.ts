@@ -107,12 +107,6 @@ export async function fetchBusinessesPaginated(options: {
     }
     const data = await response.json();
 
-    if (data.success && Array.isArray(data.businesses)) {
-      console.log(`[API] fetchBusinessesPaginated successful: returned ${data.businesses.length} items (limit: ${limit}, offset: ${offset})`);
-    } else {
-      console.log(`[API] fetchBusinessesPaginated result: ${data.success ? 'success' : 'failed'}, businesses array: ${Array.isArray(data.businesses)}`);
-    }
-
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {
       data.businesses = normalizeBusinesses(data.businesses);

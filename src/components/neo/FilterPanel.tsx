@@ -89,8 +89,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     hasInstallments !== undefined,
   ].filter(Boolean).length;
 
-  const toggleBtn = (isActive: boolean, onClick: () => void, label: string) => (
+  const toggleBtn = (isActive: boolean, onClick: () => void, label: string, key?: string | number) => (
     <button
+      key={key}
       onClick={onClick}
       className={`px-4 py-2 border-2 border-blink-ink font-mono text-sm font-bold uppercase transition-colors ${
         isActive
@@ -141,6 +142,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               maxDistance === opt.value,
               () => onMaxDistanceChange(maxDistance === opt.value ? undefined : opt.value),
               opt.label,
+              opt.value,
             ))}
           </div>
         </div>
@@ -156,6 +158,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               minDiscount === opt.value,
               () => onMinDiscountChange(minDiscount === opt.value ? undefined : opt.value),
               opt.label,
+              opt.value,
             ))}
           </div>
         </div>
@@ -171,6 +174,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               availableDay === opt.value,
               () => onAvailableDayChange(availableDay === opt.value ? undefined : opt.value),
               opt.label,
+              opt.value,
             ))}
           </div>
         </div>
@@ -198,6 +202,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               network === opt.value,
               () => onNetworkChange(network === opt.value ? undefined : opt.value),
               opt.label,
+              opt.value,
             ))}
           </div>
         </div>
