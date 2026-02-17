@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
+import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -32,6 +33,7 @@ function BusinessDetailPage() {
   const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const businessViewSignatureRef = useRef('');
 
   useEffect(() => {
     if (passedBusiness) return;
@@ -55,6 +57,20 @@ function BusinessDetailPage() {
     };
     load();
   }, [id, passedBusiness]);
+
+  useEffect(() => {
+    if (!business) return;
+
+    const signature = `${business.id}|business_detail`;
+    if (businessViewSignatureRef.current === signature) return;
+    businessViewSignatureRef.current = signature;
+
+    trackSelectBusiness({
+      source: 'business_detail_page',
+      businessId: business.id,
+      category: business.category,
+    });
+  }, [business]);
 
   // Sort benefits by discount (highest first)
   const sortedBenefits = useMemo(() => {
@@ -90,6 +106,32 @@ function BusinessDetailPage() {
     if (lower.includes('icbc')) return 'bg-red-700';
     if (lower.includes('modo')) return 'bg-purple-600';
     return 'bg-gray-600';
+  };
+
+  const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
+    if (!business) return;
+    const selectedIndex = business.benefits.indexOf(selectedBenefit);
+    if (selectedIndex < 0) return;
+
+    trackViewBenefit({
+      source: 'business_detail_benefit_list',
+      benefitId: `${business.id}:${selectedIndex}`,
+      businessId: business.id,
+      category: business.category,
+      position,
+    });
+
+    navigate(`/benefit/${business.id}/${selectedIndex}`, { state: { business } });
+  };
+
+  const handleOpenMap = () => {
+    if (!business) return;
+    trackStartNavigation({
+      source: 'business_detail_page',
+      destinationBusinessId: business.id,
+      provider: 'in_app_map',
+    });
+    navigate(`/map?business=${business.id}`);
   };
 
   if (loading) {
@@ -173,7 +215,7 @@ function BusinessDetailPage() {
               return (
                 <div
                   key={`${benefit.bankName}-${idx}`}
-                  onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`, { state: { business } })}
+                  onClick={() => handleBenefitSelect(benefit, idx + 1)}
                   className={`w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col relative overflow-hidden group active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer`}
                 >
                   {isFirst && (
@@ -255,7 +297,7 @@ function BusinessDetailPage() {
                 return (
                   <div
                     key={`other-${benefit.bankName}-${idx}`}
-                    onClick={() => navigate(`/benefit/${business.id}/${business.benefits.indexOf(benefit)}`, { state: { business } })}
+                    onClick={() => handleBenefitSelect(benefit, topBenefits.length + idx + 1)}
                     className="bg-white border-2 border-blink-ink shadow-hard-sm p-3 flex items-center justify-between active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -299,7 +341,7 @@ function BusinessDetailPage() {
       {/* Fixed CTA */}
       <div className="fixed bottom-0 left-0 w-full z-50 p-4 bg-transparent pointer-events-none flex flex-col justify-end items-center">
         <button
-          onClick={() => navigate(`/map?business=${business.id}`)}
+          onClick={handleOpenMap}
           className="pointer-events-auto shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-3 bg-blink-ink text-white w-full max-w-sm justify-center py-4 border-2 border-white hover:bg-blink-ink/90 group"
         >
           <span className="material-symbols-outlined text-primary group-hover:animate-bounce">location_on</span>

@@ -5,6 +5,7 @@ import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { Business } from '../types';
+import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -14,8 +15,16 @@ function HomePage() {
   // When user types and hits enter or after debounce, navigate to search
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchTerm.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    const normalized = searchTerm.trim();
+    if (normalized) {
+      trackSearchIntent({
+        source: 'home_hero_search',
+        searchTerm: normalized,
+        resultsCount: 0,
+        hasFilters: false,
+        activeFilterCount: 0,
+      });
+      navigate(`/search?q=${encodeURIComponent(normalized)}`);
     }
   };
 
@@ -26,6 +35,33 @@ function HomePage() {
   const handleSearchFocus = () => {
     // Navigate to search page on focus for a better mobile UX
     navigate('/search');
+  };
+
+  const handleQuickCategoryClick = (category: string) => {
+    trackFilterApply({
+      source: 'home_quick_pill',
+      filterType: 'category',
+      filterValue: category,
+      activeFilterCount: 1,
+    });
+    navigate(`/search?category=${category}`);
+  };
+
+  const handleTopBenefitClick = (
+    businessId: string,
+    category: string | undefined,
+    benefitPosition: number,
+    benefitIndex: number,
+    business: Business,
+  ) => {
+    trackViewBenefit({
+      source: 'home_top5',
+      benefitId: `${businessId}:${benefitIndex}`,
+      businessId,
+      category,
+      position: benefitPosition,
+    });
+    navigate(`/benefit/${businessId}/${benefitIndex}`, { state: { business } });
   };
 
   // Top 5 individual benefits by discount
@@ -103,7 +139,7 @@ function HomePage() {
             ].map((pill) => (
               <button
                 key={pill.category}
-                onClick={() => navigate(`/search?category=${pill.category}`)}
+                onClick={() => handleQuickCategoryClick(pill.category)}
                 className="px-4 py-1.5 rounded-full border-2 border-blink-ink bg-blink-surface text-sm font-bold hover:bg-blink-ink hover:text-white transition-colors shadow-hard-sm active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
               >
                 {pill.label}
@@ -133,9 +169,15 @@ function HomePage() {
                   <div key={i} className="flex-shrink-0 w-[260px] h-[220px] bg-blink-surface border-2 border-blink-ink shadow-hard animate-pulse" />
                 ))
               : top5.map((item, idx) => (
-                    <article
+                  <article
                       key={`${item.business.id}-${idx}`}
-                      onClick={() => navigate(`/benefit/${item.business.id}/${item.benefitIndex}`, { state: { business: item.business } })}
+                      onClick={() => handleTopBenefitClick(
+                        item.business.id,
+                        item.business.category,
+                        idx + 1,
+                        item.benefitIndex,
+                        item.business,
+                      )}
                       className="group relative flex-shrink-0 w-[260px] snap-center bg-blink-surface border-2 border-blink-ink shadow-hard active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer"
                     >
                       {/* Image */}
