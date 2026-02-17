@@ -10,11 +10,13 @@ const DAY_ABBR: Record<string, string> = {
 };
 
 const formatCuando = (cuando?: string): string => {
-  if (!cuando) return 'Todos los días';
+  if (!cuando) return 'Consultar';
   const lower = cuando.toLowerCase();
   // Check if all days of the week are mentioned
   const uniqueDays = new Set(ALL_DAYS.filter((d) => lower.includes(d)).map((d) => DAY_ABBR[d]));
   if (uniqueDays.size >= 7) return 'Todos los días';
+  // Handle explicit "todos los días" text
+  if (/todos?\s+los?\s+d[ií]as?/i.test(lower)) return 'Todos los días';
   // Replace full day names with abbreviations
   let result = cuando;
   Object.entries(DAY_ABBR).forEach(([full, abbr]) => {

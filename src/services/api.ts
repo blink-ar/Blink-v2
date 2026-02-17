@@ -439,15 +439,13 @@ export async function fetchBusinesses(options: {
       return [];
     }
 
-    // Abbreviate day names and collapse full week to "Todos los días"
-    const DAY_ABBR: Record<string, string> = {
-      lunes: 'Lun', martes: 'Mar', miércoles: 'Mié', miercoles: 'Mié',
-      jueves: 'Jue', viernes: 'Vie', sábado: 'Sáb', sabado: 'Sáb', domingo: 'Dom',
-    };
+    // Keep full day names so the dayAvailabilityParser can parse them correctly.
+    // Display-level abbreviation is handled by formatCuando in BusinessDetailPage.
     const formatDays = (days: string[]): string => {
+      if (days.length === 0) return '';
       if (days.length >= 7) return 'Todos los días';
       return days
-        .map((d) => DAY_ABBR[d.toLowerCase().trim()] || d)
+        .map((d) => d.toLowerCase().trim())
         .join(', ');
     };
 

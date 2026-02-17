@@ -100,6 +100,39 @@ const ENHANCED_DAY_PATTERNS = {
     allDaysRestriction: /todos?\s+los?\s+(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)/i,
 };
 
+// Map of abbreviated day names to full Spanish day names
+const DAY_ABBREVIATIONS: Record<string, string> = {
+    'lun': 'lunes',
+    'mar': 'martes',
+    'mié': 'miércoles',
+    'mie': 'miércoles',
+    'jue': 'jueves',
+    'vie': 'viernes',
+    'sáb': 'sábado',
+    'sab': 'sábado',
+    'dom': 'domingo',
+};
+
+/**
+ * Normalizes abbreviated day names to full Spanish day names
+ * e.g., "Lun, Mar, Vie" → "lunes, martes, viernes"
+ *
+ * Uses letter-aware boundaries (including accented chars) to avoid
+ * replacing abbreviations that are part of full day names.
+ */
+const normalizeAbbreviatedDays = (text: string): string => {
+    let normalized = text;
+    for (const [abbr, full] of Object.entries(DAY_ABBREVIATIONS)) {
+        // Use lookbehind/lookahead with Spanish letters to ensure standalone match.
+        // \b alone fails because JS treats accented chars (é, á, etc.) as non-word.
+        const regex = new RegExp(
+            `(?<![a-záéíóúüñ])${abbr}(?![a-záéíóúüñ])`, 'gi'
+        );
+        normalized = normalized.replace(regex, full);
+    }
+    return normalized;
+};
+
 /**
  * Creates a default DayAvailability object with all days set to false
  */
@@ -559,7 +592,8 @@ export const parseDayAvailabilityEnhanced = (cuando?: string): { availability: D
         return null;
     }
 
-    const text = cuando.toLowerCase().trim();
+    // Normalize abbreviated day names (e.g., "Mar" → "martes") before parsing
+    const text = normalizeAbbreviatedDays(cuando.toLowerCase().trim());
     const availability = createDefaultDayAvailability();
 
     // Check for enhanced restriction patterns first (highest priority)
@@ -733,6 +767,7 @@ const FIELD_PRIORITY = {
 const containsDayKeywords = (text: string): boolean => {
     const dayKeywords = [
         'lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo',
+        'lun', 'mar', 'mié', 'mie', 'jue', 'vie', 'sáb', 'sab', 'dom',
         'días', 'dias', 'semana', 'hábiles', 'habiles', 'laborables', 'fines', 'válido', 'valido',
         'aplicable', 'excepto', 'todos', 'permanente', 'siempre'
     ];
@@ -997,8 +1032,48 @@ export const parseMultiFieldDayAvailability = (benefitInfo: BenefitDayInfo): Day
 };
 
 /**
+ * Converts an availableDays string array (e.g., ["martes"]) directly to DayAvailability.
+ * This is the most authoritative source of day info, bypassing text parsing.
+ */
+const availableDaysArrayToAvailability = (days: string[]): DayAvailability | null => {
+    if (!Array.isArray(days) || days.length === 0) {
+        return null;
+    }
+
+    // If all 7 days are present, don't assume "all days" — fall through to text parsing
+    // which may have more specific restrictions (e.g., "todos los martes" in condicion).
+    if (days.length >= 7) {
+        return null;
+    }
+
+    const availability = createDefaultDayAvailability();
+    const dayMap: Record<string, keyof Omit<DayAvailability, 'allDays' | 'customText'>> = {
+        'lunes': 'monday',
+        'martes': 'tuesday',
+        'miércoles': 'wednesday',
+        'miercoles': 'wednesday',
+        'jueves': 'thursday',
+        'viernes': 'friday',
+        'sábado': 'saturday',
+        'sabado': 'saturday',
+        'domingo': 'sunday',
+    };
+
+    let matched = false;
+    for (const day of days) {
+        const key = dayMap[day.toLowerCase().trim()];
+        if (key) {
+            availability[key] = true;
+            matched = true;
+        }
+    }
+
+    return matched ? availability : null;
+};
+
+/**
  * Parses day availability from a BankBenefit object
- * 
+ *
  * @param benefit - The BankBenefit object to parse
  * @returns DayAvailability object or null if no day information is found
  */
@@ -1007,6 +1082,15 @@ export const parseDayAvailabilityFromBenefit = (benefit: any): DayAvailability |
         // Handle null or undefined benefit objects
         if (!benefit || typeof benefit !== 'object') {
             return null;
+        }
+
+        // Check for availableDays array first — this is the most authoritative source.
+        // If it contains a specific subset of days (< 7), use it directly.
+        if (benefit.availableDays) {
+            const fromArray = availableDaysArrayToAvailability(benefit.availableDays);
+            if (fromArray) {
+                return fromArray;
+            }
         }
 
         // Extract relevant fields from the benefit object
