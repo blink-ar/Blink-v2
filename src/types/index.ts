@@ -15,6 +15,8 @@ export interface BankBenefit {
   requisitos?: string[];
   usos?: string[];
   textoAplicacion?: string;
+  // Raw day availability from MongoDB (authoritative source for available days)
+  availableDays?: string[];
   // AI Analysis specific fields
   originalAnalyzedText?: string;
   description?: string;

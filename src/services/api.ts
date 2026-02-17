@@ -483,7 +483,8 @@ export async function fetchBusinesses(options: {
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
           textoAplicacion: benefit.link || undefined,
-          subscription: benefit.subscription || null
+          subscription: benefit.subscription || null,
+          availableDays: benefit.availableDays || [],
         };
 
         business.benefits.push(bankBenefit);
@@ -514,7 +515,8 @@ export async function fetchBusinesses(options: {
           requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
           textoAplicacion: benefit.link || undefined,
-          subscription: benefit.subscription || null
+          subscription: benefit.subscription || null,
+          availableDays: benefit.availableDays || [],
         };
         business.benefits.push(bankBenefit);
       }

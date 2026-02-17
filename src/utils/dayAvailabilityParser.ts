@@ -1074,6 +1074,10 @@ const availableDaysArrayToAvailability = (days: string[]): DayAvailability | nul
 /**
  * Parses day availability from a BankBenefit object
  *
+ * Handles both BankBenefit field names (cuando, condicion, requisitos, textoAplicacion)
+ * and raw MongoDB field names (availableDays, termsAndConditions, link) since the
+ * backend /api/businesses endpoint may return either format.
+ *
  * @param benefit - The BankBenefit object to parse
  * @returns DayAvailability object or null if no day information is found
  */
@@ -1093,15 +1097,36 @@ export const parseDayAvailabilityFromBenefit = (benefit: any): DayAvailability |
             }
         }
 
-        // Extract relevant fields from the benefit object
+        // Build cuando from availableDays if cuando is missing but availableDays exists.
+        // The backend may include availableDays but not cuando on the benefit.
+        let cuando = benefit.cuando;
+        if (!cuando && Array.isArray(benefit.availableDays) && benefit.availableDays.length > 0) {
+            cuando = benefit.availableDays.join(', ');
+        }
+
+        // Extract relevant fields, checking both BankBenefit and raw MongoDB field names.
+        // Backend /api/businesses may return raw field names (termsAndConditions)
+        // instead of transformed names (condicion).
         const benefitInfo: BenefitDayInfo = {
-            cuando: benefit.cuando,
+            cuando,
             requisitos: benefit.requisitos,
-            condicion: benefit.condicion,
-            textoAplicacion: benefit.textoAplicacion
+            condicion: benefit.condicion || benefit.termsAndConditions,
+            textoAplicacion: benefit.textoAplicacion || benefit.link
         };
 
-        return parseMultiFieldDayAvailability(benefitInfo);
+        const result = parseMultiFieldDayAvailability(benefitInfo);
+
+        // If text parsing says allDays but we have a specific availableDays array,
+        // trust the array over text parsing. This handles the case where
+        // cuando="Todos los días" but availableDays=["martes"] — the array wins.
+        if (result && result.allDays && Array.isArray(benefit.availableDays) && benefit.availableDays.length > 0 && benefit.availableDays.length < 7) {
+            const fromArray = availableDaysArrayToAvailability(benefit.availableDays);
+            if (fromArray) {
+                return fromArray;
+            }
+        }
+
+        return result;
 
     } catch (error) {
         // Log error but don't throw - graceful degradation
