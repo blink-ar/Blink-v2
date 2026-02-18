@@ -1,10 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
 import { useSubscriptions } from '../hooks/useSubscriptions';
+import {
+  trackSaveBenefit,
+  trackShareBenefit,
+  trackStartNavigation,
+  trackUnsaveBenefit,
+  trackViewBenefit,
+} from '../analytics/intentTracking';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -15,6 +22,8 @@ const BENEFIT_DAYS = [
   { key: 'saturday' as const, abbr: 'S' },
   { key: 'sunday' as const, abbr: 'D' },
 ];
+
+const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 
 function BenefitDetailPage() {
   const { id, benefitIndex } = useParams<{ id: string; benefitIndex?: string }>();
@@ -27,14 +36,21 @@ function BenefitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
+  const [benefitPosition, setBenefitPosition] = useState(0);
+  const [isSaved, setIsSaved] = useState(false);
+  const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName } = useSubscriptions();
 
   useEffect(() => {
     if (passedBusiness) {
-      const idx = benefitIndex !== undefined ? parseInt(benefitIndex, 10) : 0;
-      setBenefit(passedBusiness.benefits[idx] || passedBusiness.benefits[0] || null);
+      const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
+      const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
+      const resolvedIndex = passedBusiness.benefits[safeIndex] ? safeIndex : 0;
+      setBenefitPosition(resolvedIndex);
+      setBenefit(passedBusiness.benefits[resolvedIndex] || passedBusiness.benefits[0] || null);
       return;
     }
+
     const load = async () => {
       if (!id) return;
       try {
@@ -45,8 +61,11 @@ function BenefitDetailPage() {
         if (response.success && response.businesses.length > 0) {
           const biz = response.businesses[0];
           setBusiness(biz);
-          const idx = benefitIndex !== undefined ? parseInt(benefitIndex, 10) : 0;
-          setBenefit(biz.benefits[idx] || biz.benefits[0] || null);
+          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
+          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
+          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
+          setBenefitPosition(resolvedIndex);
+          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
         } else {
           setError('Beneficio no encontrado');
         }
@@ -58,6 +77,133 @@ function BenefitDetailPage() {
     };
     load();
   }, [id, benefitIndex, passedBusiness]);
+
+  useEffect(() => {
+    if (!business || !benefit) return;
+
+    const benefitId = `${business.id}:${benefitPosition}`;
+    const signature = `${benefitId}|detail`;
+    if (viewedBenefitSignatureRef.current === signature) return;
+    viewedBenefitSignatureRef.current = signature;
+
+    trackViewBenefit({
+      source: 'benefit_detail_page',
+      benefitId,
+      businessId: business.id,
+      category: business.category,
+      position: benefitPosition + 1,
+    });
+  }, [benefit, benefitPosition, business]);
+
+  useEffect(() => {
+    if (!business || !benefit) return;
+    if (typeof window === 'undefined') return;
+
+    const benefitId = `${business.id}:${benefitPosition}`;
+
+    try {
+      const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
+      const parsed = stored ? JSON.parse(stored) : [];
+      const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
+      setIsSaved(savedSet.has(benefitId));
+    } catch {
+      setIsSaved(false);
+    }
+  }, [benefit, benefitPosition, business]);
+
+  const handleToggleSave = () => {
+    if (!business || !benefit) return;
+    if (typeof window === 'undefined') return;
+
+    const benefitId = `${business.id}:${benefitPosition}`;
+
+    try {
+      const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
+      const parsed = stored ? JSON.parse(stored) : [];
+      const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
+
+      if (savedSet.has(benefitId)) {
+        savedSet.delete(benefitId);
+        setIsSaved(false);
+        trackUnsaveBenefit({
+          source: 'benefit_detail_page',
+          benefitId,
+          businessId: business.id,
+        });
+      } else {
+        savedSet.add(benefitId);
+        setIsSaved(true);
+        trackSaveBenefit({
+          source: 'benefit_detail_page',
+          benefitId,
+          businessId: business.id,
+        });
+      }
+
+      window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
+    } catch {
+      setIsSaved(false);
+    }
+  };
+
+  const handleOpenMap = () => {
+    if (!business) return;
+    trackStartNavigation({
+      source: 'benefit_detail_page',
+      destinationBusinessId: business.id,
+      provider: 'in_app_map',
+    });
+    navigate(`/map?business=${business.id}`);
+  };
+
+  const handleShare = async () => {
+    if (!business || !benefit) return;
+    if (typeof window === 'undefined') return;
+
+    const benefitId = `${business.id}:${benefitPosition}`;
+    const url = window.location.href;
+    const title = `${business.name} · Blink`;
+    const text = benefit.description || benefit.benefit || `Beneficio en ${business.name}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        trackShareBenefit({
+          source: 'benefit_detail_page',
+          benefitId,
+          businessId: business.id,
+          channel: 'web_share',
+        });
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        trackShareBenefit({
+          source: 'benefit_detail_page',
+          benefitId,
+          businessId: business.id,
+          channel: 'clipboard',
+        });
+        return;
+      }
+
+      trackShareBenefit({
+        source: 'benefit_detail_page',
+        benefitId,
+        businessId: business.id,
+        channel: 'unsupported',
+      });
+    } catch (error) {
+      const channel = error instanceof DOMException && error.name === 'AbortError' ? 'dismissed' : 'share_error';
+      trackShareBenefit({
+        source: 'benefit_detail_page',
+        benefitId,
+        businessId: business.id,
+        channel,
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -119,8 +265,15 @@ function BenefitDetailPage() {
           <span className="material-symbols-outlined font-bold">arrow_back</span>
         </button>
         <div className="font-display tracking-tight text-lg">DETALLE</div>
-        <button className="w-10 h-10 flex items-center justify-center border-2 border-blink-ink bg-white shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
-          <span className="material-symbols-outlined font-bold">favorite</span>
+        <button
+          onClick={handleToggleSave}
+          className={`w-10 h-10 flex items-center justify-center border-2 border-blink-ink shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all ${
+            isSaved ? 'bg-primary' : 'bg-white'
+          }`}
+        >
+          <span className="material-symbols-outlined font-bold">
+            {isSaved ? 'favorite' : 'favorite_border'}
+          </span>
         </button>
       </header>
 
@@ -277,13 +430,16 @@ function BenefitDetailPage() {
       {/* Fixed Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-blink-ink z-20 flex gap-3 max-w-md mx-auto">
         <button
-          onClick={() => navigate(`/map?business=${business.id}`)}
+          onClick={handleOpenMap}
           className="flex-1 bg-primary text-blink-ink font-bold py-4 px-6 text-lg border-2 border-blink-ink shadow-hard active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center gap-2 uppercase tracking-wide hover:brightness-110"
         >
           <span className="material-symbols-outlined">location_on</span>
           VER UBICACIÓN
         </button>
-        <button className="w-16 bg-white text-blink-ink font-bold py-4 border-2 border-blink-ink shadow-hard active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center hover:bg-gray-50">
+        <button
+          onClick={() => void handleShare()}
+          className="w-16 bg-white text-blink-ink font-bold py-4 border-2 border-blink-ink shadow-hard active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center hover:bg-gray-50"
+        >
           <span className="material-symbols-outlined">share</span>
         </button>
       </div>

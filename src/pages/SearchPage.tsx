@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
@@ -8,11 +8,29 @@ import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { fetchBanks } from '../services/api';
 import { Business } from '../types';
+import {
+  trackFilterApply,
+  trackMapInteraction,
+  trackNoResults,
+  trackSearchIntent,
+  trackSelectBusiness,
+} from '../analytics/intentTracking';
 
 interface BankDescriptor {
   token: string;
   code: string;
   label: string;
+}
+
+interface SearchFilterState {
+  selectedBanksKey: string;
+  onlineOnly: boolean;
+  maxDistance: number | undefined;
+  minDiscount: number | undefined;
+  availableDay: string | undefined;
+  cardMode: 'credit' | 'debit' | undefined;
+  network: string | undefined;
+  hasInstallments: boolean | undefined;
 }
 
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
@@ -284,6 +302,7 @@ function SearchPage() {
 
   const activeFilterCount = [
     selectedCategory && selectedCategory !== 'all',
+    selectedBanks.length > 0,
     onlineOnly,
     maxDistance !== undefined,
     minDiscount !== undefined,
@@ -292,6 +311,183 @@ function SearchPage() {
     network !== undefined,
     hasInstallments !== undefined,
   ].filter(Boolean).length;
+
+  const currentFilterState = useMemo<SearchFilterState>(() => ({
+    selectedBanksKey: selectedBanks.join(','),
+    onlineOnly,
+    maxDistance,
+    minDiscount,
+    availableDay,
+    cardMode,
+    network,
+    hasInstallments,
+  }), [
+    selectedBanks,
+    onlineOnly,
+    maxDistance,
+    minDiscount,
+    availableDay,
+    cardMode,
+    network,
+    hasInstallments,
+  ]);
+
+  const previousFilterStateRef = useRef<SearchFilterState>(currentFilterState);
+  const hasInitializedFiltersRef = useRef(false);
+  const searchIntentSignatureRef = useRef('');
+  const noResultsSignatureRef = useRef('');
+
+  useEffect(() => {
+    if (!hasInitializedFiltersRef.current) {
+      hasInitializedFiltersRef.current = true;
+      previousFilterStateRef.current = currentFilterState;
+      return;
+    }
+
+    const previous = previousFilterStateRef.current;
+
+    if (previous.selectedBanksKey !== currentFilterState.selectedBanksKey) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'bank',
+        filterValue: currentFilterState.selectedBanksKey || 'none',
+        activeFilterCount,
+      });
+    }
+
+    if (previous.onlineOnly !== currentFilterState.onlineOnly) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'online',
+        filterValue: currentFilterState.onlineOnly,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.maxDistance !== currentFilterState.maxDistance) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'distance',
+        filterValue: currentFilterState.maxDistance,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.minDiscount !== currentFilterState.minDiscount) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'discount',
+        filterValue: currentFilterState.minDiscount,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.availableDay !== currentFilterState.availableDay) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'day',
+        filterValue: currentFilterState.availableDay,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.cardMode !== currentFilterState.cardMode) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'card_mode',
+        filterValue: currentFilterState.cardMode,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.network !== currentFilterState.network) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'network',
+        filterValue: currentFilterState.network,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.hasInstallments !== currentFilterState.hasInstallments) {
+      trackFilterApply({
+        source: 'search_filters',
+        filterType: 'installments',
+        filterValue: currentFilterState.hasInstallments,
+        activeFilterCount,
+      });
+    }
+
+    previousFilterStateRef.current = currentFilterState;
+  }, [activeFilterCount, currentFilterState]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const normalizedSearch = debouncedSearch.trim();
+    const hasFilters = activeFilterCount > 0;
+    if (!normalizedSearch && !hasFilters) return;
+
+    const signature = [
+      normalizedSearch,
+      selectedCategory,
+      currentFilterState.selectedBanksKey,
+      activeFilterCount,
+      enrichedBusinesses.length,
+    ].join('|');
+
+    if (searchIntentSignatureRef.current === signature) return;
+    searchIntentSignatureRef.current = signature;
+
+    trackSearchIntent({
+      source: 'search_page',
+      searchTerm: normalizedSearch,
+      resultsCount: enrichedBusinesses.length,
+      hasFilters,
+      activeFilterCount,
+      category: selectedCategory || undefined,
+    });
+  }, [
+    activeFilterCount,
+    currentFilterState.selectedBanksKey,
+    debouncedSearch,
+    enrichedBusinesses.length,
+    isLoading,
+    selectedCategory,
+  ]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (enrichedBusinesses.length > 0) return;
+
+    const normalizedSearch = debouncedSearch.trim();
+    if (!normalizedSearch && activeFilterCount === 0) return;
+
+    const signature = [
+      normalizedSearch,
+      selectedCategory,
+      currentFilterState.selectedBanksKey,
+      activeFilterCount,
+      'empty',
+    ].join('|');
+
+    if (noResultsSignatureRef.current === signature) return;
+    noResultsSignatureRef.current = signature;
+
+    trackNoResults({
+      source: 'search_page',
+      searchTerm: normalizedSearch,
+      activeFilterCount,
+      category: selectedCategory || undefined,
+    });
+  }, [
+    activeFilterCount,
+    currentFilterState.selectedBanksKey,
+    debouncedSearch,
+    enrichedBusinesses.length,
+    isLoading,
+    selectedCategory,
+  ]);
 
   // Get max discount for a business
   const getMaxDiscount = (business: Business) => {
@@ -328,6 +524,16 @@ function SearchPage() {
   const clearSearch = () => {
     setSearchTerm('');
     setDebouncedSearch('');
+  };
+
+  const handleBusinessSelect = (business: Business, position: number) => {
+    trackSelectBusiness({
+      source: 'search_results',
+      businessId: business.id,
+      category: business.category,
+      position,
+    });
+    navigate(`/business/${business.id}`, { state: { business } });
   };
 
   const cartItemsCount = 3;
@@ -464,7 +670,7 @@ function SearchPage() {
             <p className="font-mono text-sm text-blink-muted mt-2">Proba con otro termino o filtro</p>
           </div>
         ) : (
-          enrichedBusinesses.map((business) => {
+          enrichedBusinesses.map((business, index) => {
             const bankBadges = getBankBadges(business);
             const visibleBadges = bankBadges.slice(0, 3);
             const remaining = bankBadges.length - 3;
@@ -472,7 +678,7 @@ function SearchPage() {
             return (
               <div
                 key={business.id}
-                onClick={() => navigate(`/business/${business.id}`, { state: { business } })}
+                onClick={() => handleBusinessSelect(business, index + 1)}
                 className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
               >
                 <div className="flex p-4 gap-4 items-center">
@@ -546,7 +752,13 @@ function SearchPage() {
       {/* Floating Map Button */}
       <div className="fixed bottom-24 right-4 z-30">
         <button
-          onClick={() => navigate('/map')}
+          onClick={() => {
+            trackMapInteraction({
+              source: 'search_page',
+              action: 'open_map',
+            });
+            navigate('/map');
+          }}
           className="flex items-center gap-2 bg-blink-ink text-white px-5 py-3 border-2 border-white shadow-hard hover:bg-blink-ink/90 transition-colors group active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
         >
           <span className="material-symbols-outlined group-hover:rotate-12 transition-transform" style={{ fontSize: 20 }}>map</span>

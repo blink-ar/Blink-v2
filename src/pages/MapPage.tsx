@@ -7,6 +7,13 @@ import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { Business } from '../types';
 import BottomNav from '../components/neo/BottomNav';
 import FilterPanel from '../components/neo/FilterPanel';
+import {
+  trackFilterApply,
+  trackMapInteraction,
+  trackNoResults,
+  trackSearchIntent,
+  trackSelectBusiness,
+} from '../analytics/intentTracking';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
@@ -42,6 +49,17 @@ interface MapMarker {
   lat: number;
   lng: number;
   address: string;
+}
+
+interface MapFilterState {
+  activeChip: string;
+  onlineOnly: boolean;
+  minDiscount: number | undefined;
+  maxDistance: number | undefined;
+  availableDay: string | undefined;
+  cardMode: 'credit' | 'debit' | undefined;
+  network: string | undefined;
+  hasInstallments: boolean | undefined;
 }
 
 
@@ -84,7 +102,7 @@ function MapPage() {
     hasInstallments,
   }), [debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
 
-  const { businesses: rawBusinesses, isLoading, totalBusinesses } = useBenefitsData(filters);
+  const { businesses: rawBusinesses, isLoading } = useBenefitsData(filters);
 
   // Apply client-side filters (discount, distance, day, network, card mode, installments, online)
   const businesses = useEnrichedBusinesses(rawBusinesses, {
@@ -111,9 +129,64 @@ function MapPage() {
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
+  const previousFilterStateRef = useRef<MapFilterState | null>(null);
+  const hasInitializedFiltersRef = useRef(false);
+  const searchIntentSignatureRef = useRef('');
+  const noResultsSignatureRef = useRef('');
+  const mapInteractionTimestampsRef = useRef<Record<string, number>>({});
 
   // Single-business mode: when coming from a business/benefit detail page
   const isSingleBusinessMode = !!focusBusinessId;
+
+  const activeFilterCount = [
+    activeChip !== 'nearby',
+    onlineOnly,
+    minDiscount !== undefined,
+    maxDistance !== undefined,
+    availableDay !== undefined,
+    cardMode !== undefined,
+    network !== undefined,
+    hasInstallments !== undefined,
+  ].filter(Boolean).length;
+
+  const currentFilterState = useMemo<MapFilterState>(() => ({
+    activeChip,
+    onlineOnly,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    cardMode,
+    network,
+    hasInstallments,
+  }), [
+    activeChip,
+    onlineOnly,
+    minDiscount,
+    maxDistance,
+    availableDay,
+    cardMode,
+    network,
+    hasInstallments,
+  ]);
+
+  const trackMapInteractionThrottled = useCallback((
+    action: string,
+    options: { zoomLevel?: number; businessId?: string; minIntervalMs?: number } = {},
+  ) => {
+    const { zoomLevel, businessId, minIntervalMs = 1000 } = options;
+    const now = Date.now();
+    const lastTs = mapInteractionTimestampsRef.current[action] ?? 0;
+
+    if (now - lastTs < minIntervalMs) return;
+
+    mapInteractionTimestampsRef.current[action] = now;
+    trackMapInteraction({
+      source: isSingleBusinessMode ? 'map_page_single_business' : 'map_page',
+      action,
+      zoomLevel,
+      businessId,
+    });
+  }, [isSingleBusinessMode]);
 
   // Find the focused business from loaded data
   const focusedBusiness = useMemo(() => {
@@ -154,6 +227,163 @@ function MapPage() {
 
     return markers;
   }, [businesses, isSingleBusinessMode, focusedBusiness, position]);
+
+  useEffect(() => {
+    if (!hasInitializedFiltersRef.current) {
+      hasInitializedFiltersRef.current = true;
+      previousFilterStateRef.current = currentFilterState;
+      return;
+    }
+
+    const previous = previousFilterStateRef.current;
+    if (!previous) {
+      previousFilterStateRef.current = currentFilterState;
+      return;
+    }
+
+    const source = isSingleBusinessMode ? 'map_filters_single_business' : 'map_filters';
+
+    if (previous.activeChip !== currentFilterState.activeChip) {
+      trackFilterApply({
+        source,
+        filterType: 'category',
+        filterValue: currentFilterState.activeChip === 'nearby' ? undefined : currentFilterState.activeChip,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.onlineOnly !== currentFilterState.onlineOnly) {
+      trackFilterApply({
+        source,
+        filterType: 'online',
+        filterValue: currentFilterState.onlineOnly,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.minDiscount !== currentFilterState.minDiscount) {
+      trackFilterApply({
+        source,
+        filterType: 'discount',
+        filterValue: currentFilterState.minDiscount,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.maxDistance !== currentFilterState.maxDistance) {
+      trackFilterApply({
+        source,
+        filterType: 'distance',
+        filterValue: currentFilterState.maxDistance,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.availableDay !== currentFilterState.availableDay) {
+      trackFilterApply({
+        source,
+        filterType: 'day',
+        filterValue: currentFilterState.availableDay,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.cardMode !== currentFilterState.cardMode) {
+      trackFilterApply({
+        source,
+        filterType: 'card_mode',
+        filterValue: currentFilterState.cardMode,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.network !== currentFilterState.network) {
+      trackFilterApply({
+        source,
+        filterType: 'network',
+        filterValue: currentFilterState.network,
+        activeFilterCount,
+      });
+    }
+
+    if (previous.hasInstallments !== currentFilterState.hasInstallments) {
+      trackFilterApply({
+        source,
+        filterType: 'installments',
+        filterValue: currentFilterState.hasInstallments,
+        activeFilterCount,
+      });
+    }
+
+    previousFilterStateRef.current = currentFilterState;
+  }, [activeFilterCount, currentFilterState, isSingleBusinessMode]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (isSingleBusinessMode) return;
+
+    const normalizedSearch = debouncedSearch.trim();
+    const hasFilters = activeFilterCount > 0;
+    if (!normalizedSearch && !hasFilters) return;
+
+    const signature = [
+      normalizedSearch,
+      currentFilterState.activeChip,
+      activeFilterCount,
+      mapMarkers.length,
+    ].join('|');
+
+    if (searchIntentSignatureRef.current === signature) return;
+    searchIntentSignatureRef.current = signature;
+
+    trackSearchIntent({
+      source: 'map_page',
+      searchTerm: normalizedSearch,
+      resultsCount: mapMarkers.length,
+      hasFilters,
+      activeFilterCount,
+      category: currentFilterState.activeChip !== 'nearby' ? currentFilterState.activeChip : undefined,
+    });
+  }, [
+    activeFilterCount,
+    currentFilterState.activeChip,
+    debouncedSearch,
+    isLoading,
+    isSingleBusinessMode,
+    mapMarkers.length,
+  ]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (mapMarkers.length > 0) return;
+
+    const normalizedSearch = debouncedSearch.trim();
+    if (!normalizedSearch && activeFilterCount === 0) return;
+
+    const signature = [
+      normalizedSearch,
+      currentFilterState.activeChip,
+      activeFilterCount,
+      'empty',
+    ].join('|');
+
+    if (noResultsSignatureRef.current === signature) return;
+    noResultsSignatureRef.current = signature;
+
+    trackNoResults({
+      source: isSingleBusinessMode ? 'map_page_single_business' : 'map_page',
+      searchTerm: normalizedSearch,
+      activeFilterCount,
+      category: currentFilterState.activeChip !== 'nearby' ? currentFilterState.activeChip : undefined,
+    });
+  }, [
+    activeFilterCount,
+    currentFilterState.activeChip,
+    debouncedSearch,
+    isLoading,
+    isSingleBusinessMode,
+    mapMarkers.length,
+  ]);
 
 
   // Helpers
@@ -307,6 +537,16 @@ function MapPage() {
         : selected?.id === biz.id;
       const pos = new google.maps.LatLng(lat, lng);
       const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+        trackMapInteractionThrottled('marker_click', {
+          businessId: biz.id,
+          zoomLevel: map.getZoom() || undefined,
+          minIntervalMs: 400,
+        });
+        trackSelectBusiness({
+          source: 'map_marker',
+          businessId: biz.id,
+          category: biz.category,
+        });
         setSelectedBusiness(biz);
         setSelectedMarkerIdx(idx);
         map.panTo(pos);
@@ -316,7 +556,7 @@ function MapPage() {
       (overlay as any).__markerIdx = idx;
       overlaysRef.current.push(overlay);
     });
-  }, [mapMarkers, clearOverlays, isSingleBusinessMode]);
+  }, [mapMarkers, clearOverlays, isSingleBusinessMode, trackMapInteractionThrottled]);
 
   // ─── User location overlay ─────────────────────────────────────
 
@@ -402,7 +642,29 @@ function MapPage() {
 
         mapRef.current.addListener('click', () => {
           setSelectedBusiness(null);
+          trackMapInteractionThrottled('map_click', {
+            zoomLevel: mapRef.current?.getZoom() || undefined,
+            minIntervalMs: 500,
+          });
         });
+      }
+
+      if (!(mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached) {
+        mapRef.current.addListener('dragend', () => {
+          trackMapInteractionThrottled('pan', {
+            zoomLevel: mapRef.current?.getZoom() || undefined,
+            minIntervalMs: 1500,
+          });
+        });
+
+        mapRef.current.addListener('zoom_changed', () => {
+          trackMapInteractionThrottled('zoom', {
+            zoomLevel: mapRef.current?.getZoom() || undefined,
+            minIntervalMs: 800,
+          });
+        });
+
+        (mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached = true;
       }
 
       // User location dot
@@ -449,7 +711,7 @@ function MapPage() {
       console.error('Map init failed', err);
       setMapError(err.message || 'No se pudo cargar el mapa');
     }
-  }, [position, mapMarkers, isSingleBusinessMode, focusedBusiness, buildOverlays, createUserLocationOverlay]);
+  }, [position, mapMarkers, isSingleBusinessMode, focusedBusiness, buildOverlays, createUserLocationOverlay, trackMapInteractionThrottled]);
 
   // Init map when data is ready
   useEffect(() => {
@@ -482,16 +744,6 @@ function MapPage() {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
-
-  // Select business from list & pan map to its first location
-  const handleSelectFromList = (biz: Business) => {
-    setSelectedBusiness(biz);
-    const target = mapMarkers.find((m) => m.business.id === biz.id);
-    if (target && mapRef.current) {
-      mapRef.current.panTo({ lat: target.lat, lng: target.lng });
-      if ((mapRef.current.getZoom() || 0) < 15) mapRef.current.setZoom(15);
-    }
-  };
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body h-[100dvh] flex flex-col overflow-hidden relative">
@@ -587,6 +839,10 @@ function MapPage() {
         <button
           onClick={() => {
             if (!mapRef.current || !googleRef.current) return;
+            trackMapInteractionThrottled('recenter_user_location', {
+              zoomLevel: mapRef.current?.getZoom() || undefined,
+              minIntervalMs: 500,
+            });
             const lat = position.latitude;
             const lng = position.longitude;
             const lngOff = km5InLng(lat);
@@ -658,6 +914,17 @@ function MapPage() {
                   data-biz-id={biz.id}
                   data-marker-idx={idx}
                   onClick={() => {
+                    trackMapInteractionThrottled('list_select', {
+                      businessId: biz.id,
+                      zoomLevel: mapRef.current?.getZoom() || undefined,
+                      minIntervalMs: 300,
+                    });
+                    trackSelectBusiness({
+                      source: 'map_list',
+                      businessId: biz.id,
+                      category: biz.category,
+                      position: idx + 1,
+                    });
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
                     mapRef.current?.panTo({ lat, lng });
@@ -709,6 +976,12 @@ function MapPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        trackSelectBusiness({
+                          source: 'map_list_open_business',
+                          businessId: biz.id,
+                          category: biz.category,
+                          position: idx + 1,
+                        });
                         navigate(`/business/${biz.id}`, { state: { business: biz } });
                       }}
                       className="w-10 h-10 border-2 border-blink-ink bg-white flex items-center justify-center shadow-hard-sm hover:bg-blink-ink hover:text-white transition-colors shrink-0"
