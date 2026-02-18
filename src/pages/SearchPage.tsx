@@ -541,18 +541,30 @@ function SearchPage() {
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 w-full bg-blink-bg border-b-2 border-blink-ink">
-        <div className="px-4 py-3 flex items-center gap-3">
+      <header
+        className="sticky top-0 z-40 w-full"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(232,230,225,0.8)',
+        }}
+      >
+        <div className="px-4 py-3 flex items-center gap-2.5">
           <button
             onClick={() => navigate('/home')}
-            className="flex items-center justify-center w-10 h-10 bg-white border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
           >
-            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>arrow_back</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
-          <div className="flex-1 h-10 relative">
+          <div
+            className="flex-1 h-11 flex items-center px-3 gap-2 rounded-xl"
+            style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
+          >
+            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
             <input
-              className="w-full h-full border-2 border-blink-ink bg-white px-3 pr-10 font-display uppercase tracking-tight text-blink-ink placeholder-gray-400 focus:outline-none focus:ring-0 shadow-hard"
-              placeholder="BUSCAR..."
+              className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+              placeholder="Buscar tiendas y beneficios..."
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
@@ -561,177 +573,192 @@ function SearchPage() {
             {searchTerm && (
               <button
                 onClick={clearSearch}
-                className="absolute right-0 top-0 h-full w-10 flex items-center justify-center bg-blink-ink border-l-2 border-blink-ink"
+                className="text-blink-muted hover:text-blink-ink transition-colors"
               >
-                <span className="material-symbols-outlined text-primary" style={{ fontSize: 20 }}>close</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
             )}
           </div>
-          <button className="flex items-center justify-center w-10 h-10 bg-blink-warning border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all relative">
-            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>shopping_bag</span>
-            <span className="absolute -top-2 -right-2 bg-blink-accent text-white font-mono text-xs border-2 border-blink-ink h-5 w-5 flex items-center justify-center rounded-full">
+          <button className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors relative">
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>shopping_bag</span>
+            <span className="absolute -top-1 -right-1 bg-primary text-white text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
               {cartItemsCount}
             </span>
           </button>
         </div>
 
         {/* Compact filter controls */}
-        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-white py-3">
-          <div className="flex px-4 gap-3 min-w-max items-center">
+        <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
+          <div className="flex gap-2 min-w-max items-center">
+            {/* Filter button */}
             <button
               onClick={() => setShowFilters(true)}
-              className="relative w-10 h-10 flex items-center justify-center border-2 border-blink-ink bg-blink-ink text-white shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all mr-2"
+              className={`relative h-9 px-3 flex items-center gap-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                activeFilterCount > 0
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
               aria-label="Abrir filtros"
             >
-              <span className="material-symbols-outlined text-xl">tune</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>tune</span>
+              <span>Filtros</span>
               {activeFilterCount > 0 && (
-                <span className="absolute -top-2 -right-2 h-5 min-w-5 px-1 border-2 border-blink-ink bg-primary text-blink-ink font-mono text-[10px] leading-none flex items-center justify-center">
+                <span className="bg-white/25 text-white text-[10px] font-bold h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
             </button>
 
+            {/* Bank filter button */}
             <button
               onClick={() => setShowBankSheet(true)}
-              className="flex items-center border-2 border-blink-ink bg-blink-bg shadow-hard-sm px-1 py-1 gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all h-10 shrink-0"
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                selectedBanks.length > 0
+                  ? 'bg-primary/10 border border-primary/30 text-primary'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
             >
               {selectedBanks.length > 0 ? (
                 <>
-                  <div className="flex items-center -space-x-2 pl-1">
-                    {selectedBankPreview.map((bank, index) => (
-                      <div
-                      key={bank.token}
-                      className={`w-6 h-6 border-2 border-blink-ink flex items-center justify-center relative shadow-sm ${
-                        index === 0 ? 'bg-blink-warning z-30' : index === 1 ? 'bg-white z-20' : 'bg-white z-10'
-                      }`}
-                    >
-                      <span className="font-display text-[7px] uppercase leading-none text-blink-ink">
-                        {bank.code}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="w-6 h-6 border-2 border-blink-ink bg-primary flex items-center justify-center ml-1">
-                  <span className="font-mono text-[11px] font-bold text-blink-ink leading-none">
-                    {selectedBanks.length}
-                  </span>
-                </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                  <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
                 </>
-              ) : <span className="px-2 font-display text-sm uppercase">Bancos</span>}
-              <div className="h-full flex items-center justify-center px-1">
-                <span className="material-symbols-outlined text-blink-ink text-lg">expand_more</span>
-              </div>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                  <span>Bancos</span>
+                </>
+              )}
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
             </button>
 
-            <div className="w-px h-8 bg-gray-300 mx-1" />
-
+            {/* Installments */}
             <button
               onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
-              className={`h-10 min-w-[92px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
+              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                 hasInstallments === true
-                  ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
               }`}
             >
-              Cuotas
+              Cuotas s/int.
             </button>
 
+            {/* Min discount */}
             <button
               onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
-              className={`h-10 min-w-[118px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
+              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                 minDiscount !== undefined
-                  ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
               }`}
             >
-              Descuento
+              20%+ desc.
             </button>
           </div>
         </div>
       </header>
 
       {/* Results */}
-      <main className="flex-1 px-4 py-6 space-y-5 pb-24">
-        <div className="flex justify-between items-end border-b-2 border-blink-ink pb-2 mb-4">
-          <h1 className="font-display text-2xl leading-none">TIENDAS</h1>
-          <span className="font-mono text-sm font-bold bg-primary px-2 py-0.5 border-2 border-blink-ink">
-            {totalBusinesses} TIENDAS
+      <main className="flex-1 px-4 py-5 space-y-3 pb-28">
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="font-semibold text-base text-blink-ink">Tiendas</h1>
+          <span
+            className="text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{ background: '#EEF2FF', color: '#4338CA' }}
+          >
+            {totalBusinesses} resultados
           </span>
         </div>
 
         {isLoading && !enrichedBusinesses.length ? (
           Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard h-40 animate-pulse" />
+            <div
+              key={index}
+              className="w-full h-24 rounded-2xl animate-pulse"
+              style={{ background: '#F3F4F6' }}
+            />
           ))
         ) : enrichedBusinesses.length === 0 ? (
-          <div className="text-center py-12">
-            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 64 }}>search_off</span>
-            <p className="font-display text-xl uppercase mt-4">Sin resultados</p>
-            <p className="font-mono text-sm text-blink-muted mt-2">Proba con otro termino o filtro</p>
+          <div className="text-center py-16">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: '#EEF2FF' }}
+            >
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 32 }}>search_off</span>
+            </div>
+            <p className="font-semibold text-lg text-blink-ink">Sin resultados</p>
+            <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
           enrichedBusinesses.map((business, index) => {
             const bankBadges = getBankBadges(business);
             const visibleBadges = bankBadges.slice(0, 3);
             const remaining = bankBadges.length - 3;
+            const maxDiscount = getMaxDiscount(business);
 
             return (
               <div
                 key={business.id}
                 onClick={() => handleBusinessSelect(business, index + 1)}
-                className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
+                className="w-full bg-white rounded-2xl flex items-center p-4 gap-4 cursor-pointer transition-all duration-200 active:scale-[0.98]"
+                style={{
+                  border: '1px solid #E8E6E1',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                }}
               >
-                <div className="flex p-4 gap-4 items-center">
-                  {/* Logo */}
-                  <div className="w-24 h-24 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-2 overflow-hidden">
-                    {business.image ? (
-                      <img
-                        alt={business.name}
-                        className="w-full h-full object-contain grayscale"
-                        src={business.image}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <span className="font-display text-2xl text-blink-muted">
-                        {business.name?.charAt(0)}
+                {/* Logo */}
+                <div
+                  className="w-16 h-16 shrink-0 rounded-2xl bg-blink-bg flex items-center justify-center p-2 overflow-hidden"
+                  style={{ border: '1px solid #E8E6E1' }}
+                >
+                  {business.image ? (
+                    <img
+                      alt={business.name}
+                      className="w-full h-full object-contain"
+                      src={business.image}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="font-bold text-2xl text-blink-muted">
+                      {business.name?.charAt(0)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-sm text-blink-ink truncate mb-1">
+                    {business.name}
+                  </h2>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {maxDiscount > 0 && (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: '#D1FAE5', color: '#065F46' }}
+                      >
+                        Hasta {maxDiscount}% OFF
                       </span>
                     )}
-                  </div>
-                  {/* Info */}
-                  <div className="flex-1 flex flex-col justify-center h-full gap-1">
-                    <h2 className="font-display text-lg uppercase leading-tight tracking-tight">
-                      {business.name}
-                    </h2>
-                    <div className="bg-blink-ink text-primary p-1 w-fit border border-primary">
-                      <span className="font-display text-xl leading-none block">
-                        {getBestBenefitText(business)}
+                    {visibleBadges.map((badge) => (
+                      <span
+                        key={`${business.id}-${badge}`}
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-lg"
+                        style={{ background: '#EEF2FF', color: '#4338CA' }}
+                      >
+                        {badge}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      {visibleBadges.map((badge) => (
-                        <div
-                          key={`${business.id}-${badge}`}
-                          className="h-6 w-10 border border-blink-ink flex items-center justify-center bg-gray-100 text-[10px] font-bold font-mono"
-                        >
-                          {badge}
-                        </div>
-                      ))}
-                      {remaining > 0 && (
-                        <span className="text-xs font-bold text-gray-400">+{remaining}</span>
-                      )}
-                    </div>
+                    ))}
+                    {remaining > 0 && (
+                      <span className="text-[10px] text-blink-muted font-medium">+{remaining}</span>
+                    )}
                   </div>
-                  <div className="flex items-center justify-center">
-                    <span className="material-symbols-outlined text-blink-ink text-3xl">chevron_right</span>
-                  </div>
+                  <p className="text-[10px] text-blink-muted mt-1.5">
+                    {business.benefits.length} beneficio{business.benefits.length !== 1 ? 's' : ''} activo{business.benefits.length !== 1 ? 's' : ''}
+                  </p>
                 </div>
-                <div className="bg-gray-100 border-t-2 border-blink-ink py-2 px-4 flex justify-between items-center">
-                  <span className="font-mono text-xs font-bold text-blink-ink flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full border border-blink-ink" />
-                    {business.benefits.length} BENEFICIOS ACTIVOS
-                  </span>
-                  <span className="font-mono text-xs text-gray-500">VER TODOS</span>
-                </div>
+
+                <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 20 }}>chevron_right</span>
               </div>
             );
           })
@@ -742,9 +769,10 @@ function SearchPage() {
           <button
             onClick={loadMore}
             disabled={isLoadingMore}
-            className="w-full py-3 border-2 border-dashed border-blink-ink font-mono text-sm font-bold uppercase hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="w-full py-3.5 rounded-2xl text-sm font-medium text-primary transition-colors disabled:opacity-50"
+            style={{ border: '1.5px dashed #c7d2fe', background: '#EEF2FF' }}
           >
-            {isLoadingMore ? 'Cargando...' : 'Cargar mas tiendas'}
+            {isLoadingMore ? 'Cargando...' : 'Cargar más tiendas'}
           </button>
         )}
       </main>
@@ -759,10 +787,14 @@ function SearchPage() {
             });
             navigate('/map');
           }}
-          className="flex items-center gap-2 bg-blink-ink text-white px-5 py-3 border-2 border-white shadow-hard hover:bg-blink-ink/90 transition-colors group active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+          className="flex items-center gap-2 text-white px-4 py-3 rounded-2xl transition-all duration-200 active:scale-95"
+          style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+            boxShadow: '0 8px 20px rgba(99,102,241,0.35)',
+          }}
         >
-          <span className="material-symbols-outlined group-hover:rotate-12 transition-transform" style={{ fontSize: 20 }}>map</span>
-          <span className="font-display uppercase tracking-wider text-sm">Mapa</span>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>map</span>
+          <span className="font-semibold text-sm">Mapa</span>
         </button>
       </div>
 

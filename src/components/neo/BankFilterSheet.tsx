@@ -80,74 +80,91 @@ const BankFilterSheet = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm">
+      {/* Backdrop tap to close */}
       <button
         aria-label="Cerrar selector de bancos"
         className="absolute inset-0"
         onClick={onClose}
       />
 
-      <div className="w-full h-[85vh] bg-blink-surface border-t-2 border-blink-ink flex flex-col shadow-hard relative">
-        <div className="flex items-center justify-between p-4 border-b-2 border-blink-ink bg-blink-warning">
-          <h2 className="font-display text-xl sm:text-2xl uppercase tracking-tight whitespace-nowrap">
-            Seleccionar Bancos
-          </h2>
+      {/* Sheet */}
+      <div
+        className="w-full h-[85vh] bg-white flex flex-col relative"
+        style={{
+          borderRadius: '24px 24px 0 0',
+          boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
+        }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
+          <h2 className="font-semibold text-lg text-blink-ink">Seleccionar bancos</h2>
           <button
             onClick={onClose}
-            className="w-12 h-12 flex items-center justify-center border-2 border-blink-ink bg-white"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
-            <span className="material-symbols-outlined font-bold text-4xl text-blink-ink">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
-        <div className="p-4 border-b-2 border-blink-ink bg-blink-bg space-y-3">
-          <div className="relative h-12 w-full">
+        {/* Search & Controls */}
+        <div className="px-4 pt-3 pb-2 space-y-2.5" style={{ borderBottom: '1px solid #E8E6E1' }}>
+          <div className="relative">
             <input
-              className="w-full h-full border-2 border-blink-ink px-4 pr-10 font-mono text-sm bg-white focus:ring-0 focus:outline-none placeholder-gray-500 shadow-hard-sm"
+              className="w-full h-11 rounded-xl bg-blink-bg px-4 pr-10 text-sm text-blink-ink placeholder-blink-muted focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
+              style={{ border: '1px solid #E8E6E1' }}
               placeholder="Buscar banco..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-ink">search</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted text-lg">search</span>
           </div>
-          <div className="flex justify-between items-center gap-2">
-            <span className="font-mono text-xs font-bold text-gray-500 uppercase">
-              {filteredOptions.length} Entidades Disponibles
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-blink-muted font-medium">
+              {filteredOptions.length} entidades disponibles
             </span>
             <button
               onClick={toggleSelectAll}
-              className="text-xs font-display underline decoration-2 underline-offset-2 uppercase whitespace-nowrap hover:text-blink-accent"
+              className="text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
             >
-              {allFilteredSelected ? 'Limpiar Todos' : 'Seleccionar Todos'}
+              {allFilteredSelected ? 'Limpiar todos' : 'Seleccionar todos'}
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 bg-white">
-          <div className="grid grid-cols-3 gap-3">
+        {/* Bank Grid */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="grid grid-cols-3 gap-2.5">
             {filteredOptions.map((option) => {
               const isSelected = draftTokens.includes(option.token);
               return (
                 <button
                   key={option.token}
                   onClick={() => toggleToken(option.token)}
-                  className="aspect-square relative cursor-pointer group"
+                  className={`aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 active:scale-95 ${
+                    isSelected
+                      ? 'bg-primary/10 ring-2 ring-primary/40'
+                      : 'bg-blink-bg border border-blink-border hover:border-primary/30'
+                  }`}
                 >
-                  <div
-                    className={`absolute inset-0 border-2 border-blink-ink shadow-hard-sm flex flex-col items-center justify-center p-2 transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${
-                      isSelected ? 'bg-primary' : 'bg-white hover:bg-gray-50'
-                    }`}
+                  <span
+                    className={`font-bold text-lg tracking-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}
                   >
-                    <span className="font-display text-2xl text-blink-ink uppercase tracking-tighter">{option.code}</span>
-                    <span className="font-mono text-[10px] font-bold mt-1 uppercase text-center">{option.label}</span>
-                    <div
-                      className={`absolute top-1 right-1 w-7 h-7 border-2 border-blink-ink flex items-center justify-center ${
-                        isSelected ? 'bg-blink-ink text-primary' : 'bg-white text-transparent'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-base">check</span>
+                    {option.code}
+                  </span>
+                  <span className={`text-[10px] font-medium mt-0.5 text-center leading-tight ${isSelected ? 'text-primary/80' : 'text-blink-muted'}`}>
+                    {option.label}
+                  </span>
+                  {isSelected && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white" style={{ fontSize: 12 }}>check</span>
                     </div>
-                  </div>
+                  )}
                 </button>
               );
             })}
@@ -155,14 +172,19 @@ const BankFilterSheet = ({
           <div className="h-20" />
         </div>
 
-        <div className="p-4 border-t-2 border-blink-ink bg-blink-bg">
+        {/* Apply Button */}
+        <div className="p-4" style={{ borderTop: '1px solid #E8E6E1' }}>
           <button
             onClick={() => onApply(draftTokens)}
-            className="w-full bg-blink-ink text-white font-display text-lg py-4 border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all uppercase flex justify-between px-6 items-center"
+            className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex justify-between items-center px-5"
+            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
           >
-            <span>Aplicar Filtros</span>
-            <span className="bg-primary text-blink-ink text-xs font-mono font-bold px-2 py-1 border border-blink-ink whitespace-nowrap">
-              {draftTokens.length} Seleccionados
+            <span>Aplicar filtros</span>
+            <span
+              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.25)' }}
+            >
+              {draftTokens.length} sel.
             </span>
           </button>
         </div>
