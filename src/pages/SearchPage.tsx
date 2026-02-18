@@ -347,12 +347,28 @@ function SearchPage() {
     const previous = previousFilterStateRef.current;
 
     if (previous.selectedBanksKey !== currentFilterState.selectedBanksKey) {
-      trackFilterApply({
-        source: 'search_filters',
-        filterType: 'bank',
-        filterValue: currentFilterState.selectedBanksKey || 'none',
-        activeFilterCount,
-      });
+      const selectedBanks = currentFilterState.selectedBanksKey
+        .split(',')
+        .map((token) => token.trim())
+        .filter(Boolean);
+
+      if (selectedBanks.length === 0) {
+        trackFilterApply({
+          source: 'search_filters',
+          filterType: 'bank',
+          filterValue: 'none',
+          activeFilterCount,
+        });
+      } else {
+        selectedBanks.forEach((token) => {
+          trackFilterApply({
+            source: 'search_filters',
+            filterType: 'bank',
+            filterValue: token,
+            activeFilterCount,
+          });
+        });
+      }
     }
 
     if (previous.onlineOnly !== currentFilterState.onlineOnly) {
