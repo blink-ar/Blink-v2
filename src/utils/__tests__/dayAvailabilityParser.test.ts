@@ -362,14 +362,18 @@ describe('dayAvailabilityParser', () => {
                 expect(result?.allDays).toBe(true);
             });
 
-            it('should parse "permanente"', () => {
+            it('should NOT parse "permanente" as all days (describes duration, not day availability)', () => {
                 const result = parseDayAvailability('permanente');
-                expect(result?.allDays).toBe(true);
+                // "permanente" describes benefit duration, not day-of-week availability
+                expect(result?.allDays).toBe(false);
+                expect(result?.customText).toBe('permanente');
             });
 
-            it('should parse "siempre"', () => {
+            it('should NOT parse "siempre" as all days (describes duration, not day availability)', () => {
                 const result = parseDayAvailability('siempre');
-                expect(result?.allDays).toBe(true);
+                // "siempre" describes benefit duration, not day-of-week availability
+                expect(result?.allDays).toBe(false);
+                expect(result?.customText).toBe('siempre');
             });
 
             it('should be case insensitive for all days patterns', () => {

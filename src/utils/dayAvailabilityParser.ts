@@ -47,8 +47,8 @@ const DAY_PATTERNS = {
     // Weekday patterns
     weekdays: /lunes\s+a\s+viernes|días?\s+hábiles?|días?\s+laborables?|dias?\s+habiles?|dias?\s+laborables?/i,
 
-    // All days patterns
-    allDays: /todos?\s+los?\s+días?|permanente|siempre|todos?\s+los?\s+dias?/i,
+    // All days patterns (removed "permanente" and "siempre" - they often describe duration, not day availability)
+    allDays: /todos?\s+los?\s+días?|todos?\s+los?\s+dias?/i,
 
     // Specific day patterns
     specificDays: {
@@ -96,8 +96,10 @@ const ENHANCED_DAY_PATTERNS = {
     // Enhanced weekday patterns  
     weekdayRestriction: /válido\s+solo\s+días?\s+hábiles?|aplicable\s+únicamente\s+lunes\s+a\s+viernes|valido\s+solo\s+dias?\s+habiles?|aplicable\s+unicamente\s+lunes\s+a\s+viernes/i,
 
-    // Todos los patterns with restrictions
+    // Todos los patterns with restrictions (includes "todos los días [day]" pattern)
     allDaysRestriction: /todos?\s+los?\s+(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)/i,
+    // "todos los días [day]" pattern - e.g., "todos los días martes" means every Tuesday
+    allDaysSpecificDay: /todos?\s+los?\s+d[ií]as?\s+(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)/i,
 };
 
 /**
@@ -225,7 +227,35 @@ const handleEnhancedRestrictions = (text: string, availability: DayAvailability)
         };
     }
 
-    // Check for "todos los [day]" patterns
+    // Check for "todos los días [day]" patterns FIRST (e.g., "todos los días martes" = every Tuesday)
+    const allDaysSpecificDayMatch = text.match(ENHANCED_DAY_PATTERNS.allDaysSpecificDay);
+    if (allDaysSpecificDayMatch) {
+        const dayName = allDaysSpecificDayMatch[1].toLowerCase();
+        const dayMap: { [key: string]: keyof Omit<DayAvailability, 'allDays' | 'customText'> } = {
+            'lunes': 'monday',
+            'martes': 'tuesday',
+            'miércoles': 'wednesday',
+            'miercoles': 'wednesday',
+            'jueves': 'thursday',
+            'viernes': 'friday',
+            'sábado': 'saturday',
+            'sabado': 'saturday',
+            'domingo': 'sunday'
+        };
+
+        const dayKey = dayMap[dayName];
+        if (dayKey) {
+            availability[dayKey] = true;
+            return {
+                pattern: 'allDaysSpecificDay',
+                confidence: calculateConfidence(text, 'specific'),
+                isRestriction: true,
+                isNegation: false
+            };
+        }
+    }
+
+    // Check for "todos los [day]" patterns (e.g., "todos los martes" = every Tuesday)
     const allDaysMatch = text.match(ENHANCED_DAY_PATTERNS.allDaysRestriction);
     if (allDaysMatch) {
         const dayName = allDaysMatch[1].toLowerCase();
@@ -298,13 +328,20 @@ const handleEnhancedRestrictions = (text: string, availability: DayAvailability)
  * Handles negation patterns (exclusions)
  */
 const handleNegationPatterns = (text: string, availability: DayAvailability): PatternMatch | null => {
-    // Start with all days available for negation patterns
-    setAllDays(availability);
+    const dayMap: { [key: string]: keyof Omit<DayAvailability, 'allDays' | 'customText'> } = {
+        'monday': 'monday',
+        'tuesday': 'tuesday',
+        'wednesday': 'wednesday',
+        'thursday': 'thursday',
+        'friday': 'friday',
+        'saturday': 'saturday',
+        'sunday': 'sunday'
+    };
 
     // Check for "excepto" with any days (handles both single and multiple days)
     if (text.includes('excepto')) {
         // Look for specific days mentioned after "excepto"
-        const dayMatches = [];
+        const dayMatches: string[] = [];
         for (const [day, pattern] of Object.entries(DAY_PATTERNS.specificDays)) {
             if (pattern.test(text)) {
                 dayMatches.push(day);
@@ -312,17 +349,10 @@ const handleNegationPatterns = (text: string, availability: DayAvailability): Pa
         }
 
         if (dayMatches.length > 0) {
-            // Exclude the mentioned days
-            const dayMap: { [key: string]: keyof Omit<DayAvailability, 'allDays' | 'customText'> } = {
-                'monday': 'monday',
-                'tuesday': 'tuesday',
-                'wednesday': 'wednesday',
-                'thursday': 'thursday',
-                'friday': 'friday',
-                'saturday': 'saturday',
-                'sunday': 'sunday'
-            };
+            // Only set all days to true AFTER we confirm we have days to exclude
+            setAllDays(availability);
 
+            // Exclude the mentioned days
             dayMatches.forEach(day => {
                 const dayKey = dayMap[day];
                 if (dayKey) {
@@ -343,7 +373,7 @@ const handleNegationPatterns = (text: string, availability: DayAvailability): Pa
     // Check for general "no válido" patterns with specific days
     if (ENHANCED_DAY_PATTERNS.notValid.test(text)) {
         // Look for specific days mentioned after "no válido"
-        const dayMatches = [];
+        const dayMatches: string[] = [];
         for (const [day, pattern] of Object.entries(DAY_PATTERNS.specificDays)) {
             if (pattern.test(text)) {
                 dayMatches.push(day);
@@ -351,17 +381,10 @@ const handleNegationPatterns = (text: string, availability: DayAvailability): Pa
         }
 
         if (dayMatches.length > 0) {
-            // Exclude the mentioned days
-            const dayMap: { [key: string]: keyof Omit<DayAvailability, 'allDays' | 'customText'> } = {
-                'monday': 'monday',
-                'tuesday': 'tuesday',
-                'wednesday': 'wednesday',
-                'thursday': 'thursday',
-                'friday': 'friday',
-                'saturday': 'saturday',
-                'sunday': 'sunday'
-            };
+            // Only set all days to true AFTER we confirm we have days to exclude
+            setAllDays(availability);
 
+            // Exclude the mentioned days
             dayMatches.forEach(day => {
                 const dayKey = dayMap[day];
                 if (dayKey) {
@@ -378,8 +401,6 @@ const handleNegationPatterns = (text: string, availability: DayAvailability): Pa
             };
         }
     }
-
-
 
     return null;
 };
@@ -734,7 +755,8 @@ const containsDayKeywords = (text: string): boolean => {
     const dayKeywords = [
         'lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo',
         'días', 'dias', 'semana', 'hábiles', 'habiles', 'laborables', 'fines', 'válido', 'valido',
-        'aplicable', 'excepto', 'todos', 'permanente', 'siempre'
+        'aplicable', 'excepto', 'todos'
+        // Note: "permanente" and "siempre" removed - they often describe duration, not day availability
     ];
 
     const lowerText = text.toLowerCase();
@@ -932,13 +954,10 @@ export const parseMultiFieldDayAvailability = (benefitInfo: BenefitDayInfo): Day
         if (benefitInfo.requisitos && Array.isArray(benefitInfo.requisitos)) {
             const requisitosResults = parseRequisitosArray(benefitInfo.requisitos);
             if (requisitosResults.length > 0) {
-
-
                 // Merge all requisitos results into a single result
                 let mergedRequisitos = requisitosResults[0];
                 for (let i = 1; i < requisitosResults.length; i++) {
                     const currentResult = requisitosResults[i];
-
 
                     const mergedAvailability = mergeDayAvailability(
                         mergedRequisitos.availability,
@@ -947,8 +966,6 @@ export const parseMultiFieldDayAvailability = (benefitInfo: BenefitDayInfo): Day
                         currentResult.isRestriction,
                         true // Same field
                     );
-
-
 
                     mergedRequisitos = {
                         ...mergedRequisitos,
