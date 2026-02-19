@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
+import RouteSEO from './components/seo/RouteSEO';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
@@ -20,6 +21,7 @@ function App() {
   return (
     <Router>
       <AnalyticsTracker />
+      <RouteSEO />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />

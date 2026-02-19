@@ -9,6 +9,10 @@ Maintenance rule:
 - Measurement ID env var: `VITE_GA_MEASUREMENT_ID`
 - Init point: `/Users/tomas/Dev/Blink/Blink-v2/src/components/analytics/AnalyticsTracker.tsx`
 - Router page view tracking: `trackPageView(path)`
+- Attribution persistence:
+  - Query params captured when present: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `gclid`, `wbraid`, `gbraid`, `msclkid`
+  - Persisted in localStorage key: `blink.analytics.attribution`
+  - Appended to all events when available
 
 ## Global Events (Auto)
 
@@ -59,6 +63,16 @@ Common params:
 - `keyboard_alt` (keyboard events)
 - `keyboard_meta` (keyboard events)
 - `event_is_trusted`
+- Attribution params when available:
+  - `utm_source`
+  - `utm_medium`
+  - `utm_campaign`
+  - `utm_term`
+  - `utm_content`
+  - `gclid`
+  - `wbraid`
+  - `gbraid`
+  - `msclkid`
 
 ### `scroll_depth`
 Params:

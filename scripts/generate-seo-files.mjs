@@ -1,0 +1,69 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const DEFAULT_SITE_URL = 'https://example.com';
+
+function normalizeSiteUrl(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return '';
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return withProtocol.replace(/\/+$/, '');
+}
+
+const resolvedSiteUrl = normalizeSiteUrl(
+  process.env.VITE_SITE_URL ||
+    process.env.SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    '',
+);
+
+const siteUrl = resolvedSiteUrl || DEFAULT_SITE_URL;
+
+const today = new Date().toISOString().split('T')[0];
+const routes = [
+  { path: '/home', changefreq: 'daily', priority: '1.0' },
+  { path: '/search', changefreq: 'daily', priority: '0.9' },
+  { path: '/map', changefreq: 'daily', priority: '0.8' },
+];
+
+const xmlUrls = routes
+  .map((route) => {
+    return [
+      '  <url>',
+      `    <loc>${siteUrl}${route.path}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      `    <changefreq>${route.changefreq}</changefreq>`,
+      `    <priority>${route.priority}</priority>`,
+      '  </url>',
+    ].join('\n');
+  })
+  .join('\n');
+
+const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${xmlUrls}
+</urlset>
+`;
+
+const robotsContent = `User-agent: *
+Allow: /
+Disallow: /profile
+Disallow: /saved
+
+Sitemap: ${siteUrl}/sitemap.xml
+`;
+
+const publicDir = path.resolve(process.cwd(), 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapContent, 'utf8');
+fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
+
+if (siteUrl === DEFAULT_SITE_URL) {
+  console.warn('[seo] VITE_SITE_URL/SITE_URL is not set. Using https://example.com in sitemap and robots.txt.');
+} else {
+  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl}`);
+}
