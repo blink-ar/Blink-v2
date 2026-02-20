@@ -73,6 +73,12 @@ function RouteSEO() {
       description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicacion.',
       path: '/map',
     };
+  } else if (location.pathname.startsWith('/descuentos/')) {
+    seoConfig = {
+      title: `Descuentos bancarios por banco y categoria | ${SITE_NAME}`,
+      description: 'Explora descuentos bancarios por banco, categoria y ciudad en Argentina.',
+      path: location.pathname,
+    };
   } else if (location.pathname.startsWith('/business/')) {
     seoConfig = {
       title: `Beneficios por comercio | ${SITE_NAME}`,

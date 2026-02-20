@@ -10,6 +10,7 @@ const BenefitDetailPage = lazy(() => import('./pages/BenefitDetailPage'));
 const SavedPage = lazy(() => import('./pages/SavedPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -32,6 +33,8 @@ function App() {
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
+          <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
       </Suspense>
     </Router>

@@ -21,13 +21,39 @@ const resolvedSiteUrl = normalizeSiteUrl(
 const siteUrl = resolvedSiteUrl || DEFAULT_SITE_URL;
 
 const today = new Date().toISOString().split('T')[0];
-const routes = [
+const banks = ['galicia', 'santander', 'bbva', 'macro', 'nacion', 'icbc'];
+const categories = ['gastronomia', 'moda', 'shopping', 'hogar', 'deportes', 'belleza'];
+const cities = ['buenos-aires', 'caba', 'cordoba', 'rosario', 'mendoza'];
+
+const baseRoutes = [
   { path: '/home', changefreq: 'daily', priority: '1.0' },
   { path: '/search', changefreq: 'daily', priority: '0.9' },
   { path: '/map', changefreq: 'daily', priority: '0.8' },
 ];
 
-const xmlUrls = routes
+const landingRoutes = [];
+for (const bank of banks) {
+  for (const category of categories) {
+    landingRoutes.push({
+      path: `/descuentos/${bank}/${category}`,
+      changefreq: 'weekly',
+      priority: '0.8',
+    });
+
+    for (const city of cities) {
+      landingRoutes.push({
+        path: `/descuentos/${bank}/${category}/${city}`,
+        changefreq: 'weekly',
+        priority: '0.7',
+      });
+    }
+  }
+}
+
+const routes = [...baseRoutes, ...landingRoutes];
+const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());
+
+const xmlUrls = uniqueRoutes
   .map((route) => {
     return [
       '  <url>',
