@@ -24,27 +24,48 @@ const BottomNav: React.FC = () => {
   const activeTab = getActiveTab();
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-blink-surface border-t-2 border-blink-ink z-50 pb-safe">
-      <div className="flex justify-around items-center h-16 px-2 overflow-hidden">
+    <nav
+      className="fixed bottom-0 left-0 w-full z-50 pb-safe"
+      style={{
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(232,230,225,0.8)',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.06)',
+      }}
+    >
+      <div className="flex justify-around items-center h-16 px-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <Link
               key={tab.id}
               to={tab.path}
-              className={`flex items-center justify-center w-1/4 group active:scale-95 transition-transform ${
-                isActive ? '' : 'opacity-60 hover:opacity-100'
-              }`}
+              className="flex flex-col items-center justify-center w-1/4 gap-0.5 active:scale-95 transition-transform duration-100"
             >
               <div
-                className={`border-2 border-blink-ink p-1 shadow-hard-sm transition-transform ${
-                  isActive ? 'bg-blink-warning' : 'bg-white'
+                className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary/10'
+                    : 'bg-transparent'
                 }`}
               >
-                <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>
+                <span
+                  className={`material-symbols-outlined transition-colors duration-200 ${
+                    isActive ? 'text-primary' : 'text-blink-muted'
+                  }`}
+                  style={{ fontSize: 22, fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
+                >
                   {tab.icon}
                 </span>
               </div>
+              <span
+                className={`text-[10px] font-medium transition-colors duration-200 ${
+                  isActive ? 'text-primary' : 'text-blink-muted'
+                }`}
+              >
+                {tab.label}
+              </span>
             </Link>
           );
         })}

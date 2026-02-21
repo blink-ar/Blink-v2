@@ -21,7 +21,6 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
 
   const { savings, total, cappedSavings } = useMemo(() => {
     const raw = Math.round((amount * discountPercentage) / 100);
-    // Parse cap if provided (e.g., "$4.500" -> 4500)
     let cap = Infinity;
     if (maxCap) {
       const numStr = String(maxCap).replace(/[^0-9]/g, '');
@@ -35,18 +34,33 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
     `$${n.toLocaleString('es-AR')}`;
 
   return (
-    <div className="bg-blink-bg border-2 border-blink-ink shadow-hard p-4">
-      <div className="flex justify-between items-center mb-3 border-b-2 border-blink-ink pb-2">
-        <h3 className="font-bold uppercase text-sm tracking-wide">Simulación de Ahorro</h3>
-        <span className="material-symbols-outlined text-lg">calculate</span>
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: 'linear-gradient(135deg, #F7F6F4 0%, #FFFFFF 100%)',
+        border: '1px solid #E8E6E1',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-semibold text-sm text-blink-ink">Simulación de ahorro</h3>
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}
+        >
+          <span className="material-symbols-outlined text-primary text-base">calculate</span>
+        </div>
       </div>
 
-      {/* Amount selection row */}
+      {/* Amount selection */}
       <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
-        {/* Custom amount toggle/input */}
         {isEditing ? (
-          <div className="flex-shrink-0 flex items-center border-2 border-blink-ink bg-white">
-            <span className="pl-2 font-mono text-xs font-bold text-blink-muted">$</span>
+          <div
+            className="flex-shrink-0 flex items-center rounded-xl overflow-hidden"
+            style={{ border: '1.5px solid #6366f1', background: '#fff' }}
+          >
+            <span className="pl-3 text-xs font-medium text-blink-muted">$</span>
             <input
               ref={inputRef}
               type="text"
@@ -64,12 +78,12 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
               onBlur={() => {
                 if (!customInput) { setIsEditing(false); }
               }}
-              className="w-24 px-1 py-1 font-mono text-base font-bold bg-transparent focus:outline-none"
+              className="w-24 px-1 py-2 text-sm font-semibold bg-transparent focus:outline-none text-blink-ink"
               placeholder="Monto"
             />
             <button
               onClick={() => { if (customInput) setIsEditing(false); }}
-              className="px-2 py-1 text-blink-ink hover:bg-primary/20"
+              className="px-2 py-2 text-primary"
             >
               <span className="material-symbols-outlined text-sm">check</span>
             </button>
@@ -77,26 +91,25 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
         ) : (
           <button
             onClick={() => { setIsEditing(true); setCustomInput(''); }}
-            className={`flex-shrink-0 px-3 py-1 border-2 border-blink-ink font-mono text-xs font-bold transition-colors flex items-center gap-1.5 ${
+            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 flex items-center gap-1.5 ${
               customInput
-                ? 'bg-blink-ink text-white'
-                : 'bg-white text-blink-ink hover:bg-primary/20'
+                ? 'bg-primary text-white'
+                : 'bg-blink-bg text-blink-ink border border-blink-border hover:border-primary/30'
             }`}
           >
             {customInput ? formatCurrency(amount) : 'Tu monto'}
-            <span className="material-symbols-outlined text-sm">edit</span>
+            <span className="material-symbols-outlined text-xs">edit</span>
           </button>
         )}
 
-        {/* Preset amounts */}
         {presets.map((p) => (
           <button
             key={p}
             onClick={() => { setAmount(p); setCustomInput(''); setIsEditing(false); }}
-            className={`flex-shrink-0 px-3 py-1 border-2 border-blink-ink font-mono text-xs font-bold transition-colors ${
+            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               amount === p && !customInput
-                ? 'bg-blink-ink text-white'
-                : 'bg-white text-blink-ink hover:bg-primary/20'
+                ? 'bg-primary text-white shadow-soft'
+                : 'bg-blink-bg text-blink-ink border border-blink-border hover:border-primary/30'
             }`}
           >
             {formatCurrency(p)}
@@ -104,27 +117,33 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
         ))}
       </div>
 
-      <div className="space-y-3 font-mono text-sm">
+      {/* Results */}
+      <div className="space-y-2.5 text-sm">
         <div className="flex justify-between items-center">
-          <span className="text-blink-muted">Consumo estimado:</span>
-          <span className="font-bold line-through decoration-2 decoration-blink-accent">
+          <span className="text-blink-muted">Consumo estimado</span>
+          <span className="font-medium text-blink-muted line-through">
             {formatCurrency(amount)}
           </span>
         </div>
-        <div className="flex justify-between items-center text-blink-accent">
-          <span>Descuento ({discountPercentage}%):</span>
-          <span className="font-bold">-{formatCurrency(cappedSavings)}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-blink-positive font-medium">Descuento ({discountPercentage}%)</span>
+          <span className="font-semibold text-blink-positive">−{formatCurrency(cappedSavings)}</span>
         </div>
         {maxCap && savings > cappedSavings && (
-          <div className="flex justify-between items-center text-xs text-blink-muted">
-            <span>Tope aplicado:</span>
-            <span>{maxCap}</span>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-blink-muted">Tope aplicado</span>
+            <span className="text-xs text-blink-muted">{maxCap}</span>
           </div>
         )}
-        <div className="w-full border-t-2 border-dashed border-blink-muted/40 my-2" />
-        <div className="flex justify-between items-center text-lg">
-          <span className="font-bold">TOTAL A PAGAR:</span>
-          <span className="bg-primary px-2 py-1 border-2 border-blink-ink font-bold">
+
+        <div className="h-px bg-blink-border my-1" />
+
+        <div
+          className="flex justify-between items-center p-3 rounded-xl"
+          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}
+        >
+          <span className="font-semibold text-blink-ink">Total a pagar</span>
+          <span className="font-bold text-lg text-primary">
             {formatCurrency(total)}
           </span>
         </div>

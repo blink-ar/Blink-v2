@@ -14,20 +14,20 @@ const DISCOUNT_OPTIONS = [
 ];
 
 const DAY_OPTIONS = [
-  { value: 'today', label: 'HOY' },
-  { value: 'monday', label: 'LUN' },
-  { value: 'tuesday', label: 'MAR' },
-  { value: 'wednesday', label: 'MIÉ' },
-  { value: 'thursday', label: 'JUE' },
-  { value: 'friday', label: 'VIE' },
-  { value: 'saturday', label: 'SÁB' },
-  { value: 'sunday', label: 'DOM' },
+  { value: 'today', label: 'Hoy' },
+  { value: 'monday', label: 'Lun' },
+  { value: 'tuesday', label: 'Mar' },
+  { value: 'wednesday', label: 'Mié' },
+  { value: 'thursday', label: 'Jue' },
+  { value: 'friday', label: 'Vie' },
+  { value: 'saturday', label: 'Sáb' },
+  { value: 'sunday', label: 'Dom' },
 ];
 
 const NETWORK_OPTIONS = [
-  { value: 'visa', label: 'VISA' },
-  { value: 'mastercard', label: 'MASTERCARD' },
-  { value: 'amex', label: 'AMEX' },
+  { value: 'visa', label: 'Visa' },
+  { value: 'mastercard', label: 'Mastercard' },
+  { value: 'amex', label: 'Amex' },
 ];
 
 export interface FilterPanelProps {
@@ -93,10 +93,10 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     <button
       key={key}
       onClick={onClick}
-      className={`px-4 py-2 border-2 border-blink-ink font-mono text-sm font-bold uppercase transition-colors ${
+      className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
         isActive
-          ? 'bg-blink-ink text-white shadow-none'
-          : 'bg-white text-blink-ink shadow-hard-sm hover:bg-primary/20'
+          ? 'bg-primary text-white shadow-soft'
+          : 'bg-white text-blink-ink border border-blink-border hover:border-primary/30 hover:bg-primary/5'
       }`}
     >
       {label}
@@ -106,35 +106,46 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   return (
     <div className="fixed inset-0 z-[60] bg-blink-bg overflow-y-auto">
       {/* Header */}
-      <div className="sticky top-0 bg-blink-surface border-b-2 border-blink-ink z-10 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="font-display text-xl uppercase">Filtros</h2>
+      <div
+        className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid #E8E6E1',
+        }}
+      >
+        <div className="flex items-center gap-2.5">
+          <h2 className="font-semibold text-lg text-blink-ink">Filtros</h2>
           {activeCount > 0 && (
-            <span className="bg-blink-accent text-white font-mono text-xs px-2 py-0.5 border-2 border-blink-ink">
+            <span className="bg-primary text-white text-xs font-semibold px-2 py-0.5 rounded-full">
               {activeCount}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {activeCount > 0 && (
-            <button onClick={handleClearAll} className="font-mono text-xs underline decoration-2 decoration-blink-accent font-bold">
-              LIMPIAR
+            <button
+              onClick={handleClearAll}
+              className="text-sm text-primary font-medium hover:text-primary/70 transition-colors"
+            >
+              Limpiar
             </button>
           )}
           <button
             onClick={onClose}
-            className="w-10 h-10 bg-blink-ink text-white flex items-center justify-center border-2 border-blink-ink"
+            className="w-9 h-9 bg-blink-bg border border-blink-border rounded-xl flex items-center justify-center text-blink-ink hover:bg-gray-100 transition-colors"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
       </div>
 
-      <div className="p-4 space-y-6 pb-24">
+      <div className="p-4 space-y-6 pb-28">
         {/* Distance */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">location_on</span>
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">location_on</span>
             Ubicación
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -149,9 +160,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {/* Discount */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">percent</span>
-            Descuento Mínimo
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">percent</span>
+            Descuento mínimo
           </h3>
           <div className="flex flex-wrap gap-2">
             {DISCOUNT_OPTIONS.map((opt) => toggleBtn(
@@ -165,8 +176,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {/* Day */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">calendar_today</span>
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">calendar_today</span>
             Disponibilidad
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -181,21 +192,21 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {/* Card Mode */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">credit_card</span>
-            Tipo de Tarjeta
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">credit_card</span>
+            Tipo de tarjeta
           </h3>
           <div className="flex flex-wrap gap-2">
-            {toggleBtn(cardMode === 'credit', () => onCardModeChange(cardMode === 'credit' ? undefined : 'credit'), 'CRÉDITO')}
-            {toggleBtn(cardMode === 'debit', () => onCardModeChange(cardMode === 'debit' ? undefined : 'debit'), 'DÉBITO')}
+            {toggleBtn(cardMode === 'credit', () => onCardModeChange(cardMode === 'credit' ? undefined : 'credit'), 'Crédito')}
+            {toggleBtn(cardMode === 'debit', () => onCardModeChange(cardMode === 'debit' ? undefined : 'debit'), 'Débito')}
           </div>
         </div>
 
         {/* Network */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">payments</span>
-            Red de Pago
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">payments</span>
+            Red de pago
           </h3>
           <div className="flex flex-wrap gap-2">
             {NETWORK_OPTIONS.map((opt) => toggleBtn(
@@ -209,28 +220,36 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {/* Modality */}
         <div>
-          <h3 className="font-display text-sm uppercase mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">language</span>
+          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">language</span>
             Modalidad
           </h3>
           <div className="flex flex-wrap gap-2">
-            {toggleBtn(onlineOnly, () => onOnlineChange(!onlineOnly), 'SOLO ONLINE')}
+            {toggleBtn(onlineOnly, () => onOnlineChange(!onlineOnly), 'Solo online')}
             {toggleBtn(
               hasInstallments === true,
               () => onHasInstallmentsChange(hasInstallments === true ? undefined : true),
-              'CON CUOTAS S/INT',
+              'Con cuotas s/int.',
             )}
           </div>
         </div>
       </div>
 
       {/* Apply button */}
-      <div className="fixed bottom-0 left-0 w-full p-4 bg-blink-surface border-t-2 border-blink-ink">
+      <div
+        className="fixed bottom-0 left-0 w-full p-4"
+        style={{
+          background: 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid #E8E6E1',
+        }}
+      >
         <button
           onClick={onClose}
-          className="w-full bg-blink-ink text-white font-display uppercase tracking-wider py-4 border-2 border-white shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all text-lg"
+          className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98]"
+          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
         >
-          Aplicar Filtros
+          Aplicar filtros
         </button>
       </div>
     </div>
