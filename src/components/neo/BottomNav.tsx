@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-export type NavTab = 'home' | 'search' | 'saved' | 'profile';
+export type NavTab = 'home' | 'search' | 'map' | 'saved';
 
 const tabs = [
   { id: 'home' as NavTab, label: 'Inicio', icon: 'home', path: '/home' },
   { id: 'search' as NavTab, label: 'Buscar', icon: 'search', path: '/search' },
+  { id: 'map' as NavTab, label: 'Mapa', icon: 'map', path: '/map' },
   { id: 'saved' as NavTab, label: 'Guardados', icon: 'favorite', path: '/saved' },
-  { id: 'profile' as NavTab, label: 'Perfil', icon: 'person', path: '/profile' },
 ];
 
 const BottomNav: React.FC = () => {
@@ -16,8 +16,8 @@ const BottomNav: React.FC = () => {
   const getActiveTab = (): NavTab => {
     const path = location.pathname;
     if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/map')) return 'map';
     if (path.startsWith('/saved')) return 'saved';
-    if (path.startsWith('/profile')) return 'profile';
     return 'home';
   };
 
