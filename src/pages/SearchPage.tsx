@@ -577,29 +577,27 @@ function SearchPage() {
               </button>
             )}
           </div>
+          <button
+            onClick={() => setShowFilters(true)}
+            className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
+              activeFilterCount > 0
+                ? 'bg-primary text-white'
+                : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
+            }`}
+            aria-label="Abrir filtros"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>tune</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Compact filter controls */}
         <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
           <div className="flex gap-2 min-w-max items-center">
-            {/* Filter button */}
-            <button
-              onClick={() => setShowFilters(true)}
-              className={`relative h-9 px-3 flex items-center gap-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                activeFilterCount > 0
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-              aria-label="Abrir filtros"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>tune</span>
-              <span>Filtros</span>
-              {activeFilterCount > 0 && (
-                <span className="bg-white/25 text-white text-[10px] font-bold h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
 
             {/* Bank filter button */}
             <button
