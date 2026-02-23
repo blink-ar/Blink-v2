@@ -622,6 +622,19 @@ function SearchPage() {
               <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
             </button>
 
+            {/* Online only */}
+            <button
+              onClick={() => setOnlineOnly(!onlineOnly)}
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                onlineOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>language</span>
+              <span>Online</span>
+            </button>
+
             {/* Installments */}
             <button
               onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
