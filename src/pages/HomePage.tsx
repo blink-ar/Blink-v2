@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { Business } from '../types';
 import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
+import { buildFeaturedLandingLinks } from '../seo/landingData';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -79,6 +80,11 @@ function HomePage() {
       .sort((a, b) => b.discount - a.discount)
       .slice(0, 5);
   }, [businesses]);
+
+  const featuredLandingLinks = useMemo(
+    () => buildFeaturedLandingLinks(businesses, 12),
+    [businesses],
+  );
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
@@ -233,6 +239,26 @@ function HomePage() {
 
         {/* Category Marquee */}
         <CategoryMarquee />
+
+        <section className="px-4">
+          <div className="bg-white border-2 border-blink-ink p-4 shadow-hard">
+            <h3 className="font-display text-2xl uppercase mb-2">Explora por banco y categoria</h3>
+            <p className="font-mono text-xs text-blink-muted mb-4">
+              Landing pages para encontrar beneficios en Argentina por banco, rubro y ciudad.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {featuredLandingLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="px-3 py-1.5 border-2 border-blink-ink bg-blink-surface text-xs font-mono uppercase hover:bg-primary transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* Newsletter CTA */}
         <section className="px-4">

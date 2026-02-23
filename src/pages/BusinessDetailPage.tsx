@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
+import { useSEO } from '../hooks/useSEO';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -34,6 +35,35 @@ function BusinessDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const businessViewSignatureRef = useRef('');
+  const businessCategory = business?.category?.toLowerCase() || 'comercios';
+  const businessBenefitCount = business?.benefits.length || 0;
+  const businessPath = id ? `/business/${id}` : '/business';
+
+  useSEO({
+    title: business
+      ? `${business.name}: descuentos y beneficios bancarios | Blink`
+      : 'Beneficios por comercio | Blink',
+    description: business
+      ? `${businessBenefitCount} beneficios activos en ${business.name} para ${businessCategory} en Argentina.`
+      : 'Consulta descuentos, topes y condiciones por comercio en Blink.',
+    path: business ? `/business/${business.id}` : businessPath,
+    type: 'article',
+    structuredData: business
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'LocalBusiness',
+          name: business.name,
+          image: business.image || undefined,
+          address: business.location[0]?.formattedAddress
+            ? {
+                '@type': 'PostalAddress',
+                streetAddress: business.location[0].formattedAddress,
+                addressCountry: 'AR',
+              }
+            : undefined,
+        }
+      : undefined,
+  });
 
   useEffect(() => {
     if (passedBusiness) return;

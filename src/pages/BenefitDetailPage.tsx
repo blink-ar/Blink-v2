@@ -5,6 +5,7 @@ import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
 import { useSubscriptions } from '../hooks/useSubscriptions';
+import { useSEO } from '../hooks/useSEO';
 import {
   trackSaveBenefit,
   trackShareBenefit,
@@ -40,6 +41,32 @@ function BenefitDetailPage() {
   const [isSaved, setIsSaved] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName } = useSubscriptions();
+  const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
+  const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
+
+  useSEO({
+    title: business && benefit
+      ? `${business.name}: ${benefit.benefit} | Blink`
+      : 'Detalle de beneficio bancario | Blink',
+    description: business && benefit
+      ? `${benefitDiscount ? `${benefitDiscount}% de ahorro` : 'Beneficio bancario'} en ${business.name}. Revisa vigencia, condiciones y sucursales adheridas.`
+      : 'Revisa condiciones, vigencia y ubicaciones de cada beneficio bancario.',
+    path: business ? `/benefit/${business.id}/${benefitPosition}` : benefitPath,
+    type: 'article',
+    structuredData: business && benefit
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'Offer',
+          name: `${benefit.benefit} en ${business.name}`,
+          description: benefit.description || undefined,
+          category: business.category || undefined,
+          seller: {
+            '@type': 'Organization',
+            name: benefit.bankName,
+          },
+        }
+      : undefined,
+  });
 
   useEffect(() => {
     if (passedBusiness) {
