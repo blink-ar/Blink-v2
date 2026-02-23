@@ -670,7 +670,7 @@ function SearchPage() {
             className="text-xs font-semibold px-2.5 py-1 rounded-full"
             style={{ background: '#EEF2FF', color: '#4338CA' }}
           >
-            {totalBusinesses} resultados
+            {enrichedBusinesses.length} resultados
           </span>
         </div>
 
