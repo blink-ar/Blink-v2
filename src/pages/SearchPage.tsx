@@ -536,8 +536,6 @@ function SearchPage() {
     navigate(`/business/${business.id}`, { state: { business } });
   };
 
-  const cartItemsCount = 3;
-
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
@@ -579,12 +577,6 @@ function SearchPage() {
               </button>
             )}
           </div>
-          <button className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors relative">
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>shopping_bag</span>
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
-              {cartItemsCount}
-            </span>
-          </button>
         </div>
 
         {/* Compact filter controls */}
