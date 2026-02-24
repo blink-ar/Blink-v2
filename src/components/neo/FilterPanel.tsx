@@ -247,7 +247,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         <button
           onClick={onClose}
           className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98]"
-          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
         >
           Aplicar filtros
         </button>

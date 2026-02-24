@@ -28,10 +28,10 @@ const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 // Soft bank accent colors
 const getBankAccent = (name: string): { bg: string; text: string; border: string } => {
   const lower = name.toLowerCase();
-  if (lower.includes('galicia')) return { bg: '#FEF3C7', text: '#92400E', border: '#FDE68A' };
+  if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA', border: '#C7D2FE' };
   if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
   if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' };
-  if (lower.includes('macro')) return { bg: '#FEF3C7', text: '#78350F', border: '#FDE68A' };
+  if (lower.includes('macro')) return { bg: '#EEF2FF', text: '#78350F', border: '#C7D2FE' };
   if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8', border: '#BFDBFE' };
   if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' };
   if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
@@ -212,159 +212,144 @@ function BenefitDetailPage() {
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
-      {/* Frosted glass header */}
-      <header
-        className="sticky top-0 z-40 w-full"
-        style={{
-          background: 'rgba(255,255,255,0.92)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(232,230,225,0.8)',
-        }}
-      >
-        <div className="px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-xl bg-blink-bg flex items-center justify-center text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="font-semibold text-base text-blink-ink">Beneficio</h1>
-          </div>
-          <button
-            onClick={handleToggleSave}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
-              isSaved ? 'bg-rose-50 text-rose-500' : 'bg-blink-bg text-blink-muted hover:bg-gray-100'
-            }`}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}>
-              favorite
-            </span>
-          </button>
-        </div>
-      </header>
+      <main className="flex-1 overflow-y-auto pb-32">
 
-      <main className="flex-1 overflow-y-auto pb-32 space-y-4 p-4">
-        {/* Store identity row */}
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center p-1.5 overflow-hidden flex-shrink-0"
-            style={{ border: '1px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
-          >
-            {business.image ? (
-              <img alt={business.name} className="w-full h-full object-contain" src={business.image} />
-            ) : (
-              <span className="font-bold text-xl text-blink-muted">{business.name?.charAt(0)}</span>
-            )}
+        {/* Hero - dark indigo (distinct from the light business page hero) */}
+        <div
+          className="relative overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)', minHeight: 240 }}
+        >
+          {/* Floating nav buttons - glass on dark background */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+              style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}
+            >
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 20 }}>arrow_back</span>
+            </button>
+            <button
+              onClick={handleToggleSave}
+              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+              style={{
+                background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}
+            >
+              <span
+                className="material-symbols-outlined text-white"
+                style={{ fontSize: 20, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
+              >
+                favorite
+              </span>
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-base text-blink-ink truncate">{business.name}</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full capitalize"
-                style={{ background: '#F3F4F6', color: '#374151' }}
-              >
-                {business.category || 'Comercio'}
-              </span>
-              <span
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                style={{ background: isOnline ? '#EEF2FF' : '#F0FDF4', color: isOnline ? '#4338CA' : '#14532D' }}
-              >
-                {isOnline ? 'Online' : 'Presencial'}
-              </span>
+
+          {/* Hero content: logo + business name + bank badge */}
+          <div className="relative z-10 flex flex-col items-center pt-20 pb-8 px-6 text-center">
+            {/* Logo */}
+            <div
+              className="w-[72px] h-[72px] rounded-[20px] bg-white flex items-center justify-center overflow-hidden mb-3"
+              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.30)', border: '2px solid rgba(255,255,255,0.20)' }}
+            >
+              {business.image ? (
+                <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
+              ) : (
+                <span className="font-black text-2xl text-primary">{business.name?.charAt(0)}</span>
+              )}
             </div>
+
+            {/* Business name */}
+            <h1 className="font-black text-[20px] text-white leading-tight mb-2.5">{business.name}</h1>
+
+            {/* Bank + card badge — glass style on dark bg */}
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+            >
+              {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName}` : ''}
+            </span>
           </div>
         </div>
+
+        <div className="p-4 space-y-3">
 
         {/* Main Benefit Card */}
         <div
           className="bg-white rounded-2xl overflow-hidden"
-          style={{ boxShadow: '0 4px 24px rgba(99,102,241,0.10)', border: '1.5px solid #c7d2fe' }}
+          style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
         >
-          {/* Top gradient header */}
-          <div
-            className="px-5 pt-5 pb-6 relative"
-            style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}
-          >
-            {/* Bank + subscription row */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={{ background: bankAccent.bg, color: bankAccent.text, border: `1px solid ${bankAccent.border}` }}
-                >
-                  {benefit.bankName}
-                </span>
-                {subscriptionName && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {subscriptionName}
-                  </span>
+          {/* Discount hero — white, clear contrast from the indigo hero above */}
+          <div className="flex flex-col items-center text-center px-6 pt-8 pb-7 bg-white">
+            {discount > 0 ? (
+              <>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Descuento</p>
+                <div className="flex items-end gap-1 leading-none">
+                  <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{discount}</span>
+                  <div className="flex flex-col items-start mb-1">
+                    <span className="font-black leading-none" style={{ fontSize: 34, color: '#818CF8' }}>%</span>
+                    <span className="font-bold text-[11px] tracking-[0.14em] uppercase text-blink-muted">OFF</span>
+                  </div>
+                </div>
+                {benefit.installments != null && benefit.installments > 0 && (
+                  <p className="text-xs font-semibold mt-3" style={{ color: '#059669' }}>+ {benefit.installments} cuotas sin interés</p>
                 )}
-              </div>
-              {validUntilFormatted && (
-                <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-white/70 text-blink-muted">
-                  Hasta {validUntilFormatted}
+              </>
+            ) : benefit.installments && benefit.installments > 0 ? (
+              <>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Cuotas sin interés</p>
+                <div className="flex items-end gap-2 leading-none">
+                  <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{benefit.installments}</span>
+                  <span className="font-bold mb-1" style={{ fontSize: 28, color: '#818CF8' }}>x</span>
+                </div>
+                <p className="text-xs font-medium mt-3 text-blink-muted">sin interés</p>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Beneficio</p>
+                <p className="font-bold text-blink-ink text-lg leading-snug">{benefit.benefit}</p>
+              </>
+            )}
+
+            {/* Bank + card badges */}
+            <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+              <span
+                className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: bankAccent.bg, color: bankAccent.text, border: `1px solid ${bankAccent.border}` }}
+              >
+                {benefit.bankName}
+              </span>
+              {benefit.cardName && (
+                <span
+                  className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
+                  style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
+                >
+                  {String(benefit.cardName)}
                 </span>
               )}
             </div>
+          </div>
 
-            {/* Big number */}
-            {discount > 0 ? (
-              <div className="text-center">
-                <div className="flex items-baseline justify-center gap-1">
-                  <span
-                    className="font-bold leading-none"
-                    style={{
-                      fontSize: 72,
-                      background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    }}
-                  >
-                    {discount}%
-                  </span>
-                  <span className="font-bold text-2xl text-blink-muted mb-1">OFF</span>
-                </div>
-                {benefit.installments != null && benefit.installments > 0 && (
-                  <p className="text-sm font-medium text-blink-muted mt-1">+ {benefit.installments} cuotas sin interés</p>
-                )}
-              </div>
-            ) : benefit.installments && benefit.installments > 0 ? (
-              <div className="text-center">
-                <div className="flex items-baseline justify-center gap-2">
-                  <span
-                    className="font-bold leading-none"
-                    style={{
-                      fontSize: 72,
-                      background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    }}
-                  >
-                    {benefit.installments}
-                  </span>
-                  <span className="font-bold text-xl text-blink-muted mb-1">cuotas</span>
-                </div>
-                <p className="text-sm font-semibold text-primary mt-1">Sin interés</p>
-              </div>
-            ) : (
-              <p className="text-xl font-bold text-center text-blink-ink leading-snug">{benefit.benefit}</p>
+          {/* Meta row: subscription, tope, validity */}
+          <div className="px-5 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid #E8E6E1' }}>
+            {subscriptionName && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                {subscriptionName}
+              </span>
             )}
-
-            {/* Tope */}
-            {benefit.tope && (
-              <div className="mt-3 text-center">
-                <span
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.70)', color: '#4338CA' }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>payments</span>
-                  {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
-                </span>
-              </div>
+            {discount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style={{ background: '#F3F4F6', color: '#6B7280' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 11 }}>payments</span>
+                {!benefit.tope || String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope' : benefit.tope}
+              </span>
+            )}
+            {validUntilFormatted && (
+              <span className="text-[10px] font-medium text-blink-muted ml-auto">hasta {validUntilFormatted}</span>
             )}
           </div>
 
@@ -380,7 +365,7 @@ function BenefitDetailPage() {
                     className="flex-1 h-8 flex items-center justify-center rounded-xl font-semibold text-xs transition-all"
                     style={
                       isActive
-                        ? { background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: 'white' }
+                        ? { background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', color: 'white' }
                         : { background: '#F3F4F6', color: '#9CA3AF' }
                     }
                   >
@@ -398,15 +383,7 @@ function BenefitDetailPage() {
             </div>
           )}
 
-          {/* Card info */}
-          {benefit.cardName && (
-            <div className="px-5 py-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>credit_card</span>
-              <span className="text-xs text-blink-muted">{String(benefit.cardName)}</span>
-            </div>
-          )}
-
-          <p className="text-[10px] text-blink-muted px-5 pb-4 italic">
+          <p className="text-[10px] text-blink-muted px-5 py-4 italic">
             * Por transacción. Consultá bases legales.
           </p>
         </div>
@@ -489,6 +466,7 @@ function BenefitDetailPage() {
             )}
           </div>
         </div>
+        </div>{/* close p-4 space-y-3 */}
       </main>
 
       {/* Fixed Bottom CTA */}
@@ -503,7 +481,7 @@ function BenefitDetailPage() {
         <button
           onClick={handleOpenMap}
           className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
           Ver ubicación

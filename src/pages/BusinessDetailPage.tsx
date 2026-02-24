@@ -22,27 +22,14 @@ const formatCuando = (cuando?: string): string => {
   return result;
 };
 
-// Category-specific gradient
-const getCategoryGradient = (category: string | undefined) => {
-  switch (category) {
-    case 'gastronomia': return 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)';
-    case 'moda': return 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)';
-    case 'viajes': return 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)';
-    case 'deportes': return 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)';
-    case 'entretenimiento': return 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)';
-    case 'electro': return 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)';
-    case 'hogar': return 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)';
-    default: return 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)';
-  }
-};
 
 // Bank accent colors (soft versions)
 const getBankAccent = (name: string): { bg: string; text: string } => {
   const lower = name.toLowerCase();
-  if (lower.includes('galicia')) return { bg: '#FEF3C7', text: '#92400E' };
+  if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA' };
   if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B' };
   if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF' };
-  if (lower.includes('macro')) return { bg: '#FEF3C7', text: '#78350F' };
+  if (lower.includes('macro')) return { bg: '#EEF2FF', text: '#78350F' };
   if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8' };
   if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C' };
   if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B' };
@@ -53,6 +40,7 @@ const getBankAccent = (name: string): { bg: string; text: string } => {
 };
 
 const bankAbbr = (name: string) => name.replace(/banco\s*/i, '').substring(0, 6).toUpperCase();
+
 
 function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -144,85 +132,69 @@ function BusinessDetailPage() {
     );
   }
 
-  const categoryGradient = getCategoryGradient(business.category);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
-      {/* Frosted glass header */}
-      <header
-        className="sticky top-0 z-40 w-full"
-        style={{
-          background: 'rgba(255,255,255,0.92)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(232,230,225,0.8)',
-        }}
-      >
-        <div className="px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-xl bg-blink-bg flex items-center justify-center text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="font-semibold text-base text-blink-ink">Detalle</h1>
-          </div>
-          <button className="w-10 h-10 rounded-xl bg-blink-bg flex items-center justify-center text-blink-muted hover:bg-gray-100 transition-colors active:scale-95">
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>favorite_border</span>
-          </button>
-        </div>
-      </header>
-
       <main className="flex-1 pb-32">
-        {/* Hero banner - category gradient */}
+        {/* Unified hero header */}
         <div
           className="relative overflow-hidden"
-          style={{ background: categoryGradient, minHeight: 160 }}
+          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260 }}
         >
-          {business.image && (
-            <img
-              alt={business.name}
-              className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-20"
-              src={business.image}
-            />
-          )}
-          {/* Logo overlapping at bottom */}
-          <div className="flex flex-col items-center pt-8 pb-12 px-4 relative">
+          {/* Floating nav buttons */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+              style={{ background: 'rgba(255,255,255,0.70)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 20 }}>arrow_back</span>
+            </button>
+            <button
+              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+              style={{ background: 'rgba(255,255,255,0.70)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>favorite_border</span>
+            </button>
+          </div>
+
+          {/* Logo + name + badges — all inside the hero */}
+          <div className="relative z-10 flex flex-col items-center justify-end pt-24 pb-8 px-6 text-center">
             <div
-              className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center p-2 overflow-hidden"
-              style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.10)', border: '1px solid rgba(232,230,225,0.6)' }}
+              className="w-[84px] h-[84px] rounded-[22px] bg-white flex items-center justify-center overflow-hidden mb-4"
+              style={{ boxShadow: '0 8px 28px rgba(99,102,241,0.18)', border: '2px solid rgba(255,255,255,0.95)' }}
             >
               {business.image ? (
-                <img alt={business.name} className="w-full h-full object-contain" src={business.image} />
+                <img alt={business.name} className="w-full h-full object-contain p-2" src={business.image} />
               ) : (
-                <span className="font-bold text-3xl text-blink-muted">{business.name?.charAt(0)}</span>
+                <span className="font-black text-3xl text-blink-muted">{business.name?.charAt(0)}</span>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Store info card - overlaps hero */}
-        <div className="px-4 -mt-8 relative z-10">
-          <div
-            className="bg-white rounded-2xl p-4 text-center"
-            style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #E8E6E1' }}
-          >
-            <h1 className="font-bold text-xl text-blink-ink mb-2">{business.name}</h1>
+            <h1 className="font-black text-[22px] text-blink-ink leading-tight mb-3">
+              {business.name}
+            </h1>
+
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <span
-                className="text-xs font-semibold px-3 py-1 rounded-full capitalize"
-                style={{ background: categoryGradient, color: '#374151' }}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-full capitalize"
+                style={{ background: 'rgba(255,255,255,0.72)', color: '#374151' }}
               >
                 {business.category || 'Comercio'}
               </span>
-              <span className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full" style={{ background: '#D1FAE5', color: '#065F46' }}>
+              <span
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.72)', color: '#065F46' }}
+              >
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
                 Activo
               </span>
               {business.rating > 0 && (
-                <span className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full" style={{ background: '#FEF3C7', color: '#92400E' }}>
-                  <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 14 }}>star</span>
+                <span
+                  className="flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.72)', color: '#4338CA' }}
+                >
+                  <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 12 }}>star</span>
                   {business.rating.toFixed(1)}
                 </span>
               )}
@@ -248,7 +220,7 @@ function BusinessDetailPage() {
                     key={`${benefit.bankName}-${idx}`}
                     onClick={() => handleBenefitSelect(benefit, idx + 1)}
                     className="w-full bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
-                    style={{ boxShadow: isFirst ? '0 4px 20px rgba(99,102,241,0.12)' : '0 2px 8px rgba(0,0,0,0.06)', border: isFirst ? '1.5px solid #c7d2fe' : '1px solid #E8E6E1' }}
+                    style={{ boxShadow: isFirst ? '0 4px 20px rgba(99,102,241,0.12)' : '0 2px 8px rgba(0,0,0,0.06)', border: isFirst ? '1.5px solid #C7D2FE' : '1px solid #E8E6E1' }}
                   >
                     {/* Card top - colored band */}
                     <div
@@ -287,7 +259,7 @@ function BusinessDetailPage() {
                               className="font-bold leading-none"
                               style={{
                                 fontSize: isFirst ? 52 : 40,
-                                background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text',
@@ -313,7 +285,7 @@ function BusinessDetailPage() {
                               className="font-bold leading-none"
                               style={{
                                 fontSize: isFirst ? 52 : 40,
-                                background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text',
@@ -396,7 +368,7 @@ function BusinessDetailPage() {
                 <button
                   onClick={() => setShowAll(true)}
                   className="w-full py-3 rounded-2xl text-sm font-medium text-primary transition-colors"
-                  style={{ border: '1.5px dashed #c7d2fe', background: '#EEF2FF' }}
+                  style={{ border: '1.5px dashed #C7D2FE', background: '#EEF2FF' }}
                 >
                   Ver {hiddenCount} beneficios más
                 </button>
@@ -418,7 +390,7 @@ function BusinessDetailPage() {
         <button
           onClick={handleOpenMap}
           className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
           Ver ubicación

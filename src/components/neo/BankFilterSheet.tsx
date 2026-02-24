@@ -177,7 +177,7 @@ const BankFilterSheet = ({
           <button
             onClick={() => onApply(draftTokens)}
             className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex justify-between items-center px-5"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
           >
             <span>Aplicar filtros</span>
             <span

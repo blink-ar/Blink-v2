@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { trackFilterApply } from '../../analytics/intentTracking';
 
 const CATEGORIES = [
-  { id: 'gastronomia', label: 'Gastronomía', emoji: '🍕', bg: '#FEF3C7', text: '#92400E' },
+  { id: 'gastronomia', label: 'Gastronomía', emoji: '🍕', bg: '#EEF2FF', text: '#4338CA' },
   { id: 'moda', label: 'Moda', emoji: '👗', bg: '#FCE7F3', text: '#9D174D' },
   { id: 'entretenimiento', label: 'Entretenimiento', emoji: '🎮', bg: '#EDE9FE', text: '#4C1D95' },
   { id: 'deportes', label: 'Deportes', emoji: '⚽', bg: '#D1FAE5', text: '#065F46' },
@@ -11,7 +11,7 @@ const CATEGORIES = [
   { id: 'viajes', label: 'Viajes', emoji: '✈️', bg: '#DBEAFE', text: '#1E40AF' },
   { id: 'automotores', label: 'Automotores', emoji: '🚗', bg: '#F3F4F6', text: '#374151' },
   { id: 'belleza', label: 'Belleza', emoji: '💄', bg: '#FDF2F8', text: '#831843' },
-  { id: 'jugueterias', label: 'Jugueterías', emoji: '🧸', bg: '#FEF3C7', text: '#78350F' },
+  { id: 'jugueterias', label: 'Jugueterías', emoji: '🧸', bg: '#EEF2FF', text: '#78350F' },
   { id: 'hogar', label: 'Hogar', emoji: '🏠', bg: '#ECFDF5', text: '#064E3B' },
   { id: 'electro', label: 'Electro', emoji: '💻', bg: '#EEF2FF', text: '#312E81' },
   { id: 'shopping', label: 'Supermercado', emoji: '🛒', bg: '#F0FDF4', text: '#14532D' },

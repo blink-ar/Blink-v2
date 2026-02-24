@@ -19,7 +19,7 @@ const Ticker: React.FC<TickerProps> = ({ count }) => {
     <div
       className="overflow-hidden whitespace-nowrap relative py-1.5"
       style={{
-        background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+        background: 'linear-gradient(135deg, #EEF2FF 0%, #e0e7ff 100%)',
         borderBottom: '1px solid rgba(99,102,241,0.12)',
       }}
     >

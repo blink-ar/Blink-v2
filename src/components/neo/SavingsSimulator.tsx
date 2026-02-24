@@ -58,7 +58,7 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
         {isEditing ? (
           <div
             className="flex-shrink-0 flex items-center rounded-xl overflow-hidden"
-            style={{ border: '1.5px solid #6366f1', background: '#fff' }}
+            style={{ border: '1.5px solid #6366F1', background: '#fff' }}
           >
             <span className="pl-3 text-xs font-medium text-blink-muted">$</span>
             <input

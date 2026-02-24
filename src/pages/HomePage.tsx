@@ -78,19 +78,6 @@ function HomePage() {
       .slice(0, 5);
   }, [businesses]);
 
-  // Category-specific gradient for bento cards
-  const getCategoryGradient = (category: string | undefined) => {
-    switch (category) {
-      case 'gastronomia': return 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)';
-      case 'moda': return 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)';
-      case 'viajes': return 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)';
-      case 'deportes': return 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)';
-      case 'entretenimiento': return 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)';
-      case 'electro': return 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)';
-      case 'hogar': return 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)';
-      default: return 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)';
-    }
-  };
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
@@ -115,7 +102,7 @@ function HomePage() {
             </button>
             <div
               className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
               <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>
                 person
@@ -134,7 +121,7 @@ function HomePage() {
             No pagues<br />
             <span
               className="text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+              style={{ backgroundImage: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
               de más.
             </span>
@@ -165,7 +152,7 @@ function HomePage() {
               <button
                 type="submit"
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-all duration-150 active:scale-95"
-                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+                style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
               </button>
@@ -175,19 +162,15 @@ function HomePage() {
           {/* Quick Category Pills */}
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {[
-              { label: '🍔 Gastronomía', category: 'gastronomia', bg: '#FEF3C7', text: '#92400E' },
-              { label: '👟 Moda', category: 'moda', bg: '#FCE7F3', text: '#9D174D' },
-              { label: '🛒 Supermercado', category: 'shopping', bg: '#F0FDF4', text: '#14532D' },
+              { label: '🍔 Gastronomía', category: 'gastronomia' },
+              { label: '👟 Moda', category: 'moda' },
+              { label: '🛒 Supermercado', category: 'shopping' },
             ].map((pill) => (
               <button
                 key={pill.category}
                 onClick={() => handleQuickCategoryClick(pill.category)}
-                className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 active:scale-95"
-                style={{
-                  backgroundColor: pill.bg,
-                  color: pill.text,
-                  border: `1px solid ${pill.text}20`,
-                }}
+                className="px-4 py-2 rounded-full text-sm font-medium text-blink-ink transition-all duration-150 active:scale-95"
+                style={{ background: '#FFFFFF', border: '1.5px solid #E8E6E1' }}
               >
                 {pill.label}
               </button>
@@ -236,35 +219,40 @@ function HomePage() {
                       border: '1px solid #E8E6E1',
                     }}
                   >
-                    {/* Gradient header - category color coded */}
+                    {/* Card header — image with dark overlay, indigo fallback */}
                     <div
                       className="h-28 w-full relative overflow-hidden"
-                      style={{ background: getCategoryGradient(item.business.category) }}
+                      style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
                     >
                       {item.business.image && (
                         <img
                           alt={item.business.name}
-                          className="w-full h-full object-cover mix-blend-overlay opacity-40"
+                          className="absolute inset-0 w-full h-full object-cover"
                           src={item.business.image}
                           loading="lazy"
                         />
                       )}
+                      {/* Dark scrim */}
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.52) 100%)' }}
+                      />
                       {/* Discount badge */}
                       <div className="absolute top-3 left-3">
                         <div
                           className="flex items-baseline gap-0.5 px-2.5 py-1 rounded-xl"
-                          style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(8px)' }}
+                          style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)' }}
                         >
-                          <span className="font-bold text-2xl text-blink-ink leading-none">{item.discount}%</span>
-                          <span className="text-xs font-semibold text-blink-muted">OFF</span>
+                          <span className="font-bold text-2xl text-white leading-none">{item.discount}%</span>
+                          <span className="text-xs font-semibold text-white/80">OFF</span>
                         </div>
                       </div>
                       {/* Rank */}
                       <div
                         className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.85)' }}
+                        style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)' }}
                       >
-                        <span className="text-xs font-bold text-blink-ink">#{idx + 1}</span>
+                        <span className="text-xs font-bold text-white">#{idx + 1}</span>
                       </div>
                     </div>
 
@@ -277,11 +265,8 @@ function HomePage() {
                         {item.benefit.bankName} · {item.benefit.cardName}
                       </p>
                       <div className="flex items-center justify-between">
-                        <span
-                          className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: '#EEF2FF', color: '#4338CA' }}
-                        >
-                          {item.benefit.cuando ? String(item.benefit.cuando).substring(0, 15) : 'Disponible hoy'}
+                        <span className="text-[10px] font-medium text-blink-muted">
+                          {item.benefit.cuando ? String(item.benefit.cuando).substring(0, 20) : 'Disponible hoy'}
                         </span>
                         <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>
                           bookmark
@@ -301,7 +286,7 @@ function HomePage() {
           <div
             className="p-5 rounded-2xl relative overflow-hidden"
             style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+              background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
               boxShadow: '0 8px 24px rgba(99,102,241,0.25)',
             }}
           >

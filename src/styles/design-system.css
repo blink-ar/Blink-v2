@@ -159,8 +159,8 @@
   
   /* ===== GRADIENTS ===== */
 
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
-  --gradient-featured: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --gradient-primary: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+  --gradient-featured: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%);
   --gradient-card: linear-gradient(145deg, #ffffff 0%, #f7f6f4 100%);
   --gradient-emerald: linear-gradient(135deg, #10b981 0%, #34d399 100%);
   --gradient-amber: linear-gradient(135deg, #f59e0b 0%, #fcd34d 100%);
@@ -202,7 +202,7 @@
   /* Input Fields */
   --input-bg: var(--color-white);
   --input-border: #e8e6e1;
-  --input-border-focus: #6366f1;
+  --input-border-focus: #6366F1;
   --input-radius: var(--radius-md);
   --input-padding-x: var(--space-4);
   --input-padding-y: var(--space-3);

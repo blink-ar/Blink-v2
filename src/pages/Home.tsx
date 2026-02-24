@@ -194,7 +194,7 @@ function Home() {
 
   // Transform categories for CategoryGrid component
   const categoryGridData = [
-    { id: "gastronomia", name: "Comida", icon: "🍽️", color: "#F59E0B" },
+    { id: "gastronomia", name: "Comida", icon: "🍽️", color: "#818CF8" },
     { id: "moda", name: "Ropa", icon: "👕", color: "#8B5CF6" },
     {
       id: "entretenimiento",

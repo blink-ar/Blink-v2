@@ -349,14 +349,14 @@ function MapPage() {
               padding:7px 12px;display:flex;flex-direction:column;align-items:center;
               z-index:200;pointer-events:none;border:1px solid rgba(199,210,254,0.8);">
               <span style="color:#1C1C1E;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;line-height:1.3;">${this.biz.name}</span>
-              <span style="color:#6366f1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
+              <span style="color:#6366F1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
               <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:rgba(255,255,255,0.96);border-right:1px solid rgba(199,210,254,0.8);border-bottom:1px solid rgba(199,210,254,0.8);"></div>
             </div>`;
         }
 
         // Marker: white circle with soft shadow + indigo ring when selected
         const ringStyle = this.isSelected
-          ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366f1;background:#ffffff;'
+          ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
           : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;';
 
         html += `
@@ -365,7 +365,7 @@ function MapPage() {
             transition:all 0.15s;">
             ${this.imgSrc
               ? `<img src="${this.imgSrc}" alt="" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
-              : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366f1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
+              : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
             }
           </div>`;
 
@@ -440,7 +440,7 @@ function MapPage() {
         this.div.innerHTML = `
           <div style="position:relative;width:22px;height:22px;">
             <div style="position:absolute;inset:0;background:rgba(99,102,241,0.20);border-radius:50%;animation:blink-ping 1.8s cubic-bezier(0,0,0.2,1) infinite;"></div>
-            <div style="position:absolute;inset:4px;background:#6366f1;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.40);"></div>
+            <div style="position:absolute;inset:4px;background:#6366F1;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.40);"></div>
           </div>
         `;
         this.getPanes().overlayLayer.appendChild(this.div);
@@ -637,7 +637,7 @@ function MapPage() {
               <button
                 onClick={() => setShowFilters(true)}
                 className="flex items-center justify-center w-11 h-11 rounded-2xl active:scale-95 transition-all shrink-0 relative"
-                style={{ background: activeFilterCount > 0 ? 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' : 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: activeFilterCount > 0 ? 'none' : '1px solid rgba(232,230,225,0.8)' }}
+                style={{ background: activeFilterCount > 0 ? 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' : 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: activeFilterCount > 0 ? 'none' : '1px solid rgba(232,230,225,0.8)' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: activeFilterCount > 0 ? 'white' : '#6B7280' }}>tune</span>
                 {activeFilterCount > 0 && (
@@ -662,7 +662,7 @@ function MapPage() {
                     onClick={() => setActiveChip(chip.id)}
                     className="px-3.5 py-2 rounded-2xl text-sm font-medium whitespace-nowrap transition-all duration-150 active:scale-95"
                     style={isActive ? {
-                      background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                      background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
                       color: 'white',
                       boxShadow: '0 2px 10px rgba(99,102,241,0.30)',
                     } : {
@@ -813,7 +813,7 @@ function MapPage() {
                   className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.98] relative"
                   style={isSelected ? {
                     background: '#ffffff',
-                    border: '1.5px solid #c7d2fe',
+                    border: '1.5px solid #C7D2FE',
                     boxShadow: '0 2px 12px rgba(99,102,241,0.12)',
                   } : {
                     background: '#ffffff',
@@ -825,7 +825,7 @@ function MapPage() {
                   {isSelected && (
                     <div
                       className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full"
-                      style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' }}
+                      style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
                     />
                   )}
 
