@@ -296,11 +296,9 @@ function BenefitDetailPage() {
                 {benefit.installments != null && benefit.installments > 0 && (
                   <p className="text-xs font-semibold mt-3" style={{ color: '#059669' }}>+ {benefit.installments} cuotas sin interés</p>
                 )}
-                {benefit.tope && (
-                  <p className="text-xs font-medium mt-2 text-blink-muted">
-                    {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
-                  </p>
-                )}
+                <p className="text-xs font-medium mt-2 text-blink-muted">
+                  {!benefit.tope || String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
+                </p>
               </>
             ) : benefit.installments && benefit.installments > 0 ? (
               <>
