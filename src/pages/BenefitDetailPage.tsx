@@ -264,13 +264,23 @@ function BenefitDetailPage() {
             {/* Business name */}
             <h1 className="font-black text-[20px] text-white leading-tight mb-2.5">{business.name}</h1>
 
-            {/* Bank + card badge — glass style on dark bg */}
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
-            >
-              {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName}` : ''}
-            </span>
+            {/* Bank + card badge + subscription — glass style on dark bg */}
+            <div className="flex items-center gap-2">
+              <span
+                className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+              >
+                {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName}` : ''}
+              </span>
+              {subscriptionName && (
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                >
+                  {subscriptionName}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -340,16 +350,7 @@ function BenefitDetailPage() {
             </div>
           </div>
 
-          {/* Meta row: subscription */}
-          <div className="px-5 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid #E8E6E1' }}>
-            {subscriptionName && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                {subscriptionName}
-              </span>
-            )}
-          </div>
-
-          {/* Days availability */}
+{/* Days availability */}
           <div className="px-5 py-4" style={{ borderBottom: '1px solid #E8E6E1' }}>
             <p className="text-[10px] font-semibold text-blink-muted uppercase tracking-wide mb-2.5">Días de vigencia</p>
             <div className="flex gap-1.5">
