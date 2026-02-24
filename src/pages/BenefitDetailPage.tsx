@@ -340,15 +340,12 @@ function BenefitDetailPage() {
             </div>
           </div>
 
-          {/* Meta row: subscription, tope, validity */}
+          {/* Meta row: subscription */}
           <div className="px-5 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid #E8E6E1' }}>
             {subscriptionName && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                 {subscriptionName}
               </span>
-            )}
-            {validUntilFormatted && (
-              <span className="text-[10px] font-medium text-blink-muted ml-auto">hasta {validUntilFormatted}</span>
             )}
           </div>
 
@@ -382,9 +379,12 @@ function BenefitDetailPage() {
             </div>
           )}
 
-          <p className="text-[10px] text-blink-muted px-5 py-4 italic">
-            * Por transacción. Consultá bases legales.
-          </p>
+          <div className="px-5 py-4 flex items-center justify-between">
+            <p className="text-[10px] text-blink-muted italic">* Por transacción. Consultá bases legales.</p>
+            {validUntilFormatted && (
+              <span className="text-[10px] font-medium text-blink-muted">Válido hasta {validUntilFormatted}</span>
+            )}
+          </div>
         </div>
 
         {/* Savings Simulator */}
