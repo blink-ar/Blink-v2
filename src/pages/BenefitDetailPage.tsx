@@ -296,6 +296,11 @@ function BenefitDetailPage() {
                 {benefit.installments != null && benefit.installments > 0 && (
                   <p className="text-xs font-semibold mt-3" style={{ color: '#059669' }}>+ {benefit.installments} cuotas sin interés</p>
                 )}
+                {benefit.tope && (
+                  <p className="text-xs font-medium mt-2 text-blink-muted">
+                    {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
+                  </p>
+                )}
               </>
             ) : benefit.installments && benefit.installments > 0 ? (
               <>
@@ -305,6 +310,11 @@ function BenefitDetailPage() {
                   <span className="font-bold mb-1" style={{ fontSize: 28, color: '#818CF8' }}>x</span>
                 </div>
                 <p className="text-xs font-medium mt-3 text-blink-muted">sin interés</p>
+                {benefit.tope && (
+                  <p className="text-xs font-medium mt-2 text-blink-muted">
+                    {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
+                  </p>
+                )}
               </>
             ) : (
               <>
@@ -337,15 +347,6 @@ function BenefitDetailPage() {
             {subscriptionName && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                 {subscriptionName}
-              </span>
-            )}
-            {discount > 0 && (
-              <span
-                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full"
-                style={{ background: '#F3F4F6', color: '#6B7280' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 11 }}>payments</span>
-                {!benefit.tope || String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope' : benefit.tope}
               </span>
             )}
             {validUntilFormatted && (
