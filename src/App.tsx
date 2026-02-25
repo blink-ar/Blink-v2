@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
+import RouteSEO from './components/seo/RouteSEO';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -17,6 +18,7 @@ const BenefitDetailPage = lazy(() => import('./pages/BenefitDetailPage'));
 const SavedPage = lazy(() => import('./pages/SavedPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -29,6 +31,7 @@ function App() {
     <Router>
       <ScrollToTop />
       <AnalyticsTracker />
+      <RouteSEO />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
@@ -39,6 +42,8 @@ function App() {
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
+          <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
       </Suspense>
     </Router>

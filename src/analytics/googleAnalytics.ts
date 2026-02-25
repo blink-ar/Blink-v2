@@ -10,11 +10,24 @@ declare global {
 
 const GA_MEASUREMENT_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID ?? '').trim();
 const SCROLL_DEPTH_MARKERS = [25, 50, 75, 100];
+const ATTRIBUTION_STORAGE_KEY = 'blink.analytics.attribution';
+const ATTRIBUTION_QUERY_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'gclid',
+  'wbraid',
+  'gbraid',
+  'msclkid',
+] as const;
 
 // Maintenance note:
 // If event names/params change here, update /Users/tomas/Dev/Blink/Blink-v2/ANALYTICS_EVENTS.md.
 let isInitialized = false;
 let lastTrackedPageView: { path: string; timestamp: number } | null = null;
+let attributionParams: AnalyticsParams = {};
 
 function isEnabled(): boolean {
   return GA_MEASUREMENT_ID.length > 0;
@@ -148,12 +161,87 @@ function getWindowPath(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
 
+function parseAttributionFromSearch(search: string): AnalyticsParams {
+  if (!search) {
+    return {};
+  }
+
+  const params = new URLSearchParams(search);
+  const attribution: AnalyticsParams = {};
+
+  for (const key of ATTRIBUTION_QUERY_KEYS) {
+    const value = params.get(key);
+    if (value) {
+      attribution[key] = value;
+    }
+  }
+
+  return attribution;
+}
+
+function readStoredAttribution(): AnalyticsParams {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const result: AnalyticsParams = {};
+
+    for (const key of ATTRIBUTION_QUERY_KEYS) {
+      const value = parsed[key];
+      if (typeof value === 'string' && value.trim()) {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function persistAttribution(params: AnalyticsParams): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(params));
+  } catch {
+    // Ignore storage write errors.
+  }
+}
+
+function refreshAttributionFromUrl(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const fromUrl = parseAttributionFromSearch(window.location.search);
+  if (Object.keys(fromUrl).length > 0) {
+    attributionParams = fromUrl;
+    persistAttribution(fromUrl);
+    return;
+  }
+
+  if (Object.keys(attributionParams).length === 0) {
+    attributionParams = readStoredAttribution();
+  }
+}
+
 export function initializeGoogleAnalytics(): boolean {
   if (typeof window === 'undefined' || !isEnabled()) {
     return false;
   }
 
   if (isInitialized) {
+    refreshAttributionFromUrl();
     return true;
   }
 
@@ -183,6 +271,7 @@ export function initializeGoogleAnalytics(): boolean {
     anonymize_ip: true,
   });
 
+  refreshAttributionFromUrl();
   isInitialized = true;
   return true;
 }
@@ -192,7 +281,10 @@ export function trackEvent(eventName: string, params: AnalyticsParams = {}): voi
     return;
   }
 
-  window.gtag('event', normalizeEventName(eventName), cleanParams(params));
+  window.gtag('event', normalizeEventName(eventName), cleanParams({
+    ...params,
+    ...attributionParams,
+  }));
 }
 
 export function trackPageView(path: string, title?: string): void {

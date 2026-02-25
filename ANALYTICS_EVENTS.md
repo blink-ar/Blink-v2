@@ -1,6 +1,6 @@
 # GA Event Dictionary
 
-Last updated: 2026-02-17
+Last updated: 2026-02-18
 
 Maintenance rule:
 - Any change to analytics event names or params in `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/googleAnalytics.ts` or `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/intentTracking.ts` must update this file in the same PR.
@@ -9,6 +9,10 @@ Maintenance rule:
 - Measurement ID env var: `VITE_GA_MEASUREMENT_ID`
 - Init point: `/Users/tomas/Dev/Blink/Blink-v2/src/components/analytics/AnalyticsTracker.tsx`
 - Router page view tracking: `trackPageView(path)`
+- Attribution persistence:
+  - Query params captured when present: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `gclid`, `wbraid`, `gbraid`, `msclkid`
+  - Persisted in localStorage key: `blink.analytics.attribution`
+  - Appended to all events when available
 
 ## Global Events (Auto)
 
@@ -59,6 +63,16 @@ Common params:
 - `keyboard_alt` (keyboard events)
 - `keyboard_meta` (keyboard events)
 - `event_is_trusted`
+- Attribution params when available:
+  - `utm_source`
+  - `utm_medium`
+  - `utm_campaign`
+  - `utm_term`
+  - `utm_content`
+  - `gclid`
+  - `wbraid`
+  - `gbraid`
+  - `msclkid`
 
 ### `scroll_depth`
 Params:
@@ -103,10 +117,13 @@ Params:
 Params:
 - `source`
 - `search_term`
+- `search_term_state` (`provided` | `empty`)
 - `results_count`
 - `has_filters`
+- `has_filters_state` (`filters_applied` | `no_filters`)
 - `active_filter_count`
-- `category`
+- `category` (normalized token)
+- `category_raw`
 
 Current sources:
 - `home_hero_search`
@@ -117,8 +134,21 @@ Current sources:
 Params:
 - `source`
 - `filter_type`
-- `filter_value`
+- `filter_value` (type-aware normalized label)
+- `filter_value_raw` (raw value before label formatting)
 - `active_filter_count`
+
+Notes:
+- `source` and `filter_type` are normalized tokens (snake_case).
+- For `filter_type=bank`, the app emits one `filter_apply` event per selected bank token (for example `macro` and `galicia` as separate events, not a combined `macro,galicia` value).
+- If all banks are cleared, it emits `filter_value=bank_none` and `filter_value_raw=none`.
+- `filter_value` is emitted as readable labels to avoid ambiguous values like `20` or `true`.
+  Examples:
+  - bank: `bank_macro`
+  - discount: `discount_20_percent_plus`
+  - installments: `installments_enabled`
+  - distance: `distance_within_10_km`
+  - online: `online_only_enabled`
 
 Current `filter_type` values:
 - `category`
@@ -141,7 +171,7 @@ Current sources:
 ### `map_interaction`
 Params:
 - `source`
-- `action`
+- `action` (normalized token)
 - `zoom_level`
 - `business_id`
 
@@ -163,8 +193,10 @@ Current sources:
 Params:
 - `source`
 - `business_id`
-- `category`
+- `category` (normalized token)
+- `category_raw`
 - `position`
+- `position_bucket` (`top_3` | `top_10` | `beyond_10` | `unknown`)
 
 Current sources:
 - `search_results`
@@ -178,8 +210,10 @@ Params:
 - `source`
 - `benefit_id`
 - `business_id`
-- `category`
+- `category` (normalized token)
+- `category_raw`
 - `position`
+- `position_bucket` (`top_3` | `top_10` | `beyond_10` | `unknown`)
 
 Current sources:
 - `home_top5`
@@ -190,7 +224,7 @@ Current sources:
 Params:
 - `source`
 - `destination_business_id`
-- `provider`
+- `provider` (normalized token)
 
 Current sources:
 - `business_detail_page`
@@ -204,7 +238,7 @@ Params:
 - `source`
 - `benefit_id`
 - `business_id`
-- `channel`
+- `channel` (normalized token)
 
 Current sources:
 - `benefit_detail_page`
@@ -238,8 +272,11 @@ Current sources:
 Params:
 - `source`
 - `search_term`
+- `search_term_state` (`provided` | `empty`)
 - `active_filter_count`
-- `category`
+- `has_filters_state` (`filters_applied` | `no_filters`)
+- `category` (normalized token)
+- `category_raw`
 
 Current sources:
 - `search_page`
@@ -251,3 +288,4 @@ Current sources:
 - Param keys are normalized to snake_case.
 - String param values are truncated to max 100 chars.
 - Undefined params are dropped before sending.
+- Semantic enum-like values (for example source/action/category/channel/provider) are normalized to tokens for cleaner GA dimensions.
