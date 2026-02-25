@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
+import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
 import FilterPanel from '../components/neo/FilterPanel';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
@@ -158,7 +159,7 @@ function SearchPage() {
   // Init all state from URL params so filters survive navigation
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('q') || '');
-  const [selectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedBanks, setSelectedBanks] = useState<string[]>(() => {
     const bankParam = searchParams.get('bank');
     if (!bankParam) return readStoredBanks();
@@ -174,6 +175,7 @@ function SearchPage() {
   // Filter panel state
   const [showFilters, setShowFilters] = useState(false);
   const [showBankSheet, setShowBankSheet] = useState(false);
+  const [showCategorySheet, setShowCategorySheet] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
   const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
@@ -631,6 +633,34 @@ function SearchPage() {
               <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
             </button>
 
+            {/* Category filter button */}
+            {(() => {
+              const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+              return (
+                <button
+                  onClick={() => setShowCategorySheet(true)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                    activeCat
+                      ? 'bg-primary/10 border border-primary/30 text-primary'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  {activeCat ? (
+                    <>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat.icon}</span>
+                      <span className="font-semibold">{activeCat.label}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                      <span>Categoría</span>
+                    </>
+                  )}
+                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                </button>
+              );
+            })()}
+
             {/* Online only */}
             <button
               onClick={() => setOnlineOnly(!onlineOnly)}
@@ -845,6 +875,16 @@ function SearchPage() {
         onApply={(tokens) => {
           setSelectedBanks(tokens);
           setShowBankSheet(false);
+        }}
+      />
+
+      <CategoryFilterSheet
+        isOpen={showCategorySheet}
+        selected={selectedCategory}
+        onClose={() => setShowCategorySheet(false)}
+        onApply={(category) => {
+          setSelectedCategory(category);
+          setShowCategorySheet(false);
         }}
       />
 
