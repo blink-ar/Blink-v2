@@ -15,6 +15,8 @@ import {
   benefitsAPI,
 } from './api';
 
+const BASE_URL = '';
+
 // ===== MAIN FUNCTIONS =====
 
 /**
@@ -48,7 +50,6 @@ export async function getRawBenefitsResponse(params: Record<string, string> = {}
  */
 export async function getRawBenefitById(id: string): Promise<RawMongoBenefit | null> {
   try {
-    const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003';
     const response = await fetch(`${BASE_URL}/api/benefits/${id}?collection=confirmed_benefits`);
 
     if (!response.ok) {

@@ -28,3 +28,4 @@ dist-ssr
 # Kiro AI Assistant files
 .kiro/
 .kiro/*
+.vercel
