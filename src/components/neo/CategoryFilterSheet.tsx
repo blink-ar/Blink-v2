@@ -123,7 +123,7 @@ const CategoryFilterSheet = ({
         </div>
 
         {/* Apply */}
-        <div className="p-4 pt-0" style={{ borderTop: '1px solid #E8E6E1' }}>
+        <div className="px-4 pt-4 pb-8" style={{ borderTop: '1px solid #E8E6E1' }}>
           <button
             onClick={() => onApply(draft)}
             className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex justify-between items-center px-5"

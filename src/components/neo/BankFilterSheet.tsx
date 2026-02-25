@@ -51,10 +51,6 @@ const BankFilterSheet = ({
     });
   }, [options, searchTerm]);
 
-  const allFilteredSelected =
-    filteredOptions.length > 0 &&
-    filteredOptions.every((option) => draftTokens.includes(option.token));
-
   const toggleToken = (token: string) => {
     setDraftTokens((current) =>
       current.includes(token)
@@ -63,19 +59,7 @@ const BankFilterSheet = ({
     );
   };
 
-  const toggleSelectAll = () => {
-    if (allFilteredSelected) {
-      const filteredSet = new Set(filteredOptions.map((option) => option.token));
-      setDraftTokens((current) => current.filter((token) => !filteredSet.has(token)));
-      return;
-    }
-
-    setDraftTokens((current) => {
-      const next = new Set(current);
-      filteredOptions.forEach((option) => next.add(option.token));
-      return Array.from(next);
-    });
-  };
+  const clearAll = () => setDraftTokens([]);
 
   if (!isOpen) return null;
 
@@ -129,10 +113,10 @@ const BankFilterSheet = ({
               {filteredOptions.length} entidades disponibles
             </span>
             <button
-              onClick={toggleSelectAll}
-              className="text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
+              onClick={clearAll}
+              className="text-xs font-semibold text-blink-muted hover:text-red-400 transition-colors"
             >
-              {allFilteredSelected ? 'Limpiar todos' : 'Seleccionar todos'}
+              Limpiar selección
             </button>
           </div>
         </div>
