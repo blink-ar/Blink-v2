@@ -1,0 +1,4 @@
+{
+  "framework": "vite",
+  "devCommand": "node scripts/dev-functions-server.mjs"
+}

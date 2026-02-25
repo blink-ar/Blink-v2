@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node scripts/dev-functions-server.mjs",
+    "dev:vercel:functions": "npx vercel dev --local-config vercel.functions-dev.json --listen 3000",
     "seo:generate": "node scripts/generate-seo-files.mjs",
     "prebuild": "npm run seo:generate",
     "build": "vite build",
@@ -19,6 +21,7 @@
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.12.2",
     "lucide-react": "^0.344.0",
+    "mongodb": "^6.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.6.2"
