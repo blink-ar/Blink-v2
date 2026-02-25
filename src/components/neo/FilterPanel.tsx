@@ -1,11 +1,5 @@
 import React from 'react';
 
-const DISTANCE_OPTIONS = [
-  { value: 5, label: 'Cerca (< 5km)' },
-  { value: 10, label: 'Mi área (< 10km)' },
-  { value: 50, label: 'Mi ciudad (< 50km)' },
-];
-
 const DISCOUNT_OPTIONS = [
   { value: 10, label: '10%+' },
   { value: 20, label: '20%+' },
@@ -24,69 +18,39 @@ const DAY_OPTIONS = [
   { value: 'sunday', label: 'Dom' },
 ];
 
-const NETWORK_OPTIONS = [
-  { value: 'visa', label: 'Visa' },
-  { value: 'mastercard', label: 'Mastercard' },
-  { value: 'amex', label: 'Amex' },
-];
-
 export interface FilterPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  onlineOnly: boolean;
-  onOnlineChange: (v: boolean) => void;
-  maxDistance: number | undefined;
-  onMaxDistanceChange: (v: number | undefined) => void;
   minDiscount: number | undefined;
   onMinDiscountChange: (v: number | undefined) => void;
   availableDay: string | undefined;
   onAvailableDayChange: (v: string | undefined) => void;
   cardMode: 'credit' | 'debit' | undefined;
   onCardModeChange: (v: 'credit' | 'debit' | undefined) => void;
-  network: string | undefined;
-  onNetworkChange: (v: string | undefined) => void;
-  hasInstallments: boolean | undefined;
-  onHasInstallmentsChange: (v: boolean | undefined) => void;
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({
   isOpen,
   onClose,
-  onlineOnly,
-  onOnlineChange,
-  maxDistance,
-  onMaxDistanceChange,
   minDiscount,
   onMinDiscountChange,
   availableDay,
   onAvailableDayChange,
   cardMode,
   onCardModeChange,
-  network,
-  onNetworkChange,
-  hasInstallments,
-  onHasInstallmentsChange,
 }) => {
   if (!isOpen) return null;
 
   const handleClearAll = () => {
-    onOnlineChange(false);
-    onMaxDistanceChange(undefined);
     onMinDiscountChange(undefined);
     onAvailableDayChange(undefined);
     onCardModeChange(undefined);
-    onNetworkChange(undefined);
-    onHasInstallmentsChange(undefined);
   };
 
   const activeCount = [
-    onlineOnly,
-    maxDistance !== undefined,
     minDiscount !== undefined,
     availableDay !== undefined,
     cardMode !== undefined,
-    network !== undefined,
-    hasInstallments !== undefined,
   ].filter(Boolean).length;
 
   const toggleBtn = (isActive: boolean, onClick: () => void, label: string, key?: string | number) => (
@@ -142,22 +106,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       </div>
 
       <div className="p-4 space-y-6 pb-28">
-        {/* Distance */}
-        <div>
-          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-base">location_on</span>
-            Ubicación
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {DISTANCE_OPTIONS.map((opt) => toggleBtn(
-              maxDistance === opt.value,
-              () => onMaxDistanceChange(maxDistance === opt.value ? undefined : opt.value),
-              opt.label,
-              opt.value,
-            ))}
-          </div>
-        </div>
-
         {/* Discount */}
         <div>
           <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -199,38 +147,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <div className="flex flex-wrap gap-2">
             {toggleBtn(cardMode === 'credit', () => onCardModeChange(cardMode === 'credit' ? undefined : 'credit'), 'Crédito')}
             {toggleBtn(cardMode === 'debit', () => onCardModeChange(cardMode === 'debit' ? undefined : 'debit'), 'Débito')}
-          </div>
-        </div>
-
-        {/* Network */}
-        <div>
-          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-base">payments</span>
-            Red de pago
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {NETWORK_OPTIONS.map((opt) => toggleBtn(
-              network === opt.value,
-              () => onNetworkChange(network === opt.value ? undefined : opt.value),
-              opt.label,
-              opt.value,
-            ))}
-          </div>
-        </div>
-
-        {/* Modality */}
-        <div>
-          <h3 className="text-sm font-semibold text-blink-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-base">language</span>
-            Modalidad
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {toggleBtn(onlineOnly, () => onOnlineChange(!onlineOnly), 'Solo online')}
-            {toggleBtn(
-              hasInstallments === true,
-              () => onHasInstallmentsChange(hasInstallments === true ? undefined : true),
-              'Con cuotas s/int.',
-            )}
           </div>
         </div>
       </div>

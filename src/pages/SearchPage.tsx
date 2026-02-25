@@ -302,15 +302,8 @@ function SearchPage() {
     }));
 
   const activeFilterCount = [
-    selectedCategory && selectedCategory !== 'all',
-    selectedBanks.length > 0,
-    onlineOnly,
-    maxDistance !== undefined,
-    minDiscount !== undefined,
     availableDay !== undefined,
     cardMode !== undefined,
-    network !== undefined,
-    hasInstallments !== undefined,
   ].filter(Boolean).length;
 
   const currentFilterState = useMemo<SearchFilterState>(() => ({
@@ -870,20 +863,12 @@ function SearchPage() {
       <FilterPanel
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
-        onlineOnly={onlineOnly}
-        onOnlineChange={setOnlineOnly}
-        maxDistance={maxDistance}
-        onMaxDistanceChange={setMaxDistance}
         minDiscount={minDiscount}
         onMinDiscountChange={setMinDiscount}
         availableDay={availableDay}
         onAvailableDayChange={setAvailableDay}
         cardMode={cardMode}
         onCardModeChange={setCardMode}
-        network={network}
-        onNetworkChange={setNetwork}
-        hasInstallments={hasInstallments}
-        onHasInstallmentsChange={setHasInstallments}
       />
 
       <BottomNav />
