@@ -66,7 +66,7 @@ const NearbyBusinesses: React.FC<NearbyBusinessesProps> = ({
   const getBusinessIconColor = (category: string): string => {
     switch (category) {
       case "gastronomia":
-        return "#F59E0B";
+        return "#818CF8";
       case "moda":
         return "#FBBF24";
       case "viajes":

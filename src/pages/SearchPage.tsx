@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
+import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
 import FilterPanel from '../components/neo/FilterPanel';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
@@ -10,7 +11,6 @@ import { fetchBanks } from '../services/api';
 import { Business } from '../types';
 import {
   trackFilterApply,
-  trackMapInteraction,
   trackNoResults,
   trackSearchIntent,
   trackSelectBusiness,
@@ -158,7 +158,7 @@ function SearchPage() {
   // Init all state from URL params so filters survive navigation
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('q') || '');
-  const [selectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedBanks, setSelectedBanks] = useState<string[]>(() => {
     const bankParam = searchParams.get('bank');
     if (!bankParam) return readStoredBanks();
@@ -174,6 +174,7 @@ function SearchPage() {
   // Filter panel state
   const [showFilters, setShowFilters] = useState(false);
   const [showBankSheet, setShowBankSheet] = useState(false);
+  const [showCategorySheet, setShowCategorySheet] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
   const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
@@ -301,15 +302,8 @@ function SearchPage() {
     }));
 
   const activeFilterCount = [
-    selectedCategory && selectedCategory !== 'all',
-    selectedBanks.length > 0,
-    onlineOnly,
-    maxDistance !== undefined,
-    minDiscount !== undefined,
     availableDay !== undefined,
     cardMode !== undefined,
-    network !== undefined,
-    hasInstallments !== undefined,
   ].filter(Boolean).length;
 
   const currentFilterState = useMemo<SearchFilterState>(() => ({
@@ -515,6 +509,15 @@ function SearchPage() {
     return max;
   };
 
+  // Get max installments for a business
+  const getMaxInstallments = (business: Business) => {
+    let max = 0;
+    business.benefits.forEach((benefit) => {
+      if (benefit.installments && benefit.installments > max) max = benefit.installments;
+    });
+    return max;
+  };
+
   // Get best benefit text
   const getBestBenefitText = (business: Business) => {
     const max = getMaxDiscount(business);
@@ -552,23 +555,33 @@ function SearchPage() {
     navigate(`/business/${business.id}`, { state: { business } });
   };
 
-  const cartItemsCount = 3;
-
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 w-full bg-blink-bg border-b-2 border-blink-ink">
-        <div className="px-4 py-3 flex items-center gap-3">
+      <header
+        className="sticky top-0 z-40 w-full"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(232,230,225,0.8)',
+        }}
+      >
+        <div className="px-4 py-3 flex items-center gap-2.5">
           <button
             onClick={() => navigate('/home')}
-            className="flex items-center justify-center w-10 h-10 bg-white border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
           >
-            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>arrow_back</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
-          <div className="flex-1 h-10 relative">
+          <div
+            className="flex-1 h-11 flex items-center px-3 gap-2 rounded-xl"
+            style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
+          >
+            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
             <input
-              className="w-full h-full border-2 border-blink-ink bg-white px-3 pr-10 font-display uppercase tracking-tight text-blink-ink placeholder-gray-400 focus:outline-none focus:ring-0 shadow-hard"
-              placeholder="BUSCAR..."
+              className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+              placeholder="Buscar tiendas y beneficios..."
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
@@ -577,176 +590,251 @@ function SearchPage() {
             {searchTerm && (
               <button
                 onClick={clearSearch}
-                className="absolute right-0 top-0 h-full w-10 flex items-center justify-center bg-blink-ink border-l-2 border-blink-ink"
+                className="text-blink-muted hover:text-blink-ink transition-colors"
               >
-                <span className="material-symbols-outlined text-primary" style={{ fontSize: 20 }}>close</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
             )}
           </div>
-          <button className="flex items-center justify-center w-10 h-10 bg-blink-warning border-2 border-blink-ink shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all relative">
-            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 24 }}>shopping_bag</span>
-            <span className="absolute -top-2 -right-2 bg-blink-accent text-white font-mono text-xs border-2 border-blink-ink h-5 w-5 flex items-center justify-center rounded-full">
-              {cartItemsCount}
-            </span>
+          <button
+            onClick={() => setShowFilters(true)}
+            className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
+              activeFilterCount > 0
+                ? 'bg-primary text-white'
+                : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
+            }`}
+            aria-label="Abrir filtros"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>tune</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
         </div>
 
         {/* Compact filter controls */}
-        <div className="w-full overflow-x-auto no-scrollbar border-t-2 border-blink-ink bg-white py-3">
-          <div className="flex px-4 gap-3 min-w-max items-center">
-            <button
-              onClick={() => setShowFilters(true)}
-              className="relative w-10 h-10 flex items-center justify-center border-2 border-blink-ink bg-blink-ink text-white shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all mr-2"
-              aria-label="Abrir filtros"
-            >
-              <span className="material-symbols-outlined text-xl">tune</span>
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-2 -right-2 h-5 min-w-5 px-1 border-2 border-blink-ink bg-primary text-blink-ink font-mono text-[10px] leading-none flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+        <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
+          <div className="flex gap-2 min-w-max items-center">
 
+            {/* Bank filter button */}
             <button
               onClick={() => setShowBankSheet(true)}
-              className="flex items-center border-2 border-blink-ink bg-blink-bg shadow-hard-sm px-1 py-1 gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all h-10 shrink-0"
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                selectedBanks.length > 0
+                  ? 'bg-primary/10 border border-primary/30 text-primary'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
             >
               {selectedBanks.length > 0 ? (
                 <>
-                  <div className="flex items-center -space-x-2 pl-1">
-                    {selectedBankPreview.map((bank, index) => (
-                      <div
-                      key={bank.token}
-                      className={`w-6 h-6 border-2 border-blink-ink flex items-center justify-center relative shadow-sm ${
-                        index === 0 ? 'bg-blink-warning z-30' : index === 1 ? 'bg-white z-20' : 'bg-white z-10'
-                      }`}
-                    >
-                      <span className="font-display text-[7px] uppercase leading-none text-blink-ink">
-                        {bank.code}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="w-6 h-6 border-2 border-blink-ink bg-primary flex items-center justify-center ml-1">
-                  <span className="font-mono text-[11px] font-bold text-blink-ink leading-none">
-                    {selectedBanks.length}
-                  </span>
-                </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                  <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
                 </>
-              ) : <span className="px-2 font-display text-sm uppercase">Bancos</span>}
-              <div className="h-full flex items-center justify-center px-1">
-                <span className="material-symbols-outlined text-blink-ink text-lg">expand_more</span>
-              </div>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                  <span>Bancos</span>
+                </>
+              )}
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
             </button>
 
-            <div className="w-px h-8 bg-gray-300 mx-1" />
+            {/* Category filter button */}
+            {(() => {
+              const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+              return (
+                <button
+                  onClick={() => setShowCategorySheet(true)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                    activeCat
+                      ? 'bg-primary/10 border border-primary/30 text-primary'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  {activeCat ? (
+                    <>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat.icon}</span>
+                      <span className="font-semibold">{activeCat.label}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                      <span>Categoría</span>
+                    </>
+                  )}
+                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                </button>
+              );
+            })()}
 
+            {/* Online only */}
+            <button
+              onClick={() => setOnlineOnly(!onlineOnly)}
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                onlineOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>language</span>
+              <span>Online</span>
+            </button>
+
+            {/* Installments */}
             <button
               onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
-              className={`h-10 min-w-[92px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
+              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                 hasInstallments === true
-                  ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
               }`}
             >
-              Cuotas
+              Cuotas s/int.
             </button>
 
+            {/* Min discount */}
             <button
               onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
-              className={`h-10 min-w-[118px] px-4 border-2 border-blink-ink font-mono font-bold uppercase text-xs tracking-[0.02em] shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all ${
+              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                 minDiscount !== undefined
-                  ? 'bg-primary text-blink-ink'
-                  : 'bg-white text-blink-ink hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
               }`}
             >
-              Descuento
+              20%+ desc.
             </button>
           </div>
         </div>
       </header>
 
       {/* Results */}
-      <main className="flex-1 px-4 py-6 space-y-5 pb-24">
-        <div className="flex justify-between items-end border-b-2 border-blink-ink pb-2 mb-4">
-          <h1 className="font-display text-2xl leading-none">TIENDAS</h1>
-          <span className="font-mono text-sm font-bold bg-primary px-2 py-0.5 border-2 border-blink-ink">
-            {totalBusinesses} TIENDAS
+      <main className="flex-1 px-4 py-5 space-y-3 pb-28">
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="font-semibold text-base text-blink-ink">Tiendas</h1>
+          <span
+            className="text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{ background: '#EEF2FF', color: '#4338CA' }}
+          >
+            {totalBusinesses} resultados
           </span>
         </div>
 
         {isLoading && !enrichedBusinesses.length ? (
           Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard h-40 animate-pulse" />
+            <div
+              key={index}
+              className="w-full h-24 rounded-2xl animate-pulse"
+              style={{ background: '#F3F4F6' }}
+            />
           ))
         ) : enrichedBusinesses.length === 0 ? (
-          <div className="text-center py-12">
-            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 64 }}>search_off</span>
-            <p className="font-display text-xl uppercase mt-4">Sin resultados</p>
-            <p className="font-mono text-sm text-blink-muted mt-2">Proba con otro termino o filtro</p>
+          <div className="text-center py-16">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: '#EEF2FF' }}
+            >
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 32 }}>search_off</span>
+            </div>
+            <p className="font-semibold text-lg text-blink-ink">Sin resultados</p>
+            <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
           enrichedBusinesses.map((business, index) => {
             const bankBadges = getBankBadges(business);
             const visibleBadges = bankBadges.slice(0, 3);
             const remaining = bankBadges.length - 3;
+            const maxDiscount = getMaxDiscount(business);
+            const maxInstallments = getMaxInstallments(business);
+
+            const categoryStyle = {
+              gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
+              moda:        { bg: '#EDE9FE', color: '#7C3AED' },
+              viajes:      { bg: '#E0F2FE', color: '#0284C7' },
+            }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
 
             return (
               <div
                 key={business.id}
                 onClick={() => handleBusinessSelect(business, index + 1)}
-                className="w-full bg-blink-surface border-2 border-blink-ink shadow-hard flex flex-col active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
+                className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
+                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
               >
-                <div className="flex p-4 gap-4 items-center">
+
+                <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
                   {/* Logo */}
-                  <div className="w-24 h-24 shrink-0 border-2 border-blink-ink bg-white flex items-center justify-center p-2 overflow-hidden">
+                  <div
+                    className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+                    style={{
+                      background: business.image ? '#F7F6F4' : categoryStyle.bg,
+                      border: '1px solid rgba(0,0,0,0.07)',
+                    }}
+                  >
                     {business.image ? (
                       <img
                         alt={business.name}
-                        className="w-full h-full object-contain grayscale"
+                        className="w-full h-full object-contain p-1"
                         src={business.image}
                         loading="lazy"
                       />
                     ) : (
-                      <span className="font-display text-2xl text-blink-muted">
+                      <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
                         {business.name?.charAt(0)}
                       </span>
                     )}
                   </div>
+
                   {/* Info */}
-                  <div className="flex-1 flex flex-col justify-center h-full gap-1">
-                    <h2 className="font-display text-lg uppercase leading-tight tracking-tight">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-bold text-[13.5px] text-blink-ink truncate leading-snug mb-[7px]">
                       {business.name}
                     </h2>
-                    <div className="bg-blink-ink text-primary p-1 w-fit border border-primary">
-                      <span className="font-display text-xl leading-none block">
-                        {getBestBenefitText(business)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
+
+                    {/* Banks + count row */}
+                    <div className="flex items-center gap-1.5">
                       {visibleBadges.map((badge) => (
-                        <div
+                        <span
                           key={`${business.id}-${badge}`}
-                          className="h-6 w-10 border border-blink-ink flex items-center justify-center bg-gray-100 text-[10px] font-bold font-mono"
+                          className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                          style={{ background: '#1E293B', color: '#E2E8F0' }}
                         >
                           {badge}
-                        </div>
+                        </span>
                       ))}
                       {remaining > 0 && (
-                        <span className="text-xs font-bold text-gray-400">+{remaining}</span>
+                        <span
+                          className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                          style={{ background: '#F1F5F9', color: '#94A3B8' }}
+                        >
+                          +{remaining}
+                        </span>
                       )}
+                      <span className="text-[10px] text-blink-muted ml-1.5">
+                        {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-center">
-                    <span className="material-symbols-outlined text-blink-ink text-3xl">chevron_right</span>
-                  </div>
-                </div>
-                <div className="bg-gray-100 border-t-2 border-blink-ink py-2 px-4 flex justify-between items-center">
-                  <span className="font-mono text-xs font-bold text-blink-ink flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full border border-blink-ink" />
-                    {business.benefits.length} BENEFICIOS ACTIVOS
-                  </span>
-                  <span className="font-mono text-xs text-gray-500">VER TODOS</span>
+
+                  {/* Benefit — typographic right column, no box */}
+                  {maxDiscount > 0 ? (
+                    <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                      <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+                      <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
+                      <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+                    </div>
+                  ) : maxInstallments > 0 ? (
+                    <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                      <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+                      <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
+                      <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+                    </div>
+                  ) : (
+                    <div className="shrink-0" style={{ minWidth: 38 }} />
+                  )}
+
+                  {/* Chevron — always at far right, vertically centered */}
+                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
                 </div>
               </div>
             );
@@ -758,29 +846,13 @@ function SearchPage() {
           <button
             onClick={loadMore}
             disabled={isLoadingMore}
-            className="w-full py-3 border-2 border-dashed border-blink-ink font-mono text-sm font-bold uppercase hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="w-full py-3.5 rounded-2xl text-sm font-medium text-primary transition-colors disabled:opacity-50"
+            style={{ border: '1.5px dashed #C7D2FE', background: '#EEF2FF' }}
           >
-            {isLoadingMore ? 'Cargando...' : 'Cargar mas tiendas'}
+            {isLoadingMore ? 'Cargando...' : 'Cargar más tiendas'}
           </button>
         )}
       </main>
-
-      {/* Floating Map Button */}
-      <div className="fixed bottom-24 right-4 z-30">
-        <button
-          onClick={() => {
-            trackMapInteraction({
-              source: 'search_page',
-              action: 'open_map',
-            });
-            navigate('/map');
-          }}
-          className="flex items-center gap-2 bg-blink-ink text-white px-5 py-3 border-2 border-white shadow-hard hover:bg-blink-ink/90 transition-colors group active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-        >
-          <span className="material-symbols-outlined group-hover:rotate-12 transition-transform" style={{ fontSize: 20 }}>map</span>
-          <span className="font-display uppercase tracking-wider text-sm">Mapa</span>
-        </button>
-      </div>
 
       <BankFilterSheet
         isOpen={showBankSheet}
@@ -793,24 +865,26 @@ function SearchPage() {
         }}
       />
 
+      <CategoryFilterSheet
+        isOpen={showCategorySheet}
+        selected={selectedCategory}
+        onClose={() => setShowCategorySheet(false)}
+        onApply={(category) => {
+          setSelectedCategory(category);
+          setShowCategorySheet(false);
+        }}
+      />
+
       {/* Filter Panel */}
       <FilterPanel
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
-        onlineOnly={onlineOnly}
-        onOnlineChange={setOnlineOnly}
-        maxDistance={maxDistance}
-        onMaxDistanceChange={setMaxDistance}
         minDiscount={minDiscount}
         onMinDiscountChange={setMinDiscount}
         availableDay={availableDay}
         onAvailableDayChange={setAvailableDay}
         cardMode={cardMode}
         onCardModeChange={setCardMode}
-        network={network}
-        onNetworkChange={setNetwork}
-        hasInstallments={hasInstallments}
-        onHasInstallmentsChange={setHasInstallments}
       />
 
       <BottomNav />

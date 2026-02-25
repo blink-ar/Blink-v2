@@ -125,7 +125,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
 
           // Create modern custom marker - circle with dot and shadow
           const pinSize = isSelected ? 36 : 28;
-          const pinColor = isSelected ? "#3b82f6" : "#6366f1";
+          const pinColor = isSelected ? "#3b82f6" : "#6366F1";
           
           const customIcon = {
             url:

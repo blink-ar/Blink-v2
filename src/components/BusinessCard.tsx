@@ -197,7 +197,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
             style={{
               backgroundColor:
                 business.category === "gastronomia"
-                  ? "#F59E0B"
+                  ? "#818CF8"
                   : business.category === "moda"
                   ? "#8B5CF6"
                   : business.category === "viajes"

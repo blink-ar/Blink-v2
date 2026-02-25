@@ -1,7 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
@@ -21,6 +29,7 @@ const PageLoader = () => (
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
       <Suspense fallback={<PageLoader />}>
