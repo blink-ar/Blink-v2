@@ -3,4 +3,4 @@ Allow: /
 Disallow: /profile
 Disallow: /saved
 
-Sitemap: https://example.com/sitemap.xml
+Sitemap: https://www.blinkapp.com.ar/sitemap.xml
