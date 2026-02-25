@@ -11,7 +11,6 @@ import { fetchBanks } from '../services/api';
 import { Business } from '../types';
 import {
   trackFilterApply,
-  trackMapInteraction,
   trackNoResults,
   trackSearchIntent,
   trackSelectBusiness,
@@ -845,27 +844,6 @@ function SearchPage() {
           </button>
         )}
       </main>
-
-      {/* Floating Map Button */}
-      <div className="fixed bottom-24 right-4 z-30">
-        <button
-          onClick={() => {
-            trackMapInteraction({
-              source: 'search_page',
-              action: 'open_map',
-            });
-            navigate('/map');
-          }}
-          className="flex items-center gap-2 text-white px-4 py-3 rounded-2xl transition-all duration-200 active:scale-95"
-          style={{
-            background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-            boxShadow: '0 8px 20px rgba(99,102,241,0.35)',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>map</span>
-          <span className="font-semibold text-sm">Mapa</span>
-        </button>
-      </div>
 
       <BankFilterSheet
         isOpen={showBankSheet}
