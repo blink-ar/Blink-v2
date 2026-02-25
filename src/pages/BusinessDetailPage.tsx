@@ -229,13 +229,13 @@ function BusinessDetailPage() {
                     >
                       {isFirst && (
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white">Mejor opción</span>
                           <span
                             className="text-xs font-semibold px-2.5 py-1 rounded-full"
                             style={{ background: bankAccent.bg, color: bankAccent.text }}
                           >
                             {bankAbbr(benefit.bankName)}
                           </span>
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white">Mejor opción</span>
                         </div>
                       )}
                       {!isFirst && (
