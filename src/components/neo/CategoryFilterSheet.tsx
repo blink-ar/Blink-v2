@@ -66,7 +66,7 @@ const CategoryFilterSheet = ({
 
       {/* Sheet */}
       <div
-        className="w-full bg-white flex flex-col relative"
+        className="w-full h-[85vh] bg-white flex flex-col relative"
         style={{ borderRadius: '24px 24px 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }}
       >
         {/* Drag handle */}
@@ -86,7 +86,7 @@ const CategoryFilterSheet = ({
         </div>
 
         {/* Grid */}
-        <div className="p-4">
+        <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-3 gap-2.5">
             {CATEGORY_OPTIONS.map((option) => {
               const isSelected = draft === option.token;
