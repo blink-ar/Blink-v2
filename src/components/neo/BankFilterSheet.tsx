@@ -113,10 +113,16 @@ const BankFilterSheet = ({
               {filteredOptions.length} entidades disponibles
             </span>
             <button
-              onClick={clearAll}
-              className="text-xs font-semibold text-blink-muted hover:text-red-400 transition-colors"
+              onClick={(e) => { clearAll(); e.currentTarget.blur(); }}
+              disabled={draftTokens.length === 0}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-150 focus:outline-none active:scale-95 ${
+                draftTokens.length > 0
+                  ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                  : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+              }`}
             >
-              Limpiar selección
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>close</span>
+              {draftTokens.length > 0 ? `${draftTokens.length} selec.` : 'Limpiar'}
             </button>
           </div>
         </div>
