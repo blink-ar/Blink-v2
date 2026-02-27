@@ -503,7 +503,9 @@ function BenefitDetailPage() {
           {/* DEBUG PANEL - remove before prod */}
           <div className="p-3 rounded-xl border border-yellow-400 bg-yellow-50 text-xs font-mono break-all">
             <p className="font-bold text-yellow-700 mb-1">DEBUG – cardTypes</p>
-            <pre className="text-yellow-900 whitespace-pre-wrap">{JSON.stringify(benefit.cardTypes, null, 2)}</pre>
+            <p className="text-yellow-900">cardTypes: {benefit.cardTypes === undefined ? 'UNDEFINED' : benefit.cardTypes === null ? 'NULL' : JSON.stringify(benefit.cardTypes)}</p>
+            <p className="text-yellow-900">cardName: {(benefit as any).cardName === undefined ? 'UNDEFINED' : String((benefit as any).cardName)}</p>
+            <p className="text-yellow-900 mt-1">keys: {Object.keys(benefit).join(', ')}</p>
           </div>
 
           {/* Card types */}
