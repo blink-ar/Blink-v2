@@ -789,17 +789,17 @@ function SearchPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     {/* Name + distance row */}
-                    <div className="flex items-center justify-between gap-2 mb-[7px]">
-                      <h2 className="font-bold text-[13.5px] text-blink-ink truncate leading-snug min-w-0">
-                        {business.name}
-                      </h2>
+                    <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
+                      <span className="truncate">{business.name}</span>
                       {(business.distanceText || business.distance !== undefined) && (
-                        <span className="text-[10px] text-blink-muted flex items-center gap-0.5 shrink-0">
-                          <span className="material-symbols-outlined" style={{ fontSize: 10 }}>near_me</span>
-                          {business.distanceText || formatDistance(business.distance!)}
-                        </span>
+                        <>
+                          <span className="shrink-0 font-normal text-blink-muted">·</span>
+                          <span className="shrink-0 text-[11px] font-normal text-blink-muted">
+                            {business.distanceText || formatDistance(business.distance!)}
+                          </span>
+                        </>
                       )}
-                    </div>
+                    </h2>
 
                     {/* Banks + count row */}
                     <div className="flex items-center gap-1.5">
