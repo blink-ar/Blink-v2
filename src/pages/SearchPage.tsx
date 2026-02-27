@@ -788,9 +788,18 @@ function SearchPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h2 className="font-bold text-[13.5px] text-blink-ink truncate leading-snug mb-[7px]">
-                      {business.name}
-                    </h2>
+                    {/* Name + distance row */}
+                    <div className="flex items-center justify-between gap-2 mb-[7px]">
+                      <h2 className="font-bold text-[13.5px] text-blink-ink truncate leading-snug min-w-0">
+                        {business.name}
+                      </h2>
+                      {(business.distanceText || business.distance !== undefined) && (
+                        <span className="text-[10px] text-blink-muted flex items-center gap-0.5 shrink-0">
+                          <span className="material-symbols-outlined" style={{ fontSize: 10 }}>near_me</span>
+                          {business.distanceText || formatDistance(business.distance!)}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Banks + count row */}
                     <div className="flex items-center gap-1.5">
@@ -814,15 +823,6 @@ function SearchPage() {
                       <span className="text-[10px] text-blink-muted ml-1.5">
                         {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
                       </span>
-                      {(business.distanceText || business.distance !== undefined) && (
-                        <>
-                          <span className="text-[10px] text-blink-muted">·</span>
-                          <span className="text-[10px] text-blink-muted flex items-center gap-0.5">
-                            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>near_me</span>
-                            {business.distanceText || formatDistance(business.distance!)}
-                          </span>
-                        </>
-                      )}
                     </div>
                   </div>
 
