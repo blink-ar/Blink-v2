@@ -15,6 +15,7 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
+import { formatDistance } from '../utils/distance';
 
 interface BankDescriptor {
   token: string;
@@ -787,8 +788,17 @@ function SearchPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h2 className="font-bold text-[13.5px] text-blink-ink truncate leading-snug mb-[7px]">
-                      {business.name}
+                    {/* Name + distance row */}
+                    <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
+                      <span className="truncate">{business.name}</span>
+                      {(business.distanceText || business.distance !== undefined) && (
+                        <>
+                          <span className="shrink-0 font-normal text-blink-muted">·</span>
+                          <span className="shrink-0 text-[11px] font-normal text-blink-muted">
+                            {business.distanceText || formatDistance(business.distance!)}
+                          </span>
+                        </>
+                      )}
                     </h2>
 
                     {/* Banks + count row */}
