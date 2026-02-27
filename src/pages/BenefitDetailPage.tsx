@@ -223,6 +223,8 @@ function BenefitDetailPage() {
   const isOnline = business.hasOnline;
   const bankAccent = getBankAccent(benefit.bankName);
 
+  console.log('[BenefitDetail] cardTypes:', benefit.cardTypes, '| cardName:', benefit.cardName, '| benefit id:', benefit.id);
+
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     try {
