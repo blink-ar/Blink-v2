@@ -366,14 +366,18 @@ function BenefitDetailPage() {
               >
                 {benefit.bankName}
               </span>
-              {benefit.cardName && (
+              {(benefit.cardTypes && benefit.cardTypes.length > 0
+                ? benefit.cardTypes
+                : benefit.cardName ? [benefit.cardName] : []
+              ).map((card, i) => (
                 <span
+                  key={i}
                   className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
                   style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
                 >
-                  {String(benefit.cardName)}
+                  {card}
                 </span>
-              )}
+              ))}
             </div>
           </div>
 

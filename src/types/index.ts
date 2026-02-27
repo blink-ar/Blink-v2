@@ -1,6 +1,7 @@
 export interface BankBenefit {
   bankName: string;
   cardName: string;
+  cardTypes?: string[];
   benefit: string;
   rewardRate: string;
   color: string;
