@@ -53,6 +53,7 @@ function BenefitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
+  const [showCards, setShowCards] = useState(false);
   const [benefitPosition, setBenefitPosition] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
@@ -496,6 +497,45 @@ function BenefitDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Card types */}
+          {(benefit.cardTypes && benefit.cardTypes.length > 0) && (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ border: '1px solid #E8E6E1' }}
+            >
+              <button
+                onClick={() => setShowCards(!showCards)}
+                className="w-full px-4 py-3.5 flex justify-between items-center text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ background: '#EEF2FF' }}
+                  >
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>credit_card</span>
+                  </div>
+                  <span className="font-semibold text-sm text-blink-ink">Tarjetas adheridas</span>
+                </div>
+                <span
+                  className="material-symbols-outlined text-blink-muted transition-transform duration-200"
+                  style={{ fontSize: 20, transform: showCards ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+              {showCards && (
+                <div className="px-4 pb-4 pt-0 space-y-2" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  {benefit.cardTypes.map((card, i) => (
+                    <div key={i} className="flex items-center gap-2 pt-3 border-b border-blink-border pb-2 last:border-0">
+                      <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 14 }}>credit_card</span>
+                      <p className="text-xs text-blink-muted leading-snug">{card}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         </div>{/* close p-4 space-y-3 */}
       </main>
