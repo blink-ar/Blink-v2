@@ -500,6 +500,12 @@ function BenefitDetailPage() {
             )}
           </div>
 
+          {/* DEBUG PANEL - remove before prod */}
+          <div className="p-3 rounded-xl border border-yellow-400 bg-yellow-50 text-xs font-mono break-all">
+            <p className="font-bold text-yellow-700 mb-1">DEBUG – cardTypes</p>
+            <pre className="text-yellow-900 whitespace-pre-wrap">{JSON.stringify(benefit.cardTypes, null, 2)}</pre>
+          </div>
+
           {/* Card types */}
           {(benefit.cardTypes && benefit.cardTypes.length > 0) && (
             <div
@@ -541,12 +547,6 @@ function BenefitDetailPage() {
         </div>
         </div>{/* close p-4 space-y-3 */}
       </main>
-
-      {/* DEBUG PANEL - remove before prod */}
-      <div className="mx-4 mb-4 p-3 rounded-xl border border-yellow-400 bg-yellow-50 text-xs font-mono break-all">
-        <p className="font-bold text-yellow-700 mb-1">DEBUG – cardTypes</p>
-        <pre className="text-yellow-900 whitespace-pre-wrap">{JSON.stringify(benefit.cardTypes, null, 2)}</pre>
-      </div>
 
       {/* Fixed Bottom CTA */}
       <div
