@@ -114,7 +114,7 @@ function HomePage() {
         <Ticker count={totalBusinesses || 0} />
       </header>
 
-      <main className="flex-1 flex flex-col gap-8 pb-24">
+      <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}
         <section className="px-4 pt-6">
           <h1 className="text-[2rem] font-bold leading-tight text-blink-ink text-center mb-2">
