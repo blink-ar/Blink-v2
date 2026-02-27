@@ -5,6 +5,7 @@ import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { Business } from '../types';
+import { formatDistance } from '../utils/distance';
 import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
 
 function HomePage() {
@@ -257,8 +258,16 @@ function HomePage() {
 
                     {/* Card content */}
                     <div className="p-3 bg-white">
-                      <h3 className="font-semibold text-sm text-blink-ink truncate mb-0.5">
-                        {item.business.name}
+                      <h3 className="font-semibold text-sm text-blink-ink mb-0.5 flex items-center gap-1 min-w-0">
+                        <span className="truncate">{item.business.name}</span>
+                        {(item.business.distanceText || item.business.distance !== undefined) && (
+                          <>
+                            <span className="shrink-0 font-normal text-blink-muted">·</span>
+                            <span className="shrink-0 text-[11px] font-normal text-blink-muted">
+                              {item.business.distanceText || formatDistance(item.business.distance!)}
+                            </span>
+                          </>
+                        )}
                       </h3>
                       <p className="text-xs text-blink-muted truncate mb-2">
                         {item.benefit.bankName} · {item.benefit.cardName}
