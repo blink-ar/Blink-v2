@@ -56,8 +56,16 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
       }
     }
 
+    const benefits = Array.isArray(raw.benefits)
+      ? raw.benefits.map((b: any) => ({
+          ...b,
+          cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : b.cardTypes
+        }))
+      : raw.benefits;
+
     const business: any = {
       ...raw,
+      benefits,
       location: uniqueLocations
     };
 
@@ -473,6 +481,7 @@ export async function fetchBusinesses(options: {
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
+          cardTypes: benefit.cardTypes.map(ct => ct.name),
           benefit: benefit.benefitTitle,
           rewardRate: discountPct > 0 ? `${discountPct}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
@@ -504,6 +513,7 @@ export async function fetchBusinesses(options: {
         const bankBenefit: BankBenefit = {
           bankName: benefit.bank,
           cardName: benefit.cardTypes[0]?.name || 'Credit Card',
+          cardTypes: benefit.cardTypes.map(ct => ct.name),
           benefit: benefit.benefitTitle,
           rewardRate: discountPct2 > 0 ? `${discountPct2}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',

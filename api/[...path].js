@@ -631,6 +631,29 @@ async function handleGetBusinesses(req, res, url, db) {
         'merchant.name': { $exists: true, $nin: [null, ''] }
       }
     },
+    // Stage 1.7: Resolve cardTypes IDs to card names via bank_cards collection
+    {
+      $lookup: {
+        from: 'bank_cards',
+        let: { cardTypeIds: { $ifNull: ['$cardTypes', []] } },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: [{ $toString: '$_id' }, '$$cardTypeIds']
+              }
+            }
+          },
+          {
+            $project: {
+              _id: 0,
+              name: { $concat: ['$issuer', ' ', '$tier'] }
+            }
+          }
+        ],
+        as: 'resolvedCards'
+      }
+    },
     {
       $group: {
         _id: '$merchant.name',
@@ -642,7 +665,19 @@ async function handleGetBusinesses(req, res, url, db) {
           $push: {
             id: '$id',
             bankName: { $ifNull: ['$bank', 'Banco'] },
-            cardName: { $ifNull: [{ $arrayElemAt: ['$cardTypes.name', 0] }, 'Tarjeta de crédito'] },
+            cardName: {
+              $ifNull: [
+                { $arrayElemAt: ['$resolvedCards.name', 0] },
+                'Tarjeta de crédito'
+              ]
+            },
+            cardTypes: {
+              $cond: {
+                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
+                then: { $setUnion: ['$resolvedCards.name', []] },
+                else: []
+              }
+            },
             benefit: '$benefitTitle',
             rewardRate: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
             tipo: 'descuento',
@@ -662,7 +697,13 @@ async function handleGetBusinesses(req, res, url, db) {
             valor: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
             tope: { $ifNull: [{ $arrayElemAt: ['$caps.amount', 0] }, null] },
             condicion: '$termsAndConditions',
-            requisitos: [{ $ifNull: [{ $arrayElemAt: ['$cardTypes.name', 0] }, 'Tarjeta de crédito'] }],
+            requisitos: {
+              $cond: {
+                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
+                then: { $setUnion: ['$resolvedCards.name', []] },
+                else: ['Tarjeta de crédito']
+              }
+            },
             usos: {
               $cond: {
                 if: { $eq: ['$online', true] },
