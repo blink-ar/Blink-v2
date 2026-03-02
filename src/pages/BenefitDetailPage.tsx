@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
-import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
+import { parseDayAvailability } from '../utils/dayAvailabilityParser';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { useSEO } from '../hooks/useSEO';
 import {
@@ -234,7 +234,7 @@ function BenefitDetailPage() {
   };
 
   const validUntilFormatted = formatDate(benefit.validUntil);
-  const dayAvailability = parseDayAvailabilityFromBenefit(benefit);
+  const dayAvailability = parseDayAvailability(benefit.cuando);
   const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])].filter(Boolean).join('\n\n');
   const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
 
