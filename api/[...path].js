@@ -596,7 +596,7 @@ async function handleGetBusinesses(req, res, url, db) {
             cardTypes: {
               $cond: {
                 if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: '$resolvedCards.name',
+                then: { $setUnion: ['$resolvedCards.name', []] },
                 else: []
               }
             },
@@ -622,7 +622,7 @@ async function handleGetBusinesses(req, res, url, db) {
             requisitos: {
               $cond: {
                 if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: '$resolvedCards.name',
+                then: { $setUnion: ['$resolvedCards.name', []] },
                 else: ['Tarjeta de crédito']
               }
             },

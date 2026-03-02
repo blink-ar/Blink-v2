@@ -223,8 +223,6 @@ function BenefitDetailPage() {
   const isOnline = business.hasOnline;
   const bankAccent = getBankAccent(benefit.bankName);
 
-  console.log('[BenefitDetail] cardTypes:', benefit.cardTypes, '| cardName:', benefit.cardName, '| benefit id:', benefit.id);
-
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     try {
@@ -300,7 +298,7 @@ function BenefitDetailPage() {
                 className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
                 style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
               >
-                {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName}` : ''}
+                {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
               {subscriptionName && (
                 <span
@@ -378,9 +376,17 @@ function BenefitDetailPage() {
                   className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
                   style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
                 >
-                  {card}
+                  {card.replace(/ any$/i, '')}
                 </span>
               ))}
+              {subscriptionName && (
+                <span
+                  className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
+                  style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
+                >
+                  {subscriptionName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -500,12 +506,6 @@ function BenefitDetailPage() {
             )}
           </div>
 
-          {/* DEBUG PANEL - remove before prod */}
-          <div className="p-3 rounded-xl border border-yellow-400 bg-yellow-50 text-xs font-mono break-all">
-            <p className="font-bold text-yellow-700 mb-1">DEBUG – cardTypes</p>
-            <p className="text-yellow-900">cardTypes: {benefit.cardTypes === undefined ? 'UNDEFINED' : benefit.cardTypes === null ? 'NULL' : JSON.stringify(benefit.cardTypes)}</p>
-          </div>
-
           {/* Card types */}
           {(benefit.cardTypes && benefit.cardTypes.length > 0) && (
             <div
@@ -537,7 +537,7 @@ function BenefitDetailPage() {
                   {benefit.cardTypes.map((card, i) => (
                     <div key={i} className="flex items-center gap-2 pt-3 border-b border-blink-border pb-2 last:border-0">
                       <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 14 }}>credit_card</span>
-                      <p className="text-xs text-blink-muted leading-snug">{card}</p>
+                      <p className="text-xs text-blink-muted leading-snug">{card.replace(/ any$/i, '')}</p>
                     </div>
                   ))}
                 </div>

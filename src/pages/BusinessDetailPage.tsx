@@ -277,7 +277,7 @@ function BusinessDetailPage() {
                             {bankAbbr(benefit.bankName)}
                           </span>
                           {benefit.cardName && (
-                            <span className="text-xs text-blink-muted font-medium">{String(benefit.cardName)}</span>
+                            <span className="text-xs text-blink-muted font-medium">{String(benefit.cardName).replace(/ any$/i, '')}</span>
                           )}
                         </div>
                       )}

@@ -56,8 +56,16 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
       }
     }
 
+    const benefits = Array.isArray(raw.benefits)
+      ? raw.benefits.map((b: any) => ({
+          ...b,
+          cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : b.cardTypes
+        }))
+      : raw.benefits;
+
     const business: any = {
       ...raw,
+      benefits,
       location: uniqueLocations
     };
 
