@@ -6,6 +6,8 @@ import RouteSEO from './components/seo/RouteSEO';
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
+    // SearchPage manages its own scroll (restoration + reset on fresh mount)
+    if (pathname === '/search') return;
     window.scrollTo(0, 0);
   }, [pathname]);
   return null;

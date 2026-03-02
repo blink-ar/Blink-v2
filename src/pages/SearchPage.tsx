@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
@@ -332,6 +332,46 @@ function SearchPage() {
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
 
+  // Infinite scroll sentinel
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const infiniteScrollStateRef = useRef({ hasMore, isLoadingMore, loadMore });
+
+  // Keep ref values fresh every render (no deps = runs every render)
+  useEffect(() => {
+    infiniteScrollStateRef.current = { hasMore, isLoadingMore, loadMore };
+  });
+
+  // Create IntersectionObserver once on mount
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          const { hasMore: more, isLoadingMore: loading, loadMore: load } = infiniteScrollStateRef.current;
+          if (more && !loading) load();
+        }
+      },
+      { rootMargin: '300px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // Scroll position restoration on mount
+  useLayoutEffect(() => {
+    const key = 'blink.search.scrollY';
+    const saved = sessionStorage.getItem(key);
+    if (saved) {
+      sessionStorage.removeItem(key);
+      window.scrollTo({ top: Number(saved), behavior: 'instant' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!hasInitializedFiltersRef.current) {
       hasInitializedFiltersRef.current = true;
@@ -547,6 +587,7 @@ function SearchPage() {
   };
 
   const handleBusinessSelect = (business: Business, position: number) => {
+    sessionStorage.setItem('blink.search.scrollY', String(window.scrollY));
     trackSelectBusiness({
       source: 'search_results',
       businessId: business.id,
@@ -851,16 +892,14 @@ function SearchPage() {
           })
         )}
 
-        {/* Load More */}
-        {hasMore && (
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="w-full py-3.5 rounded-2xl text-sm font-medium text-primary transition-colors disabled:opacity-50"
-            style={{ border: '1.5px dashed #C7D2FE', background: '#EEF2FF' }}
-          >
-            {isLoadingMore ? 'Cargando...' : 'Cargar más tiendas'}
-          </button>
+        {/* Infinite scroll sentinel — triggers loadMore when entering viewport */}
+        <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+
+        {/* Loading indicator shown while fetching next page */}
+        {isLoadingMore && (
+          <div className="flex justify-center py-4">
+            <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
         )}
       </main>
 
