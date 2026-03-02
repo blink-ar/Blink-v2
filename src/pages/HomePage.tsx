@@ -63,9 +63,15 @@ function HomePage() {
     navigate(`/benefit/${businessId}/${benefitIndex}`, { state: { business } });
   };
 
-  // Top 5 individual benefits by discount
+  // Top 5 individual benefits by discount, ensuring different merchants
   const top5 = useMemo(() => {
-    const allBenefits: { business: Business; benefit: typeof businesses[0]['benefits'][0]; benefitIndex: number; discount: number }[] = [];
+    const allBenefits: {
+      business: Business;
+      benefit: Business['benefits'][number];
+      benefitIndex: number;
+      discount: number;
+    }[] = [];
+
     businesses.forEach((business) => {
       business.benefits.forEach((b, bIdx) => {
         const match = String(b.rewardRate).match(/(\d+)%/);
@@ -74,9 +80,22 @@ function HomePage() {
         }
       });
     });
-    return allBenefits
-      .sort((a, b) => b.discount - a.discount)
-      .slice(0, 5);
+
+    const sortedByDiscount = allBenefits.sort((a, b) => b.discount - a.discount);
+    const selected: typeof allBenefits = [];
+    const seenMerchants = new Set<string>();
+
+    for (const item of sortedByDiscount) {
+      const merchantKey = (item.business.id || item.business.name || '').trim().toLowerCase();
+      if (!merchantKey || seenMerchants.has(merchantKey)) continue;
+
+      selected.push(item);
+      seenMerchants.add(merchantKey);
+
+      if (selected.length === 5) break;
+    }
+
+    return selected;
   }, [businesses]);
 
   return (
