@@ -299,12 +299,12 @@ function BusinessDetailPage() {
                             </span>
                             <span className="font-semibold text-blink-muted text-lg">OFF</span>
                           </div>
-                          {benefit.tope && (
+                          {!!benefit.tope && (
                             <p className="text-xs font-medium mt-1" style={{ color: '#4338CA' }}>
                               {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
                             </p>
                           )}
-                          {benefit.installments && benefit.installments > 0 && (
+                          {(benefit.installments ?? 0) > 0 && (
                             <p className="text-sm font-medium text-blink-muted mt-0.5">+ {benefit.installments} cuotas s/int.</p>
                           )}
                         </div>
@@ -381,7 +381,7 @@ function BusinessDetailPage() {
                                 ? `${benefit.installments} cuotas s/int.`
                                 : benefit.benefit}
                           </p>
-                          {benefit.tope && (
+                          {!!benefit.tope && (
                             <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
                           )}
                         </div>
