@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import { useBenefitsData } from '../hooks/useBenefitsData';
+import { fetchMongoStats } from '../services/api';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
@@ -11,7 +13,12 @@ import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analyt
 function HomePage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { businesses, totalBusinesses, isLoading } = useBenefitsData({});
+  const { businesses, isLoading } = useBenefitsData({});
+  const { data: statsResponse } = useQuery({
+    queryKey: ['home-ticker-active-benefits-count'],
+    queryFn: fetchMongoStats,
+  });
+  const activeBenefitsCount = statsResponse?.stats?.totalBenefits || 0;
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +118,7 @@ function HomePage() {
           </div>
         </div>
         {/* Ticker */}
-        <Ticker count={totalBusinesses || 0} />
+        <Ticker count={activeBenefitsCount} />
       </header>
 
       <main className="flex-1 flex flex-col gap-8 pb-32">

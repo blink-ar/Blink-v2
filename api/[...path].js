@@ -70,6 +70,54 @@ function toPositiveInt(value, fallback, max) {
   return typeof max === 'number' ? Math.min(safe, max) : safe;
 }
 
+function shouldIncludeExpired(searchParams) {
+  return searchParams.get('includeExpired') === 'true';
+}
+
+function getActiveBenefitsMatch(searchParams) {
+  if (shouldIncludeExpired(searchParams)) {
+    return null;
+  }
+
+  const now = new Date();
+  return {
+    $expr: {
+      $let: {
+        vars: {
+          parsedValidUntil: {
+            $convert: {
+              input: '$validUntil',
+              to: 'date',
+              onError: null,
+              onNull: null
+            }
+          }
+        },
+        in: {
+          $or: [
+            { $eq: ['$$parsedValidUntil', null] },
+            { $gte: ['$$parsedValidUntil', now] }
+          ]
+        }
+      }
+    }
+  };
+}
+
+function applyActiveBenefitsFilter(query, searchParams) {
+  const activeMatch = getActiveBenefitsMatch(searchParams);
+  if (!activeMatch) {
+    return;
+  }
+
+  if (Array.isArray(query.$and)) {
+    query.$and.push(activeMatch);
+    return;
+  }
+
+  query.$and = [activeMatch];
+}
+
 function serializeDocWithId(doc) {
   return {
     ...doc,
@@ -188,6 +236,7 @@ async function fetchGooglePlaceDetails(placeId) {
 async function handleGetBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
+  const includeExpired = shouldIncludeExpired(searchParams);
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
@@ -223,6 +272,8 @@ async function handleGetBenefits(req, res, url, db) {
     ];
   }
 
+  applyActiveBenefitsFilter(query, searchParams);
+
   const collection = db.collection(collectionName);
   const [benefits, total] = await Promise.all([
     collection.find(query).sort({ _id: -1 }).skip(offsetNum).limit(limitNum).toArray(),
@@ -243,13 +294,15 @@ async function handleGetBenefits(req, res, url, db) {
       bank,
       network,
       online,
-      search
+      search,
+      includeExpired
     }
   });
 }
 
 async function handleGetBenefitById(req, res, url, db, id) {
-  const collectionName = getCollectionName(url.searchParams);
+  const searchParams = url.searchParams;
+  const collectionName = getCollectionName(searchParams);
   const collection = db.collection(collectionName);
 
   let query;
@@ -259,7 +312,10 @@ async function handleGetBenefitById(req, res, url, db, id) {
     query = { id };
   }
 
-  const benefit = await collection.findOne(query);
+  const activeMatch = getActiveBenefitsMatch(searchParams);
+  const finalQuery = activeMatch ? { $and: [query, activeMatch] } : query;
+
+  const benefit = await collection.findOne(finalQuery);
   if (!benefit) {
     return json(res, 404, {
       error: 'Benefit not found',
@@ -274,10 +330,13 @@ async function handleGetBenefitById(req, res, url, db, id) {
 }
 
 async function handleGetCategories(req, res, url, db) {
-  const collectionName = getCollectionName(url.searchParams);
+  const searchParams = url.searchParams;
+  const collectionName = getCollectionName(searchParams);
+  const activeMatch = getActiveBenefitsMatch(searchParams);
 
   const categories = await db.collection(collectionName)
     .aggregate([
+      ...(activeMatch ? [{ $match: activeMatch }] : []),
       { $unwind: '$categories' },
       { $group: { _id: '$categories', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
@@ -294,10 +353,13 @@ async function handleGetCategories(req, res, url, db) {
 }
 
 async function handleGetBanks(req, res, url, db) {
-  const collectionName = getCollectionName(url.searchParams);
+  const searchParams = url.searchParams;
+  const collectionName = getCollectionName(searchParams);
+  const activeMatch = getActiveBenefitsMatch(searchParams);
 
   const banks = await db.collection(collectionName)
     .aggregate([
+      ...(activeMatch ? [{ $match: activeMatch }] : []),
       { $group: { _id: '$bank', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ])
@@ -313,10 +375,13 @@ async function handleGetBanks(req, res, url, db) {
 }
 
 async function handleGetNetworks(req, res, url, db) {
-  const collectionName = getCollectionName(url.searchParams);
+  const searchParams = url.searchParams;
+  const collectionName = getCollectionName(searchParams);
+  const activeMatch = getActiveBenefitsMatch(searchParams);
 
   const networks = await db.collection(collectionName)
     .aggregate([
+      ...(activeMatch ? [{ $match: activeMatch }] : []),
       { $group: { _id: '$network', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ])
@@ -332,8 +397,10 @@ async function handleGetNetworks(req, res, url, db) {
 }
 
 async function handleGetStats(req, res, url, db) {
-  const collectionName = getCollectionName(url.searchParams);
+  const searchParams = url.searchParams;
+  const collectionName = getCollectionName(searchParams);
   const collection = db.collection(collectionName);
+  const activeMatch = getActiveBenefitsMatch(searchParams) || {};
 
   const [
     totalBenefits,
@@ -342,11 +409,12 @@ async function handleGetStats(req, res, url, db) {
     topCategories,
     topBanks
   ] = await Promise.all([
-    collection.countDocuments(),
-    collection.countDocuments({ online: true }),
-    collection.countDocuments({ online: false }),
+    collection.countDocuments(activeMatch),
+    collection.countDocuments({ ...activeMatch, online: true }),
+    collection.countDocuments({ ...activeMatch, online: false }),
     collection
       .aggregate([
+        ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $unwind: '$categories' },
         { $group: { _id: '$categories', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -355,6 +423,7 @@ async function handleGetStats(req, res, url, db) {
       .toArray(),
     collection
       .aggregate([
+        ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $group: { _id: '$bank', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 }
@@ -383,6 +452,7 @@ async function handleGetStats(req, res, url, db) {
 async function handleGetNearbyBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
+  const includeExpired = shouldIncludeExpired(searchParams);
 
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
@@ -406,6 +476,10 @@ async function handleGetNearbyBenefits(req, res, url, db) {
   }
 
   const baseMatch = {};
+  const activeMatch = getActiveBenefitsMatch(searchParams);
+  if (activeMatch) {
+    Object.assign(baseMatch, activeMatch);
+  }
   if (category && category !== 'all') {
     baseMatch.categories = { $in: [category] };
   }
@@ -500,7 +574,8 @@ async function handleGetNearbyBenefits(req, res, url, db) {
       lat: latitude,
       lng: longitude,
       radius: radiusMeters,
-      category
+      category,
+      includeExpired
     }
   });
 }
@@ -508,6 +583,7 @@ async function handleGetNearbyBenefits(req, res, url, db) {
 async function handleGetBusinesses(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
+  const includeExpired = shouldIncludeExpired(searchParams);
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
@@ -546,7 +622,9 @@ async function handleGetBusinesses(req, res, url, db) {
     ];
   }
 
+  const activeMatch = getActiveBenefitsMatch(searchParams);
   const pipeline = [
+    ...(activeMatch ? [{ $match: activeMatch }] : []),
     ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
     {
       $match: {
@@ -908,6 +986,7 @@ async function handleGetBusinesses(req, res, url, db) {
       ...(category && { category }),
       ...(bank && { bank }),
       ...(search && { search }),
+      includeExpired,
       ...(hasLocation && { lat: userLat, lng: userLng })
     }
   });
