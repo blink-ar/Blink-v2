@@ -1,7 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import handler from '../api/[...path].js';
 
 function loadEnvFile(fileName) {
   const filePath = path.resolve(process.cwd(), fileName);
@@ -33,6 +32,8 @@ function loadEnvFile(fileName) {
 
 loadEnvFile('.env');
 loadEnvFile('.env.local');
+
+const { default: handler } = await import('../api/[...path].js');
 
 const port = Number.parseInt(process.env.PORT || process.env.API_PORT || '3000', 10);
 
