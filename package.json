@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:api": "node scripts/dev-functions-server.mjs",
     "dev:vercel:functions": "npx vercel dev --local-config vercel.functions-dev.json --listen 3000",
+    "search:index": "node scripts/search-indexer.mjs full",
+    "search:watch": "node scripts/search-indexer.mjs watch",
     "seo:generate": "node scripts/generate-seo-files.mjs",
     "prebuild": "npm run seo:generate",
     "build": "vite build",

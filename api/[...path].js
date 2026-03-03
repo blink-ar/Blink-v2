@@ -1,4 +1,8 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { buildMeiliSynonyms, buildSearchDataset } from './search/entities.js';
+import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
+import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
+import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -123,6 +127,432 @@ function serializeDocWithId(doc) {
     ...doc,
     id: doc?._id?.toString?.() || doc?.id || null
   };
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(a));
+}
+
+function formatDistanceText(distance) {
+  if (!Number.isFinite(distance)) return null;
+  if (distance < 1) return `${Math.round(distance * 1000)}m`;
+  if (distance < 10) return `${Math.round(distance * 10) / 10}km`;
+  return `${Math.round(distance)}km`;
+}
+
+function enrichBusinessWithDistance(business, userLat, userLng) {
+  if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+    return business;
+  }
+
+  const locations = Array.isArray(business.location) ? business.location : [];
+  const validDistances = locations
+    .filter((location) => Number.isFinite(location?.lat) && Number.isFinite(location?.lng))
+    .map((location) => haversineKm(userLat, userLng, Number(location.lat), Number(location.lng)));
+
+  if (validDistances.length === 0) return business;
+  const distance = Math.min(...validDistances);
+  return {
+    ...business,
+    distance,
+    distanceText: formatDistanceText(distance),
+    isNearby: distance <= 50
+  };
+}
+
+function parseSearchFilters(searchParams) {
+  const bank = searchParams.get('bank') || undefined;
+  const category = searchParams.get('category') || undefined;
+  const latParam = searchParams.get('lat');
+  const lngParam = searchParams.get('lng');
+  const lat = latParam != null ? Number.parseFloat(latParam) : null;
+  const lng = lngParam != null ? Number.parseFloat(lngParam) : null;
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  return {
+    bank,
+    category,
+    lat: hasLocation ? lat : null,
+    lng: hasLocation ? lng : null
+  };
+}
+
+function buildExpandedQueryTokens(query) {
+  const synonyms = buildMeiliSynonyms();
+  const normalized = normalizeSearchText(query);
+  const tokens = tokenizeSearchText(query);
+  const expanded = new Set([normalized, ...tokens].filter(Boolean));
+
+  for (const token of tokens) {
+    const candidates = synonyms[token] || [];
+    for (const candidate of candidates) {
+      expanded.add(normalizeSearchText(candidate));
+    }
+  }
+
+  return Array.from(expanded).filter(Boolean);
+}
+
+function buildMeiliFilter(entityType, filters) {
+  const clauses = [`entityType = "${entityType}"`];
+  if (filters.category && filters.category !== 'all') {
+    clauses.push(`categories = "${normalizeSearchText(filters.category)}"`);
+  }
+
+  if (filters.bank) {
+    const banks = filters.bank
+      .split(',')
+      .map((value) => normalizeSearchText(value))
+      .filter(Boolean);
+    if (banks.length > 0) {
+      const bankClause = banks.map((bank) => `banks = "${bank}"`).join(' OR ');
+      clauses.push(`(${bankClause})`);
+    }
+  }
+
+  return clauses.join(' AND ');
+}
+
+function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
+  const reasons = [];
+  let score = Number(hit?._rankingScore || 0) * 100;
+
+  const merchantName = normalizeSearchText(hit.merchantName || '');
+  const aliases = (Array.isArray(hit.aliases) ? hit.aliases : []).map((value) => normalizeSearchText(value));
+  const aliasSet = new Set(aliases);
+  const manualAliasSet = new Set(
+    (Array.isArray(hit.manualAliases) ? hit.manualAliases : []).map((value) => normalizeSearchText(value))
+  );
+  const productTags = (Array.isArray(hit.productTags) ? hit.productTags : []).map((value) => normalizeSearchText(value));
+  const intentHitTags = (Array.isArray(hit.intentTags) ? hit.intentTags : []).map((value) => normalizeSearchText(value));
+
+  if (merchantName && merchantName === normalizedQuery) {
+    score += 1000;
+    reasons.push('merchant_exact');
+  } else if (merchantName && merchantName.startsWith(normalizedQuery)) {
+    score += 450;
+    reasons.push('merchant_prefix');
+  }
+
+  if (aliasSet.has(normalizedQuery)) {
+    score += 700;
+    reasons.push('alias_exact');
+  }
+  if (manualAliasSet.has(normalizedQuery)) {
+    score += 2200;
+    reasons.push('manual_alias_exact');
+  }
+
+  const aliasOverlap = expandedTokens.filter((token) => aliasSet.has(token)).length;
+  if (aliasOverlap > 0) {
+    score += aliasOverlap * 80;
+    reasons.push('alias_overlap');
+  }
+  const manualAliasOverlap = expandedTokens.filter((token) => manualAliasSet.has(token)).length;
+  if (manualAliasOverlap > 0) {
+    score += manualAliasOverlap * 180;
+    reasons.push('manual_alias_overlap');
+  }
+
+  const productOverlap = expandedTokens.filter((token) => productTags.includes(token)).length;
+  if (productOverlap > 0) {
+    score += productOverlap * 45;
+    reasons.push('product_tag_overlap');
+  }
+
+  const intentOverlap = intentTags.filter((tag) => intentHitTags.includes(tag)).length;
+  if (intentOverlap > 0) {
+    score += intentOverlap * 95;
+    reasons.push('intent_overlap');
+  }
+
+  score += Number(hit.popularity || 0) * 0.6;
+  score += Number(hit.maxDiscount || 0) * 0.4;
+
+  return {
+    score,
+    reasons
+  };
+}
+
+function mapMerchantHitToResponse(hit, scoreMeta, filters) {
+  const business = {
+    ...(hit.business || {
+      id: hit.merchantId || normalizeSearchText(hit.merchantName).replace(/\s+/g, '-'),
+      name: hit.merchantName,
+      category: hit.categories?.[0] || 'otros',
+      description: hit.description || '',
+      rating: 5,
+      location: hit.locations || [],
+      image: '',
+      benefits: []
+    }),
+    benefits: Array.isArray(hit.business?.benefits) ? hit.business.benefits : [],
+    location: Array.isArray(hit.business?.location) ? hit.business.location : (Array.isArray(hit.locations) ? hit.locations : []),
+    image: hit.business?.image || ''
+  };
+
+  const withDistance = enrichBusinessWithDistance(business, filters.lat, filters.lng);
+
+  return {
+    entityId: hit.entityId,
+    merchantId: hit.merchantId,
+    merchantName: hit.merchantName,
+    aliases: hit.aliases || [],
+    intentTags: hit.intentTags || [],
+    productTags: hit.productTags || [],
+    categories: hit.categories || [],
+    banks: hit.banks || [],
+    score: scoreMeta.score,
+    reasons: scoreMeta.reasons,
+    business: withDistance
+  };
+}
+
+function mapIntentHit(hit) {
+  return {
+    entityId: hit.entityId,
+    intentKey: hit.intentKey,
+    displayLabel: hit.displayLabel,
+    synonyms: hit.synonyms || [],
+    merchantRefs: hit.merchantRefs || [],
+    categoryRefs: hit.categoryRefs || [],
+    score: Number(hit._rankingScore || 0)
+  };
+}
+
+function mapProductHit(hit) {
+  return {
+    entityId: hit.entityId,
+    productTerm: hit.productTerm,
+    intentTags: hit.intentTags || [],
+    merchantRefs: hit.merchantRefs || [],
+    categories: hit.categories || [],
+    score: Number(hit._rankingScore || 0)
+  };
+}
+
+async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams) {
+  const expandedTokens = buildExpandedQueryTokens(query);
+  const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
+  const regex = new RegExp(regexSource, 'i');
+
+  const mongoQuery = {
+    $or: [
+      { 'merchant.name': { $regex: regex } },
+      { benefitTitle: { $regex: regex } },
+      { description: { $regex: regex } },
+      { 'locations.name': { $regex: regex } },
+      { categories: { $regex: regex } }
+    ]
+  };
+  applyActiveBenefitsFilter(mongoQuery, searchParams);
+
+  if (filters.category && filters.category !== 'all') {
+    mongoQuery.categories = { $in: [filters.category] };
+  }
+  if (filters.bank) {
+    const bankPatterns = filters.bank
+      .split(',')
+      .map((bank) => bank.trim())
+      .filter(Boolean)
+      .map((bank) => new RegExp(escapeRegex(bank), 'i'));
+    if (bankPatterns.length > 0) {
+      mongoQuery.bank = { $in: bankPatterns };
+    }
+  }
+
+  const fallbackBenefits = await db.collection(collectionName)
+    .find(mongoQuery)
+    .limit(600)
+    .toArray();
+
+  const dataset = buildSearchDataset(fallbackBenefits);
+  const normalizedQuery = normalizeSearchText(query);
+  const intentTags = resolveIntentTagsFromTokens(expandedTokens);
+
+  const merchantHits = dataset.merchantDocuments
+    .map((hit) => {
+      const scoreMeta = scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags);
+      return mapMerchantHitToResponse(hit, scoreMeta, filters);
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const pagedMerchants = merchantHits.slice(offsetNum, offsetNum + limitNum);
+  const intentHits = dataset.intentDocuments
+    .filter((intent) => intentTags.includes(intent.intentKey))
+    .slice(0, 12)
+    .map((intent) => ({
+      entityId: intent.entityId,
+      intentKey: intent.intentKey,
+      displayLabel: intent.displayLabel,
+      synonyms: intent.synonyms || [],
+      merchantRefs: intent.merchantRefs || [],
+      categoryRefs: intent.categoryRefs || [],
+      score: 1
+    }));
+  const productHits = dataset.productDocuments
+    .filter((product) => expandedTokens.includes(product.productTerm))
+    .slice(0, 12)
+    .map((product) => ({
+      entityId: product.entityId,
+      productTerm: product.productTerm,
+      intentTags: product.intentTags || [],
+      merchantRefs: product.merchantRefs || [],
+      categories: product.categories || [],
+      score: 1
+    }));
+
+  return {
+    source: 'mongodb_fallback',
+    expandedTokens,
+    merchants: pagedMerchants,
+    intents: intentHits,
+    products: productHits,
+    totalMerchants: merchantHits.length
+  };
+}
+
+async function handleSearch(req, res, url, db) {
+  const searchParams = url.searchParams;
+  const q = searchParams.get('q');
+  if (!q || !q.trim()) {
+    return json(res, 400, {
+      success: false,
+      error: 'Missing required query param: q'
+    });
+  }
+
+  const collectionName = getCollectionName(searchParams);
+  const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
+  const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
+  const sectionLimit = Math.min(Math.max(toPositiveInt(searchParams.get('sectionLimit'), 12), 1), 30);
+  const filters = parseSearchFilters(searchParams);
+  const debugMode = searchParams.get('debug') === '1' || process.env.SEARCH_DEBUG === 'true';
+
+  const normalized = normalizeSearchText(q);
+  const expandedTokens = buildExpandedQueryTokens(q);
+  const expandedQuery = expandedTokens.join(' ');
+  const intentTags = resolveIntentTagsFromTokens(expandedTokens);
+
+  const debug = {
+    normalized,
+    expandedTokens,
+    mode: 'meilisearch'
+  };
+
+  try {
+    if (!isMeilisearchConfigured()) {
+      throw new Error('Meilisearch is not configured');
+    }
+
+    const merchantSearch = await meiliSearch(expandedQuery, {
+      limit: Math.min(limitNum + offsetNum + 30, 220),
+      filter: buildMeiliFilter('merchant', filters),
+      showRankingScore: true
+    });
+    const intentSearch = await meiliSearch(expandedQuery, {
+      limit: sectionLimit,
+      filter: buildMeiliFilter('intent', filters),
+      showRankingScore: true
+    });
+    const productSearch = await meiliSearch(expandedQuery, {
+      limit: sectionLimit,
+      filter: buildMeiliFilter('product', filters),
+      showRankingScore: true
+    });
+
+    const scoredMerchantHits = (merchantSearch.hits || [])
+      .map((hit) => {
+        const scoreMeta = scoreMerchantHit(hit, normalized, expandedTokens, intentTags);
+        return mapMerchantHitToResponse(hit, scoreMeta, filters);
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const merchants = scoredMerchantHits.slice(offsetNum, offsetNum + limitNum);
+    const intents = (intentSearch.hits || []).map(mapIntentHit);
+    const products = (productSearch.hits || []).map(mapProductHit);
+    const totalMerchants = merchantSearch.estimatedTotalHits || scoredMerchantHits.length;
+
+    return json(res, 200, {
+      success: true,
+      source: 'meilisearch',
+      query: {
+        q,
+        normalized,
+        expanded: expandedTokens,
+        limit: limitNum,
+        offset: offsetNum,
+        filters: {
+          ...(filters.bank && { bank: filters.bank }),
+          ...(filters.category && { category: filters.category })
+        }
+      },
+      intents,
+      merchants,
+      products,
+      pagination: {
+        totalMerchants,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + merchants.length < totalMerchants
+      },
+      ...(debugMode && {
+        debug: {
+          ...debug,
+          meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null
+        }
+      })
+    });
+  } catch (error) {
+    console.error('[Search] Meilisearch unavailable, falling back to Mongo regex search:', error);
+    debug.mode = 'mongodb_fallback';
+    debug.error = error instanceof Error ? error.message : 'unknown';
+
+    const fallback = await searchFromMongoFallback(
+      db,
+      collectionName,
+      q,
+      limitNum,
+      offsetNum,
+      filters,
+      searchParams
+    );
+
+    return json(res, 200, {
+      success: true,
+      source: fallback.source,
+      query: {
+        q,
+        normalized,
+        expanded: fallback.expandedTokens,
+        limit: limitNum,
+        offset: offsetNum,
+        filters: {
+          ...(filters.bank && { bank: filters.bank }),
+          ...(filters.category && { category: filters.category })
+        }
+      },
+      intents: fallback.intents,
+      merchants: fallback.merchants,
+      products: fallback.products,
+      pagination: {
+        totalMerchants: fallback.totalMerchants,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + fallback.merchants.length < fallback.totalMerchants
+      },
+      ...(debugMode && { debug })
+    });
+  }
 }
 
 async function getDb() {
@@ -587,7 +1017,6 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
-  const search = searchParams.get('search');
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
@@ -611,15 +1040,6 @@ async function handleGetBusinesses(req, res, url, db) {
   const matchStage = {};
   if (category && category !== 'all') {
     matchStage.categories = { $in: [category] };
-  }
-
-  if (search) {
-    matchStage.$or = [
-      { 'merchant.name': { $regex: search, $options: 'i' } },
-      { benefitTitle: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { 'locations.name': { $regex: search, $options: 'i' } }
-    ];
   }
 
   const activeMatch = getActiveBenefitsMatch(searchParams);
@@ -1026,7 +1446,6 @@ async function handleGetBusinesses(req, res, url, db) {
     filters: {
       ...(category && { category }),
       ...(bank && { bank }),
-      ...(search && { search }),
       includeExpired,
       ...(hasLocation && { lat: userLat, lng: userLng })
     }
@@ -1076,6 +1495,10 @@ export default async function handler(req, res) {
       return await handleGetBusinesses(req, res, url, db);
     }
 
+    if (req.method === 'GET' && path === '/api/search') {
+      return await handleSearch(req, res, url, db);
+    }
+
     if (req.method === 'GET' && path === '/api/categories') {
       return await handleGetCategories(req, res, url, db);
     }
@@ -1111,6 +1534,7 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
         'GET /api/networks',
