@@ -91,7 +91,9 @@ function BusinessDetailPage() {
         setLoading(true);
         const searchName = id.replace(/-/g, ' ');
         const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
-        if (response.success && response.businesses.length > 0) {
+        if (Array.isArray(response) && response.length > 0) {
+          setBusiness(response[0]);
+        } else if (response.success && response.businesses.length > 0) {
           setBusiness(response.businesses[0]);
         } else {
           setError('Comercio no encontrado');

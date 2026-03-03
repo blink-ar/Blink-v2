@@ -87,11 +87,13 @@ function Benefit() {
           businesses = await fetchBusinessesFromEndpoint(LOCALHOST_BUSINESSES_ENDPOINT);
         } else {
           const response = await fetchBusinessesPaginated({
-            search: id.replace(/[-\s]+/g, '[-\\s]+'),
+            search: id.replace(/-/g, ' '),
             limit: 1
           });
 
-          if (response.success && Array.isArray(response.businesses)) {
+          if (Array.isArray(response)) {
+            businesses = response;
+          } else if (response?.success && Array.isArray(response.businesses)) {
             businesses = response.businesses;
           }
         }
