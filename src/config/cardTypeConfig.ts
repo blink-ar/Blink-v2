@@ -1,7 +1,7 @@
 /**
  * Card type display configuration.
  *
- * All Visa, Mastercard, and American Express variants (regardless of tier,
+ * All Visa, Mastercard, and Amex variants (regardless of tier,
  * region, or sub-type) collapse to their base brand name.
  * Any card type not matched by the brand prefix logic can be added to
  * CARD_TYPE_DISPLAY_MAP for explicit renaming.
@@ -22,7 +22,7 @@ export const CARD_TYPE_BLOCKLIST: string[] = [
 // ---------------------------------------------------------------------------
 
 export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
-  'amex': 'American Express',
+  'amex': 'Amex',
   // Add more explicit overrides here as needed
 };
 
@@ -33,7 +33,8 @@ export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
 const BRAND_PREFIXES: Array<{ prefix: string; display: string }> = [
   { prefix: 'visa', display: 'Visa' },
   { prefix: 'mastercard', display: 'Mastercard' },
-  { prefix: 'american express', display: 'American Express' },
+  { prefix: 'amex', display: 'Amex' },
+  { prefix: 'american express', display: 'Amex' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -45,8 +46,8 @@ const BRAND_PREFIXES: Array<{ prefix: string; display: string }> = [
  *  1. Strips the legacy " any" suffix
  *  2. Removes entries that match the blocklist
  *  3. Applies explicit overrides from CARD_TYPE_DISPLAY_MAP
- *  4. Collapses any "visa …", "mastercard …", "american express …" variant
- *     to just "Visa", "Mastercard", or "American Express"
+ *  4. Collapses any "visa …", "mastercard …", "amex …", or "american express …" variant
+ *     to just "Visa", "Mastercard", or "Amex"
  *  5. Deduplicates case-insensitively (preserves first-occurrence order)
  */
 export function processCardTypes(rawCardTypes: string[]): string[] {
