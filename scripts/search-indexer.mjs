@@ -31,7 +31,7 @@ const MEILI_SETTINGS = {
     'synonyms',
     'productTerm'
   ],
-  filterableAttributes: ['entityType', 'categories', 'banks', 'online'],
+  filterableAttributes: ['entityType', 'categories', 'banks', 'online', 'merchantId'],
   sortableAttributes: ['popularity', 'maxDiscount'],
   rankingRules: [
     'words',

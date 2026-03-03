@@ -16,6 +16,16 @@ export const INTENT_TAXONOMY = {
       'helados',
       'postre',
       'postres',
+      'pasteleria',
+      'pastelerias',
+      'confiteria',
+      'confiterias',
+      'reposteria',
+      'reposterias',
+      'torta',
+      'tortas',
+      'dulce',
+      'dulces',
       'ice cream',
       'gelato'
     ],
@@ -72,13 +82,9 @@ export const SPANISH_STOP_WORDS = new Set([
   'tarjeta'
 ]);
 
-export const SEARCH_SYNONYMS = {
-  heladeria: ['heladerias', 'helado', 'helados', 'gelato', 'ice cream'],
-  helados: ['helado', 'heladeria', 'gelato'],
-  postre: ['postres', 'helado', 'helados'],
-  postres: ['postre', 'helado', 'helados'],
-  gastronomia: ['gastronomico', 'comida', 'restaurante', 'restaurantes']
-};
+// Intentionally empty by default:
+// query expansion should come from indexed corpus relations, not hand-maintained maps.
+export const SEARCH_SYNONYMS = {};
 
 export function resolveIntentTagsFromTokens(tokens) {
   const normalizedTokens = tokens.map((token) => normalizeSearchText(token)).filter(Boolean);

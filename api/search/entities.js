@@ -1,7 +1,6 @@
 import {
   INTENT_TAXONOMY,
   MERCHANT_ALIASES,
-  SEARCH_SYNONYMS,
   SPANISH_STOP_WORDS,
   resolveIntentTagsFromTokens
 } from './dictionaries.js';
@@ -337,29 +336,5 @@ export function buildSearchDataset(benefits) {
 }
 
 export function buildMeiliSynonyms() {
-  const synonyms = { ...SEARCH_SYNONYMS };
-
-  for (const intentMeta of Object.values(INTENT_TAXONOMY)) {
-    const normalized = intentMeta.synonyms
-      .map((term) => normalizeSearchText(term))
-      .filter(Boolean);
-    for (const term of normalized) {
-      const existing = new Set(synonyms[term] || []);
-      normalized.forEach((candidate) => {
-        if (candidate !== term) existing.add(candidate);
-      });
-      synonyms[term] = Array.from(existing);
-    }
-  }
-
-  for (const [merchantKey, aliases] of Object.entries(MERCHANT_ALIASES)) {
-    const normalizedAliases = aliases.map((alias) => normalizeSearchText(alias)).filter(Boolean);
-    const existing = new Set(synonyms[merchantKey] || []);
-    normalizedAliases.forEach((alias) => {
-      if (alias !== merchantKey) existing.add(alias);
-    });
-    synonyms[merchantKey] = Array.from(existing);
-  }
-
-  return synonyms;
+  return {};
 }

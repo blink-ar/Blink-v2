@@ -1,5 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
-import { buildMeiliSynonyms, buildSearchDataset } from './search/entities.js';
+import { buildSearchDataset } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
 import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
@@ -149,6 +149,37 @@ function formatDistanceText(distance) {
   return `${Math.round(distance)}km`;
 }
 
+const LOCAL_DISTANCE_RADIUS_KM = Number.parseFloat(process.env.SEARCH_LOCAL_DISTANCE_RADIUS_KM || '80');
+const DISTANT_RESULT_CUTOFF_KM = Number.parseFloat(process.env.SEARCH_DISTANT_RESULT_CUTOFF_KM || '300');
+const MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING = Number.parseInt(
+  process.env.SEARCH_MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING || '3',
+  10
+);
+
+function isFiniteDistanceKm(value) {
+  return Number.isFinite(value);
+}
+
+function applyLocalDistanceGuardrail(merchantHits, filters) {
+  if (!Number.isFinite(filters?.lat) || !Number.isFinite(filters?.lng)) {
+    return merchantHits;
+  }
+
+  const withDistance = (merchantHits || []).filter((hit) => isFiniteDistanceKm(hit?.business?.distance));
+  if (withDistance.length === 0) return merchantHits;
+
+  const nearbyCount = withDistance.filter((hit) => hit.business.distance <= LOCAL_DISTANCE_RADIUS_KM).length;
+  if (nearbyCount < MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING) {
+    return merchantHits;
+  }
+
+  return merchantHits.filter((hit) => {
+    const distance = hit?.business?.distance;
+    if (!isFiniteDistanceKm(distance)) return true;
+    return distance <= DISTANT_RESULT_CUTOFF_KM;
+  });
+}
+
 function enrichBusinessWithDistance(business, userLat, userLng) {
   if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
     return business;
@@ -186,19 +217,9 @@ function parseSearchFilters(searchParams) {
 }
 
 function buildExpandedQueryTokens(query) {
-  const synonyms = buildMeiliSynonyms();
   const normalized = normalizeSearchText(query);
   const tokens = tokenizeSearchText(query);
-  const expanded = new Set([normalized, ...tokens].filter(Boolean));
-
-  for (const token of tokens) {
-    const candidates = synonyms[token] || [];
-    for (const candidate of candidates) {
-      expanded.add(normalizeSearchText(candidate));
-    }
-  }
-
-  return Array.from(expanded).filter(Boolean);
+  return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
 }
 
 function buildMeiliFilter(entityType, filters) {
@@ -221,6 +242,43 @@ function buildMeiliFilter(entityType, filters) {
   return clauses.join(' AND ');
 }
 
+function buildMerchantSeedFilter(seedMerchantIds, filters) {
+  const ids = (seedMerchantIds || []).filter(Boolean);
+  if (ids.length === 0) {
+    return buildMeiliFilter('merchant', filters);
+  }
+
+  const escapedIds = ids.map((id) => `"${String(id).replace(/"/g, '\\"')}"`).join(', ');
+  return `${buildMeiliFilter('merchant', filters)} AND merchantId IN [${escapedIds}]`;
+}
+
+function collectSeedMerchantIds(intentHits, productHits, maxIds = 350) {
+  const out = [];
+  const seen = new Set();
+
+  const pushId = (id) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+
+  for (const hit of Array.isArray(intentHits) ? intentHits : []) {
+    for (const id of Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : []) {
+      pushId(id);
+      if (out.length >= maxIds) return out;
+    }
+  }
+
+  for (const hit of Array.isArray(productHits) ? productHits : []) {
+    for (const id of Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : []) {
+      pushId(id);
+      if (out.length >= maxIds) return out;
+    }
+  }
+
+  return out;
+}
+
 function buildIntentReferenceBoostMap(intentHits) {
   const boostByMerchant = new Map();
   const intents = Array.isArray(intentHits) ? intentHits : [];
@@ -239,6 +297,31 @@ function buildIntentReferenceBoostMap(intentHits) {
       if (positionBoost <= 0) break;
 
       const boost = positionBoost * intentWeight;
+      boostByMerchant.set(merchantId, (boostByMerchant.get(merchantId) || 0) + boost);
+    }
+  }
+
+  return boostByMerchant;
+}
+
+function buildProductReferenceBoostMap(productHits) {
+  const boostByMerchant = new Map();
+  const products = Array.isArray(productHits) ? productHits : [];
+
+  for (let productRank = 0; productRank < products.length; productRank += 1) {
+    const hit = products[productRank];
+    const merchantRefs = Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : [];
+    const productScore = Number(hit?._rankingScore || 0.5);
+    const productWeight = Math.max(0.25, 1 - productRank * 0.15) * Math.max(0.4, productScore);
+
+    for (let refRank = 0; refRank < merchantRefs.length; refRank += 1) {
+      const merchantId = merchantRefs[refRank];
+      if (!merchantId) continue;
+
+      const positionBoost = Math.max(0, 220 - refRank * 9);
+      if (positionBoost <= 0) break;
+
+      const boost = positionBoost * productWeight;
       boostByMerchant.set(merchantId, (boostByMerchant.get(merchantId) || 0) + boost);
     }
   }
@@ -411,7 +494,8 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
     })
     .sort((a, b) => b.score - a.score);
 
-  const pagedMerchants = merchantHits.slice(offsetNum, offsetNum + limitNum);
+  const distanceAwareMerchants = applyLocalDistanceGuardrail(merchantHits, filters);
+  const pagedMerchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
   const intentHits = dataset.intentDocuments
     .filter((intent) => intentTags.includes(intent.intentKey))
     .slice(0, 12)
@@ -442,7 +526,7 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
     merchants: pagedMerchants,
     intents: intentHits,
     products: productHits,
-    totalMerchants: merchantHits.length
+    totalMerchants: distanceAwareMerchants.length
   };
 }
 
@@ -498,23 +582,52 @@ async function handleSearch(req, res, url, db) {
       showRankingScore: true
     });
 
+    const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
+    const merchantBaseHits = Array.isArray(merchantSearch.hits) ? merchantSearch.hits : [];
+    let merchantCandidateHits = merchantBaseHits;
+
+    if (seedMerchantIds.length > 0) {
+      const currentIds = new Set(merchantBaseHits.map((hit) => hit?.merchantId).filter(Boolean));
+      const missingSeedIds = seedMerchantIds.filter((id) => !currentIds.has(id));
+
+      if (missingSeedIds.length > 0) {
+        const seededMerchantSearch = await meiliSearch('', {
+          limit: Math.min(missingSeedIds.length, 350),
+          filter: buildMerchantSeedFilter(missingSeedIds, filters),
+          showRankingScore: true
+        });
+
+        merchantCandidateHits = [
+          ...merchantBaseHits,
+          ...(Array.isArray(seededMerchantSearch.hits) ? seededMerchantSearch.hits : [])
+        ];
+      }
+    }
+
     const intentReferenceBoost = buildIntentReferenceBoostMap(intentSearch.hits || []);
-    const scoredMerchantHits = (merchantSearch.hits || [])
+    const productReferenceBoost = buildProductReferenceBoostMap(productSearch.hits || []);
+    const scoredMerchantHits = merchantCandidateHits
       .map((hit) => {
         const scoreMeta = scoreMerchantHit(hit, normalized, expandedTokens, intentTags);
-        const refBoost = intentReferenceBoost.get(hit.merchantId) || 0;
-        if (refBoost > 0) {
-          scoreMeta.score += refBoost;
+        const intentBoost = intentReferenceBoost.get(hit.merchantId) || 0;
+        if (intentBoost > 0) {
+          scoreMeta.score += intentBoost;
           scoreMeta.reasons.push('intent_ref_boost');
+        }
+        const productBoost = productReferenceBoost.get(hit.merchantId) || 0;
+        if (productBoost > 0) {
+          scoreMeta.score += productBoost;
+          scoreMeta.reasons.push('product_ref_boost');
         }
         return mapMerchantHitToResponse(hit, scoreMeta, filters);
       })
       .sort((a, b) => b.score - a.score);
 
-    const merchants = scoredMerchantHits.slice(offsetNum, offsetNum + limitNum);
+    const distanceAwareMerchants = applyLocalDistanceGuardrail(scoredMerchantHits, filters);
+    const merchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
     const intents = (intentSearch.hits || []).map(mapIntentHit);
     const products = (productSearch.hits || []).map(mapProductHit);
-    const totalMerchants = merchantSearch.estimatedTotalHits || scoredMerchantHits.length;
+    const totalMerchants = distanceAwareMerchants.length;
 
     return json(res, 200, {
       success: true,
@@ -542,7 +655,8 @@ async function handleSearch(req, res, url, db) {
       ...(debugMode && {
         debug: {
           ...debug,
-          meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null
+          meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null,
+          meiliDistancePrunedTotal: distanceAwareMerchants.length
         }
       })
     });
