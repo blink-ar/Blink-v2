@@ -1,4 +1,4 @@
-import { Business, BankBenefit } from '../types';
+import { Business, BankBenefit, SearchApiResponse } from '../types';
 import {
   Benefit,
   RawMongoBenefit,
@@ -29,6 +29,85 @@ export interface BusinessesApiResponse {
   };
 }
 
+function normalizeBusinesses(businesses: any[]): Business[] {
+  return businesses.map((b: any) => {
+    const rawLocations = b.location || b.locations || [];
+    const uniqueLocations: any[] = [];
+    const seenAddresses = new Set();
+
+    if (Array.isArray(rawLocations)) {
+      for (const loc of rawLocations) {
+        const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
+        if (!seenAddresses.has(key)) {
+          seenAddresses.add(key);
+          uniqueLocations.push(loc);
+        }
+      }
+    }
+
+    const business = { ...b, location: uniqueLocations };
+    if ('locations' in business) {
+      delete business.locations;
+    }
+    return business as Business;
+  });
+}
+
+function mapSearchResponseToBusinessesResponse(
+  searchData: SearchApiResponse,
+  options: {
+    limit: number;
+    offset: number;
+    category?: string;
+    bank?: string;
+    search?: string;
+  }
+): BusinessesApiResponse {
+  return {
+    success: searchData.success,
+    businesses: normalizeBusinesses(
+      (searchData.merchants || []).map((merchantHit) => merchantHit.business)
+    ),
+    pagination: {
+      total: searchData.pagination.totalMerchants,
+      limit: options.limit,
+      offset: options.offset,
+      hasMore: searchData.pagination.hasMore
+    },
+    filters: {
+      ...(options.category && { category: options.category }),
+      ...(options.bank && { bank: options.bank }),
+      ...(options.search && { search: options.search })
+    }
+  };
+}
+
+export async function fetchSearch(options: {
+  q: string;
+  limit?: number;
+  offset?: number;
+  category?: string;
+  bank?: string;
+  lat?: number;
+  lng?: number;
+}): Promise<SearchApiResponse> {
+  const params = new URLSearchParams();
+  params.append('q', options.q);
+  params.append('limit', String(options.limit ?? 20));
+  params.append('offset', String(options.offset ?? 0));
+  params.append('collection', COLLECTION);
+  if (options.category) params.append('category', options.category);
+  if (options.bank) params.append('bank', options.bank);
+  if (options.lat !== undefined && options.lng !== undefined) {
+    params.append('lat', String(options.lat));
+    params.append('lng', String(options.lng));
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  return response.json();
+}
+
 export async function fetchBusinessesPaginated(options: {
   limit?: number;
   offset?: number;
@@ -39,6 +118,29 @@ export async function fetchBusinessesPaginated(options: {
   lng?: number;
 } = {}): Promise<BusinessesApiResponse> {
   const { limit = 20, offset = 0, category, bank, search, lat, lng } = options;
+
+  if (search && search.trim()) {
+    try {
+      const searchData = await fetchSearch({
+        q: search.trim(),
+        limit,
+        offset,
+        category,
+        bank,
+        lat,
+        lng
+      });
+      return mapSearchResponseToBusinessesResponse(searchData, {
+        limit,
+        offset,
+        category,
+        bank,
+        search
+      });
+    } catch (error) {
+      console.error('[API] fetchSearch failed:', error);
+    }
+  }
 
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
@@ -62,27 +164,7 @@ export async function fetchBusinessesPaginated(options: {
     const data = await response.json();
 
     if (data.success && Array.isArray(data.businesses)) {
-      data.businesses = data.businesses.map((b: any) => {
-        const rawLocations = b.location || b.locations || [];
-        const uniqueLocations: any[] = [];
-        const seenAddresses = new Set();
-
-        if (Array.isArray(rawLocations)) {
-          for (const loc of rawLocations) {
-            const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
-            if (!seenAddresses.has(key)) {
-              seenAddresses.add(key);
-              uniqueLocations.push(loc);
-            }
-          }
-        }
-
-        const business = { ...b, location: uniqueLocations };
-        if ('locations' in business) {
-          delete business.locations;
-        }
-        return business;
-      });
+      data.businesses = normalizeBusinesses(data.businesses);
     }
 
     return data;

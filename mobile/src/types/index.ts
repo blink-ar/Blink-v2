@@ -37,6 +37,65 @@ export interface Business {
   priorityScore?: number;
 }
 
+export interface SearchIntentHit {
+  entityId: string;
+  intentKey: string;
+  displayLabel: string;
+  synonyms: string[];
+  merchantRefs: string[];
+  categoryRefs: string[];
+  score: number;
+}
+
+export interface SearchProductHit {
+  entityId: string;
+  productTerm: string;
+  intentTags: string[];
+  merchantRefs: string[];
+  categories: string[];
+  score: number;
+}
+
+export interface SearchMerchantHit {
+  entityId: string;
+  merchantId: string;
+  merchantName: string;
+  aliases: string[];
+  intentTags: string[];
+  productTags: string[];
+  categories: string[];
+  banks: string[];
+  score: number;
+  reasons: string[];
+  business: Business;
+}
+
+export interface SearchApiResponse {
+  success: boolean;
+  query: {
+    q: string;
+    normalized: string;
+    expanded: string[];
+    limit: number;
+    offset: number;
+    filters: {
+      bank?: string;
+      category?: string;
+    };
+  };
+  source: 'meilisearch' | 'mongodb_fallback';
+  intents: SearchIntentHit[];
+  merchants: SearchMerchantHit[];
+  products: SearchProductHit[];
+  pagination: {
+    totalMerchants: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+  debug?: Record<string, unknown>;
+}
+
 export type Category =
   | 'all'
   | 'gastronomia'
