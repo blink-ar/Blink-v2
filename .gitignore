@@ -29,3 +29,4 @@ dist-ssr
 .kiro/
 .kiro/*
 .vercel
+.meili_data/

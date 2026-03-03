@@ -195,7 +195,7 @@ function buildMerchantDocument(accumulator) {
   business.benefits = accumulator.benefits;
 
   return {
-    entityId: `merchant:${merchantSlug}`,
+    entityId: `merchant_${merchantSlug}`,
     entityType: 'merchant',
     merchantId: merchantSlug,
     merchantName: accumulator.merchantName,
@@ -227,7 +227,7 @@ function buildProductDocuments(merchantDocuments) {
     for (const productTag of merchant.productTags || []) {
       if (!productMap.has(productTag)) {
         productMap.set(productTag, {
-          entityId: `product:${productTag}`,
+          entityId: `product_${productTag}`,
           entityType: 'product',
           productTerm: productTag,
           intentTags: new Set(),
@@ -269,7 +269,7 @@ function buildIntentDocuments(merchantDocuments) {
       .map((merchant) => merchant.merchantId);
 
     intentDocs.push({
-      entityId: `intent:${intentKey}`,
+      entityId: `intent_${intentKey}`,
       entityType: 'intent',
       intentKey,
       displayLabel: intentMeta.displayLabel,

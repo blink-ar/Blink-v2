@@ -454,8 +454,11 @@ async function handleSearch(req, res, url, db) {
       throw new Error('Meilisearch is not configured');
     }
 
+    // Fetch a wider candidate window, then apply business-aware rescoring.
+    // This is needed so strong alias/intent matches (e.g. FREDDO for gastronomy terms)
+    // are still considered even if raw lexical rank is lower.
     const merchantSearch = await meiliSearch(expandedQuery, {
-      limit: Math.min(limitNum + offsetNum + 30, 220),
+      limit: Math.min(limitNum + offsetNum + 400, 1000),
       filter: buildMeiliFilter('merchant', filters),
       showRankingScore: true
     });

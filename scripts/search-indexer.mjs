@@ -40,8 +40,8 @@ const MEILI_SETTINGS = {
     'attribute',
     'sort',
     'exactness',
-    'desc(popularity)',
-    'desc(maxDiscount)'
+    'popularity:desc',
+    'maxDiscount:desc'
   ],
   typoTolerance: {
     enabled: true,
