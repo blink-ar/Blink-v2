@@ -4,6 +4,7 @@ import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { parseDayAvailability } from '../utils/dayAvailabilityParser';
+import { processCardTypes } from '../config/cardTypeConfig';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { useSEO } from '../hooks/useSEO';
 import {
@@ -237,6 +238,7 @@ function BenefitDetailPage() {
   const dayAvailability = parseDayAvailability(benefit.cuando);
   const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])].filter(Boolean).join('\n\n');
   const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+  const processedCardTypes = processCardTypes(benefit.cardTypes ?? []);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
@@ -367,8 +369,8 @@ function BenefitDetailPage() {
               >
                 {benefit.bankName}
               </span>
-              {(benefit.cardTypes && benefit.cardTypes.length > 0
-                ? benefit.cardTypes
+              {(processedCardTypes.length > 0
+                ? processedCardTypes
                 : benefit.cardName ? [benefit.cardName] : []
               ).map((card, i) => (
                 <span
@@ -376,7 +378,7 @@ function BenefitDetailPage() {
                   className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
                   style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
                 >
-                  {card.replace(/ any$/i, '')}
+                  {card}
                 </span>
               ))}
               {subscriptionName && (
@@ -507,7 +509,7 @@ function BenefitDetailPage() {
           </div>
 
           {/* Card types */}
-          {(benefit.cardTypes && benefit.cardTypes.length > 0) && (
+          {processedCardTypes.length > 0 && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ border: '1px solid #E8E6E1' }}
@@ -534,10 +536,10 @@ function BenefitDetailPage() {
               </button>
               {showCards && (
                 <div className="px-4 pb-4 pt-0 space-y-2" style={{ borderTop: '1px solid #E8E6E1' }}>
-                  {benefit.cardTypes.map((card, i) => (
+                  {processedCardTypes.map((card, i) => (
                     <div key={i} className="flex items-center gap-2 pt-3 border-b border-blink-border pb-2 last:border-0">
                       <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 14 }}>credit_card</span>
-                      <p className="text-xs text-blink-muted leading-snug">{card.replace(/ any$/i, '')}</p>
+                      <p className="text-xs text-blink-muted leading-snug">{card}</p>
                     </div>
                   ))}
                 </div>
