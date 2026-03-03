@@ -239,6 +239,7 @@ function BenefitDetailPage() {
   const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])].filter(Boolean).join('\n\n');
   const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
   const processedCardTypes = processCardTypes(benefit.cardTypes ?? []);
+  const processedCardName = processCardTypes(benefit.cardName ? [benefit.cardName] : [])[0] ?? null;
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
@@ -300,7 +301,7 @@ function BenefitDetailPage() {
                 className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
                 style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
               >
-                {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
+                {benefit.bankName}{processedCardName ? ` · ${processedCardName}` : ''}
               </span>
               {subscriptionName && (
                 <span
@@ -371,7 +372,7 @@ function BenefitDetailPage() {
               </span>
               {(processedCardTypes.length > 0
                 ? processedCardTypes
-                : benefit.cardName ? [benefit.cardName] : []
+                : processedCardName ? [processedCardName] : []
               ).map((card, i) => (
                 <span
                   key={i}
