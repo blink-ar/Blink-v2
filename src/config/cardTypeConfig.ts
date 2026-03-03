@@ -1,37 +1,30 @@
 /**
  * Card type display configuration.
  *
- * This is the single place to control how raw card type names from the
- * database are processed before being shown in the UI.
- *
  * There are two mechanisms:
  *
  *  1. CARD_TYPE_BLOCKLIST  — card types that should never appear in the UI.
- *     A card type is blocked if its name (lowercased) contains any entry.
- *     Example: "default" blocks "visa default", "mastercard default", etc.
+ *     A card type is blocked if its lowercase name contains any entry.
  *
- *  2. CARD_TYPE_DISPLAY_MAP — rename / normalise card type strings.
- *     Keys are the raw lowercase names as they come from the database.
+ *  2. CARD_TYPE_DISPLAY_MAP — rename / normalise raw card type strings.
+ *     Keys are lowercase trimmed names as they come from the database.
  *     Values are the display labels shown to the user.
- *     Mapping several raw names to the same display label effectively
- *     collapses them into a single entry after deduplication.
  *
- * After applying both rules the list is automatically deduplicated, so you
- * can safely map "visa gold", "visa standard", and "visa" all to "Visa" and
- * only one badge will be shown.
+ *     Rule of thumb:
+ *       - Non-tier variants (classic, standard, recargable, debito,
+ *         internacional, regional, nacional …) → collapse to brand name.
+ *       - Tier variants (Gold, Platinum, Black, Signature, Infinite …)
+ *         → keep them, they are meaningful to the user.
+ *
+ * After applying both rules the list is automatically deduplicated
+ * (case-insensitive), so mapping several raw names to the same display
+ * label naturally produces a single badge.
  */
 
 // ---------------------------------------------------------------------------
 // 1. Blocklist — hide these card types entirely
 // ---------------------------------------------------------------------------
 
-/**
- * If any word in this list appears anywhere in a card type's lowercase name
- * the card type is removed from the displayed list.
- *
- * Add new entries to hide additional types, e.g.:
- *   'prueba', 'test', 'interno'
- */
 export const CARD_TYPE_BLOCKLIST: string[] = [
   'default',
 ];
@@ -40,49 +33,58 @@ export const CARD_TYPE_BLOCKLIST: string[] = [
 // 2. Display name map — normalise / rename raw card type strings
 // ---------------------------------------------------------------------------
 
-/**
- * Maps raw card type names (lowercase, trimmed) to their display labels.
- *
- * Common use-cases:
- *   - Fix typos/variants  → 'visa standar' : 'Visa'
- *   - Collapse tiers      → 'visa gold'    : 'Visa'
- *   - Brand aliases       → 'amex'         : 'American Express'
- *
- * If a raw name is NOT listed here it is shown as-is (with legacy " any"
- * suffix already stripped).
- */
 export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
-  // ── Visa variants ──────────────────────────────────────────────────────
+  // ── Visa – base / non-tier variants ────────────────────────────────────
   'visa': 'Visa',
   'visa standar': 'Visa',
   'visa standard': 'Visa',
   'visa classic': 'Visa',
-  'visa gold': 'Visa',
   'visa recargable': 'Visa',
   'visa débito': 'Visa',
   'visa debito': 'Visa',
+  'visa internacional': 'Visa',
+  'visa nacional': 'Visa',
+
+  // ── Visa – tier variants (kept) ─────────────────────────────────────────
+  'visa gold': 'Visa Gold',
   'visa platinum': 'Visa Platinum',
+  'visa black': 'Visa Black',
   'visa signature': 'Visa Signature',
   'visa infinite': 'Visa Infinite',
 
-  // ── Mastercard variants ─────────────────────────────────────────────────
+  // ── Mastercard – base / non-tier variants ───────────────────────────────
   'mastercard': 'Mastercard',
   'mastercard standar': 'Mastercard',
   'mastercard standard': 'Mastercard',
   'mastercard classic': 'Mastercard',
-  'mastercard gold': 'Mastercard',
   'mastercard débito': 'Mastercard',
   'mastercard debito': 'Mastercard',
+  'mastercard internacional': 'Mastercard',
+  'mastercard regional': 'Mastercard',
+  'mastercard nacional': 'Mastercard',
+
+  // ── Mastercard – tier variants (kept) ───────────────────────────────────
+  'mastercard gold': 'Mastercard Gold',
   'mastercard platinum': 'Mastercard Platinum',
   'mastercard black': 'Mastercard Black',
 
-  // ── American Express variants ───────────────────────────────────────────
+  // ── American Express – base / non-tier variants ─────────────────────────
   'amex': 'American Express',
-  'amex gold': 'American Express Gold',
-  'amex platinum': 'American Express Platinum',
   'american express': 'American Express',
+  'amex standar': 'American Express',
+  'amex standard': 'American Express',
+  'amex internacional': 'American Express',
   'american express standar': 'American Express',
   'american express standard': 'American Express',
+  'american express internacional': 'American Express',
+
+  // ── American Express – tier variants (kept) ─────────────────────────────
+  'amex gold': 'American Express Gold',
+  'amex platinum': 'American Express Platinum',
+  'amex black': 'American Express Black',
+  'american express gold': 'American Express Gold',
+  'american express platinum': 'American Express Platinum',
+  'american express black': 'American Express Black',
 
   // ── Add more mappings below as needed ───────────────────────────────────
 };
@@ -96,11 +98,7 @@ export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
  *  1. Strips the legacy " any" suffix
  *  2. Removes entries that match the blocklist
  *  3. Applies display name normalisation from CARD_TYPE_DISPLAY_MAP
- *  4. Deduplicates the result (preserves first-occurrence order)
- *
- * @example
- *   processCardTypes(['visa', 'visa gold', 'visa standar', 'mastercard default any'])
- *   // → ['Visa', 'Mastercard'] ('default' blocked; visa variants collapsed)
+ *  4. Deduplicates case-insensitively (preserves first-occurrence order)
  */
 export function processCardTypes(rawCardTypes: string[]): string[] {
   const seen = new Set<string>();
@@ -110,7 +108,6 @@ export function processCardTypes(rawCardTypes: string[]): string[] {
     const cleaned = raw.replace(/ any$/i, '').trim();
     const lower = cleaned.toLowerCase();
 
-    // Skip blocklisted entries
     if (CARD_TYPE_BLOCKLIST.some((blocked) => lower.includes(blocked))) {
       continue;
     }
