@@ -53,19 +53,26 @@ export const CARD_TYPE_BLOCKLIST: string[] = [
  */
 export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
   // ── Visa variants ──────────────────────────────────────────────────────
+  'visa': 'Visa',
   'visa standar': 'Visa',
   'visa standard': 'Visa',
   'visa classic': 'Visa',
   'visa gold': 'Visa',
+  'visa recargable': 'Visa',
+  'visa débito': 'Visa',
+  'visa debito': 'Visa',
   'visa platinum': 'Visa Platinum',
   'visa signature': 'Visa Signature',
   'visa infinite': 'Visa Infinite',
 
   // ── Mastercard variants ─────────────────────────────────────────────────
+  'mastercard': 'Mastercard',
   'mastercard standar': 'Mastercard',
   'mastercard standard': 'Mastercard',
   'mastercard classic': 'Mastercard',
   'mastercard gold': 'Mastercard',
+  'mastercard débito': 'Mastercard',
+  'mastercard debito': 'Mastercard',
   'mastercard platinum': 'Mastercard Platinum',
   'mastercard black': 'Mastercard Black',
 
@@ -73,6 +80,7 @@ export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
   'amex': 'American Express',
   'amex gold': 'American Express Gold',
   'amex platinum': 'American Express Platinum',
+  'american express': 'American Express',
   'american express standar': 'American Express',
   'american express standard': 'American Express',
 
@@ -109,8 +117,10 @@ export function processCardTypes(rawCardTypes: string[]): string[] {
 
     const displayName = CARD_TYPE_DISPLAY_MAP[lower] ?? cleaned;
 
-    if (!seen.has(displayName)) {
-      seen.add(displayName);
+    // Deduplicate case-insensitively so "visa" and "Visa" don't both appear
+    const dedupeKey = displayName.toLowerCase();
+    if (!seen.has(dedupeKey)) {
+      seen.add(dedupeKey);
       result.push(displayName);
     }
   }
