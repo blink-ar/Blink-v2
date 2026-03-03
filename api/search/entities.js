@@ -41,7 +41,7 @@ function buildProductTags(benefit) {
   return uniqueStrings(tokens);
 }
 
-function resolveMerchantAliases(merchantName, merchantKey, productTags, intentTags) {
+function resolveMerchantAliases(merchantName, merchantKey) {
   const aliases = new Set();
   const nameTokens = tokenizeSearchText(merchantName);
   nameTokens.forEach((token) => aliases.add(token));
@@ -56,16 +56,21 @@ function resolveMerchantAliases(merchantName, merchantKey, productTags, intentTa
   const manualAliases = MERCHANT_ALIASES[merchantKey] || [];
   manualAliases.forEach((alias) => aliases.add(normalizeSearchText(alias)));
 
-  // Reinforce merchant intent searchability using learned tags.
-  for (const intentTag of intentTags) {
-    const intent = INTENT_TAXONOMY[intentTag];
-    if (!intent) continue;
-    intent.synonyms.forEach((term) => aliases.add(normalizeSearchText(term)));
-  }
+  const aliasCandidates = Array.from(aliases);
+  for (const alias of aliasCandidates) {
+    if (!alias || alias.length < 4) continue;
 
-  productTags.forEach((tag) => {
-    if (tag.length >= 4) aliases.add(tag);
-  });
+    // Common user typo/variation: repeated letters removed (e.g. freddo -> fredo).
+    const collapsed = alias.replace(/(.)\1+/g, '$1');
+    if (collapsed && collapsed !== alias) {
+      aliases.add(collapsed);
+    }
+
+    // Prefix rescue for partial merchant searches (e.g. "fred").
+    if (alias.length >= 4) {
+      aliases.add(alias.slice(0, 4));
+    }
+  }
 
   return Array.from(aliases).filter(Boolean);
 }
@@ -179,9 +184,7 @@ function buildMerchantDocument(accumulator) {
   );
   const aliases = resolveMerchantAliases(
     accumulator.merchantName,
-    accumulator.merchantKey,
-    sortedProductTags,
-    intentTags
+    accumulator.merchantKey
   );
 
   const business = buildMerchantBusinessSkeleton(

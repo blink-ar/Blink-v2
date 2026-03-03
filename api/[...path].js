@@ -221,6 +221,31 @@ function buildMeiliFilter(entityType, filters) {
   return clauses.join(' AND ');
 }
 
+function buildIntentReferenceBoostMap(intentHits) {
+  const boostByMerchant = new Map();
+  const intents = Array.isArray(intentHits) ? intentHits : [];
+
+  for (let intentRank = 0; intentRank < intents.length; intentRank += 1) {
+    const hit = intents[intentRank];
+    const merchantRefs = Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : [];
+    const intentScore = Number(hit?._rankingScore || 0.5);
+    const intentWeight = Math.max(0.25, 1 - intentRank * 0.2) * Math.max(0.4, intentScore);
+
+    for (let refRank = 0; refRank < merchantRefs.length; refRank += 1) {
+      const merchantId = merchantRefs[refRank];
+      if (!merchantId) continue;
+
+      const positionBoost = Math.max(0, 260 - refRank * 10);
+      if (positionBoost <= 0) break;
+
+      const boost = positionBoost * intentWeight;
+      boostByMerchant.set(merchantId, (boostByMerchant.get(merchantId) || 0) + boost);
+    }
+  }
+
+  return boostByMerchant;
+}
+
 function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   const reasons = [];
   let score = Number(hit?._rankingScore || 0) * 100;
@@ -232,7 +257,7 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
     (Array.isArray(hit.manualAliases) ? hit.manualAliases : []).map((value) => normalizeSearchText(value))
   );
   const productTags = (Array.isArray(hit.productTags) ? hit.productTags : []).map((value) => normalizeSearchText(value));
-  const intentHitTags = (Array.isArray(hit.intentTags) ? hit.intentTags : []).map((value) => normalizeSearchText(value));
+  const intentHitTags = Array.isArray(hit.intentTags) ? hit.intentTags : [];
 
   if (merchantName && merchantName === normalizedQuery) {
     score += 1000;
@@ -473,9 +498,15 @@ async function handleSearch(req, res, url, db) {
       showRankingScore: true
     });
 
+    const intentReferenceBoost = buildIntentReferenceBoostMap(intentSearch.hits || []);
     const scoredMerchantHits = (merchantSearch.hits || [])
       .map((hit) => {
         const scoreMeta = scoreMerchantHit(hit, normalized, expandedTokens, intentTags);
+        const refBoost = intentReferenceBoost.get(hit.merchantId) || 0;
+        if (refBoost > 0) {
+          scoreMeta.score += refBoost;
+          scoreMeta.reasons.push('intent_ref_boost');
+        }
         return mapMerchantHitToResponse(hit, scoreMeta, filters);
       })
       .sort((a, b) => b.score - a.score);

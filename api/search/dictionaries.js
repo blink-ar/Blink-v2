@@ -36,20 +36,9 @@ export const INTENT_TAXONOMY = {
   }
 };
 
-export const MERCHANT_ALIASES = {
-  freddo: [
-    'freddo',
-    'fredo',
-    'fred',
-    'heladeria',
-    'helado',
-    'helados',
-    'postre',
-    'postres',
-    'gastronomia',
-    'heladeria freddo'
-  ]
-};
+// Optional curated aliases for true merchant-name variants only.
+// Do not include intent/category/product terms here.
+export const MERCHANT_ALIASES = {};
 
 export const SPANISH_STOP_WORDS = new Set([
   'de',
@@ -84,8 +73,6 @@ export const SPANISH_STOP_WORDS = new Set([
 ]);
 
 export const SEARCH_SYNONYMS = {
-  freddo: ['fredo', 'fred'],
-  fredo: ['freddo', 'fred'],
   heladeria: ['heladerias', 'helado', 'helados', 'gelato', 'ice cream'],
   helados: ['helado', 'heladeria', 'gelato'],
   postre: ['postres', 'helado', 'helados'],
