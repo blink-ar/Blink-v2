@@ -150,7 +150,7 @@ function formatDistanceText(distance) {
 }
 
 const LOCAL_DISTANCE_RADIUS_KM = Number.parseFloat(process.env.SEARCH_LOCAL_DISTANCE_RADIUS_KM || '80');
-const DISTANT_RESULT_CUTOFF_KM = Number.parseFloat(process.env.SEARCH_DISTANT_RESULT_CUTOFF_KM || '300');
+const DISTANT_RESULT_CUTOFF_KM = Number.parseFloat(process.env.SEARCH_DISTANT_RESULT_CUTOFF_KM || '120');
 const MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING = Number.parseInt(
   process.env.SEARCH_MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING || '3',
   10
@@ -252,6 +252,32 @@ function buildMerchantSeedFilter(seedMerchantIds, filters) {
   return `${buildMeiliFilter('merchant', filters)} AND merchantId IN [${escapedIds}]`;
 }
 
+function buildMerchantCategoryFilter(seedCategories, filters) {
+  const categories = (seedCategories || [])
+    .map((value) => normalizeSearchText(value))
+    .filter(Boolean);
+  if (categories.length === 0) {
+    return buildMeiliFilter('merchant', filters);
+  }
+
+  const categoryClause = categories.map((category) => `categories = "${category}"`).join(' OR ');
+  return `${buildMeiliFilter('merchant', filters)} AND (${categoryClause})`;
+}
+
+function mergeMerchantHitCandidates(hitLists) {
+  const mergedByMerchantId = new Map();
+  for (const hits of hitLists || []) {
+    for (const hit of Array.isArray(hits) ? hits : []) {
+      const merchantId = hit?.merchantId || hit?.entityId;
+      if (!merchantId) continue;
+      if (!mergedByMerchantId.has(merchantId)) {
+        mergedByMerchantId.set(merchantId, hit);
+      }
+    }
+  }
+  return Array.from(mergedByMerchantId.values());
+}
+
 function collectSeedMerchantIds(intentHits, productHits, maxIds = 350) {
   const out = [];
   const seen = new Set();
@@ -277,6 +303,45 @@ function collectSeedMerchantIds(intentHits, productHits, maxIds = 350) {
   }
 
   return out;
+}
+
+function buildProductCategorySignalMap(productHits) {
+  const signalByCategory = new Map();
+  const products = Array.isArray(productHits) ? productHits : [];
+
+  for (let productRank = 0; productRank < products.length; productRank += 1) {
+    const hit = products[productRank];
+    const categories = Array.isArray(hit?.categories) ? hit.categories : [];
+    const productScore = Number(hit?._rankingScore || 0.5);
+    const productWeight = Math.max(0.25, 1 - productRank * 0.15) * Math.max(0.4, productScore);
+
+    for (const category of categories) {
+      const normalized = normalizeSearchText(category);
+      if (!normalized) continue;
+      const boost = 120 * productWeight;
+      signalByCategory.set(normalized, (signalByCategory.get(normalized) || 0) + boost);
+    }
+  }
+
+  return signalByCategory;
+}
+
+function getTopCategoriesBySignal(signalByCategory, maxCategories = 4, minSignal = 20) {
+  return Array.from(signalByCategory.entries())
+    .filter(([, signal]) => signal >= minSignal)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxCategories)
+    .map(([category]) => category);
+}
+
+function getCategorySignalBoostForMerchant(hit, categorySignalMap) {
+  const categories = Array.isArray(hit?.categories) ? hit.categories : [];
+  let boost = 0;
+  for (const category of categories) {
+    const normalized = normalizeSearchText(category);
+    boost += categorySignalMap.get(normalized) || 0;
+  }
+  return Math.min(boost, 220);
 }
 
 function buildIntentReferenceBoostMap(intentHits) {
@@ -604,6 +669,24 @@ async function handleSearch(req, res, url, db) {
       }
     }
 
+    const productCategorySignalMap = buildProductCategorySignalMap(productSearch.hits || []);
+    const topSeedCategories = getTopCategoriesBySignal(productCategorySignalMap);
+    const shouldExpandByCategory =
+      topSeedCategories.length > 0 && merchantCandidateHits.length < Math.max(limitNum + offsetNum + 80, 120);
+
+    if (shouldExpandByCategory) {
+      const categoryExpansionSearch = await meiliSearch('', {
+        limit: 300,
+        filter: buildMerchantCategoryFilter(topSeedCategories, filters),
+        showRankingScore: true
+      });
+
+      merchantCandidateHits = mergeMerchantHitCandidates([
+        merchantCandidateHits,
+        Array.isArray(categoryExpansionSearch.hits) ? categoryExpansionSearch.hits : []
+      ]);
+    }
+
     const intentReferenceBoost = buildIntentReferenceBoostMap(intentSearch.hits || []);
     const productReferenceBoost = buildProductReferenceBoostMap(productSearch.hits || []);
     const scoredMerchantHits = merchantCandidateHits
@@ -618,6 +701,11 @@ async function handleSearch(req, res, url, db) {
         if (productBoost > 0) {
           scoreMeta.score += productBoost;
           scoreMeta.reasons.push('product_ref_boost');
+        }
+        const categoryBoost = getCategorySignalBoostForMerchant(hit, productCategorySignalMap);
+        if (categoryBoost > 0) {
+          scoreMeta.score += categoryBoost;
+          scoreMeta.reasons.push('product_category_boost');
         }
         return mapMerchantHitToResponse(hit, scoreMeta, filters);
       })
@@ -656,7 +744,9 @@ async function handleSearch(req, res, url, db) {
         debug: {
           ...debug,
           meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null,
-          meiliDistancePrunedTotal: distanceAwareMerchants.length
+          meiliDistancePrunedTotal: distanceAwareMerchants.length,
+          meiliCategoryExpanded: shouldExpandByCategory,
+          meiliCategorySeeds: topSeedCategories
         }
       })
     });
