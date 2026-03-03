@@ -63,7 +63,7 @@ export const mockBusinesses: Business[] = [
         textoAplicacion: "Cashback acreditado mensualmente en tu estado de cuenta."
       },
       {
-        bankName: "American Express",
+        bankName: "Amex",
         cardName: "Credit Card",
         benefit: "Earn 4x points at restaurants",
         rewardRate: "4x points",
@@ -76,7 +76,7 @@ export const mockBusinesses: Business[] = [
         claseDeBeneficio: "Gastronomía Premium",
         condicion: "Aplicable solo en restaurantes de categoría premium",
         requisitos: [
-          "Membresía American Express activa",
+          "Membresía Amex activa",
           "Gasto mínimo mensual de $200"
         ],
         usos: [
@@ -234,7 +234,7 @@ export const mockBusinesses: Business[] = [
         textoAplicacion: "Cashback se refleja como crédito en tu cuenta Amazon dentro de 1-2 días hábiles."
       },
       {
-        bankName: "American Express",
+        bankName: "Amex",
         cardName: "Credit Card",
         benefit: "Earn 6% on supermarkets",
         rewardRate: "6% cash back",
@@ -247,7 +247,7 @@ export const mockBusinesses: Business[] = [
         claseDeBeneficio: "Supermercados",
         condicion: "Máximo $6,000 en compras elegibles por año",
         requisitos: [
-          "Tarjeta American Express activa",
+          "Tarjeta Amex activa",
           "Compras en supermercados de EE.UU."
         ],
         usos: [
@@ -295,7 +295,7 @@ export const mockBusinesses: Business[] = [
         textoAplicacion: "Puntos se acreditan automáticamente en tu próximo estado de cuenta."
       },
       {
-        bankName: "American Express",
+        bankName: "Amex",
         cardName: "Credit Card",
         benefit: "Earn 1.5% on all purchases",
         rewardRate: "1.5% cash back",
@@ -306,7 +306,7 @@ export const mockBusinesses: Business[] = [
         claseDeBeneficio: "Compras Generales",
         requisitos: [],
         usos: [
-          "Cualquier comercio que acepte American Express"
+          "Cualquier comercio que acepte Amex"
         ]
       },
     ],
