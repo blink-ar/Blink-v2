@@ -1,24 +1,12 @@
 /**
  * Card type display configuration.
  *
- * There are two mechanisms:
+ * All Visa, Mastercard, and American Express variants (regardless of tier,
+ * region, or sub-type) collapse to their base brand name.
+ * Any card type not matched by the brand prefix logic can be added to
+ * CARD_TYPE_DISPLAY_MAP for explicit renaming.
  *
- *  1. CARD_TYPE_BLOCKLIST  — card types that should never appear in the UI.
- *     A card type is blocked if its lowercase name contains any entry.
- *
- *  2. CARD_TYPE_DISPLAY_MAP — rename / normalise raw card type strings.
- *     Keys are lowercase trimmed names as they come from the database.
- *     Values are the display labels shown to the user.
- *
- *     Rule of thumb:
- *       - Non-tier variants (classic, standard, recargable, debito,
- *         internacional, regional, nacional …) → collapse to brand name.
- *       - Tier variants (Gold, Platinum, Black, Signature, Infinite …)
- *         → keep them, they are meaningful to the user.
- *
- * After applying both rules the list is automatically deduplicated
- * (case-insensitive), so mapping several raw names to the same display
- * label naturally produces a single badge.
+ * CARD_TYPE_BLOCKLIST hides card types entirely (matched by substring).
  */
 
 // ---------------------------------------------------------------------------
@@ -30,75 +18,36 @@ export const CARD_TYPE_BLOCKLIST: string[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// 2. Display name map — normalise / rename raw card type strings
+// 2. Display name map — explicit overrides (applied before brand detection)
 // ---------------------------------------------------------------------------
 
 export const CARD_TYPE_DISPLAY_MAP: Record<string, string> = {
-  // ── Visa – base / non-tier variants ────────────────────────────────────
-  'visa': 'Visa',
-  'visa standar': 'Visa',
-  'visa standard': 'Visa',
-  'visa classic': 'Visa',
-  'visa recargable': 'Visa',
-  'visa débito': 'Visa',
-  'visa debito': 'Visa',
-  'visa internacional': 'Visa',
-  'visa nacional': 'Visa',
-
-  // ── Visa – tier variants (kept) ─────────────────────────────────────────
-  'visa gold': 'Visa Gold',
-  'visa platinum': 'Visa Platinum',
-  'visa black': 'Visa Black',
-  'visa signature': 'Visa Signature',
-  'visa infinite': 'Visa Infinite',
-
-  // ── Mastercard – base / non-tier variants ───────────────────────────────
-  'mastercard': 'Mastercard',
-  'mastercard standar': 'Mastercard',
-  'mastercard standard': 'Mastercard',
-  'mastercard classic': 'Mastercard',
-  'mastercard débito': 'Mastercard',
-  'mastercard debito': 'Mastercard',
-  'mastercard internacional': 'Mastercard',
-  'mastercard regional': 'Mastercard',
-  'mastercard nacional': 'Mastercard',
-
-  // ── Mastercard – tier variants (kept) ───────────────────────────────────
-  'mastercard gold': 'Mastercard Gold',
-  'mastercard platinum': 'Mastercard Platinum',
-  'mastercard black': 'Mastercard Black',
-
-  // ── American Express – base / non-tier variants ─────────────────────────
   'amex': 'American Express',
-  'american express': 'American Express',
-  'amex standar': 'American Express',
-  'amex standard': 'American Express',
-  'amex internacional': 'American Express',
-  'american express standar': 'American Express',
-  'american express standard': 'American Express',
-  'american express internacional': 'American Express',
-
-  // ── American Express – tier variants (kept) ─────────────────────────────
-  'amex gold': 'American Express Gold',
-  'amex platinum': 'American Express Platinum',
-  'amex black': 'American Express Black',
-  'american express gold': 'American Express Gold',
-  'american express platinum': 'American Express Platinum',
-  'american express black': 'American Express Black',
-
-  // ── Add more mappings below as needed ───────────────────────────────────
+  // Add more explicit overrides here as needed
 };
 
 // ---------------------------------------------------------------------------
-// 3. Processing utility
+// 3. Brand prefix rules — anything starting with these collapses to the brand
+// ---------------------------------------------------------------------------
+
+const BRAND_PREFIXES: Array<{ prefix: string; display: string }> = [
+  { prefix: 'visa', display: 'Visa' },
+  { prefix: 'mastercard', display: 'Mastercard' },
+  { prefix: 'american express', display: 'American Express' },
+];
+
+// ---------------------------------------------------------------------------
+// 4. Processing utility
 // ---------------------------------------------------------------------------
 
 /**
  * Processes a raw list of card type strings coming from the API:
  *  1. Strips the legacy " any" suffix
  *  2. Removes entries that match the blocklist
- *  3. Applies display name normalisation from CARD_TYPE_DISPLAY_MAP
- *  4. Deduplicates case-insensitively (preserves first-occurrence order)
+ *  3. Applies explicit overrides from CARD_TYPE_DISPLAY_MAP
+ *  4. Collapses any "visa …", "mastercard …", "american express …" variant
+ *     to just "Visa", "Mastercard", or "American Express"
+ *  5. Deduplicates case-insensitively (preserves first-occurrence order)
  */
 export function processCardTypes(rawCardTypes: string[]): string[] {
   const seen = new Set<string>();
@@ -112,9 +61,16 @@ export function processCardTypes(rawCardTypes: string[]): string[] {
       continue;
     }
 
-    const displayName = CARD_TYPE_DISPLAY_MAP[lower] ?? cleaned;
+    let displayName = CARD_TYPE_DISPLAY_MAP[lower] ?? cleaned;
 
-    // Deduplicate case-insensitively so "visa" and "Visa" don't both appear
+    // Collapse any brand variant to its base name
+    for (const { prefix, display } of BRAND_PREFIXES) {
+      if (lower === prefix || lower.startsWith(prefix + ' ') || lower.startsWith(prefix + '-')) {
+        displayName = display;
+        break;
+      }
+    }
+
     const dedupeKey = displayName.toLowerCase();
     if (!seen.has(dedupeKey)) {
       seen.add(dedupeKey);
