@@ -4,7 +4,6 @@ import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
 import { getRawBenefits } from '../services/rawBenefitsApi';
-import { useGeolocation } from './useGeolocation';
 
 // Query keys for cache management
 export const queryKeys = {
@@ -46,10 +45,7 @@ export interface BenefitsFilters {
  * Uses the new /api/businesses endpoint with proper server-side pagination and filtering
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
-    const { position, loading: positionLoading } = useGeolocation();
-
     // Fetch businesses with infinite query for pagination
-    // Wait for position to finish loading before starting the query
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -64,10 +60,6 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
-                ...(position && {
-                    lat: position.latitude,
-                    lng: position.longitude,
-                }),
                 ...(filters?.search && { search: filters.search }),
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),
@@ -81,7 +73,6 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return undefined;
         },
         initialPageParam: 0,
-        enabled: !positionLoading, // Wait for position to finish loading
         staleTime: 0,
     });
 
@@ -152,8 +143,6 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
  * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
-    const { position, loading: positionLoading } = useGeolocation();
-
     const {
         data,
         isLoading,
@@ -167,10 +156,6 @@ export function useBusinessesData() {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
-                ...(position && {
-                    lat: position.latitude,
-                    lng: position.longitude,
-                }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -180,7 +165,6 @@ export function useBusinessesData() {
             return undefined;
         },
         initialPageParam: 0,
-        enabled: !positionLoading, // Wait for position to finish loading
         staleTime: 0,
     });
 
