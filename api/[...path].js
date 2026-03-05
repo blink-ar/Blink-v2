@@ -39,6 +39,28 @@ function setCacheControl(res, directive) {
   res.setHeader('Cache-Control', directive);
 }
 
+/**
+ * Decode a geohash string to its center lat/lng.
+ * Returns null if the input is invalid.
+ */
+function decodeGeohash(hash) {
+  const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let even = true;
+  const lat = [-90, 90];
+  const lng = [-180, 180];
+  for (const c of hash) {
+    const bits = BASE32.indexOf(c);
+    if (bits === -1) return null;
+    for (let i = 4; i >= 0; i--) {
+      const bit = (bits >> i) & 1;
+      if (even) { const m = (lng[0] + lng[1]) / 2; if (bit) lng[0] = m; else lng[1] = m; }
+      else      { const m = (lat[0] + lat[1]) / 2; if (bit) lat[0] = m; else lat[1] = m; }
+      even = !even;
+    }
+  }
+  return { latitude: (lat[0] + lat[1]) / 2, longitude: (lng[0] + lng[1]) / 2 };
+}
+
 function getParsedUrl(req) {
   const protoHeader = req.headers['x-forwarded-proto'];
   const protocol = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'https';
@@ -607,15 +629,11 @@ async function handleGetBusinesses(req, res, url, db) {
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
-  const lat = searchParams.get('lat');
-  const lng = searchParams.get('lng');
-  const userLat = lat ? Number.parseFloat(lat) : null;
-  const userLng = lng ? Number.parseFloat(lng) : null;
-  const hasLocation =
-    userLat !== null &&
-    userLng !== null &&
-    Number.isFinite(userLat) &&
-    Number.isFinite(userLng);
+  const geohash = searchParams.get('geohash');
+  const decoded = geohash ? decodeGeohash(geohash) : null;
+  const userLat = decoded?.latitude ?? null;
+  const userLng = decoded?.longitude ?? null;
+  const hasLocation = userLat !== null && userLng !== null;
 
   const bankFilter = bank
     ? bank
@@ -1030,7 +1048,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const total = result[0]?.metadata?.[0]?.total || 0;
   const businesses = result[0]?.businesses || [];
 
-  setCacheControl(res, hasLocation ? CC_LOCATION : CC_CONTENT);
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     businesses,

@@ -88,10 +88,9 @@ export async function fetchBusinessesPaginated(options: {
   bank?: string;
   search?: string;
   subscription?: string;
-  lat?: number;
-  lng?: number;
+  geohash?: string;
 } = {}): Promise<BusinessesApiResponse> {
-  const { limit = 20, offset = 0, category, bank, search, subscription, lat, lng } = options;
+  const { limit = 20, offset = 0, category, bank, search, subscription, geohash } = options;
 
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
@@ -101,10 +100,7 @@ export async function fetchBusinessesPaginated(options: {
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
   if (subscription) params.append('subscription', subscription);
-  if (lat !== undefined && lng !== undefined) {
-    params.append('lat', lat.toString());
-    params.append('lng', lng.toString());
-  }
+  if (geohash) params.append('geohash', geohash);
 
   const url = `${BASE_URL}/api/businesses?${params.toString()}`;
 

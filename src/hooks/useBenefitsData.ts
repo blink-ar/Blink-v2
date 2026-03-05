@@ -4,6 +4,8 @@ import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
 import { getRawBenefits } from '../services/rawBenefitsApi';
+import { useGeolocation } from './useGeolocation';
+import { encodeGeohash } from '../utils/geohash';
 
 // Query keys for cache management
 export const queryKeys = {
@@ -45,7 +47,12 @@ export interface BenefitsFilters {
  * Uses the new /api/businesses endpoint with proper server-side pagination and filtering
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
-    // Fetch businesses with infinite query for pagination
+    const { position, loading: positionLoading } = useGeolocation();
+    const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
+
+    // Fetch businesses with infinite query for pagination.
+    // Wait for geolocation so the first response is already sorted by proximity.
+    // On return visits the position comes from localStorage (<16ms), so the wait is imperceptible.
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -55,11 +62,12 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         hasNextPage,
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
-        queryKey: [...queryKeys.businesses, filters], // Include filters in cache key
+        queryKey: [...queryKeys.businesses, geohash, filters], // geohash in key → correct cache bucket
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
+                ...(geohash && { geohash }),
                 ...(filters?.search && { search: filters.search }),
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),
@@ -73,6 +81,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return undefined;
         },
         initialPageParam: 0,
+        enabled: !positionLoading,
         staleTime: 0,
     });
 
@@ -143,6 +152,9 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
  * Hook for accessing only businesses data with pagination
  */
 export function useBusinessesData() {
+    const { position, loading: positionLoading } = useGeolocation();
+    const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
+
     const {
         data,
         isLoading,
@@ -151,11 +163,12 @@ export function useBusinessesData() {
         fetchNextPage,
         hasNextPage,
     } = useInfiniteQuery({
-        queryKey: queryKeys.businesses,
+        queryKey: [...queryKeys.businesses, geohash],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
+                ...(geohash && { geohash }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -165,6 +178,7 @@ export function useBusinessesData() {
             return undefined;
         },
         initialPageParam: 0,
+        enabled: !positionLoading,
         staleTime: 0,
     });
 
