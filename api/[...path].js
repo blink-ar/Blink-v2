@@ -30,6 +30,15 @@ function json(res, statusCode, payload) {
   res.send(JSON.stringify(payload));
 }
 
+// Cache-Control directives
+const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
+const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
+const CC_LOCATION = 'private, max-age=60';                                          // browser-only, 1m
+
+function setCacheControl(res, directive) {
+  res.setHeader('Cache-Control', directive);
+}
+
 function getParsedUrl(req) {
   const protoHeader = req.headers['x-forwarded-proto'];
   const protocol = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'https';
@@ -280,6 +289,7 @@ async function handleGetBenefits(req, res, url, db) {
     collection.countDocuments(query)
   ]);
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefits: benefits.map(serializeDocWithId),
@@ -323,6 +333,7 @@ async function handleGetBenefitById(req, res, url, db, id) {
     });
   }
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefit: serializeDocWithId(benefit)
@@ -343,6 +354,7 @@ async function handleGetCategories(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     categories: categories.map((cat) => ({
@@ -365,6 +377,7 @@ async function handleGetBanks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     banks: banks.map((bank) => ({
@@ -387,6 +400,7 @@ async function handleGetNetworks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     networks: networks.map((network) => ({
@@ -431,6 +445,7 @@ async function handleGetStats(req, res, url, db) {
       .toArray()
   ]);
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     stats: {
@@ -566,6 +581,7 @@ async function handleGetNearbyBenefits(req, res, url, db) {
 
   const filtered = nearbyBenefits.map(serializeDocWithId);
 
+  setCacheControl(res, CC_LOCATION);
   return json(res, 200, {
     success: true,
     benefits: filtered,
@@ -1014,6 +1030,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const total = result[0]?.metadata?.[0]?.total || 0;
   const businesses = result[0]?.businesses || [];
 
+  setCacheControl(res, hasLocation ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {
     success: true,
     businesses,
