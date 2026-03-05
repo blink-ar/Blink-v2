@@ -37,6 +37,8 @@ interface BeneficiosTabProps {
   hasMore: boolean;
   isLoadingMore: boolean;
   totalCount?: number;
+  sortByDistance?: boolean;
+  onSortByDistanceChange?: (value: boolean) => void;
 }
 
 const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
@@ -52,6 +54,8 @@ const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
   hasMore,
   isLoadingMore,
   totalCount,
+  sortByDistance,
+  onSortByDistanceChange,
 }) => {
   return (
     <>
@@ -70,6 +74,8 @@ const BeneficiosTab: React.FC<BeneficiosTabProps> = ({
           banks={bankGridData}
           onBankSelect={onBankSelect}
           selectedBanks={selectedBanks}
+          sortByDistance={sortByDistance}
+          onSortByDistanceChange={onSortByDistanceChange}
         />
       </div>
 

@@ -12,12 +12,16 @@ interface BankGridProps {
   banks: Bank[];
   onBankSelect: (bank: Bank) => void;
   selectedBanks?: string[];
+  sortByDistance?: boolean;
+  onSortByDistanceChange?: (value: boolean) => void;
 }
 
 const BankGrid: React.FC<BankGridProps> = ({
   banks,
   onBankSelect,
   selectedBanks = [],
+  sortByDistance = false,
+  onSortByDistanceChange,
 }) => {
   const itemsRef = useRef<HTMLElement[]>([]);
   const { handleKeyDown, setCurrentIndex } = useKeyboardNavigation(
@@ -47,6 +51,25 @@ const BankGrid: React.FC<BankGridProps> = ({
         }}
       >
         <div className="flex gap-2 sm:gap-3 px-3">
+          {/* Proximity sort chip — only shown when the handler is provided */}
+          {onSortByDistanceChange && (
+            <button
+              className={`bank-grid__item touch-target touch-button touch-feedback flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all focus-visible:focus-visible micro-bounce flex-shrink-0 ${
+                sortByDistance
+                  ? "bank-grid__item--active bg-primary-50 border-2 border-primary-500"
+                  : "bg-white border-2 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+              }`}
+              onClick={() => onSortByDistanceChange(!sortByDistance)}
+              aria-pressed={sortByDistance}
+              aria-label={sortByDistance ? "Desactivar orden por cercanía" : "Ordenar por cercanía"}
+              style={{ minHeight: "var(--touch-target-comfortable)" }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>near_me</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">
+                Más cercanos
+              </span>
+            </button>
+          )}
           {banks.map((bank, index) => (
             <button
               key={bank.id}

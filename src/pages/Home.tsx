@@ -123,6 +123,9 @@ function Home() {
   // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
 
+  // State for proximity sort
+  const [sortByDistance, setSortByDistance] = useState(false);
+
   // State for filter dropdown
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
@@ -151,6 +154,7 @@ function Home() {
     network: selectedNetwork,
     cardMode,
     hasInstallments,
+    sortByDistance,
   });
 
   // Since search, category, and bank filters are now server-side, we only need client-side online filter
@@ -606,6 +610,8 @@ function Home() {
                   hasMore={hasMore}
                   isLoadingMore={isLoadingMore || isLoading}
                   totalCount={totalBusinesses}
+                  sortByDistance={sortByDistance}
+                  onSortByDistanceChange={setSortByDistance}
                 />
               ) : (
                 <InicioTab

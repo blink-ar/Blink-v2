@@ -183,6 +183,7 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
+  const [sortByDistance, setSortByDistance] = useState(false);
 
   const { data: availableBankNames = [] } = useQuery({
     queryKey: ['availableBanks'],
@@ -251,6 +252,7 @@ function SearchPage() {
     network,
     cardMode,
     hasInstallments,
+    sortByDistance,
   });
 
   const businessBankNames = useMemo(() => {
@@ -710,6 +712,19 @@ function SearchPage() {
                 </button>
               );
             })()}
+
+            {/* Proximity sort */}
+            <button
+              onClick={() => setSortByDistance(!sortByDistance)}
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                sortByDistance
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
+              <span>Más cercanos</span>
+            </button>
 
             {/* Online only */}
             <button
