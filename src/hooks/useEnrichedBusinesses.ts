@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Business } from '../types';
-import { hasOnlineBenefits } from '../utils/distance';
+import { hasOnlineBenefits, calculateDistance, formatDistance } from '../utils/distance';
+import { useGeolocation } from './useGeolocation';
 
 /**
  * Enriches businesses with online information and applies filters
@@ -16,8 +17,11 @@ export const useEnrichedBusinesses = (
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
+    sortByDistance?: boolean; // Re-sort all loaded businesses by real distance
   }
 ) => {
+  const { position } = useGeolocation();
+
   const {
     onlineOnly = false,
     minDiscount,
@@ -26,17 +30,33 @@ export const useEnrichedBusinesses = (
     network,
     cardMode,
     hasInstallments,
+    sortByDistance = false,
   } = options || {};
 
   const enrichedBusinesses = useMemo(() => {
-    // Add hasOnline flag to each business
+    // Add hasOnline flag and compute distance client-side when position is available
     let result = businesses.map((business) => {
-      // Check if has online benefits
       const hasOnline = hasOnlineBenefits(business);
+
+      let distance = business.distance;
+      let distanceText = business.distanceText;
+      let isNearby = business.isNearby;
+
+      if (position && business.location?.length > 0) {
+        const distances = business.location.map((loc) =>
+          calculateDistance(position.latitude, position.longitude, loc.lat, loc.lng)
+        );
+        distance = Math.min(...distances);
+        distanceText = formatDistance(distance);
+        isNearby = distance <= 50;
+      }
 
       return {
         ...business,
         hasOnline,
+        distance,
+        distanceText,
+        isNearby,
       };
     });
 
@@ -144,9 +164,18 @@ export const useEnrichedBusinesses = (
       });
     }
 
-    // Backend already sorts by distance, so we preserve that order
+    // Only re-sort when the user explicitly enables the "sort by proximity" filter.
+    // Otherwise preserve server order so new pages appended on scroll don't jump.
+    if (sortByDistance && position) {
+      result.sort((a, b) => {
+        const da = a.distance ?? Infinity;
+        const db = b.distance ?? Infinity;
+        return da - db;
+      });
+    }
+
     return result;
-  }, [businesses, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
+  }, [businesses, position, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments, sortByDistance]);
 
   return enrichedBusinesses;
 };

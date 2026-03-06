@@ -183,6 +183,7 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
+  const [sortByDistance, setSortByDistance] = useState(searchParams.get('nearby') === '1');
 
   const { data: availableBankNames = [] } = useQuery({
     queryKey: ['availableBanks'],
@@ -203,8 +204,9 @@ function SearchPage() {
     if (cardMode) params.set('card', cardMode);
     if (network) params.set('network', network);
     if (hasInstallments) params.set('installments', '1');
+    if (sortByDistance) params.set('nearby', '1');
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, selectedCategory, selectedBanks, onlineOnly, maxDistance, minDiscount, availableDay, cardMode, network, hasInstallments, setSearchParams]);
+  }, [debouncedSearch, selectedCategory, selectedBanks, onlineOnly, maxDistance, minDiscount, availableDay, cardMode, network, hasInstallments, sortByDistance, setSearchParams]);
 
   // Debounce search
   useEffect(() => {
@@ -243,6 +245,14 @@ function SearchPage() {
     hasInstallments,
   });
 
+  // When "Más cercanos" is active, keep fetching until every page is loaded
+  // so the client-side sort has the full dataset to work with.
+  useEffect(() => {
+    if (sortByDistance && hasMore && !isLoadingMore) {
+      loadMore();
+    }
+  }, [sortByDistance, hasMore, isLoadingMore, loadMore]);
+
   const enrichedBusinesses = useEnrichedBusinesses(businesses, {
     onlineOnly,
     minDiscount,
@@ -251,6 +261,7 @@ function SearchPage() {
     network,
     cardMode,
     hasInstallments,
+    sortByDistance,
   });
 
   const businessBankNames = useMemo(() => {
@@ -710,6 +721,19 @@ function SearchPage() {
                 </button>
               );
             })()}
+
+            {/* Proximity sort */}
+            <button
+              onClick={() => setSortByDistance(!sortByDistance)}
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                sortByDistance
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
+              <span>Más cercanos</span>
+            </button>
 
             {/* Online only */}
             <button
