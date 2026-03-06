@@ -63,6 +63,9 @@ function Home() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
 
+  // State for proximity sort — must be declared before useBenefitsData
+  const [sortByDistance, setSortByDistance] = useState(false);
+
   // Debounce search term to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -123,9 +126,6 @@ function Home() {
 
   // State for online filter
   const [onlineOnly, setOnlineOnly] = useState(false);
-
-  // State for proximity sort
-  const [sortByDistance, setSortByDistance] = useState(false);
 
   // State for filter dropdown
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);

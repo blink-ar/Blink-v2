@@ -49,7 +49,10 @@ export interface BenefitsFilters {
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
-    const sortByDistance = filters?.sortByDistance ?? false;
+    const wantsSortByDistance = filters?.sortByDistance ?? false;
+    // Only use proximity sort when the filter is active AND we have real coordinates.
+    // If position is null (geolocation denied/unavailable) we fall back to geohash.
+    const sortByDistance = wantsSortByDistance && position !== null;
     const geohash = !sortByDistance && position
         ? encodeGeohash(position.latitude, position.longitude)
         : undefined;
@@ -67,7 +70,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
         queryKey: sortByDistance
-            ? [...queryKeys.businesses, 'exact', position?.latitude, position?.longitude, filters]
+            ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filters]
             : [...queryKeys.businesses, geohash, filters],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
@@ -89,7 +92,9 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return undefined;
         },
         initialPageParam: 0,
-        enabled: !positionLoading,
+        // Wait for geolocation to resolve; also wait for position when proximity sort is
+        // requested so we never fire a lat/lng-less query and cache a non-sorted result.
+        enabled: !positionLoading && (!wantsSortByDistance || position !== null),
         staleTime: 0,
     });
 
