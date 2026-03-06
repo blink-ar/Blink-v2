@@ -137,10 +137,12 @@ const CategoryMarquee: React.FC = () => {
         borderBottom: '1px solid #E8E6E1',
       }}
     >
+      <style>{`.marquee-row::-webkit-scrollbar{display:none}`}</style>
       <div
         ref={row1Marquee.containerRef}
         {...row1Marquee.handlers}
-        className="flex mb-2.5 gap-2.5 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        className="marquee-row flex mb-2.5 gap-2.5 overflow-x-scroll cursor-grab active:cursor-grabbing select-none"
+        style={{ scrollbarWidth: 'none' }}
       >
         {row1.map((c) => renderButton(c))}
         {row1.map((c) => renderButton(c, 'dup'))}
@@ -148,7 +150,8 @@ const CategoryMarquee: React.FC = () => {
       <div
         ref={row2Marquee.containerRef}
         {...row2Marquee.handlers}
-        className="flex gap-2.5 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        className="marquee-row flex gap-2.5 overflow-x-scroll cursor-grab active:cursor-grabbing select-none"
+        style={{ scrollbarWidth: 'none' }}
       >
         {row2.map((c) => renderButton(c))}
         {row2.map((c) => renderButton(c, 'dup'))}
