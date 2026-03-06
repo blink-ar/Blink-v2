@@ -92,6 +92,7 @@ function Home() {
     network: selectedNetwork,
     cardMode,
     hasInstallments,
+    sortByDistance,
   });
 
   // Track when data has loaded at least once
@@ -126,14 +127,6 @@ function Home() {
   // State for proximity sort
   const [sortByDistance, setSortByDistance] = useState(false);
 
-  // When "Más cercanos" is active, keep fetching until every page is loaded
-  // so the client-side sort has the full dataset to work with.
-  useEffect(() => {
-    if (sortByDistance && hasMore && !isLoadingMore) {
-      loadMore();
-    }
-  }, [sortByDistance, hasMore, isLoadingMore, loadMore]);
-
   // State for filter dropdown
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
@@ -162,7 +155,6 @@ function Home() {
     network: selectedNetwork,
     cardMode,
     hasInstallments,
-    sortByDistance,
   });
 
   // Since search, category, and bank filters are now server-side, we only need client-side online filter

@@ -40,6 +40,7 @@ export interface BenefitsFilters {
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
+    sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
 
 /**
@@ -48,11 +49,14 @@ export interface BenefitsFilters {
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
-    const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
+    const sortByDistance = filters?.sortByDistance ?? false;
+    const geohash = !sortByDistance && position
+        ? encodeGeohash(position.latitude, position.longitude)
+        : undefined;
 
     // Fetch businesses with infinite query for pagination.
-    // Wait for geolocation so the first response is already sorted by proximity.
-    // On return visits the position comes from localStorage (<16ms), so the wait is imperceptible.
+    // sortByDistance=true → sends exact lat/lng to server (precise sort, bypasses CDN cache).
+    // sortByDistance=false → sends geohash (CDN-cached, approximate proximity sort).
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -62,12 +66,16 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         hasNextPage,
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
-        queryKey: [...queryKeys.businesses, geohash, filters], // geohash in key → correct cache bucket
+        queryKey: sortByDistance
+            ? [...queryKeys.businesses, 'exact', position?.latitude, position?.longitude, filters]
+            : [...queryKeys.businesses, geohash, filters],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
-                ...(geohash && { geohash }),
+                ...(sortByDistance && position
+                    ? { lat: position.latitude, lng: position.longitude }
+                    : geohash ? { geohash } : {}),
                 ...(filters?.search && { search: filters.search }),
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),

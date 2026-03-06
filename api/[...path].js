@@ -629,10 +629,18 @@ async function handleGetBusinesses(req, res, url, db) {
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
+  // Exact lat/lng (precise sort, bypasses CDN) takes priority over geohash (CDN-cached, approximate)
+  const rawLat = searchParams.get('lat');
+  const rawLng = searchParams.get('lng');
+  const exactLat = rawLat ? Number.parseFloat(rawLat) : null;
+  const exactLng = rawLng ? Number.parseFloat(rawLng) : null;
+  const hasExact = exactLat !== null && exactLng !== null && Number.isFinite(exactLat) && Number.isFinite(exactLng);
+
   const geohash = searchParams.get('geohash');
-  const decoded = geohash ? decodeGeohash(geohash) : null;
-  const userLat = decoded?.latitude ?? null;
-  const userLng = decoded?.longitude ?? null;
+  const decoded = !hasExact && geohash ? decodeGeohash(geohash) : null;
+
+  const userLat = hasExact ? exactLat : (decoded?.latitude ?? null);
+  const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
   const hasLocation = userLat !== null && userLng !== null;
 
   const bankFilter = bank
@@ -1048,7 +1056,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const total = result[0]?.metadata?.[0]?.total || 0;
   const businesses = result[0]?.businesses || [];
 
-  setCacheControl(res, CC_CONTENT);
+  setCacheControl(res, hasExact ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {
     success: true,
     businesses,

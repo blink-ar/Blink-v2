@@ -243,15 +243,8 @@ function SearchPage() {
     network,
     cardMode,
     hasInstallments,
+    sortByDistance,
   });
-
-  // When "Más cercanos" is active, keep fetching until every page is loaded
-  // so the client-side sort has the full dataset to work with.
-  useEffect(() => {
-    if (sortByDistance && hasMore && !isLoadingMore) {
-      loadMore();
-    }
-  }, [sortByDistance, hasMore, isLoadingMore, loadMore]);
 
   const enrichedBusinesses = useEnrichedBusinesses(businesses, {
     onlineOnly,
@@ -261,7 +254,6 @@ function SearchPage() {
     network,
     cardMode,
     hasInstallments,
-    sortByDistance,
   });
 
   const businessBankNames = useMemo(() => {

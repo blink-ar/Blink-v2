@@ -17,7 +17,7 @@ export const useEnrichedBusinesses = (
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
-    sortByDistance?: boolean; // Re-sort all loaded businesses by real distance
+    sortByDistance?: boolean; // unused — server handles sort when exact coords are sent
   }
 ) => {
   const { position } = useGeolocation();
@@ -30,7 +30,6 @@ export const useEnrichedBusinesses = (
     network,
     cardMode,
     hasInstallments,
-    sortByDistance = false,
   } = options || {};
 
   const enrichedBusinesses = useMemo(() => {
@@ -164,18 +163,9 @@ export const useEnrichedBusinesses = (
       });
     }
 
-    // Only re-sort when the user explicitly enables the "sort by proximity" filter.
-    // Otherwise preserve server order so new pages appended on scroll don't jump.
-    if (sortByDistance && position) {
-      result.sort((a, b) => {
-        const da = a.distance ?? Infinity;
-        const db = b.distance ?? Infinity;
-        return da - db;
-      });
-    }
-
+    // Server already sorts by distance when exact coords are sent — preserve that order.
     return result;
-  }, [businesses, position, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments, sortByDistance]);
+  }, [businesses, position, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
 
   return enrichedBusinesses;
 };
