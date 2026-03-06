@@ -137,25 +137,21 @@ const CategoryMarquee: React.FC = () => {
         borderBottom: '1px solid #E8E6E1',
       }}
     >
-      <div className="overflow-hidden mb-2.5">
-        <div
-          ref={row1Marquee.containerRef}
-          {...row1Marquee.handlers}
-          className="flex gap-2.5 overflow-x-scroll scrollbar-hide cursor-grab active:cursor-grabbing select-none"
-        >
-          {row1.map((c) => renderButton(c))}
-          {row1.map((c) => renderButton(c, 'dup'))}
-        </div>
+      <div
+        ref={row1Marquee.containerRef}
+        {...row1Marquee.handlers}
+        className="flex mb-2.5 gap-2.5 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      >
+        {row1.map((c) => renderButton(c))}
+        {row1.map((c) => renderButton(c, 'dup'))}
       </div>
-      <div className="overflow-hidden">
-        <div
-          ref={row2Marquee.containerRef}
-          {...row2Marquee.handlers}
-          className="flex gap-2.5 overflow-x-scroll scrollbar-hide cursor-grab active:cursor-grabbing select-none"
-        >
-          {row2.map((c) => renderButton(c))}
-          {row2.map((c) => renderButton(c, 'dup'))}
-        </div>
+      <div
+        ref={row2Marquee.containerRef}
+        {...row2Marquee.handlers}
+        className="flex gap-2.5 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      >
+        {row2.map((c) => renderButton(c))}
+        {row2.map((c) => renderButton(c, 'dup'))}
       </div>
     </section>
   );
