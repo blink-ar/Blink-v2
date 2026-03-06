@@ -233,6 +233,7 @@ function SearchPage() {
     hasMore,
     loadMore,
     totalBusinesses,
+    proximityUnavailable,
   } = useBenefitsData({
     search: debouncedSearch.trim() || undefined,
     category: selectedCategory && selectedCategory !== 'all' ? selectedCategory : undefined,
@@ -769,6 +770,17 @@ function SearchPage() {
 
       {/* Results */}
       <main className="flex-1 px-4 py-5 space-y-3 pb-28">
+        {/* Location-unavailable banner — shown when "Más cercanos" is active but GPS is denied */}
+        {proximityUnavailable && (
+          <div
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm"
+            style={{ background: '#FFF7ED', border: '1px solid #FED7AA', color: '#C2410C' }}
+          >
+            <span className="material-symbols-outlined shrink-0" style={{ fontSize: 18 }}>location_off</span>
+            <span>Activá tu ubicación para ordenar por cercanía</span>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-2">
           <h1 className="font-semibold text-base text-blink-ink">Tiendas</h1>
           <span

@@ -26,6 +26,8 @@ interface UseBenefitsDataReturn {
     loadMore: () => void;
     refreshData: () => Promise<void>;
     totalBusinesses: number;
+    /** True when the user wants proximity sort but geolocation is unavailable/denied */
+    proximityUnavailable: boolean;
 }
 
 export interface BenefitsFilters {
@@ -92,9 +94,12 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return undefined;
         },
         initialPageParam: 0,
-        // Wait for geolocation to resolve; also wait for position when proximity sort is
-        // requested so we never fire a lat/lng-less query and cache a non-sorted result.
-        enabled: !positionLoading && (!wantsSortByDistance || position !== null),
+        // Wait for geolocation to resolve (so the first request already has a geohash or
+        // exact coordinates). Once geolocation settles, always fire — even if position is
+        // null (denied). In that case sortByDistance stays false (see above), so we fall
+        // back to the geohash/no-location key instead of the 'exact' key, preventing
+        // pollution of the proximity-sorted cache entry.
+        enabled: !positionLoading,
         staleTime: 0,
     });
 
@@ -158,6 +163,8 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         loadMore,
         refreshData,
         totalBusinesses,
+        // True when user wants proximity sort but geolocation was denied/unavailable
+        proximityUnavailable: wantsSortByDistance && !positionLoading && position === null,
     };
 }
 
