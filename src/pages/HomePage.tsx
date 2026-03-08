@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
+import InstallBanner from '../components/InstallBanner';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { fetchMongoStats } from '../services/api';
 import { Business } from '../types';
@@ -359,6 +360,7 @@ function HomePage() {
       </main>
 
       <BottomNav />
+      <InstallBanner />
     </div>
   );
 }
