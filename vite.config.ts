@@ -46,8 +46,8 @@ export default defineConfig(({ mode }) => {
           ],
         },
         manifest: {
-          name: 'Bank Benefits Finder',
-          short_name: 'BankBenefits',
+          name: 'Blink',
+          short_name: 'Blink',
           description: 'Find the best bank card benefits for your favorite businesses',
           theme_color: '#3b82f6',
           background_color: '#ffffff',

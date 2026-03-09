@@ -4,6 +4,7 @@ import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
 import { useSEO } from '../hooks/useSEO';
+import { SkeletonBusinessDetailPage } from '../components/skeletons';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -143,11 +144,7 @@ function BusinessDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-blink-bg flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-blink-border border-t-primary animate-spin" />
-      </div>
-    );
+    return <SkeletonBusinessDetailPage />;
   }
 
   if (error || !business) {

@@ -3,3 +3,7 @@ export { default as SkeletonFeaturedBanner } from './SkeletonFeaturedBanner';
 export { default as SkeletonActiveOffers } from './SkeletonActiveOffers';
 export { default as SkeletonBenefitPage } from './SkeletonBenefitPage';
 export { default as SkeletonBeneficiosTab } from './SkeletonBeneficiosTab';
+export { default as SkeletonHomePage } from './SkeletonHomePage';
+export { default as SkeletonSearchPage } from './SkeletonSearchPage';
+export { default as SkeletonBusinessDetailPage } from './SkeletonBusinessDetailPage';
+export { default as SkeletonBenefitDetailPage } from './SkeletonBenefitDetailPage';

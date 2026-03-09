@@ -63,6 +63,11 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
     // Fetch businesses with infinite query for pagination.
     // sortByDistance=true → sends exact lat/lng to server (precise sort, bypasses CDN cache).
     // sortByDistance=false → sends geohash (CDN-cached, approximate proximity sort).
+    // Strip falsy values so e.g. `{ onlineOnly: false }` and `{}` share the same cache entry.
+    const filtersKey = Object.fromEntries(
+        Object.entries(filters || {}).filter(([, v]) => v !== undefined && v !== false && v !== '' && v !== 0),
+    );
+
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -73,8 +78,8 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
         queryKey: sortByDistance
-            ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filters]
-            : [...queryKeys.businesses, geohash, filters],
+            ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
+            : [...queryKeys.businesses, geohash, filtersKey],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,

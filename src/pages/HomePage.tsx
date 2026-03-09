@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
@@ -8,40 +8,16 @@ import { useBenefitsData } from '../hooks/useBenefitsData';
 import { fetchMongoStats } from '../services/api';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
-import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
+import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 
 function HomePage() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
     queryFn: fetchMongoStats,
   });
   const activeBenefitsCount = statsResponse?.stats?.totalBenefits || 0;
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const normalized = searchTerm.trim();
-    if (normalized) {
-      trackSearchIntent({
-        source: 'home_hero_search',
-        searchTerm: normalized,
-        resultsCount: 0,
-        hasFilters: false,
-        activeFilterCount: 0,
-      });
-      navigate(`/search?q=${encodeURIComponent(normalized)}`);
-    }
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleSearchFocus = () => {
-    navigate('/search');
-  };
 
   const handleQuickCategoryClick = (category: string) => {
     trackFilterApply({
@@ -156,34 +132,23 @@ function HomePage() {
             Encontrá beneficios de tu banco en segundos
           </p>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearchSubmit} className="relative">
-            <div
-              className="flex items-center gap-2 px-4 rounded-2xl h-14"
-              style={{
-                background: '#FFFFFF',
-                border: '1.5px solid #E8E6E1',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-              }}
+          {/* CTA Button */}
+          <button
+            onClick={() => navigate('/search')}
+            className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 px-5 transition-all duration-150 active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
+              boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
+            }}
+          >
+            <span className="font-semibold text-base text-white tracking-tight">Empezá a ahorrar</span>
+            <span
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(255,255,255,0.20)' }}
             >
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>search</span>
-              <input
-                className="flex-1 bg-transparent text-base text-blink-ink placeholder:text-blink-muted focus:outline-none"
-                placeholder="¿Qué buscás? Sushi, Zapas..."
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onFocus={handleSearchFocus}
-              />
-              <button
-                type="submit"
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-all duration-150 active:scale-95"
-                style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
-              </button>
-            </div>
-          </form>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>arrow_forward</span>
+            </span>
+          </button>
 
           {/* Quick Category Pills */}
           <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -226,7 +191,7 @@ function HomePage() {
                   <div
                     key={i}
                     className="flex-shrink-0 w-[240px] h-[200px] rounded-2xl animate-pulse"
-                    style={{ background: '#F3F4F6' }}
+                    style={{ background: '#D1D5DB' }}
                   />
                 ))
               : top5.map((item, idx) => (

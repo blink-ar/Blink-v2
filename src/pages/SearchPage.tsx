@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
+import { SkeletonCard } from '../components/skeletons';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
 import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
 import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/UnifiedFilterSheet';
@@ -152,9 +153,17 @@ const readStoredBanks = (): string[] => {
   }
 };
 
+export const SEARCH_PARAMS_KEY = 'searchPageParams';
+
 function SearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Persist current search params so BottomNav can restore them on return
+  useEffect(() => {
+    sessionStorage.setItem(SEARCH_PARAMS_KEY, location.search);
+  }, [location.search]);
 
   // Init all state from URL params so filters survive navigation
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
@@ -834,12 +843,8 @@ function SearchPage() {
         </div>
 
         {isLoading && !enrichedBusinesses.length ? (
-          Array.from({ length: 3 }).map((_, index) => (
-            <div
-              key={index}
-              className="w-full h-24 rounded-2xl animate-pulse"
-              style={{ background: '#F3F4F6' }}
-            />
+          Array.from({ length: 5 }).map((_, index) => (
+            <SkeletonCard key={index} />
           ))
         ) : enrichedBusinesses.length === 0 ? (
           <div className="text-center py-16">
