@@ -30,6 +30,37 @@ function json(res, statusCode, payload) {
   res.send(JSON.stringify(payload));
 }
 
+// Cache-Control directives
+const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
+const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
+const CC_LOCATION = 'private, max-age=60';                                          // browser-only, 1m
+
+function setCacheControl(res, directive) {
+  res.setHeader('Cache-Control', directive);
+}
+
+/**
+ * Decode a geohash string to its center lat/lng.
+ * Returns null if the input is invalid.
+ */
+function decodeGeohash(hash) {
+  const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let even = true;
+  const lat = [-90, 90];
+  const lng = [-180, 180];
+  for (const c of hash) {
+    const bits = BASE32.indexOf(c);
+    if (bits === -1) return null;
+    for (let i = 4; i >= 0; i--) {
+      const bit = (bits >> i) & 1;
+      if (even) { const m = (lng[0] + lng[1]) / 2; if (bit) lng[0] = m; else lng[1] = m; }
+      else      { const m = (lat[0] + lat[1]) / 2; if (bit) lat[0] = m; else lat[1] = m; }
+      even = !even;
+    }
+  }
+  return { latitude: (lat[0] + lat[1]) / 2, longitude: (lng[0] + lng[1]) / 2 };
+}
+
 function getParsedUrl(req) {
   const protoHeader = req.headers['x-forwarded-proto'];
   const protocol = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'https';
@@ -280,6 +311,7 @@ async function handleGetBenefits(req, res, url, db) {
     collection.countDocuments(query)
   ]);
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefits: benefits.map(serializeDocWithId),
@@ -323,6 +355,7 @@ async function handleGetBenefitById(req, res, url, db, id) {
     });
   }
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefit: serializeDocWithId(benefit)
@@ -343,6 +376,7 @@ async function handleGetCategories(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     categories: categories.map((cat) => ({
@@ -365,6 +399,7 @@ async function handleGetBanks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     banks: banks.map((bank) => ({
@@ -387,6 +422,7 @@ async function handleGetNetworks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     networks: networks.map((network) => ({
@@ -431,6 +467,7 @@ async function handleGetStats(req, res, url, db) {
       .toArray()
   ]);
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     stats: {
@@ -566,6 +603,7 @@ async function handleGetNearbyBenefits(req, res, url, db) {
 
   const filtered = nearbyBenefits.map(serializeDocWithId);
 
+  setCacheControl(res, CC_LOCATION);
   return json(res, 200, {
     success: true,
     benefits: filtered,
@@ -588,18 +626,23 @@ async function handleGetBusinesses(req, res, url, db) {
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
   const search = searchParams.get('search');
+  const onlineOnly = searchParams.get('online') === 'true';
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
-  const lat = searchParams.get('lat');
-  const lng = searchParams.get('lng');
-  const userLat = lat ? Number.parseFloat(lat) : null;
-  const userLng = lng ? Number.parseFloat(lng) : null;
-  const hasLocation =
-    userLat !== null &&
-    userLng !== null &&
-    Number.isFinite(userLat) &&
-    Number.isFinite(userLng);
+  // Exact lat/lng (precise sort, bypasses CDN) takes priority over geohash (CDN-cached, approximate)
+  const rawLat = searchParams.get('lat');
+  const rawLng = searchParams.get('lng');
+  const exactLat = rawLat ? Number.parseFloat(rawLat) : null;
+  const exactLng = rawLng ? Number.parseFloat(rawLng) : null;
+  const hasExact = exactLat !== null && exactLng !== null && Number.isFinite(exactLat) && Number.isFinite(exactLng);
+
+  const geohash = searchParams.get('geohash');
+  const decoded = !hasExact && geohash ? decodeGeohash(geohash) : null;
+
+  const userLat = hasExact ? exactLat : (decoded?.latitude ?? null);
+  const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
+  const hasLocation = userLat !== null && userLng !== null;
 
   const bankFilter = bank
     ? bank
@@ -854,6 +897,9 @@ async function handleGetBusinesses(req, res, url, db) {
           }
         }]
       : []),
+    ...(onlineOnly
+      ? [{ $match: { 'benefits.usos': 'online' } }]
+      : []),
     ...(hasLocation
       ? [
           {
@@ -1014,6 +1060,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const total = result[0]?.metadata?.[0]?.total || 0;
   const businesses = result[0]?.businesses || [];
 
+  setCacheControl(res, hasExact ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {
     success: true,
     businesses,

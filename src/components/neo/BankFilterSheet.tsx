@@ -69,7 +69,7 @@ const BankFilterSheet = ({
       <button
         aria-label="Cerrar selector de bancos"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={() => onApply(draftTokens)}
       />
 
       {/* Sheet */}
@@ -89,7 +89,7 @@ const BankFilterSheet = ({
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
           <h2 className="font-semibold text-lg text-blink-ink">Seleccionar bancos</h2>
           <button
-            onClick={onClose}
+            onClick={() => onApply(draftTokens)}
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -162,22 +162,6 @@ const BankFilterSheet = ({
           <div className="h-20" />
         </div>
 
-        {/* Apply Button */}
-        <div className="p-4" style={{ borderTop: '1px solid #E8E6E1' }}>
-          <button
-            onClick={() => onApply(draftTokens)}
-            className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex justify-between items-center px-5"
-            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-          >
-            <span>Aplicar filtros</span>
-            <span
-              className="text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(255,255,255,0.25)' }}
-            >
-              {draftTokens.length} sel.
-            </span>
-          </button>
-        </div>
       </div>
     </div>
   );
