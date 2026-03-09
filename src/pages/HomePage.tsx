@@ -9,6 +9,7 @@ import { fetchMongoStats } from '../services/api';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { trackFilterApply, trackSearchIntent, trackViewBenefit } from '../analytics/intentTracking';
+import { SkeletonHomePage } from '../components/skeletons';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -104,6 +105,8 @@ function HomePage() {
 
     return selected;
   }, [businesses]);
+
+  if (isLoading) return <><SkeletonHomePage /><BottomNav /></>;
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">

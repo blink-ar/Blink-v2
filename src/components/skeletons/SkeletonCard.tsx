@@ -2,46 +2,40 @@ import React from 'react';
 import Skeleton from '../ui/Skeleton';
 
 /**
- * Skeleton loader matching the BusinessCard component structure
+ * Skeleton loader matching the SearchPage business row card
  */
 const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
     <div
-      className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 ${className}`}
+      className={`w-full bg-white rounded-2xl overflow-hidden flex ${className}`}
+      style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
       aria-hidden="true"
     >
-      <div className="flex items-start gap-3">
-        {/* Icon placeholder */}
-        <div className="relative flex-shrink-0">
-          <Skeleton variant="rectangular" width={40} height={40} className="rounded-lg" />
-          <div className="absolute -top-1 -right-1">
-            <Skeleton variant="circular" width={18} height={18} />
+      <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
+        {/* Logo */}
+        <Skeleton variant="rectangular" width={44} height={44} className="rounded-xl flex-shrink-0" />
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Name row */}
+          <Skeleton variant="text" width="55%" height={14} />
+          {/* Bank badges row */}
+          <div className="flex items-center gap-1.5">
+            <Skeleton variant="rectangular" width={32} height={18} className="rounded-md" />
+            <Skeleton variant="rectangular" width={32} height={18} className="rounded-md" />
+            <Skeleton variant="text" width={60} height={12} className="ml-1" />
           </div>
         </div>
 
-        {/* Content placeholder */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-1">
-            <div className="flex-1 min-w-0 pr-2">
-              {/* Title */}
-              <Skeleton variant="text" width="80%" height={16} className="mb-2" />
-              {/* Location */}
-              <div className="flex items-center gap-1 mb-2">
-                <Skeleton variant="circular" width={12} height={12} />
-                <Skeleton variant="text" width="60%" height={12} />
-              </div>
-            </div>
-          </div>
-
-          {/* Discount badge and payment methods */}
-          <div className="flex items-center justify-between">
-            <Skeleton variant="rectangular" width={80} height={24} className="rounded-full" />
-            <div className="flex items-center gap-1">
-              <Skeleton variant="rectangular" width={20} height={20} className="rounded" />
-              <Skeleton variant="rectangular" width={20} height={20} className="rounded" />
-            </div>
-          </div>
+        {/* Discount column */}
+        <div className="shrink-0 flex flex-col items-center gap-1" style={{ minWidth: 38 }}>
+          <Skeleton variant="text" width={28} height={10} />
+          <Skeleton variant="text" width={36} height={22} />
+          <Skeleton variant="text" width={22} height={10} />
         </div>
+
+        {/* Chevron */}
+        <Skeleton variant="circular" width={16} height={16} className="shrink-0" />
       </div>
     </div>
   );

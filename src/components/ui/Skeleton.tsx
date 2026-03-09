@@ -18,7 +18,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
   className = '',
   style,
 }) => {
-  const baseClasses = 'animate-pulse bg-gray-200';
+  const baseClasses = 'animate-pulse bg-gray-300';
   
   const variantClasses = {
     text: 'rounded',
