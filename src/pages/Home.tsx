@@ -95,6 +95,7 @@ function Home() {
     network: selectedNetwork,
     cardMode,
     hasInstallments,
+    onlineOnly,
     sortByDistance,
   });
 
@@ -148,7 +149,6 @@ function Home() {
   // Enrich businesses with online information and apply client-side only filters (like onlineOnly)
   // Note: Distance calculation, proximity sorting, search, category, and bank filters are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
-    onlineOnly,
     minDiscount,
     maxDistance,
     availableDay,

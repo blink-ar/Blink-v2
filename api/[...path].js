@@ -626,6 +626,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
   const search = searchParams.get('search');
+  const onlineOnly = searchParams.get('online') === 'true';
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
@@ -895,6 +896,9 @@ async function handleGetBusinesses(req, res, url, db) {
             }
           }
         }]
+      : []),
+    ...(onlineOnly
+      ? [{ $match: { 'benefits.usos': 'online' } }]
       : []),
     ...(hasLocation
       ? [

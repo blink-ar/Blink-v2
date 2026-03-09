@@ -10,7 +10,6 @@ import { useGeolocation } from './useGeolocation';
 export const useEnrichedBusinesses = (
   businesses: Business[],
   options?: {
-    onlineOnly?: boolean; // Filter to show only online
     minDiscount?: number; // Minimum discount percentage
     maxDistance?: number; // Maximum distance in km
     availableDay?: string; // Specific day of the week
@@ -23,7 +22,6 @@ export const useEnrichedBusinesses = (
   const { position } = useGeolocation();
 
   const {
-    onlineOnly = false,
     minDiscount,
     maxDistance,
     availableDay,
@@ -58,11 +56,6 @@ export const useEnrichedBusinesses = (
         isNearby,
       };
     });
-
-    // Apply online filter if requested
-    if (onlineOnly) {
-      result = result.filter((b) => b.hasOnline);
-    }
 
     // Apply distance filter (only if distance is available)
     if (maxDistance !== undefined) {
@@ -165,7 +158,7 @@ export const useEnrichedBusinesses = (
 
     // Server already sorts by distance when exact coords are sent — preserve that order.
     return result;
-  }, [businesses, position, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
+  }, [businesses, position, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
 
   return enrichedBusinesses;
 };

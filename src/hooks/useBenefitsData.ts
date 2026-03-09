@@ -42,6 +42,7 @@ export interface BenefitsFilters {
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
+    onlineOnly?: boolean; // Filter for businesses with online benefits (server-side)
     sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
 
@@ -85,6 +86,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),
                 ...(filters?.subscription && { subscription: filters.subscription }),
+                ...(filters?.onlineOnly && { online: true }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {

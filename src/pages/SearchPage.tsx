@@ -244,11 +244,11 @@ function SearchPage() {
     network,
     cardMode,
     hasInstallments,
+    onlineOnly,
     sortByDistance,
   });
 
   const enrichedBusinesses = useEnrichedBusinesses(businesses, {
-    onlineOnly,
     minDiscount,
     maxDistance,
     availableDay,
