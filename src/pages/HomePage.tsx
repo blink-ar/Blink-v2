@@ -135,13 +135,13 @@ function HomePage() {
           {/* CTA Button */}
           <button
             onClick={() => navigate('/search')}
-            className="w-full h-14 rounded-2xl flex items-center justify-between px-5 transition-all duration-150 active:scale-[0.98]"
+            className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 px-5 transition-all duration-150 active:scale-[0.98]"
             style={{
               background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
               boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
             }}
           >
-            <span className="flex-1 text-center font-semibold text-base text-white tracking-tight">Empezá a ahorrar</span>
+            <span className="font-semibold text-base text-white tracking-tight">Empezá a ahorrar</span>
             <span
               className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.20)' }}
