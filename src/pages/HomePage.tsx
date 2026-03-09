@@ -141,7 +141,7 @@ function HomePage() {
               boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
             }}
           >
-            <span className="font-semibold text-base text-white tracking-tight">Empezá a ahorrar</span>
+            <span className="flex-1 text-center font-semibold text-base text-white tracking-tight">Empezá a ahorrar</span>
             <span
               className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.20)' }}
