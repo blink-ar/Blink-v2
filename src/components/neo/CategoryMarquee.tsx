@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { trackFilterApply } from '../../analytics/intentTracking';
 
@@ -21,8 +21,87 @@ const CATEGORIES = [
 const row1 = CATEGORIES.slice(0, 7);
 const row2 = CATEGORIES.slice(7);
 
+const SPEED = 0.8; // px per frame
+
+function useScrollableMarquee(reverse = false) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>();
+  const isDragging = useRef(false);
+  const hasDragged = useRef(false);
+  const startX = useRef(0);
+  const startScrollLeft = useRef(0);
+
+  const animate = useCallback(() => {
+    const el = containerRef.current;
+    if (el && !isDragging.current) {
+      const half = el.scrollWidth / 2;
+      if (half > 0) {
+        if (reverse) {
+          el.scrollLeft -= SPEED;
+          if (el.scrollLeft <= 0) el.scrollLeft = half;
+        } else {
+          el.scrollLeft += SPEED;
+          if (el.scrollLeft >= half) el.scrollLeft = 0;
+        }
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate);
+  }, [reverse]);
+
+  useEffect(() => {
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [animate]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = true;
+    hasDragged.current = false;
+    startX.current = e.clientX;
+    startScrollLeft.current = containerRef.current?.scrollLeft ?? 0;
+    containerRef.current?.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const walk = startX.current - e.clientX;
+    if (Math.abs(walk) > 4) hasDragged.current = true;
+    el.scrollLeft = startScrollLeft.current + walk;
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = false;
+    containerRef.current?.releasePointerCapture(e.pointerId);
+  };
+
+  // Suppress click on buttons when the user actually dragged
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (hasDragged.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      hasDragged.current = false;
+    }
+  };
+
+  return {
+    containerRef,
+    handlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerLeave: onPointerUp,
+      onClickCapture,
+    },
+  };
+}
+
 const CategoryMarquee: React.FC = () => {
   const navigate = useNavigate();
+  const row1Marquee = useScrollableMarquee(false);
+  const row2Marquee = useScrollableMarquee(true);
 
   const handleClick = (categoryId: string) => {
     trackFilterApply({
@@ -51,18 +130,29 @@ const CategoryMarquee: React.FC = () => {
 
   return (
     <section
-      className="overflow-hidden py-4"
+      className="py-4"
       style={{
         background: 'linear-gradient(180deg, #F7F6F4 0%, #FFFFFF 50%, #F7F6F4 100%)',
         borderTop: '1px solid #E8E6E1',
         borderBottom: '1px solid #E8E6E1',
       }}
     >
-      <div className="flex animate-marquee mb-2.5 gap-2.5 w-[200%]">
+      <style>{`.marquee-row::-webkit-scrollbar{display:none}`}</style>
+      <div
+        ref={row1Marquee.containerRef}
+        {...row1Marquee.handlers}
+        className="marquee-row flex mb-2.5 gap-2.5 overflow-x-scroll cursor-grab active:cursor-grabbing select-none"
+        style={{ scrollbarWidth: 'none' }}
+      >
         {row1.map((c) => renderButton(c))}
         {row1.map((c) => renderButton(c, 'dup'))}
       </div>
-      <div className="flex animate-marquee-reverse gap-2.5 w-[200%]">
+      <div
+        ref={row2Marquee.containerRef}
+        {...row2Marquee.handlers}
+        className="marquee-row flex gap-2.5 overflow-x-scroll cursor-grab active:cursor-grabbing select-none"
+        style={{ scrollbarWidth: 'none' }}
+      >
         {row2.map((c) => renderButton(c))}
         {row2.map((c) => renderButton(c, 'dup'))}
       </div>
