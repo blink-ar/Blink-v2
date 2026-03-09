@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import { SkeletonCard } from '../components/skeletons';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
@@ -153,9 +153,17 @@ const readStoredBanks = (): string[] => {
   }
 };
 
+export const SEARCH_PARAMS_KEY = 'searchPageParams';
+
 function SearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Persist current search params so BottomNav can restore them on return
+  useEffect(() => {
+    sessionStorage.setItem(SEARCH_PARAMS_KEY, location.search);
+  }, [location.search]);
 
   // Init all state from URL params so filters survive navigation
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
