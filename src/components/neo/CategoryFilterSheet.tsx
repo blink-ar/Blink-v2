@@ -62,7 +62,7 @@ const CategoryFilterSheet = ({
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm">
       {/* Backdrop */}
-      <button aria-label="Cerrar selector de categorías" className="absolute inset-0" onClick={onClose} />
+      <button aria-label="Cerrar selector de categorías" className="absolute inset-0" onClick={() => onApply(draft)} />
 
       {/* Sheet */}
       <div
@@ -78,7 +78,7 @@ const CategoryFilterSheet = ({
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
           <h2 className="font-semibold text-lg text-blink-ink">Categoría</h2>
           <button
-            onClick={onClose}
+            onClick={() => onApply(draft)}
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -122,24 +122,6 @@ const CategoryFilterSheet = ({
           </div>
         </div>
 
-        {/* Apply */}
-        <div className="px-4 pt-4 pb-8" style={{ borderTop: '1px solid #E8E6E1' }}>
-          <button
-            onClick={() => onApply(draft)}
-            className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex justify-between items-center px-5"
-            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-          >
-            <span>Aplicar filtro</span>
-            {activeOption && (
-              <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.25)' }}
-              >
-                {activeOption.label}
-              </span>
-            )}
-          </button>
-        </div>
       </div>
     </div>
   );

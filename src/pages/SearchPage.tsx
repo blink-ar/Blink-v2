@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
 import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
-import FilterPanel from '../components/neo/FilterPanel';
+import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/UnifiedFilterSheet';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { fetchBanks } from '../services/api';
@@ -307,8 +307,14 @@ function SearchPage() {
     }));
 
   const activeFilterCount = [
+    selectedBanks.length > 0,
+    !!selectedCategory,
+    minDiscount !== undefined,
     availableDay !== undefined,
     cardMode !== undefined,
+    onlineOnly,
+    hasInstallments === true,
+    sortByDistance,
   ].filter(Boolean).length;
 
   const currentFilterState = useMemo<SearchFilterState>(() => ({
@@ -590,6 +596,18 @@ function SearchPage() {
     setDebouncedSearch('');
   };
 
+  const handleFiltersApply = (values: UnifiedFilterValues) => {
+    setSelectedBanks(values.selectedBanks);
+    setSelectedCategory(values.selectedCategory);
+    setMinDiscount(values.minDiscount);
+    setAvailableDay(values.availableDay);
+    setCardMode(values.cardMode);
+    setOnlineOnly(values.onlineOnly);
+    setHasInstallments(values.hasInstallments);
+    setSortByDistance(values.sortByDistance);
+    setShowFilters(false);
+  };
+
   const handleBusinessSelect = (business: Business, position: number) => {
     sessionStorage.setItem('blink.search.scrollY', String(window.scrollY));
     trackSelectBusiness({
@@ -660,38 +678,41 @@ function SearchPage() {
           </button>
         </div>
 
-        {/* Compact filter controls */}
-        <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
-          <div className="flex gap-2 min-w-max items-center">
-
-            {/* Bank filter button */}
-            <button
-              onClick={() => setShowBankSheet(true)}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
-                selectedBanks.length > 0
-                  ? 'bg-primary/10 border border-primary/30 text-primary'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-            >
-              {selectedBanks.length > 0 ? (
-                <>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
-                  <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
-                  <span>Bancos</span>
-                </>
-              )}
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-            </button>
-
-            {/* Category filter button */}
-            {(() => {
-              const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
-              return (
+        {/* Quick filter pills — active ones float to the front */}
+        {(() => {
+          const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+          const pills = [
+            {
+              key: 'banks',
+              active: selectedBanks.length > 0,
+              isSheet: true,
+              node: (
                 <button
+                  key="banks"
+                  onClick={() => setShowBankSheet(true)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                    selectedBanks.length > 0
+                      ? 'bg-primary/10 border border-primary/30 text-primary'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                  {selectedBanks.length > 0 ? (
+                    <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
+                  ) : (
+                    <span>Bancos</span>
+                  )}
+                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                </button>
+              ),
+            },
+            {
+              key: 'category',
+              active: !!activeCat,
+              isSheet: true,
+              node: (
+                <button
+                  key="category"
                   onClick={() => setShowCategorySheet(true)}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
                     activeCat
@@ -699,73 +720,94 @@ function SearchPage() {
                       : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
                   }`}
                 >
-                  {activeCat ? (
-                    <>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat.icon}</span>
-                      <span className="font-semibold">{activeCat.label}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
-                      <span>Categoría</span>
-                    </>
-                  )}
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat ? activeCat.icon : 'category'}</span>
+                  <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
                   <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
                 </button>
-              );
-            })()}
+              ),
+            },
+            {
+              key: 'proximity',
+              active: sortByDistance,
+              node: (
+                <button
+                  key="proximity"
+                  onClick={() => setSortByDistance(!sortByDistance)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    sortByDistance
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
+                  <span>Más cercanos</span>
+                </button>
+              ),
+            },
+            {
+              key: 'online',
+              active: onlineOnly,
+              node: (
+                <button
+                  key="online"
+                  onClick={() => setOnlineOnly(!onlineOnly)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    onlineOnly
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>language</span>
+                  <span>Online</span>
+                </button>
+              ),
+            },
+            {
+              key: 'installments',
+              active: hasInstallments === true,
+              node: (
+                <button
+                  key="installments"
+                  onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
+                  className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    hasInstallments === true
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  Cuotas s/int.
+                </button>
+              ),
+            },
+            {
+              key: 'discount',
+              active: minDiscount !== undefined,
+              node: (
+                <button
+                  key="discount"
+                  onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
+                  className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    minDiscount !== undefined
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  20%+ desc.
+                </button>
+              ),
+            },
+          ];
 
-            {/* Proximity sort */}
-            <button
-              onClick={() => setSortByDistance(!sortByDistance)}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                sortByDistance
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
-              <span>Más cercanos</span>
-            </button>
+          const sorted = [...pills.filter((p) => p.active), ...pills.filter((p) => !p.active)];
 
-            {/* Online only */}
-            <button
-              onClick={() => setOnlineOnly(!onlineOnly)}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                onlineOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>language</span>
-              <span>Online</span>
-            </button>
-
-            {/* Installments */}
-            <button
-              onClick={() => setHasInstallments(hasInstallments === true ? undefined : true)}
-              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                hasInstallments === true
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-            >
-              Cuotas s/int.
-            </button>
-
-            {/* Min discount */}
-            <button
-              onClick={() => setMinDiscount(minDiscount === undefined ? 20 : undefined)}
-              className={`h-9 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                minDiscount !== undefined
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
-              }`}
-            >
-              20%+ desc.
-            </button>
-          </div>
-        </div>
+          return (
+            <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
+              <div className="flex gap-2 min-w-max items-center">
+                {sorted.map((p) => p.node)}
+              </div>
+            </div>
+          );
+        })()}
       </header>
 
       {/* Results */}
@@ -952,16 +994,21 @@ function SearchPage() {
         }}
       />
 
-      {/* Filter Panel */}
-      <FilterPanel
+      <UnifiedFilterSheet
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
-        minDiscount={minDiscount}
-        onMinDiscountChange={setMinDiscount}
-        availableDay={availableDay}
-        onAvailableDayChange={setAvailableDay}
-        cardMode={cardMode}
-        onCardModeChange={setCardMode}
+        bankOptions={bankOptions}
+        values={{
+          selectedBanks,
+          selectedCategory,
+          minDiscount,
+          availableDay,
+          cardMode,
+          onlineOnly,
+          hasInstallments,
+          sortByDistance,
+        }}
+        onApply={handleFiltersApply}
       />
 
       <BottomNav />
