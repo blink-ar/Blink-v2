@@ -395,6 +395,7 @@ async function handleGetBanks(req, res, url, db) {
     .aggregate([
       ...(activeMatch ? [{ $match: activeMatch }] : []),
       { $group: { _id: '$bank', count: { $sum: 1 } } },
+      { $match: { count: { $gte: 5 } } },
       { $sort: { count: -1 } }
     ])
     .toArray();
