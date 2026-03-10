@@ -1,5 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
-import { buildSearchDataset } from './search/entities.js';
+import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
 import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
@@ -13,6 +13,7 @@ const ALLOWED_COLLECTIONS = new Set([
 ]);
 
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
+const BANK_CARDS_COLLECTION = 'bank_cards';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
@@ -126,6 +127,173 @@ function serializeDocWithId(doc) {
   return {
     ...doc,
     id: doc?._id?.toString?.() || doc?.id || null
+  };
+}
+
+function pickBusinessImage(asset) {
+  if (asset?.coverUrl) return asset.coverUrl;
+  if (asset?.imageUrl) return asset.imageUrl;
+  if (asset?.logoUrl) return asset.logoUrl;
+  return DEFAULT_BUSINESS_IMAGE;
+}
+
+function dedupeLocations(locations) {
+  const uniqueLocations = [];
+  const seenKeys = new Set();
+  for (const location of Array.isArray(locations) ? locations : []) {
+    if (!location) continue;
+    const key = location.placeId || location.formattedAddress || `${location.lat},${location.lng}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    uniqueLocations.push(location);
+  }
+  return uniqueLocations;
+}
+
+function rehydrateBenefitDoc(benefit, merchant) {
+  if (!merchant) {
+    return serializeDocWithId(benefit);
+  }
+
+  return serializeDocWithId({
+    ...benefit,
+    merchant: {
+      name: merchant.merchantName || benefit?.merchant?.name || 'Unknown Merchant'
+    },
+    categories: Array.isArray(merchant.categories) ? merchant.categories : benefit.categories || [],
+    locations: Array.isArray(merchant.locations) ? merchant.locations : benefit.locations || [],
+    merchantId: merchant.merchantId || benefit.merchantId || null,
+    merchantSnapshot: merchant.merchantId
+      ? {
+          merchantId: merchant.merchantId,
+          merchantKey: merchant.merchantKey,
+          merchantName: merchant.merchantName,
+          kind: merchant.kind || 'merchant'
+        }
+      : benefit.merchantSnapshot
+  });
+}
+
+async function loadMerchantMapByIds(db, merchantIds) {
+  const ids = Array.from(new Set((merchantIds || []).filter(Boolean)));
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const merchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+    .find(
+      {
+        merchantId: { $in: ids }
+      },
+      {
+        projection: {
+          _id: 0,
+          merchantId: 1,
+          merchantKey: 1,
+          merchantName: 1,
+          kind: 1,
+          aliases: 1,
+          categories: 1,
+          locations: 1,
+          geoPoints: 1,
+          banks: 1,
+          subscriptionIds: 1,
+          hasOnlineBenefits: 1,
+          benefitCount: 1,
+          activeBenefitCount: 1,
+          maxDiscountPercentage: 1,
+          searchProfile: 1,
+          imageUrl: 1,
+          logoUrl: 1,
+          coverUrl: 1,
+          isActive: 1
+        }
+      }
+    )
+    .toArray();
+
+  return new Map(merchants.map((merchant) => [merchant.merchantId, merchant]));
+}
+
+async function resolveCardNameLookup(db, benefits) {
+  const cardIds = Array.from(
+    new Set(
+      (benefits || [])
+        .flatMap((benefit) => (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : []))
+        .filter((value) => typeof value === 'string' && ObjectId.isValid(value))
+    )
+  );
+
+  if (cardIds.length === 0) {
+    return new Map();
+  }
+
+  const cards = await db.collection(BANK_CARDS_COLLECTION)
+    .find(
+      {
+        _id: { $in: cardIds.map((value) => new ObjectId(value)) }
+      },
+      {
+        projection: { issuer: 1, tier: 1 }
+      }
+    )
+    .toArray();
+
+  return new Map(
+    cards.map((card) => {
+      const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim() || 'Tarjeta de credito';
+      return [card._id.toString(), name];
+    })
+  );
+}
+
+function formatBenefitValue(benefit) {
+  if (Number.isFinite(benefit?.discountPercentage) && Number(benefit.discountPercentage) > 0) {
+    return `${Number(benefit.discountPercentage)}%`;
+  }
+  if (Number.isFinite(benefit?.installments) && Number(benefit.installments) > 0) {
+    return `${Number(benefit.installments)} cuotas s/int`;
+  }
+  if (typeof benefit?.otherDiscounts === 'string' && benefit.otherDiscounts.trim()) {
+    return benefit.otherDiscounts.trim();
+  }
+  return null;
+}
+
+function buildBusinessBenefitSummary(benefit, cardNameLookup) {
+  const cardNames = Array.from(
+    new Set(
+      (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : [])
+        .map((cardId) => cardNameLookup.get(cardId))
+        .filter(Boolean)
+    )
+  );
+  const value = formatBenefitValue(benefit);
+
+  return {
+    id: benefit?.id || benefit?._id?.toString?.() || null,
+    bankName: benefit?.bank || 'Banco',
+    cardName: cardNames[0] || 'Tarjeta de credito',
+    cardTypes: cardNames,
+    benefit: benefit?.benefitTitle || 'Beneficio',
+    rewardRate: value || 'Beneficio',
+    tipo: 'descuento',
+    cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
+    valor: value,
+    tope:
+      Array.isArray(benefit?.caps) && benefit.caps.length > 0 && Number.isFinite(benefit.caps[0]?.amount)
+        ? benefit.caps[0].amount
+        : null,
+    condicion: benefit?.termsAndConditions || null,
+    requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de credito'],
+    usos: benefit?.online ? ['online', 'presencial'] : ['presencial'],
+    textoAplicacion: benefit?.link || null,
+    description: benefit?.description || '',
+    installments: Number.isFinite(benefit?.installments) ? Number(benefit.installments) : null,
+    validUntil: benefit?.validUntil || null,
+    caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
+    otherDiscounts: benefit?.otherDiscounts || null,
+    subscription: benefit?.subscription || null
   };
 }
 
@@ -518,19 +686,26 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
   const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
   const regex = new RegExp(regexSource, 'i');
 
-  const mongoQuery = {
+  const merchantQuery = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    ...(shouldIncludeExpired(searchParams)
+      ? { benefitCount: { $gt: 0 } }
+      : { activeBenefitCount: { $gt: 0 } }),
     $or: [
-      { 'merchant.name': { $regex: regex } },
-      { benefitTitle: { $regex: regex } },
-      { description: { $regex: regex } },
-      { 'locations.name': { $regex: regex } },
-      { categories: { $regex: regex } }
+      { merchantName: { $regex: regex } },
+      { aliases: { $regex: regex } },
+      { categories: { $regex: regex } },
+      { banks: { $regex: regex } },
+      { 'searchProfile.description': { $regex: regex } },
+      { 'searchProfile.productTags': { $regex: regex } },
+      { 'searchProfile.benefits.benefit': { $regex: regex } },
+      { 'searchProfile.benefits.description': { $regex: regex } }
     ]
   };
-  applyActiveBenefitsFilter(mongoQuery, searchParams);
 
   if (filters.category && filters.category !== 'all') {
-    mongoQuery.categories = { $in: [filters.category] };
+    merchantQuery.categories = { $in: [filters.category] };
   }
   if (filters.bank) {
     const bankPatterns = filters.bank
@@ -539,16 +714,16 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
       .filter(Boolean)
       .map((bank) => new RegExp(escapeRegex(bank), 'i'));
     if (bankPatterns.length > 0) {
-      mongoQuery.bank = { $in: bankPatterns };
+      merchantQuery.banks = { $in: bankPatterns };
     }
   }
 
-  const fallbackBenefits = await db.collection(collectionName)
-    .find(mongoQuery)
+  const fallbackMerchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+    .find(merchantQuery)
     .limit(600)
     .toArray();
 
-  const dataset = buildSearchDataset(fallbackBenefits);
+  const dataset = buildSearchDatasetFromMerchantDocs(fallbackMerchants);
   const normalizedQuery = normalizeSearchText(query);
   const intentTags = resolveIntentTagsFromTokens(expandedTokens);
 
@@ -901,6 +1076,31 @@ async function fetchGooglePlaceDetails(placeId) {
   };
 }
 
+async function resolveMerchantIdsForBenefitQuery(db, { category, search }) {
+  if (!category && !search) {
+    return null;
+  }
+
+  const merchantQuery = {
+    merchantId: { $exists: true, $type: 'string' },
+    isActive: { $ne: false }
+  };
+
+  if (category && category !== 'all') {
+    merchantQuery.categories = { $in: [category] };
+  }
+
+  if (search) {
+    merchantQuery.$or = [
+      { merchantName: { $regex: search, $options: 'i' } },
+      { aliases: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  const merchantIds = await db.collection(MERCHANT_ASSETS_COLLECTION).distinct('merchantId', merchantQuery);
+  return merchantIds.length > 0 ? merchantIds : [];
+}
+
 async function handleGetBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -915,10 +1115,6 @@ async function handleGetBenefits(req, res, url, db) {
   const offsetNum = toPositiveInt(searchParams.get('offset'), 0);
 
   const query = {};
-
-  if (category && category !== 'all') {
-    query.categories = { $in: [category] };
-  }
 
   if (bank) {
     query.bank = { $regex: bank, $options: 'i' };
@@ -935,9 +1131,33 @@ async function handleGetBenefits(req, res, url, db) {
   if (search) {
     query.$or = [
       { benefitTitle: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { 'merchant.name': { $regex: search, $options: 'i' } }
+      { description: { $regex: search, $options: 'i' } }
     ];
+  }
+
+  const merchantIds = await resolveMerchantIdsForBenefitQuery(db, { category, search });
+  if (Array.isArray(merchantIds)) {
+    if (merchantIds.length === 0) {
+      return json(res, 200, {
+        success: true,
+        benefits: [],
+        pagination: {
+          total: 0,
+          limit: limitNum,
+          offset: offsetNum,
+          hasMore: false
+        },
+        filters: {
+          category,
+          bank,
+          network,
+          online,
+          search,
+          includeExpired
+        }
+      });
+    }
+    query.merchantId = { $in: merchantIds };
   }
 
   applyActiveBenefitsFilter(query, searchParams);
@@ -947,10 +1167,14 @@ async function handleGetBenefits(req, res, url, db) {
     collection.find(query).sort({ _id: -1 }).skip(offsetNum).limit(limitNum).toArray(),
     collection.countDocuments(query)
   ]);
+  const merchantMap = await loadMerchantMapByIds(
+    db,
+    benefits.map((benefit) => benefit.merchantId).filter(Boolean)
+  );
 
   return json(res, 200, {
     success: true,
-    benefits: benefits.map(serializeDocWithId),
+    benefits: benefits.map((benefit) => rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))),
     pagination: {
       total,
       limit: limitNum,
@@ -991,9 +1215,10 @@ async function handleGetBenefitById(req, res, url, db, id) {
     });
   }
 
+  const merchantMap = await loadMerchantMapByIds(db, [benefit.merchantId].filter(Boolean));
   return json(res, 200, {
     success: true,
-    benefit: serializeDocWithId(benefit)
+    benefit: rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))
   });
 }
 
@@ -1255,6 +1480,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  const subscription = searchParams.get('subscription');
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
@@ -1275,402 +1501,185 @@ async function handleGetBusinesses(req, res, url, db) {
       .filter(Boolean)
     : null;
 
-  const matchStage = {};
+  const merchantQuery = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    ...(includeExpired ? { benefitCount: { $gt: 0 } } : { activeBenefitCount: { $gt: 0 } })
+  };
   if (category && category !== 'all') {
-    matchStage.categories = { $in: [category] };
+    merchantQuery.categories = { $in: [category] };
+  }
+  if (bankFilter && bankFilter.length > 0) {
+    merchantQuery.banks = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  if (subscription) {
+    merchantQuery.subscriptionIds = subscription;
   }
 
-  const activeMatch = getActiveBenefitsMatch(searchParams);
-  const pipeline = [
-    ...(activeMatch ? [{ $match: activeMatch }] : []),
-    ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
-    {
-      $match: {
-        'merchant.name': { $exists: true, $nin: [null, ''] }
-      }
-    },
-    // Stage 1.7: Resolve cardTypes IDs to card names via bank_cards collection
-    {
-      $lookup: {
-        from: 'bank_cards',
-        let: { cardTypeIds: { $ifNull: ['$cardTypes', []] } },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $in: [{ $toString: '$_id' }, '$$cardTypeIds']
-              }
-            }
-          },
-          {
-            $project: {
-              _id: 0,
-              name: { $concat: ['$issuer', ' ', '$tier'] }
-            }
-          }
-        ],
-        as: 'resolvedCards'
-      }
-    },
-    {
-      $group: {
-        _id: '$merchant.name',
-        name: { $first: '$merchant.name' },
-        category: { $first: { $arrayElemAt: ['$categories', 0] } },
-        description: { $first: '$description' },
-        allLocations: { $push: '$locations' },
-        benefits: {
-          $push: {
-            id: '$id',
-            bankName: { $ifNull: ['$bank', 'Banco'] },
-            cardName: {
-              $ifNull: [
-                { $arrayElemAt: ['$resolvedCards.name', 0] },
-                'Tarjeta de crédito'
-              ]
-            },
-            cardTypes: {
-              $cond: {
-                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: { $setUnion: ['$resolvedCards.name', []] },
-                else: []
-              }
-            },
-            benefit: '$benefitTitle',
-            rewardRate: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
-            tipo: 'descuento',
-            cuando: {
-              $reduce: {
-                input: { $ifNull: ['$availableDays', []] },
-                initialValue: '',
-                in: {
-                  $cond: {
-                    if: { $eq: ['$$value', ''] },
-                    then: '$$this',
-                    else: { $concat: ['$$value', ', ', '$$this'] }
-                  }
-                }
-              }
-            },
-            valor: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
-            tope: { $ifNull: [{ $arrayElemAt: ['$caps.amount', 0] }, null] },
-            condicion: '$termsAndConditions',
-            requisitos: {
-              $cond: {
-                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: { $setUnion: ['$resolvedCards.name', []] },
-                else: ['Tarjeta de crédito']
-              }
-            },
-            usos: {
-              $cond: {
-                if: { $eq: ['$online', true] },
-                then: ['online', 'presencial'],
-                else: ['presencial']
-              }
-            },
-            textoAplicacion: '$link',
-            description: '$description',
-            installments: '$installments',
-            validUntil: '$validUntil',
-            caps: '$caps',
-            otherDiscounts: '$otherDiscounts',
-            subscription: '$subscription'
-          }
-        }
-      }
-    },
-    {
-      $addFields: {
-        id: {
-          $toLower: {
-            $replaceAll: {
-              input: {
-                $replaceAll: {
-                  input: { $ifNull: ['$name', 'unknown'] },
-                  find: "'",
-                  replacement: ''
-                }
-              },
-              find: ' ',
-              replacement: '-'
-            }
-          }
-        },
-        locations: {
-          $reduce: {
-            input: { $ifNull: ['$allLocations', []] },
-            initialValue: [],
-            in: { $concatArrays: ['$$value', { $ifNull: ['$$this', []] }] }
-          }
-        }
-      }
-    },
-    {
-      $lookup: {
-        from: MERCHANT_ASSETS_COLLECTION,
-        let: {
-          merchantName: '$name'
-        },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $ne: ['$isActive', false] },
-                  {
-                    $or: [
-                      {
-                        $eq: [
-                          '$merchantKey',
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$$merchantName', ''] }
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        $eq: [
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$merchantName', ''] }
-                              }
-                            }
-                          },
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$$merchantName', ''] }
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          { $sort: { priority: -1, updatedAt: -1, createdAt: -1 } },
-          { $limit: 1 },
-          {
-            $project: {
-              _id: 0,
-              merchantName: 1,
-              merchantKey: 1,
-              imageUrl: 1,
-              logoUrl: 1,
-              coverUrl: 1,
-              source: 1
-            }
-          }
-        ],
-        as: 'merchantAsset'
-      }
-    },
-    {
-      $addFields: {
-        merchantAsset: { $first: '$merchantAsset' }
-      }
-    },
-    {
-      $addFields: {
-        image: {
-          $ifNull: [
-            '$merchantAsset.logoUrl',
-            {
-              $ifNull: [
-                '$merchantAsset.coverUrl',
-                {
-                  $ifNull: [
-                    '$merchantAsset.imageUrl',
-                    DEFAULT_BUSINESS_IMAGE
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        logo: '$merchantAsset.logoUrl',
-        coverImage: '$merchantAsset.coverUrl',
-        rating: 5,
-        category: { $ifNull: ['$category', 'otros'] },
-        description: { $ifNull: ['$description', ''] }
-      }
-    },
-    ...(bankFilter && bankFilter.length > 0
-      ? [{
-          $match: {
-            'benefits.bankName': {
-              $in: bankFilter.map((value) => new RegExp(value, 'i'))
-            }
-          }
-        }]
-      : []),
-    ...(hasLocation
-      ? [
-          {
-            $addFields: {
-              locationDistances: {
-                $map: {
-                  input: '$locations',
-                  as: 'loc',
-                  in: {
-                    $cond: {
-                      if: {
-                        $and: [
-                          { $ne: ['$$loc.lat', 0] },
-                          { $ne: ['$$loc.lng', 0] },
-                          { $ne: ['$$loc.lat', null] },
-                          { $ne: ['$$loc.lng', null] }
-                        ]
-                      },
-                      then: {
-                        $multiply: [
-                          6371,
-                          {
-                            $acos: {
-                              $add: [
-                                {
-                                  $multiply: [
-                                    { $sin: { $multiply: [{ $degreesToRadians: userLat }, 1] } },
-                                    { $sin: { $degreesToRadians: '$$loc.lat' } }
-                                  ]
-                                },
-                                {
-                                  $multiply: [
-                                    { $cos: { $multiply: [{ $degreesToRadians: userLat }, 1] } },
-                                    { $cos: { $degreesToRadians: '$$loc.lat' } },
-                                    { $cos: { $degreesToRadians: { $subtract: ['$$loc.lng', userLng] } } }
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        ]
-                      },
-                      else: null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            $addFields: {
-              distance: {
-                $let: {
-                  vars: {
-                    validDistances: {
-                      $filter: {
-                        input: '$locationDistances',
-                        as: 'dist',
-                        cond: { $ne: ['$$dist', null] }
-                      }
-                    }
-                  },
-                  in: {
-                    $cond: {
-                      if: { $gt: [{ $size: '$$validDistances' }, 0] },
-                      then: { $min: '$$validDistances' },
-                      else: null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            $addFields: {
-              distanceText: {
-                $cond: {
-                  if: { $ne: ['$distance', null] },
-                  then: {
-                    $cond: {
-                      if: { $lt: ['$distance', 1] },
-                      then: {
-                        $concat: [
-                          { $toString: { $round: { $multiply: ['$distance', 1000] } } },
-                          'm'
-                        ]
-                      },
-                      else: {
-                        $cond: {
-                          if: { $lt: ['$distance', 10] },
-                          then: {
-                            $concat: [
-                              { $toString: { $round: ['$distance', 1] } },
-                              'km'
-                            ]
-                          },
-                          else: {
-                            $concat: [
-                              { $toString: { $round: ['$distance', 0] } },
-                              'km'
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  },
-                  else: null
-                }
-              },
-              isNearby: {
-                $cond: {
-                  if: { $and: [{ $ne: ['$distance', null] }, { $lte: ['$distance', 50] }] },
-                  then: true,
-                  else: false
-                }
-              }
-            }
-          }
-        ]
-      : []),
-    {
-      $project: {
-        _id: 0,
-        allLocations: 0,
-        locationDistances: 0,
-        merchantAsset: 0
-      }
-    },
-    {
-      $facet: {
-        metadata: [{ $count: 'total' }],
-        businesses: [
-          ...(hasLocation
-            ? [
-                {
-                  $addFields: {
-                    sortKey: {
-                      $cond: {
-                        if: { $eq: ['$distance', null] },
-                        then: 999999,
-                        else: '$distance'
-                      }
-                    }
-                  }
-                },
-                { $sort: { sortKey: 1, name: 1 } },
-                { $project: { sortKey: 0 } }
-              ]
-            : [{ $sort: { name: 1 } }]),
-          { $skip: offsetNum },
-          { $limit: limitNum }
-        ]
-      }
-    }
-  ];
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  const total = await merchantCollection.countDocuments(merchantQuery);
 
-  const result = await db.collection(collectionName).aggregate(pipeline).toArray();
-  const total = result[0]?.metadata?.[0]?.total || 0;
-  const businesses = result[0]?.businesses || [];
+  let pagedMerchants = [];
+  if (hasLocation) {
+    const withGeo = await merchantCollection
+      .aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [userLng, userLat] },
+            distanceField: 'distanceMeters',
+            spherical: true,
+            key: 'geoPoints',
+            query: merchantQuery
+          }
+        },
+        { $sort: { distanceMeters: 1, merchantName: 1 } },
+        {
+          $project: {
+            _id: 0,
+            merchantId: 1,
+            merchantName: 1,
+            merchantKey: 1,
+            kind: 1,
+            categories: 1,
+            locations: 1,
+            banks: 1,
+            subscriptionIds: 1,
+            hasOnlineBenefits: 1,
+            activeBenefitCount: 1,
+            benefitCount: 1,
+            maxDiscountPercentage: 1,
+            searchProfile: 1,
+            imageUrl: 1,
+            logoUrl: 1,
+            coverUrl: 1,
+            distanceMeters: 1
+          }
+        }
+      ])
+      .toArray();
+
+    const withoutGeo = await merchantCollection
+      .aggregate([
+        { $match: merchantQuery },
+        {
+          $addFields: {
+            geoPointCount: { $size: { $ifNull: ['$geoPoints', []] } }
+          }
+        },
+        { $match: { geoPointCount: 0 } },
+        { $sort: { merchantName: 1 } },
+        {
+          $project: {
+            _id: 0,
+            merchantId: 1,
+            merchantName: 1,
+            merchantKey: 1,
+            kind: 1,
+            categories: 1,
+            locations: 1,
+            banks: 1,
+            subscriptionIds: 1,
+            hasOnlineBenefits: 1,
+            activeBenefitCount: 1,
+            benefitCount: 1,
+            maxDiscountPercentage: 1,
+            searchProfile: 1,
+            imageUrl: 1,
+            logoUrl: 1,
+            coverUrl: 1
+          }
+        }
+      ])
+      .toArray();
+
+    const merchantsWithDistance = withGeo.map((merchant) => ({
+      ...merchant,
+      distance: Number(merchant.distanceMeters) / 1000,
+      distanceText: formatDistanceText(Number(merchant.distanceMeters) / 1000),
+      isNearby: Number(merchant.distanceMeters) / 1000 <= 50
+    }));
+    const merchantsWithoutDistance = withoutGeo.map((merchant) => ({
+      ...merchant,
+      distance: null,
+      distanceText: null,
+      isNearby: false
+    }));
+    pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance].slice(offsetNum, offsetNum + limitNum);
+  } else {
+    pagedMerchants = await merchantCollection
+      .find(merchantQuery, {
+        projection: {
+          _id: 0,
+          merchantId: 1,
+          merchantName: 1,
+          merchantKey: 1,
+          kind: 1,
+          categories: 1,
+          locations: 1,
+          banks: 1,
+          subscriptionIds: 1,
+          hasOnlineBenefits: 1,
+          activeBenefitCount: 1,
+          benefitCount: 1,
+          maxDiscountPercentage: 1,
+          searchProfile: 1,
+          imageUrl: 1,
+          logoUrl: 1,
+          coverUrl: 1
+        }
+      })
+      .sort({ merchantName: 1 })
+      .skip(offsetNum)
+      .limit(limitNum)
+      .toArray();
+  }
+
+  const merchantIds = pagedMerchants.map((merchant) => merchant.merchantId).filter(Boolean);
+  const benefitQuery = {
+    merchantId: { $in: merchantIds }
+  };
+  if (bankFilter && bankFilter.length > 0) {
+    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  if (subscription) {
+    benefitQuery.subscription = subscription;
+  }
+  applyActiveBenefitsFilter(benefitQuery, searchParams);
+
+  const rawBenefits = merchantIds.length > 0
+    ? await db.collection(collectionName).find(benefitQuery).sort({ bank: 1, benefitTitle: 1 }).toArray()
+    : [];
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefitsByMerchant = new Map();
+  for (const benefit of rawBenefits) {
+    const key = benefit.merchantId;
+    if (!key) continue;
+    if (!benefitsByMerchant.has(key)) {
+      benefitsByMerchant.set(key, []);
+    }
+    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
+  }
+
+  const businesses = pagedMerchants
+    .map((merchant) => ({
+      id: merchant.merchantId,
+      name: merchant.merchantName,
+      category: Array.isArray(merchant.categories) && merchant.categories.length > 0
+        ? merchant.categories[0]
+        : 'otros',
+      description: merchant.searchProfile?.description || '',
+      rating: 5,
+      locations: dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []),
+      image: pickBusinessImage(merchant),
+      logo: merchant.logoUrl || null,
+      coverImage: merchant.coverUrl || null,
+      benefits: benefitsByMerchant.get(merchant.merchantId) || [],
+      distance: merchant.distance ?? null,
+      distanceText: merchant.distanceText ?? null,
+      isNearby: Boolean(merchant.isNearby),
+      hasOnline: Boolean(merchant.hasOnlineBenefits)
+    }))
+    .filter((merchant) => merchant.benefits.length > 0);
 
   return json(res, 200, {
     success: true,
@@ -1684,6 +1693,7 @@ async function handleGetBusinesses(req, res, url, db) {
     filters: {
       ...(category && { category }),
       ...(bank && { bank }),
+      ...(subscription && { subscription }),
       includeExpired,
       ...(hasLocation && { lat: userLat, lng: userLng })
     }
@@ -1713,6 +1723,14 @@ async function handlePlaceDetails(req, res) {
     result
   });
 }
+
+export {
+  buildBusinessBenefitSummary,
+  handleGetBenefitById,
+  handleGetBenefits,
+  handleGetBusinesses,
+  rehydrateBenefitDoc
+};
 
 export default async function handler(req, res) {
   const url = getParsedUrl(req);

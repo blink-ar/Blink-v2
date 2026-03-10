@@ -222,6 +222,63 @@ function buildMerchantDocument(accumulator) {
   };
 }
 
+function pickMerchantImage(merchant) {
+  if (merchant?.coverUrl) return merchant.coverUrl;
+  if (merchant?.imageUrl) return merchant.imageUrl;
+  if (merchant?.logoUrl) return merchant.logoUrl;
+  return '';
+}
+
+function buildMerchantDocumentFromStoredMerchant(merchant) {
+  const merchantId = merchant?.merchantId || merchant?.merchantKey || slugify(merchant?.merchantName || 'merchant');
+  const merchantName = merchant?.merchantName || 'Unknown Merchant';
+  const merchantKey = merchant?.merchantKey || normalizeSearchText(merchantName);
+  const searchProfile = merchant?.searchProfile || {};
+  const categories = uniqueStrings(Array.isArray(merchant?.categories) ? merchant.categories.map((category) => normalizeSearchText(category)) : []);
+  const banks = uniqueStrings(Array.isArray(merchant?.banks) ? merchant.banks.map((bank) => normalizeSearchText(bank)) : []);
+  const locations = Array.isArray(merchant?.locations) ? merchant.locations.slice(0, 15) : [];
+  const aliases = uniqueStrings([
+    ...resolveMerchantAliases(merchantName, merchantKey),
+    ...(Array.isArray(searchProfile.aliases) ? searchProfile.aliases.map((alias) => normalizeSearchText(alias)) : [])
+  ]);
+  const productTags = uniqueStrings(Array.isArray(searchProfile.productTags) ? searchProfile.productTags.map((tag) => normalizeSearchText(tag)) : []);
+  const intentTags = uniqueStrings(Array.isArray(searchProfile.intentTags) ? searchProfile.intentTags : []);
+  const business = {
+    id: merchantId,
+    name: merchantName,
+    category: categories[0] || 'otros',
+    description: searchProfile.description || '',
+    rating: 5,
+    location: locations,
+    image: pickMerchantImage(merchant),
+    benefits: Array.isArray(searchProfile.benefits) ? searchProfile.benefits : []
+  };
+
+  return {
+    entityId: `merchant_${merchantId}`,
+    entityType: 'merchant',
+    merchantId,
+    merchantName,
+    aliases,
+    manualAliases: uniqueStrings(
+      (MERCHANT_ALIASES[merchantKey] || []).map((alias) => normalizeSearchText(alias))
+    ),
+    intentTags,
+    productTags,
+    categories,
+    banks,
+    maxDiscount: Number(merchant?.maxDiscountPercentage || searchProfile.maxDiscount || 0),
+    online: Boolean(merchant?.hasOnlineBenefits),
+    locations,
+    popularity: Number(merchant?.activeBenefitCount || merchant?.benefitCount || searchProfile.popularity || 0),
+    description: searchProfile.description || '',
+    searchText:
+      searchProfile.searchText ||
+      uniqueStrings([merchantName, ...aliases, ...intentTags, ...productTags]).join(' '),
+    business
+  };
+}
+
 function buildProductDocuments(merchantDocuments) {
   const productMap = new Map();
 
@@ -322,6 +379,23 @@ export function buildSearchDataset(benefits) {
 
   const merchantDocuments = Array.from(merchantMap.values())
     .map(buildMerchantDocument)
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+  const productDocuments = buildProductDocuments(merchantDocuments);
+  const intentDocuments = buildIntentDocuments(merchantDocuments);
+
+  return {
+    merchantDocuments,
+    productDocuments,
+    intentDocuments,
+    allDocuments: [...merchantDocuments, ...productDocuments, ...intentDocuments]
+  };
+}
+
+export function buildSearchDatasetFromMerchantDocs(merchants) {
+  const merchantDocuments = (Array.isArray(merchants) ? merchants : [])
+    .filter((merchant) => merchant?.merchantId && merchant?.merchantName)
+    .map((merchant) => buildMerchantDocumentFromStoredMerchant(merchant))
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
 
   const productDocuments = buildProductDocuments(merchantDocuments);

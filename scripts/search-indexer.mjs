@@ -3,7 +3,7 @@ import path from 'node:path';
 import { MongoClient } from 'mongodb';
 import {
   buildMeiliSynonyms,
-  buildSearchDataset
+  buildSearchDatasetFromMerchantDocs
 } from '../api/search/entities.js';
 import {
   meiliAddDocuments,
@@ -15,7 +15,7 @@ import {
   meiliWaitForTask
 } from '../api/search/meilisearch.js';
 
-const COLLECTION = process.env.SEARCH_SOURCE_COLLECTION || 'confirmed_benefits';
+const COLLECTION = process.env.SEARCH_SOURCE_COLLECTION || 'merchant_assets';
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const BATCH_SIZE = Number.parseInt(process.env.SEARCH_INDEX_BATCH_SIZE || '500', 10);
 
@@ -74,34 +74,16 @@ function loadEnvFile(fileName) {
   }
 }
 
-function getActiveBenefitsMatch() {
-  const now = new Date();
+function getActiveMerchantMatch() {
   return {
-    $expr: {
-      $let: {
-        vars: {
-          parsedValidUntil: {
-            $convert: {
-              input: '$validUntil',
-              to: 'date',
-              onError: null,
-              onNull: null
-            }
-          }
-        },
-        in: {
-          $or: [
-            { $eq: ['$$parsedValidUntil', null] },
-            { $gte: ['$$parsedValidUntil', now] }
-          ]
-        }
-      }
-    }
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    activeBenefitCount: { $gt: 0 }
   };
 }
 
-async function loadBenefits(db) {
-  return db.collection(COLLECTION).find(getActiveBenefitsMatch()).toArray();
+async function loadMerchants(db) {
+  return db.collection(COLLECTION).find(getActiveMerchantMatch()).toArray();
 }
 
 async function applyMeiliIndexSettings() {
@@ -139,11 +121,11 @@ async function runFullReindex(db) {
   await meiliHealth();
   await applyMeiliIndexSettings();
 
-  console.log('[search-indexer] Loading Mongo benefits...');
-  const benefits = await loadBenefits(db);
-  console.log(`[search-indexer] Loaded ${benefits.length} active benefits`);
+  console.log('[search-indexer] Loading Mongo merchants...');
+  const merchants = await loadMerchants(db);
+  console.log(`[search-indexer] Loaded ${merchants.length} active merchants`);
 
-  const dataset = buildSearchDataset(benefits);
+  const dataset = buildSearchDatasetFromMerchantDocs(merchants);
   console.log(
     `[search-indexer] Built dataset: merchants=${dataset.merchantDocuments.length}, products=${dataset.productDocuments.length}, intents=${dataset.intentDocuments.length}`
   );
