@@ -60,7 +60,7 @@ const DAY_OPTIONS = [
 const NETWORK_OPTIONS = [
   { value: "visa", label: "VISA" },
   { value: "mastercard", label: "Mastercard" },
-  { value: "amex", label: "American Express" },
+  { value: "amex", label: "Amex" },
 ];
 
 export function FilterMenu({

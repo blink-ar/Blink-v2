@@ -34,7 +34,7 @@ export class MockDataGenerator {
                 bankBenefits: [
                     { bankName: "Chase", benefit: "Earn 3x points on dining", rewardRate: "3x points" },
                     { bankName: "Capital One", benefit: "Earn 4% cash back on dining", rewardRate: "4% cash back" },
-                    { bankName: "American Express", benefit: "Earn 4x points at restaurants", rewardRate: "4x points" }
+                    { bankName: "Amex", benefit: "Earn 4x points at restaurants", rewardRate: "4x points" }
                 ]
             },
             {
@@ -67,7 +67,7 @@ export class MockDataGenerator {
                 image: "https://images.pexels.com/photos/1435752/pexels-photo-1435752.jpeg?auto=compress&cs=tinysrgb&w=400",
                 bankBenefits: [
                     { bankName: "Amazon", benefit: "5% back at Whole Foods for Prime members", rewardRate: "5% cash back" },
-                    { bankName: "American Express", benefit: "Earn 6% on supermarkets", rewardRate: "6% cash back" }
+                    { bankName: "Amex", benefit: "Earn 6% on supermarkets", rewardRate: "6% cash back" }
                 ]
             },
             {
@@ -78,7 +78,7 @@ export class MockDataGenerator {
                 image: "https://images.pexels.com/photos/265685/pexels-photo-265685.jpeg?auto=compress&cs=tinysrgb&w=400",
                 bankBenefits: [
                     { bankName: "Chase", benefit: "Earn 3x points on streaming", rewardRate: "3x points" },
-                    { bankName: "American Express", benefit: "Earn 1.5% on all purchases", rewardRate: "1.5% cash back" }
+                    { bankName: "Amex", benefit: "Earn 1.5% on all purchases", rewardRate: "1.5% cash back" }
                 ]
             },
             {
