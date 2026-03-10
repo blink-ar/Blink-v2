@@ -5,6 +5,7 @@ import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
 import { getRawBenefits } from '../services/rawBenefitsApi';
 import { useGeolocation } from './useGeolocation';
+import { encodeGeohash } from '../utils/geohash';
 
 // Query keys for cache management
 export const queryKeys = {
@@ -25,6 +26,8 @@ interface UseBenefitsDataReturn {
     loadMore: () => void;
     refreshData: () => Promise<void>;
     totalBusinesses: number;
+    /** True when the user wants proximity sort but geolocation is unavailable/denied */
+    proximityUnavailable: boolean;
 }
 
 export interface BenefitsFilters {
@@ -39,6 +42,8 @@ export interface BenefitsFilters {
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
+    onlineOnly?: boolean; // Filter for businesses with online benefits (server-side)
+    sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
 
 /**
@@ -47,9 +52,22 @@ export interface BenefitsFilters {
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
+    const wantsSortByDistance = filters?.sortByDistance ?? false;
+    // Only use proximity sort when the filter is active AND we have real coordinates.
+    // If position is null (geolocation denied/unavailable) we fall back to geohash.
+    const sortByDistance = wantsSortByDistance && position !== null;
+    const geohash = !sortByDistance && position
+        ? encodeGeohash(position.latitude, position.longitude)
+        : undefined;
 
-    // Fetch businesses with infinite query for pagination
-    // Wait for position to finish loading before starting the query
+    // Fetch businesses with infinite query for pagination.
+    // sortByDistance=true → sends exact lat/lng to server (precise sort, bypasses CDN cache).
+    // sortByDistance=false → sends geohash (CDN-cached, approximate proximity sort).
+    // Strip falsy values so e.g. `{ onlineOnly: false }` and `{}` share the same cache entry.
+    const filtersKey = Object.fromEntries(
+        Object.entries(filters || {}).filter(([, v]) => v !== undefined && v !== false && v !== '' && v !== 0),
+    );
+
     const {
         data,
         isLoading: isLoadingBusinesses,
@@ -59,19 +77,21 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         hasNextPage,
         refetch: refetchBusinesses,
     } = useInfiniteQuery({
-        queryKey: [...queryKeys.businesses, filters], // Include filters in cache key
+        queryKey: sortByDistance
+            ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
+            : [...queryKeys.businesses, geohash, filtersKey],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
-                ...(position && {
-                    lat: position.latitude,
-                    lng: position.longitude,
-                }),
+                ...(sortByDistance && position
+                    ? { lat: position.latitude, lng: position.longitude }
+                    : geohash ? { geohash } : {}),
                 ...(filters?.search && { search: filters.search }),
                 ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
                 ...(filters?.bank && { bank: filters.bank }),
                 ...(filters?.subscription && { subscription: filters.subscription }),
+                ...(filters?.onlineOnly && { online: true }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -81,7 +101,12 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             return undefined;
         },
         initialPageParam: 0,
-        enabled: !positionLoading, // Wait for position to finish loading
+        // Wait for geolocation to resolve (so the first request already has a geohash or
+        // exact coordinates). Once geolocation settles, always fire — even if position is
+        // null (denied). In that case sortByDistance stays false (see above), so we fall
+        // back to the geohash/no-location key instead of the 'exact' key, preventing
+        // pollution of the proximity-sorted cache entry.
+        enabled: !positionLoading,
         staleTime: 0,
     });
 
@@ -145,6 +170,8 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         loadMore,
         refreshData,
         totalBusinesses,
+        // True when user wants proximity sort but geolocation was denied/unavailable
+        proximityUnavailable: wantsSortByDistance && !positionLoading && position === null,
     };
 }
 
@@ -153,6 +180,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
  */
 export function useBusinessesData() {
     const { position, loading: positionLoading } = useGeolocation();
+    const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
 
     const {
         data,
@@ -162,15 +190,12 @@ export function useBusinessesData() {
         fetchNextPage,
         hasNextPage,
     } = useInfiniteQuery({
-        queryKey: queryKeys.businesses,
+        queryKey: [...queryKeys.businesses, geohash],
         queryFn: async ({ pageParam = 0 }) => {
             return fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
-                ...(position && {
-                    lat: position.latitude,
-                    lng: position.longitude,
-                }),
+                ...(geohash && { geohash }),
             });
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -180,7 +205,7 @@ export function useBusinessesData() {
             return undefined;
         },
         initialPageParam: 0,
-        enabled: !positionLoading, // Wait for position to finish loading
+        enabled: !positionLoading,
         staleTime: 0,
     });
 

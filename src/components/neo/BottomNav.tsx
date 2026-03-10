@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { SEARCH_PARAMS_KEY } from '../../pages/SearchPage';
 
 export type NavTab = 'home' | 'search' | 'map' | 'saved';
 
@@ -12,6 +13,14 @@ const tabs = [
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
+
+  const getTabPath = (tab: (typeof tabs)[number]) => {
+    if (tab.id === 'search' && !location.pathname.startsWith('/search')) {
+      const saved = sessionStorage.getItem(SEARCH_PARAMS_KEY);
+      if (saved) return `/search${saved}`;
+    }
+    return tab.path;
+  };
 
   const getActiveTab = (): NavTab => {
     const path = location.pathname;
@@ -40,7 +49,7 @@ const BottomNav: React.FC = () => {
           return (
             <Link
               key={tab.id}
-              to={tab.path}
+              to={getTabPath(tab)}
               className="flex flex-col items-center justify-center w-1/4 gap-0.5 active:scale-95 transition-transform duration-100"
             >
               <div

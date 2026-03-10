@@ -95,12 +95,12 @@ function MapPage() {
     network,
     cardMode,
     hasInstallments,
-  }), [debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
+    onlineOnly,
+  }), [debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments, onlineOnly]);
 
   const { businesses: rawBusinesses, isLoading } = useBenefitsData(filters);
 
   const businesses = useEnrichedBusinesses(rawBusinesses, {
-    onlineOnly,
     minDiscount,
     maxDistance,
     availableDay,

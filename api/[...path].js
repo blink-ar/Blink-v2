@@ -35,6 +35,37 @@ function json(res, statusCode, payload) {
   res.send(JSON.stringify(payload));
 }
 
+// Cache-Control directives
+const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
+const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
+const CC_LOCATION = 'private, max-age=60';                                          // browser-only, 1m
+
+function setCacheControl(res, directive) {
+  res.setHeader('Cache-Control', directive);
+}
+
+/**
+ * Decode a geohash string to its center lat/lng.
+ * Returns null if the input is invalid.
+ */
+function decodeGeohash(hash) {
+  const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let even = true;
+  const lat = [-90, 90];
+  const lng = [-180, 180];
+  for (const c of hash) {
+    const bits = BASE32.indexOf(c);
+    if (bits === -1) return null;
+    for (let i = 4; i >= 0; i--) {
+      const bit = (bits >> i) & 1;
+      if (even) { const m = (lng[0] + lng[1]) / 2; if (bit) lng[0] = m; else lng[1] = m; }
+      else      { const m = (lat[0] + lat[1]) / 2; if (bit) lat[0] = m; else lat[1] = m; }
+      even = !even;
+    }
+  }
+  return { latitude: (lat[0] + lat[1]) / 2, longitude: (lng[0] + lng[1]) / 2 };
+}
+
 function getParsedUrl(req) {
   const protoHeader = req.headers['x-forwarded-proto'];
   const protocol = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'https';
@@ -1172,6 +1203,7 @@ async function handleGetBenefits(req, res, url, db) {
     benefits.map((benefit) => benefit.merchantId).filter(Boolean)
   );
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefits: benefits.map((benefit) => rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))),
@@ -1216,6 +1248,7 @@ async function handleGetBenefitById(req, res, url, db, id) {
   }
 
   const merchantMap = await loadMerchantMapByIds(db, [benefit.merchantId].filter(Boolean));
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     benefit: rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))
@@ -1236,6 +1269,7 @@ async function handleGetCategories(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     categories: categories.map((cat) => ({
@@ -1258,6 +1292,7 @@ async function handleGetBanks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     banks: banks.map((bank) => ({
@@ -1280,6 +1315,7 @@ async function handleGetNetworks(req, res, url, db) {
     ])
     .toArray();
 
+  setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
     networks: networks.map((network) => ({
@@ -1324,6 +1360,7 @@ async function handleGetStats(req, res, url, db) {
       .toArray()
   ]);
 
+  setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
     stats: {
@@ -1459,6 +1496,7 @@ async function handleGetNearbyBenefits(req, res, url, db) {
 
   const filtered = nearbyBenefits.map(serializeDocWithId);
 
+  setCacheControl(res, CC_LOCATION);
   return json(res, 200, {
     success: true,
     benefits: filtered,
@@ -1481,18 +1519,24 @@ async function handleGetBusinesses(req, res, url, db) {
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
   const subscription = searchParams.get('subscription');
+  const search = searchParams.get('search');
+  const onlineOnly = searchParams.get('online') === 'true';
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
 
-  const lat = searchParams.get('lat');
-  const lng = searchParams.get('lng');
-  const userLat = lat ? Number.parseFloat(lat) : null;
-  const userLng = lng ? Number.parseFloat(lng) : null;
-  const hasLocation =
-    userLat !== null &&
-    userLng !== null &&
-    Number.isFinite(userLat) &&
-    Number.isFinite(userLng);
+  // Exact lat/lng (precise sort, bypasses CDN) takes priority over geohash (CDN-cached, approximate)
+  const rawLat = searchParams.get('lat');
+  const rawLng = searchParams.get('lng');
+  const exactLat = rawLat ? Number.parseFloat(rawLat) : null;
+  const exactLng = rawLng ? Number.parseFloat(rawLng) : null;
+  const hasExact = exactLat !== null && exactLng !== null && Number.isFinite(exactLat) && Number.isFinite(exactLng);
+
+  const geohash = searchParams.get('geohash');
+  const decoded = !hasExact && geohash ? decodeGeohash(geohash) : null;
+
+  const userLat = hasExact ? exactLat : (decoded?.latitude ?? null);
+  const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
+  const hasLocation = userLat !== null && userLng !== null;
 
   const bankFilter = bank
     ? bank
@@ -1506,6 +1550,7 @@ async function handleGetBusinesses(req, res, url, db) {
     merchantId: { $exists: true, $type: 'string' },
     ...(includeExpired ? { benefitCount: { $gt: 0 } } : { activeBenefitCount: { $gt: 0 } })
   };
+
   if (category && category !== 'all') {
     merchantQuery.categories = { $in: [category] };
   }
@@ -1514,6 +1559,33 @@ async function handleGetBusinesses(req, res, url, db) {
   }
   if (subscription) {
     merchantQuery.subscriptionIds = subscription;
+  }
+  if (onlineOnly) {
+    merchantQuery.hasOnlineBenefits = true;
+  }
+  if (search) {
+    const normalizedSearch = normalizeSearchText(search);
+    const searchTerms = Array.from(
+      new Set([
+        search,
+        normalizedSearch,
+        ...tokenizeSearchText(search),
+        ...tokenizeSearchText(normalizedSearch)
+      ].filter(Boolean))
+    );
+
+    merchantQuery.$or = searchTerms.flatMap((term) => {
+      const pattern = new RegExp(escapeRegex(term), 'i');
+      return [
+        { merchantName: pattern },
+        { merchantKey: pattern },
+        { aliases: { $elemMatch: { $regex: pattern } } },
+        { categories: { $elemMatch: { $regex: pattern } } },
+        { banks: { $elemMatch: { $regex: pattern } } },
+        { 'searchProfile.searchText': pattern },
+        { 'searchProfile.description': pattern }
+      ];
+    });
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
@@ -1543,6 +1615,7 @@ async function handleGetBusinesses(req, res, url, db) {
             categories: 1,
             locations: 1,
             banks: 1,
+            aliases: 1,
             subscriptionIds: 1,
             hasOnlineBenefits: 1,
             activeBenefitCount: 1,
@@ -1578,6 +1651,7 @@ async function handleGetBusinesses(req, res, url, db) {
             categories: 1,
             locations: 1,
             banks: 1,
+            aliases: 1,
             subscriptionIds: 1,
             hasOnlineBenefits: 1,
             activeBenefitCount: 1,
@@ -1617,6 +1691,7 @@ async function handleGetBusinesses(req, res, url, db) {
           categories: 1,
           locations: 1,
           banks: 1,
+          aliases: 1,
           subscriptionIds: 1,
           hasOnlineBenefits: 1,
           activeBenefitCount: 1,
@@ -1638,11 +1713,15 @@ async function handleGetBusinesses(req, res, url, db) {
   const benefitQuery = {
     merchantId: { $in: merchantIds }
   };
+
   if (bankFilter && bankFilter.length > 0) {
     benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
   }
   if (subscription) {
     benefitQuery.subscription = subscription;
+  }
+  if (onlineOnly) {
+    benefitQuery.online = true;
   }
   applyActiveBenefitsFilter(benefitQuery, searchParams);
 
@@ -1681,6 +1760,7 @@ async function handleGetBusinesses(req, res, url, db) {
     }))
     .filter((merchant) => merchant.benefits.length > 0);
 
+  setCacheControl(res, hasExact ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {
     success: true,
     businesses,
@@ -1693,6 +1773,8 @@ async function handleGetBusinesses(req, res, url, db) {
     filters: {
       ...(category && { category }),
       ...(bank && { bank }),
+      ...(search && { search }),
+      ...(onlineOnly && { online: 'true' }),
       ...(subscription && { subscription }),
       includeExpired,
       ...(hasLocation && { lat: userLat, lng: userLng })

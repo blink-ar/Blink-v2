@@ -63,6 +63,9 @@ function Home() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
 
+  // State for proximity sort — must be declared before useBenefitsData
+  const [sortByDistance, setSortByDistance] = useState(false);
+
   // Debounce search term to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -92,6 +95,8 @@ function Home() {
     network: selectedNetwork,
     cardMode,
     hasInstallments,
+    onlineOnly,
+    sortByDistance,
   });
 
   // Track when data has loaded at least once
@@ -144,7 +149,6 @@ function Home() {
   // Enrich businesses with online information and apply client-side only filters (like onlineOnly)
   // Note: Distance calculation, proximity sorting, search, category, and bank filters are now handled by the backend
   const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
-    onlineOnly,
     minDiscount,
     maxDistance,
     availableDay,
@@ -606,6 +610,8 @@ function Home() {
                   hasMore={hasMore}
                   isLoadingMore={isLoadingMore || isLoading}
                   totalCount={totalBusinesses}
+                  sortByDistance={sortByDistance}
+                  onSortByDistanceChange={setSortByDistance}
                 />
               ) : (
                 <InicioTab

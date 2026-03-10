@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
+import { SkeletonBenefitDetailPage } from '../components/skeletons';
 import { parseDayAvailability } from '../utils/dayAvailabilityParser';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { useSEO } from '../hooks/useSEO';
@@ -207,11 +208,7 @@ function BenefitDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-blink-bg flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-blink-border border-t-primary animate-spin" />
-      </div>
-    );
+    return <SkeletonBenefitDetailPage />;
   }
 
   if (error || !business || !benefit) {

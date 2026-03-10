@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Business } from '../types';
-import { hasOnlineBenefits } from '../utils/distance';
+import { hasOnlineBenefits, calculateDistance, formatDistance } from '../utils/distance';
+import { useGeolocation } from './useGeolocation';
 
 /**
  * Enriches businesses with online information and applies filters
@@ -9,17 +10,18 @@ import { hasOnlineBenefits } from '../utils/distance';
 export const useEnrichedBusinesses = (
   businesses: Business[],
   options?: {
-    onlineOnly?: boolean; // Filter to show only online
     minDiscount?: number; // Minimum discount percentage
     maxDistance?: number; // Maximum distance in km
     availableDay?: string; // Specific day of the week
     network?: string; // Payment network (VISA, Mastercard, etc.)
     cardMode?: 'credit' | 'debit'; // Card type
     hasInstallments?: boolean; // Filter for installment availability
+    sortByDistance?: boolean; // unused — server handles sort when exact coords are sent
   }
 ) => {
+  const { position } = useGeolocation();
+
   const {
-    onlineOnly = false,
     minDiscount,
     maxDistance,
     availableDay,
@@ -29,21 +31,31 @@ export const useEnrichedBusinesses = (
   } = options || {};
 
   const enrichedBusinesses = useMemo(() => {
-    // Add hasOnline flag to each business
+    // Add hasOnline flag and compute distance client-side when position is available
     let result = businesses.map((business) => {
-      // Check if has online benefits
       const hasOnline = hasOnlineBenefits(business);
+
+      let distance = business.distance;
+      let distanceText = business.distanceText;
+      let isNearby = business.isNearby;
+
+      if (position && business.location?.length > 0) {
+        const distances = business.location.map((loc) =>
+          calculateDistance(position.latitude, position.longitude, loc.lat, loc.lng)
+        );
+        distance = Math.min(...distances);
+        distanceText = formatDistance(distance);
+        isNearby = distance <= 50;
+      }
 
       return {
         ...business,
         hasOnline,
+        distance,
+        distanceText,
+        isNearby,
       };
     });
-
-    // Apply online filter if requested
-    if (onlineOnly) {
-      result = result.filter((b) => b.hasOnline);
-    }
 
     // Apply distance filter (only if distance is available)
     if (maxDistance !== undefined) {
@@ -144,9 +156,9 @@ export const useEnrichedBusinesses = (
       });
     }
 
-    // Backend already sorts by distance, so we preserve that order
+    // Server already sorts by distance when exact coords are sent — preserve that order.
     return result;
-  }, [businesses, onlineOnly, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
+  }, [businesses, position, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments]);
 
   return enrichedBusinesses;
 };
