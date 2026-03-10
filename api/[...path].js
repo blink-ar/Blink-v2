@@ -1590,118 +1590,135 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
   const total = await merchantCollection.countDocuments(merchantQuery);
+  const merchantProjection = {
+    _id: 0,
+    merchantId: 1,
+    merchantName: 1,
+    merchantKey: 1,
+    kind: 1,
+    categories: 1,
+    locations: 1,
+    banks: 1,
+    aliases: 1,
+    subscriptionIds: 1,
+    hasOnlineBenefits: 1,
+    activeBenefitCount: 1,
+    benefitCount: 1,
+    maxDiscountPercentage: 1,
+    searchProfile: 1,
+    imageUrl: 1,
+    logoUrl: 1,
+    coverUrl: 1
+  };
 
   let pagedMerchants = [];
   if (hasLocation) {
-    const withGeo = await merchantCollection
-      .aggregate([
-        {
-          $geoNear: {
-            near: { type: 'Point', coordinates: [userLng, userLat] },
-            distanceField: 'distanceMeters',
-            spherical: true,
-            key: 'geoPoints',
-            query: merchantQuery
+    try {
+      const withGeo = await merchantCollection
+        .aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [userLng, userLat] },
+              distanceField: 'distanceMeters',
+              spherical: true,
+              key: 'geoPoints',
+              query: merchantQuery
+            }
+          },
+          { $sort: { distanceMeters: 1, merchantName: 1 } },
+          {
+            $project: {
+              ...merchantProjection,
+              distanceMeters: 1
+            }
           }
-        },
-        { $sort: { distanceMeters: 1, merchantName: 1 } },
-        {
-          $project: {
-            _id: 0,
-            merchantId: 1,
-            merchantName: 1,
-            merchantKey: 1,
-            kind: 1,
-            categories: 1,
-            locations: 1,
-            banks: 1,
-            aliases: 1,
-            subscriptionIds: 1,
-            hasOnlineBenefits: 1,
-            activeBenefitCount: 1,
-            benefitCount: 1,
-            maxDiscountPercentage: 1,
-            searchProfile: 1,
-            imageUrl: 1,
-            logoUrl: 1,
-            coverUrl: 1,
-            distanceMeters: 1
-          }
-        }
-      ])
-      .toArray();
+        ])
+        .toArray();
 
-    const withoutGeo = await merchantCollection
-      .aggregate([
-        { $match: merchantQuery },
-        {
-          $addFields: {
-            geoPointCount: { $size: { $ifNull: ['$geoPoints', []] } }
+      const withoutGeo = await merchantCollection
+        .aggregate([
+          { $match: merchantQuery },
+          {
+            $addFields: {
+              geoPointCount: { $size: { $ifNull: ['$geoPoints', []] } }
+            }
+          },
+          { $match: { geoPointCount: 0 } },
+          { $sort: { merchantName: 1 } },
+          {
+            $project: merchantProjection
           }
-        },
-        { $match: { geoPointCount: 0 } },
-        { $sort: { merchantName: 1 } },
-        {
-          $project: {
-            _id: 0,
-            merchantId: 1,
-            merchantName: 1,
-            merchantKey: 1,
-            kind: 1,
-            categories: 1,
-            locations: 1,
-            banks: 1,
-            aliases: 1,
-            subscriptionIds: 1,
-            hasOnlineBenefits: 1,
-            activeBenefitCount: 1,
-            benefitCount: 1,
-            maxDiscountPercentage: 1,
-            searchProfile: 1,
-            imageUrl: 1,
-            logoUrl: 1,
-            coverUrl: 1
-          }
-        }
-      ])
-      .toArray();
+        ])
+        .toArray();
 
-    const merchantsWithDistance = withGeo.map((merchant) => ({
-      ...merchant,
-      distance: Number(merchant.distanceMeters) / 1000,
-      distanceText: formatDistanceText(Number(merchant.distanceMeters) / 1000),
-      isNearby: Number(merchant.distanceMeters) / 1000 <= 50
-    }));
-    const merchantsWithoutDistance = withoutGeo.map((merchant) => ({
-      ...merchant,
-      distance: null,
-      distanceText: null,
-      isNearby: false
-    }));
-    pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance].slice(offsetNum, offsetNum + limitNum);
+      const merchantsWithDistance = withGeo.map((merchant) => ({
+        ...merchant,
+        distance: Number(merchant.distanceMeters) / 1000,
+        distanceText: formatDistanceText(Number(merchant.distanceMeters) / 1000),
+        isNearby: Number(merchant.distanceMeters) / 1000 <= 50
+      }));
+      const merchantsWithoutDistance = withoutGeo.map((merchant) => ({
+        ...merchant,
+        distance: null,
+        distanceText: null,
+        isNearby: false
+      }));
+      pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance].slice(offsetNum, offsetNum + limitNum);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const missingGeoIndex = message.includes('unable to find index for $geoNear query');
+      if (!missingGeoIndex) {
+        throw error;
+      }
+
+      console.warn('[businesses] Falling back to in-memory distance sort because geoPoints is not indexed');
+
+      const merchants = await merchantCollection
+        .find(merchantQuery, { projection: merchantProjection })
+        .toArray();
+
+      pagedMerchants = merchants
+        .map((merchant) => {
+          const validDistances = (Array.isArray(merchant.locations) ? merchant.locations : [])
+            .filter((location) => Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng)))
+            .map((location) => haversineKm(
+              userLat,
+              userLng,
+              Number(location.lat),
+              Number(location.lng)
+            ));
+
+          if (validDistances.length === 0) {
+            return {
+              ...merchant,
+              distance: null,
+              distanceText: null,
+              isNearby: false
+            };
+          }
+
+          const distance = Math.min(...validDistances);
+          return {
+            ...merchant,
+            distance,
+            distanceText: formatDistanceText(distance),
+            isNearby: distance <= 50
+          };
+        })
+        .sort((left, right) => {
+          const leftDistance = Number.isFinite(left.distance) ? left.distance : Number.POSITIVE_INFINITY;
+          const rightDistance = Number.isFinite(right.distance) ? right.distance : Number.POSITIVE_INFINITY;
+          if (leftDistance !== rightDistance) {
+            return leftDistance - rightDistance;
+          }
+          return String(left.merchantName || '').localeCompare(String(right.merchantName || ''));
+        })
+        .slice(offsetNum, offsetNum + limitNum);
+    }
   } else {
     pagedMerchants = await merchantCollection
       .find(merchantQuery, {
-        projection: {
-          _id: 0,
-          merchantId: 1,
-          merchantName: 1,
-          merchantKey: 1,
-          kind: 1,
-          categories: 1,
-          locations: 1,
-          banks: 1,
-          aliases: 1,
-          subscriptionIds: 1,
-          hasOnlineBenefits: 1,
-          activeBenefitCount: 1,
-          benefitCount: 1,
-          maxDiscountPercentage: 1,
-          searchProfile: 1,
-          imageUrl: 1,
-          logoUrl: 1,
-          coverUrl: 1
-        }
+        projection: merchantProjection
       })
       .sort({ merchantName: 1 })
       .skip(offsetNum)
