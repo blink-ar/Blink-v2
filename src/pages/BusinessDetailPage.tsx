@@ -52,7 +52,6 @@ function BusinessDetailPage() {
   const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
   const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const businessViewSignatureRef = useRef('');
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
   const businessBenefitCount = business?.benefits.length || 0;
@@ -126,8 +125,6 @@ function BusinessDetailPage() {
 
   const topBenefits = sortedBenefits.slice(0, 2);
   const otherBenefits = sortedBenefits.slice(2);
-  const displayedOthers = showAll ? otherBenefits : otherBenefits.slice(0, 3);
-  const hiddenCount = otherBenefits.length - 3;
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
     if (!business) return;
@@ -353,7 +350,7 @@ function BusinessDetailPage() {
             <section className="space-y-3">
               <h2 className="font-semibold text-base text-blink-ink">Más beneficios</h2>
               <div className="space-y-2">
-                {displayedOthers.map((benefit, idx) => {
+                {otherBenefits.map((benefit, idx) => {
                   const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
                   const bankAccent = getBankAccent(benefit.bankName);
                   return (
@@ -391,15 +388,6 @@ function BusinessDetailPage() {
                   );
                 })}
               </div>
-              {!showAll && hiddenCount > 0 && (
-                <button
-                  onClick={() => setShowAll(true)}
-                  className="w-full py-3 rounded-2xl text-sm font-medium text-primary transition-colors"
-                  style={{ border: '1.5px dashed #C7D2FE', background: '#EEF2FF' }}
-                >
-                  Ver {hiddenCount} beneficios más
-                </button>
-              )}
             </section>
           )}
         </div>
