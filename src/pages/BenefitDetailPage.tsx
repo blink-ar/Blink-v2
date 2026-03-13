@@ -242,7 +242,7 @@ function BenefitDetailPage() {
         {/* Hero - dark indigo (distinct from the light business page hero) */}
         <div
           className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)', minHeight: 240 }}
+          style={{ background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)', minHeight: 240, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 }}
         >
           {/* Floating nav buttons - glass on dark background */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">

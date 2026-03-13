@@ -39,7 +39,10 @@ export const useEnrichedBusinesses = (
       let distanceText = business.distanceText;
       let isNearby = business.isNearby;
 
-      if (position && business.location?.length > 0) {
+      if (!business.location?.length) {
+        distanceText = 'exclusivo online';
+        distance = undefined;
+      } else if (position) {
         const distances = business.location.map((loc) =>
           calculateDistance(position.latitude, position.longitude, loc.lat, loc.lng)
         );
