@@ -106,20 +106,31 @@ function toPositiveInt(value, fallback, max) {
   return typeof max === 'number' ? Math.min(safe, max) : safe;
 }
 
+function formatLocalDateOnly(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
 function shouldIncludeExpired(searchParams) {
   return searchParams.get('includeExpired') === 'true';
 }
 
-function getActiveBenefitsMatch(searchParams) {
+function getActiveBenefitsMatch(searchParams, now = new Date()) {
   if (shouldIncludeExpired(searchParams)) {
     return null;
   }
 
-  const now = new Date();
+  const todayLocal = formatLocalDateOnly(now);
   return {
     $expr: {
       $let: {
         vars: {
+          validUntilValue: {
+            $ifNull: ['$validUntil', null]
+          },
           parsedValidUntil: {
             $convert: {
               input: '$validUntil',
@@ -131,7 +142,15 @@ function getActiveBenefitsMatch(searchParams) {
         },
         in: {
           $or: [
-            { $eq: ['$$parsedValidUntil', null] },
+            { $eq: ['$$validUntilValue', null] },
+            { $eq: ['$$validUntilValue', ''] },
+            {
+              $and: [
+                { $eq: [{ $type: '$$validUntilValue' }, 'string'] },
+                { $regexMatch: { input: '$$validUntilValue', regex: /^\d{4}-\d{2}-\d{2}$/ } },
+                { $gte: ['$$validUntilValue', todayLocal] }
+              ]
+            },
             { $gte: ['$$parsedValidUntil', now] }
           ]
         }
@@ -179,6 +198,24 @@ function dedupeLocations(locations) {
     uniqueLocations.push(location);
   }
   return uniqueLocations;
+}
+
+function buildGeoPointCountExpression() {
+  return {
+    $switch: {
+      branches: [
+        {
+          case: { $isArray: '$geoPoints' },
+          then: { $size: '$geoPoints' }
+        },
+        {
+          case: { $isArray: '$geoPoints.coordinates' },
+          then: { $size: '$geoPoints.coordinates' }
+        }
+      ],
+      default: 0
+    }
+  };
 }
 
 function rehydrateBenefitDoc(benefit, merchant) {
@@ -1640,7 +1677,7 @@ async function handleGetBusinesses(req, res, url, db) {
           { $match: merchantQuery },
           {
             $addFields: {
-              geoPointCount: { $size: { $ifNull: ['$geoPoints', []] } }
+              geoPointCount: buildGeoPointCountExpression()
             }
           },
           { $match: { geoPointCount: 0 } },
@@ -1825,6 +1862,7 @@ async function handlePlaceDetails(req, res) {
 
 export {
   buildBusinessBenefitSummary,
+  getActiveBenefitsMatch,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
