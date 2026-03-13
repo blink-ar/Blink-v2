@@ -1,4 +1,8 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
+import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
+import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
+import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -9,6 +13,7 @@ const ALLOWED_COLLECTIONS = new Set([
 ]);
 
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
+const BANK_CARDS_COLLECTION = 'bank_cards';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
@@ -101,20 +106,31 @@ function toPositiveInt(value, fallback, max) {
   return typeof max === 'number' ? Math.min(safe, max) : safe;
 }
 
+function formatLocalDateOnly(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
 function shouldIncludeExpired(searchParams) {
   return searchParams.get('includeExpired') === 'true';
 }
 
-function getActiveBenefitsMatch(searchParams) {
+function getActiveBenefitsMatch(searchParams, now = new Date()) {
   if (shouldIncludeExpired(searchParams)) {
     return null;
   }
 
-  const now = new Date();
+  const todayLocal = formatLocalDateOnly(now);
   return {
     $expr: {
       $let: {
         vars: {
+          validUntilValue: {
+            $ifNull: ['$validUntil', null]
+          },
           parsedValidUntil: {
             $convert: {
               input: '$validUntil',
@@ -126,7 +142,15 @@ function getActiveBenefitsMatch(searchParams) {
         },
         in: {
           $or: [
-            { $eq: ['$$parsedValidUntil', null] },
+            { $eq: ['$$validUntilValue', null] },
+            { $eq: ['$$validUntilValue', ''] },
+            {
+              $and: [
+                { $eq: [{ $type: '$$validUntilValue' }, 'string'] },
+                { $regexMatch: { input: '$$validUntilValue', regex: /^\d{4}-\d{2}-\d{2}$/ } },
+                { $gte: ['$$validUntilValue', todayLocal] }
+              ]
+            },
             { $gte: ['$$parsedValidUntil', now] }
           ]
         }
@@ -154,6 +178,862 @@ function serializeDocWithId(doc) {
     ...doc,
     id: doc?._id?.toString?.() || doc?.id || null
   };
+}
+
+function pickBusinessImage(asset) {
+  if (asset?.coverUrl) return asset.coverUrl;
+  if (asset?.imageUrl) return asset.imageUrl;
+  if (asset?.logoUrl) return asset.logoUrl;
+  return DEFAULT_BUSINESS_IMAGE;
+}
+
+function dedupeLocations(locations) {
+  const uniqueLocations = [];
+  const seenKeys = new Set();
+  for (const location of Array.isArray(locations) ? locations : []) {
+    if (!location) continue;
+    const key = location.placeId || location.formattedAddress || `${location.lat},${location.lng}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    uniqueLocations.push(location);
+  }
+  return uniqueLocations;
+}
+
+function buildGeoPointCountExpression() {
+  return {
+    $switch: {
+      branches: [
+        {
+          case: { $isArray: '$geoPoints' },
+          then: { $size: '$geoPoints' }
+        },
+        {
+          case: { $isArray: '$geoPoints.coordinates' },
+          then: { $size: '$geoPoints.coordinates' }
+        }
+      ],
+      default: 0
+    }
+  };
+}
+
+function rehydrateBenefitDoc(benefit, merchant) {
+  if (!merchant) {
+    return serializeDocWithId(benefit);
+  }
+
+  return serializeDocWithId({
+    ...benefit,
+    merchant: {
+      name: merchant.merchantName || benefit?.merchant?.name || 'Unknown Merchant'
+    },
+    categories: Array.isArray(merchant.categories) ? merchant.categories : benefit.categories || [],
+    locations: Array.isArray(merchant.locations) ? merchant.locations : benefit.locations || [],
+    merchantId: merchant.merchantId || benefit.merchantId || null,
+    merchantSnapshot: merchant.merchantId
+      ? {
+          merchantId: merchant.merchantId,
+          merchantKey: merchant.merchantKey,
+          merchantName: merchant.merchantName,
+          kind: merchant.kind || 'merchant'
+        }
+      : benefit.merchantSnapshot
+  });
+}
+
+async function loadMerchantMapByIds(db, merchantIds) {
+  const ids = Array.from(new Set((merchantIds || []).filter(Boolean)));
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const merchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+    .find(
+      {
+        merchantId: { $in: ids }
+      },
+      {
+        projection: {
+          _id: 0,
+          merchantId: 1,
+          merchantKey: 1,
+          merchantName: 1,
+          kind: 1,
+          aliases: 1,
+          categories: 1,
+          locations: 1,
+          geoPoints: 1,
+          banks: 1,
+          subscriptionIds: 1,
+          hasOnlineBenefits: 1,
+          benefitCount: 1,
+          activeBenefitCount: 1,
+          maxDiscountPercentage: 1,
+          searchProfile: 1,
+          imageUrl: 1,
+          logoUrl: 1,
+          coverUrl: 1,
+          isActive: 1
+        }
+      }
+    )
+    .toArray();
+
+  return new Map(merchants.map((merchant) => [merchant.merchantId, merchant]));
+}
+
+async function resolveCardNameLookup(db, benefits) {
+  const cardIds = Array.from(
+    new Set(
+      (benefits || [])
+        .flatMap((benefit) => (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : []))
+        .filter((value) => typeof value === 'string' && ObjectId.isValid(value))
+    )
+  );
+
+  if (cardIds.length === 0) {
+    return new Map();
+  }
+
+  const cards = await db.collection(BANK_CARDS_COLLECTION)
+    .find(
+      {
+        _id: { $in: cardIds.map((value) => new ObjectId(value)) }
+      },
+      {
+        projection: { issuer: 1, tier: 1 }
+      }
+    )
+    .toArray();
+
+  return new Map(
+    cards.map((card) => {
+      const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim() || 'Tarjeta de credito';
+      return [card._id.toString(), name];
+    })
+  );
+}
+
+function formatBenefitValue(benefit) {
+  if (Number.isFinite(benefit?.discountPercentage) && Number(benefit.discountPercentage) > 0) {
+    return `${Number(benefit.discountPercentage)}%`;
+  }
+  if (Number.isFinite(benefit?.installments) && Number(benefit.installments) > 0) {
+    return `${Number(benefit.installments)} cuotas s/int`;
+  }
+  if (typeof benefit?.otherDiscounts === 'string' && benefit.otherDiscounts.trim()) {
+    return benefit.otherDiscounts.trim();
+  }
+  return null;
+}
+
+function buildBusinessBenefitSummary(benefit, cardNameLookup) {
+  const cardNames = Array.from(
+    new Set(
+      (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : [])
+        .map((cardId) => cardNameLookup.get(cardId))
+        .filter(Boolean)
+    )
+  );
+  const value = formatBenefitValue(benefit);
+
+  return {
+    id: benefit?.id || benefit?._id?.toString?.() || null,
+    bankName: benefit?.bank || 'Banco',
+    cardName: cardNames[0] || 'Tarjeta de credito',
+    cardTypes: cardNames,
+    benefit: benefit?.benefitTitle || 'Beneficio',
+    rewardRate: value || 'Beneficio',
+    tipo: 'descuento',
+    cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
+    valor: value,
+    tope:
+      Array.isArray(benefit?.caps) && benefit.caps.length > 0 && Number.isFinite(benefit.caps[0]?.amount)
+        ? benefit.caps[0].amount
+        : null,
+    condicion: benefit?.termsAndConditions || null,
+    requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de credito'],
+    usos: benefit?.online ? ['online', 'presencial'] : ['presencial'],
+    textoAplicacion: benefit?.link || null,
+    description: benefit?.description || '',
+    installments: Number.isFinite(benefit?.installments) ? Number(benefit.installments) : null,
+    validUntil: benefit?.validUntil || null,
+    caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
+    otherDiscounts: benefit?.otherDiscounts || null,
+    subscription: benefit?.subscription || null
+  };
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(a));
+}
+
+function formatDistanceText(distance) {
+  if (!Number.isFinite(distance)) return null;
+  if (distance < 1) return `${Math.round(distance * 1000)}m`;
+  if (distance < 10) return `${Math.round(distance * 10) / 10}km`;
+  return `${Math.round(distance)}km`;
+}
+
+const LOCAL_DISTANCE_RADIUS_KM = Number.parseFloat(process.env.SEARCH_LOCAL_DISTANCE_RADIUS_KM || '80');
+const DISTANT_RESULT_CUTOFF_KM = Number.parseFloat(process.env.SEARCH_DISTANT_RESULT_CUTOFF_KM || '120');
+const MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING = Number.parseInt(
+  process.env.SEARCH_MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING || '3',
+  10
+);
+
+function isFiniteDistanceKm(value) {
+  return Number.isFinite(value);
+}
+
+function applyLocalDistanceGuardrail(merchantHits, filters) {
+  if (!Number.isFinite(filters?.lat) || !Number.isFinite(filters?.lng)) {
+    return merchantHits;
+  }
+
+  const withDistance = (merchantHits || []).filter((hit) => isFiniteDistanceKm(hit?.business?.distance));
+  if (withDistance.length === 0) return merchantHits;
+
+  const nearbyCount = withDistance.filter((hit) => hit.business.distance <= LOCAL_DISTANCE_RADIUS_KM).length;
+  if (nearbyCount < MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING) {
+    return merchantHits;
+  }
+
+  return merchantHits.filter((hit) => {
+    const distance = hit?.business?.distance;
+    if (!isFiniteDistanceKm(distance)) return true;
+    return distance <= DISTANT_RESULT_CUTOFF_KM;
+  });
+}
+
+function enrichBusinessWithDistance(business, userLat, userLng) {
+  if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+    return business;
+  }
+
+  const locations = Array.isArray(business.location) ? business.location : [];
+  const validDistances = locations
+    .filter((location) => Number.isFinite(location?.lat) && Number.isFinite(location?.lng))
+    .map((location) => haversineKm(userLat, userLng, Number(location.lat), Number(location.lng)));
+
+  if (validDistances.length === 0) return business;
+  const distance = Math.min(...validDistances);
+  return {
+    ...business,
+    distance,
+    distanceText: formatDistanceText(distance),
+    isNearby: distance <= 50
+  };
+}
+
+function parseSearchFilters(searchParams) {
+  const bank = searchParams.get('bank') || undefined;
+  const category = searchParams.get('category') || undefined;
+  const latParam = searchParams.get('lat');
+  const lngParam = searchParams.get('lng');
+  const lat = latParam != null ? Number.parseFloat(latParam) : null;
+  const lng = lngParam != null ? Number.parseFloat(lngParam) : null;
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  return {
+    bank,
+    category,
+    lat: hasLocation ? lat : null,
+    lng: hasLocation ? lng : null
+  };
+}
+
+function buildExpandedQueryTokens(query) {
+  const normalized = normalizeSearchText(query);
+  const tokens = tokenizeSearchText(query);
+  return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
+}
+
+function buildMeiliFilter(entityType, filters) {
+  const clauses = [`entityType = "${entityType}"`];
+  if (filters.category && filters.category !== 'all') {
+    clauses.push(`categories = "${normalizeSearchText(filters.category)}"`);
+  }
+
+  if (filters.bank) {
+    const banks = filters.bank
+      .split(',')
+      .map((value) => normalizeSearchText(value))
+      .filter(Boolean);
+    if (banks.length > 0) {
+      const bankClause = banks.map((bank) => `banks = "${bank}"`).join(' OR ');
+      clauses.push(`(${bankClause})`);
+    }
+  }
+
+  return clauses.join(' AND ');
+}
+
+function buildMerchantSeedFilter(seedMerchantIds, filters) {
+  const ids = (seedMerchantIds || []).filter(Boolean);
+  if (ids.length === 0) {
+    return buildMeiliFilter('merchant', filters);
+  }
+
+  const escapedIds = ids.map((id) => `"${String(id).replace(/"/g, '\\"')}"`).join(', ');
+  return `${buildMeiliFilter('merchant', filters)} AND merchantId IN [${escapedIds}]`;
+}
+
+function buildMerchantCategoryFilter(seedCategories, filters) {
+  const categories = (seedCategories || [])
+    .map((value) => normalizeSearchText(value))
+    .filter(Boolean);
+  if (categories.length === 0) {
+    return buildMeiliFilter('merchant', filters);
+  }
+
+  const categoryClause = categories.map((category) => `categories = "${category}"`).join(' OR ');
+  return `${buildMeiliFilter('merchant', filters)} AND (${categoryClause})`;
+}
+
+function mergeMerchantHitCandidates(hitLists) {
+  const mergedByMerchantId = new Map();
+  for (const hits of hitLists || []) {
+    for (const hit of Array.isArray(hits) ? hits : []) {
+      const merchantId = hit?.merchantId || hit?.entityId;
+      if (!merchantId) continue;
+      if (!mergedByMerchantId.has(merchantId)) {
+        mergedByMerchantId.set(merchantId, hit);
+      }
+    }
+  }
+  return Array.from(mergedByMerchantId.values());
+}
+
+function collectSeedMerchantIds(intentHits, productHits, maxIds = 350) {
+  const out = [];
+  const seen = new Set();
+
+  const pushId = (id) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+
+  for (const hit of Array.isArray(intentHits) ? intentHits : []) {
+    for (const id of Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : []) {
+      pushId(id);
+      if (out.length >= maxIds) return out;
+    }
+  }
+
+  for (const hit of Array.isArray(productHits) ? productHits : []) {
+    for (const id of Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : []) {
+      pushId(id);
+      if (out.length >= maxIds) return out;
+    }
+  }
+
+  return out;
+}
+
+function buildProductCategorySignalMap(productHits) {
+  const signalByCategory = new Map();
+  const products = Array.isArray(productHits) ? productHits : [];
+
+  for (let productRank = 0; productRank < products.length; productRank += 1) {
+    const hit = products[productRank];
+    const categories = Array.isArray(hit?.categories) ? hit.categories : [];
+    const productScore = Number(hit?._rankingScore || 0.5);
+    const productWeight = Math.max(0.25, 1 - productRank * 0.15) * Math.max(0.4, productScore);
+
+    for (const category of categories) {
+      const normalized = normalizeSearchText(category);
+      if (!normalized) continue;
+      const boost = 120 * productWeight;
+      signalByCategory.set(normalized, (signalByCategory.get(normalized) || 0) + boost);
+    }
+  }
+
+  return signalByCategory;
+}
+
+function getTopCategoriesBySignal(signalByCategory, maxCategories = 4, minSignal = 20) {
+  return Array.from(signalByCategory.entries())
+    .filter(([, signal]) => signal >= minSignal)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxCategories)
+    .map(([category]) => category);
+}
+
+function getCategorySignalBoostForMerchant(hit, categorySignalMap) {
+  const categories = Array.isArray(hit?.categories) ? hit.categories : [];
+  let boost = 0;
+  for (const category of categories) {
+    const normalized = normalizeSearchText(category);
+    boost += categorySignalMap.get(normalized) || 0;
+  }
+  return Math.min(boost, 220);
+}
+
+function buildIntentReferenceBoostMap(intentHits) {
+  const boostByMerchant = new Map();
+  const intents = Array.isArray(intentHits) ? intentHits : [];
+
+  for (let intentRank = 0; intentRank < intents.length; intentRank += 1) {
+    const hit = intents[intentRank];
+    const merchantRefs = Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : [];
+    const intentScore = Number(hit?._rankingScore || 0.5);
+    const intentWeight = Math.max(0.25, 1 - intentRank * 0.2) * Math.max(0.4, intentScore);
+
+    for (let refRank = 0; refRank < merchantRefs.length; refRank += 1) {
+      const merchantId = merchantRefs[refRank];
+      if (!merchantId) continue;
+
+      const positionBoost = Math.max(0, 260 - refRank * 10);
+      if (positionBoost <= 0) break;
+
+      const boost = positionBoost * intentWeight;
+      boostByMerchant.set(merchantId, (boostByMerchant.get(merchantId) || 0) + boost);
+    }
+  }
+
+  return boostByMerchant;
+}
+
+function buildProductReferenceBoostMap(productHits) {
+  const boostByMerchant = new Map();
+  const products = Array.isArray(productHits) ? productHits : [];
+
+  for (let productRank = 0; productRank < products.length; productRank += 1) {
+    const hit = products[productRank];
+    const merchantRefs = Array.isArray(hit?.merchantRefs) ? hit.merchantRefs : [];
+    const productScore = Number(hit?._rankingScore || 0.5);
+    const productWeight = Math.max(0.25, 1 - productRank * 0.15) * Math.max(0.4, productScore);
+
+    for (let refRank = 0; refRank < merchantRefs.length; refRank += 1) {
+      const merchantId = merchantRefs[refRank];
+      if (!merchantId) continue;
+
+      const positionBoost = Math.max(0, 220 - refRank * 9);
+      if (positionBoost <= 0) break;
+
+      const boost = positionBoost * productWeight;
+      boostByMerchant.set(merchantId, (boostByMerchant.get(merchantId) || 0) + boost);
+    }
+  }
+
+  return boostByMerchant;
+}
+
+function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
+  const reasons = [];
+  let score = Number(hit?._rankingScore || 0) * 100;
+
+  const merchantName = normalizeSearchText(hit.merchantName || '');
+  const aliases = (Array.isArray(hit.aliases) ? hit.aliases : []).map((value) => normalizeSearchText(value));
+  const aliasSet = new Set(aliases);
+  const manualAliasSet = new Set(
+    (Array.isArray(hit.manualAliases) ? hit.manualAliases : []).map((value) => normalizeSearchText(value))
+  );
+  const productTags = (Array.isArray(hit.productTags) ? hit.productTags : []).map((value) => normalizeSearchText(value));
+  const intentHitTags = Array.isArray(hit.intentTags) ? hit.intentTags : [];
+
+  if (merchantName && merchantName === normalizedQuery) {
+    score += 1000;
+    reasons.push('merchant_exact');
+  } else if (merchantName && merchantName.startsWith(normalizedQuery)) {
+    score += 450;
+    reasons.push('merchant_prefix');
+  }
+
+  if (aliasSet.has(normalizedQuery)) {
+    score += 700;
+    reasons.push('alias_exact');
+  }
+  if (manualAliasSet.has(normalizedQuery)) {
+    score += 2200;
+    reasons.push('manual_alias_exact');
+  }
+
+  const aliasOverlap = expandedTokens.filter((token) => aliasSet.has(token)).length;
+  if (aliasOverlap > 0) {
+    score += aliasOverlap * 80;
+    reasons.push('alias_overlap');
+  }
+  const manualAliasOverlap = expandedTokens.filter((token) => manualAliasSet.has(token)).length;
+  if (manualAliasOverlap > 0) {
+    score += manualAliasOverlap * 180;
+    reasons.push('manual_alias_overlap');
+  }
+
+  const productOverlap = expandedTokens.filter((token) => productTags.includes(token)).length;
+  if (productOverlap > 0) {
+    score += productOverlap * 45;
+    reasons.push('product_tag_overlap');
+  }
+
+  const intentOverlap = intentTags.filter((tag) => intentHitTags.includes(tag)).length;
+  if (intentOverlap > 0) {
+    score += intentOverlap * 95;
+    reasons.push('intent_overlap');
+  }
+
+  score += Number(hit.popularity || 0) * 0.6;
+  score += Number(hit.maxDiscount || 0) * 0.4;
+
+  return {
+    score,
+    reasons
+  };
+}
+
+function mapMerchantHitToResponse(hit, scoreMeta, filters) {
+  const business = {
+    ...(hit.business || {
+      id: hit.merchantId || normalizeSearchText(hit.merchantName).replace(/\s+/g, '-'),
+      name: hit.merchantName,
+      category: hit.categories?.[0] || 'otros',
+      description: hit.description || '',
+      rating: 5,
+      location: hit.locations || [],
+      image: '',
+      benefits: []
+    }),
+    benefits: Array.isArray(hit.business?.benefits) ? hit.business.benefits : [],
+    location: Array.isArray(hit.business?.location) ? hit.business.location : (Array.isArray(hit.locations) ? hit.locations : []),
+    image: hit.business?.image || ''
+  };
+
+  const withDistance = enrichBusinessWithDistance(business, filters.lat, filters.lng);
+
+  return {
+    entityId: hit.entityId,
+    merchantId: hit.merchantId,
+    merchantName: hit.merchantName,
+    aliases: hit.aliases || [],
+    intentTags: hit.intentTags || [],
+    productTags: hit.productTags || [],
+    categories: hit.categories || [],
+    banks: hit.banks || [],
+    score: scoreMeta.score,
+    reasons: scoreMeta.reasons,
+    business: withDistance
+  };
+}
+
+function mapIntentHit(hit) {
+  return {
+    entityId: hit.entityId,
+    intentKey: hit.intentKey,
+    displayLabel: hit.displayLabel,
+    synonyms: hit.synonyms || [],
+    merchantRefs: hit.merchantRefs || [],
+    categoryRefs: hit.categoryRefs || [],
+    score: Number(hit._rankingScore || 0)
+  };
+}
+
+function mapProductHit(hit) {
+  return {
+    entityId: hit.entityId,
+    productTerm: hit.productTerm,
+    intentTags: hit.intentTags || [],
+    merchantRefs: hit.merchantRefs || [],
+    categories: hit.categories || [],
+    score: Number(hit._rankingScore || 0)
+  };
+}
+
+async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams) {
+  const expandedTokens = buildExpandedQueryTokens(query);
+  const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
+  const regex = new RegExp(regexSource, 'i');
+
+  const merchantQuery = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    ...(shouldIncludeExpired(searchParams)
+      ? { benefitCount: { $gt: 0 } }
+      : { activeBenefitCount: { $gt: 0 } }),
+    $or: [
+      { merchantName: { $regex: regex } },
+      { aliases: { $regex: regex } },
+      { categories: { $regex: regex } },
+      { banks: { $regex: regex } },
+      { 'searchProfile.description': { $regex: regex } },
+      { 'searchProfile.productTags': { $regex: regex } },
+      { 'searchProfile.benefits.benefit': { $regex: regex } },
+      { 'searchProfile.benefits.description': { $regex: regex } }
+    ]
+  };
+
+  if (filters.category && filters.category !== 'all') {
+    merchantQuery.categories = { $in: [filters.category] };
+  }
+  if (filters.bank) {
+    const bankPatterns = filters.bank
+      .split(',')
+      .map((bank) => bank.trim())
+      .filter(Boolean)
+      .map((bank) => new RegExp(escapeRegex(bank), 'i'));
+    if (bankPatterns.length > 0) {
+      merchantQuery.banks = { $in: bankPatterns };
+    }
+  }
+
+  const fallbackMerchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+    .find(merchantQuery)
+    .limit(600)
+    .toArray();
+
+  const dataset = buildSearchDatasetFromMerchantDocs(fallbackMerchants);
+  const normalizedQuery = normalizeSearchText(query);
+  const intentTags = resolveIntentTagsFromTokens(expandedTokens);
+
+  const merchantHits = dataset.merchantDocuments
+    .map((hit) => {
+      const scoreMeta = scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags);
+      return mapMerchantHitToResponse(hit, scoreMeta, filters);
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const distanceAwareMerchants = applyLocalDistanceGuardrail(merchantHits, filters);
+  const pagedMerchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
+  const intentHits = dataset.intentDocuments
+    .filter((intent) => intentTags.includes(intent.intentKey))
+    .slice(0, 12)
+    .map((intent) => ({
+      entityId: intent.entityId,
+      intentKey: intent.intentKey,
+      displayLabel: intent.displayLabel,
+      synonyms: intent.synonyms || [],
+      merchantRefs: intent.merchantRefs || [],
+      categoryRefs: intent.categoryRefs || [],
+      score: 1
+    }));
+  const productHits = dataset.productDocuments
+    .filter((product) => expandedTokens.includes(product.productTerm))
+    .slice(0, 12)
+    .map((product) => ({
+      entityId: product.entityId,
+      productTerm: product.productTerm,
+      intentTags: product.intentTags || [],
+      merchantRefs: product.merchantRefs || [],
+      categories: product.categories || [],
+      score: 1
+    }));
+
+  return {
+    source: 'mongodb_fallback',
+    expandedTokens,
+    merchants: pagedMerchants,
+    intents: intentHits,
+    products: productHits,
+    totalMerchants: distanceAwareMerchants.length
+  };
+}
+
+async function handleSearch(req, res, url, db) {
+  const searchParams = url.searchParams;
+  const q = searchParams.get('q');
+  if (!q || !q.trim()) {
+    return json(res, 400, {
+      success: false,
+      error: 'Missing required query param: q'
+    });
+  }
+
+  const collectionName = getCollectionName(searchParams);
+  const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
+  const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
+  const sectionLimit = Math.min(Math.max(toPositiveInt(searchParams.get('sectionLimit'), 12), 1), 30);
+  const filters = parseSearchFilters(searchParams);
+  const debugMode = searchParams.get('debug') === '1' || process.env.SEARCH_DEBUG === 'true';
+
+  const normalized = normalizeSearchText(q);
+  const expandedTokens = buildExpandedQueryTokens(q);
+  const expandedQuery = expandedTokens.join(' ');
+  const intentTags = resolveIntentTagsFromTokens(expandedTokens);
+
+  const debug = {
+    normalized,
+    expandedTokens,
+    mode: 'meilisearch'
+  };
+
+  try {
+    if (!isMeilisearchConfigured()) {
+      throw new Error('Meilisearch is not configured');
+    }
+
+    // Fetch a wider candidate window, then apply business-aware rescoring.
+    // This is needed so strong alias/intent matches (e.g. FREDDO for gastronomy terms)
+    // are still considered even if raw lexical rank is lower.
+    const merchantSearch = await meiliSearch(expandedQuery, {
+      limit: Math.min(limitNum + offsetNum + 400, 1000),
+      filter: buildMeiliFilter('merchant', filters),
+      showRankingScore: true
+    });
+    const intentSearch = await meiliSearch(expandedQuery, {
+      limit: sectionLimit,
+      filter: buildMeiliFilter('intent', filters),
+      showRankingScore: true
+    });
+    const productSearch = await meiliSearch(expandedQuery, {
+      limit: sectionLimit,
+      filter: buildMeiliFilter('product', filters),
+      showRankingScore: true
+    });
+
+    const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
+    const merchantBaseHits = Array.isArray(merchantSearch.hits) ? merchantSearch.hits : [];
+    let merchantCandidateHits = merchantBaseHits;
+
+    if (seedMerchantIds.length > 0) {
+      const currentIds = new Set(merchantBaseHits.map((hit) => hit?.merchantId).filter(Boolean));
+      const missingSeedIds = seedMerchantIds.filter((id) => !currentIds.has(id));
+
+      if (missingSeedIds.length > 0) {
+        const seededMerchantSearch = await meiliSearch('', {
+          limit: Math.min(missingSeedIds.length, 350),
+          filter: buildMerchantSeedFilter(missingSeedIds, filters),
+          showRankingScore: true
+        });
+
+        merchantCandidateHits = [
+          ...merchantBaseHits,
+          ...(Array.isArray(seededMerchantSearch.hits) ? seededMerchantSearch.hits : [])
+        ];
+      }
+    }
+
+    const productCategorySignalMap = buildProductCategorySignalMap(productSearch.hits || []);
+    const topSeedCategories = getTopCategoriesBySignal(productCategorySignalMap);
+    const shouldExpandByCategory =
+      topSeedCategories.length > 0 && merchantCandidateHits.length < Math.max(limitNum + offsetNum + 80, 120);
+
+    if (shouldExpandByCategory) {
+      const categoryExpansionSearch = await meiliSearch('', {
+        limit: 300,
+        filter: buildMerchantCategoryFilter(topSeedCategories, filters),
+        showRankingScore: true
+      });
+
+      merchantCandidateHits = mergeMerchantHitCandidates([
+        merchantCandidateHits,
+        Array.isArray(categoryExpansionSearch.hits) ? categoryExpansionSearch.hits : []
+      ]);
+    }
+
+    const intentReferenceBoost = buildIntentReferenceBoostMap(intentSearch.hits || []);
+    const productReferenceBoost = buildProductReferenceBoostMap(productSearch.hits || []);
+    const scoredMerchantHits = merchantCandidateHits
+      .map((hit) => {
+        const scoreMeta = scoreMerchantHit(hit, normalized, expandedTokens, intentTags);
+        const intentBoost = intentReferenceBoost.get(hit.merchantId) || 0;
+        if (intentBoost > 0) {
+          scoreMeta.score += intentBoost;
+          scoreMeta.reasons.push('intent_ref_boost');
+        }
+        const productBoost = productReferenceBoost.get(hit.merchantId) || 0;
+        if (productBoost > 0) {
+          scoreMeta.score += productBoost;
+          scoreMeta.reasons.push('product_ref_boost');
+        }
+        const categoryBoost = getCategorySignalBoostForMerchant(hit, productCategorySignalMap);
+        if (categoryBoost > 0) {
+          scoreMeta.score += categoryBoost;
+          scoreMeta.reasons.push('product_category_boost');
+        }
+        return mapMerchantHitToResponse(hit, scoreMeta, filters);
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const distanceAwareMerchants = applyLocalDistanceGuardrail(scoredMerchantHits, filters);
+    const merchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
+    const intents = (intentSearch.hits || []).map(mapIntentHit);
+    const products = (productSearch.hits || []).map(mapProductHit);
+    const totalMerchants = distanceAwareMerchants.length;
+
+    return json(res, 200, {
+      success: true,
+      source: 'meilisearch',
+      query: {
+        q,
+        normalized,
+        expanded: expandedTokens,
+        limit: limitNum,
+        offset: offsetNum,
+        filters: {
+          ...(filters.bank && { bank: filters.bank }),
+          ...(filters.category && { category: filters.category })
+        }
+      },
+      intents,
+      merchants,
+      products,
+      pagination: {
+        totalMerchants,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + merchants.length < totalMerchants
+      },
+      ...(debugMode && {
+        debug: {
+          ...debug,
+          meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null,
+          meiliDistancePrunedTotal: distanceAwareMerchants.length,
+          meiliCategoryExpanded: shouldExpandByCategory,
+          meiliCategorySeeds: topSeedCategories
+        }
+      })
+    });
+  } catch (error) {
+    console.error('[Search] Meilisearch unavailable, falling back to Mongo regex search:', error);
+    debug.mode = 'mongodb_fallback';
+    debug.error = error instanceof Error ? error.message : 'unknown';
+
+    const fallback = await searchFromMongoFallback(
+      db,
+      collectionName,
+      q,
+      limitNum,
+      offsetNum,
+      filters,
+      searchParams
+    );
+
+    return json(res, 200, {
+      success: true,
+      source: fallback.source,
+      query: {
+        q,
+        normalized,
+        expanded: fallback.expandedTokens,
+        limit: limitNum,
+        offset: offsetNum,
+        filters: {
+          ...(filters.bank && { bank: filters.bank }),
+          ...(filters.category && { category: filters.category })
+        }
+      },
+      intents: fallback.intents,
+      merchants: fallback.merchants,
+      products: fallback.products,
+      pagination: {
+        totalMerchants: fallback.totalMerchants,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + fallback.merchants.length < fallback.totalMerchants
+      },
+      ...(debugMode && { debug })
+    });
+  }
 }
 
 async function getDb() {
@@ -264,6 +1144,31 @@ async function fetchGooglePlaceDetails(placeId) {
   };
 }
 
+async function resolveMerchantIdsForBenefitQuery(db, { category, search }) {
+  if (!category && !search) {
+    return null;
+  }
+
+  const merchantQuery = {
+    merchantId: { $exists: true, $type: 'string' },
+    isActive: { $ne: false }
+  };
+
+  if (category && category !== 'all') {
+    merchantQuery.categories = { $in: [category] };
+  }
+
+  if (search) {
+    merchantQuery.$or = [
+      { merchantName: { $regex: search, $options: 'i' } },
+      { aliases: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  const merchantIds = await db.collection(MERCHANT_ASSETS_COLLECTION).distinct('merchantId', merchantQuery);
+  return merchantIds.length > 0 ? merchantIds : [];
+}
+
 async function handleGetBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -278,10 +1183,6 @@ async function handleGetBenefits(req, res, url, db) {
   const offsetNum = toPositiveInt(searchParams.get('offset'), 0);
 
   const query = {};
-
-  if (category && category !== 'all') {
-    query.categories = { $in: [category] };
-  }
 
   if (bank) {
     query.bank = { $regex: bank, $options: 'i' };
@@ -298,9 +1199,33 @@ async function handleGetBenefits(req, res, url, db) {
   if (search) {
     query.$or = [
       { benefitTitle: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { 'merchant.name': { $regex: search, $options: 'i' } }
+      { description: { $regex: search, $options: 'i' } }
     ];
+  }
+
+  const merchantIds = await resolveMerchantIdsForBenefitQuery(db, { category, search });
+  if (Array.isArray(merchantIds)) {
+    if (merchantIds.length === 0) {
+      return json(res, 200, {
+        success: true,
+        benefits: [],
+        pagination: {
+          total: 0,
+          limit: limitNum,
+          offset: offsetNum,
+          hasMore: false
+        },
+        filters: {
+          category,
+          bank,
+          network,
+          online,
+          search,
+          includeExpired
+        }
+      });
+    }
+    query.merchantId = { $in: merchantIds };
   }
 
   applyActiveBenefitsFilter(query, searchParams);
@@ -310,11 +1235,15 @@ async function handleGetBenefits(req, res, url, db) {
     collection.find(query).sort({ _id: -1 }).skip(offsetNum).limit(limitNum).toArray(),
     collection.countDocuments(query)
   ]);
+  const merchantMap = await loadMerchantMapByIds(
+    db,
+    benefits.map((benefit) => benefit.merchantId).filter(Boolean)
+  );
 
   setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
-    benefits: benefits.map(serializeDocWithId),
+    benefits: benefits.map((benefit) => rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))),
     pagination: {
       total,
       limit: limitNum,
@@ -355,10 +1284,11 @@ async function handleGetBenefitById(req, res, url, db, id) {
     });
   }
 
+  const merchantMap = await loadMerchantMapByIds(db, [benefit.merchantId].filter(Boolean));
   setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
-    benefit: serializeDocWithId(benefit)
+    benefit: rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))
   });
 }
 
@@ -626,6 +1556,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  const subscription = searchParams.get('subscription');
   const search = searchParams.get('search');
   const onlineOnly = searchParams.get('online') === 'true';
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
@@ -652,414 +1583,237 @@ async function handleGetBusinesses(req, res, url, db) {
       .filter(Boolean)
     : null;
 
-  const matchStage = {};
+  const merchantQuery = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    ...(includeExpired ? { benefitCount: { $gt: 0 } } : { activeBenefitCount: { $gt: 0 } })
+  };
+
   if (category && category !== 'all') {
-    matchStage.categories = { $in: [category] };
+    merchantQuery.categories = { $in: [category] };
   }
-
+  if (bankFilter && bankFilter.length > 0) {
+    merchantQuery.banks = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  if (subscription) {
+    merchantQuery.subscriptionIds = subscription;
+  }
+  if (onlineOnly) {
+    merchantQuery.hasOnlineBenefits = true;
+  }
   if (search) {
-    matchStage.$or = [
-      { 'merchant.name': { $regex: search, $options: 'i' } },
-      { benefitTitle: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { 'locations.name': { $regex: search, $options: 'i' } }
-    ];
+    const normalizedSearch = normalizeSearchText(search);
+    const searchTerms = Array.from(
+      new Set([
+        search,
+        normalizedSearch,
+        ...tokenizeSearchText(search),
+        ...tokenizeSearchText(normalizedSearch)
+      ].filter(Boolean))
+    );
+
+    merchantQuery.$or = searchTerms.flatMap((term) => {
+      const pattern = new RegExp(escapeRegex(term), 'i');
+      return [
+        { merchantName: pattern },
+        { merchantKey: pattern },
+        { aliases: { $elemMatch: { $regex: pattern } } },
+        { categories: { $elemMatch: { $regex: pattern } } },
+        { banks: { $elemMatch: { $regex: pattern } } },
+        { 'searchProfile.searchText': pattern },
+        { 'searchProfile.description': pattern }
+      ];
+    });
   }
 
-  const activeMatch = getActiveBenefitsMatch(searchParams);
-  const pipeline = [
-    ...(activeMatch ? [{ $match: activeMatch }] : []),
-    ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
-    {
-      $match: {
-        'merchant.name': { $exists: true, $nin: [null, ''] }
-      }
-    },
-    // Stage 1.7: Resolve cardTypes IDs to card names via bank_cards collection
-    {
-      $lookup: {
-        from: 'bank_cards',
-        let: { cardTypeIds: { $ifNull: ['$cardTypes', []] } },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $in: [{ $toString: '$_id' }, '$$cardTypeIds']
-              }
-            }
-          },
-          {
-            $project: {
-              _id: 0,
-              name: { $concat: ['$issuer', ' ', '$tier'] }
-            }
-          }
-        ],
-        as: 'resolvedCards'
-      }
-    },
-    {
-      $group: {
-        _id: '$merchant.name',
-        name: { $first: '$merchant.name' },
-        category: { $first: { $arrayElemAt: ['$categories', 0] } },
-        description: { $first: '$description' },
-        allLocations: { $push: '$locations' },
-        benefits: {
-          $push: {
-            id: '$id',
-            bankName: { $ifNull: ['$bank', 'Banco'] },
-            cardName: {
-              $ifNull: [
-                { $arrayElemAt: ['$resolvedCards.name', 0] },
-                'Tarjeta de crédito'
-              ]
-            },
-            cardTypes: {
-              $cond: {
-                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: { $setUnion: ['$resolvedCards.name', []] },
-                else: []
-              }
-            },
-            benefit: '$benefitTitle',
-            rewardRate: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
-            tipo: 'descuento',
-            cuando: {
-              $reduce: {
-                input: { $ifNull: ['$availableDays', []] },
-                initialValue: '',
-                in: {
-                  $cond: {
-                    if: { $eq: ['$$value', ''] },
-                    then: '$$this',
-                    else: { $concat: ['$$value', ', ', '$$this'] }
-                  }
-                }
-              }
-            },
-            valor: { $concat: [{ $toString: { $ifNull: ['$discountPercentage', 0] } }, '%'] },
-            tope: { $ifNull: [{ $arrayElemAt: ['$caps.amount', 0] }, null] },
-            condicion: '$termsAndConditions',
-            requisitos: {
-              $cond: {
-                if: { $gt: [{ $size: { $ifNull: ['$resolvedCards', []] } }, 0] },
-                then: { $setUnion: ['$resolvedCards.name', []] },
-                else: ['Tarjeta de crédito']
-              }
-            },
-            usos: {
-              $cond: {
-                if: { $eq: ['$online', true] },
-                then: ['online', 'presencial'],
-                else: ['presencial']
-              }
-            },
-            textoAplicacion: '$link',
-            description: '$description',
-            installments: '$installments',
-            validUntil: '$validUntil',
-            caps: '$caps',
-            otherDiscounts: '$otherDiscounts',
-            subscription: '$subscription'
-          }
-        }
-      }
-    },
-    {
-      $addFields: {
-        id: {
-          $toLower: {
-            $replaceAll: {
-              input: {
-                $replaceAll: {
-                  input: { $ifNull: ['$name', 'unknown'] },
-                  find: "'",
-                  replacement: ''
-                }
-              },
-              find: ' ',
-              replacement: '-'
-            }
-          }
-        },
-        locations: {
-          $reduce: {
-            input: { $ifNull: ['$allLocations', []] },
-            initialValue: [],
-            in: { $concatArrays: ['$$value', { $ifNull: ['$$this', []] }] }
-          }
-        }
-      }
-    },
-    {
-      $lookup: {
-        from: MERCHANT_ASSETS_COLLECTION,
-        let: {
-          merchantName: '$name'
-        },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $ne: ['$isActive', false] },
-                  {
-                    $or: [
-                      {
-                        $eq: [
-                          '$merchantKey',
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$$merchantName', ''] }
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        $eq: [
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$merchantName', ''] }
-                              }
-                            }
-                          },
-                          {
-                            $toLower: {
-                              $trim: {
-                                input: { $ifNull: ['$$merchantName', ''] }
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          { $sort: { priority: -1, updatedAt: -1, createdAt: -1 } },
-          { $limit: 1 },
-          {
-            $project: {
-              _id: 0,
-              merchantName: 1,
-              merchantKey: 1,
-              imageUrl: 1,
-              logoUrl: 1,
-              coverUrl: 1,
-              source: 1
-            }
-          }
-        ],
-        as: 'merchantAsset'
-      }
-    },
-    {
-      $addFields: {
-        merchantAsset: { $first: '$merchantAsset' }
-      }
-    },
-    {
-      $addFields: {
-        image: {
-          $ifNull: [
-            '$merchantAsset.logoUrl',
-            {
-              $ifNull: [
-                '$merchantAsset.coverUrl',
-                {
-                  $ifNull: [
-                    '$merchantAsset.imageUrl',
-                    DEFAULT_BUSINESS_IMAGE
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        logo: '$merchantAsset.logoUrl',
-        coverImage: '$merchantAsset.coverUrl',
-        rating: 5,
-        category: { $ifNull: ['$category', 'otros'] },
-        description: { $ifNull: ['$description', ''] }
-      }
-    },
-    ...(bankFilter && bankFilter.length > 0
-      ? [{
-          $match: {
-            'benefits.bankName': {
-              $in: bankFilter.map((value) => new RegExp(value, 'i'))
-            }
-          }
-        }]
-      : []),
-    ...(onlineOnly
-      ? [{ $match: { 'benefits.usos': 'online' } }]
-      : []),
-    ...(hasLocation
-      ? [
-          {
-            $addFields: {
-              locationDistances: {
-                $map: {
-                  input: '$locations',
-                  as: 'loc',
-                  in: {
-                    $cond: {
-                      if: {
-                        $and: [
-                          { $ne: ['$$loc.lat', 0] },
-                          { $ne: ['$$loc.lng', 0] },
-                          { $ne: ['$$loc.lat', null] },
-                          { $ne: ['$$loc.lng', null] }
-                        ]
-                      },
-                      then: {
-                        $multiply: [
-                          6371,
-                          {
-                            $acos: {
-                              $add: [
-                                {
-                                  $multiply: [
-                                    { $sin: { $multiply: [{ $degreesToRadians: userLat }, 1] } },
-                                    { $sin: { $degreesToRadians: '$$loc.lat' } }
-                                  ]
-                                },
-                                {
-                                  $multiply: [
-                                    { $cos: { $multiply: [{ $degreesToRadians: userLat }, 1] } },
-                                    { $cos: { $degreesToRadians: '$$loc.lat' } },
-                                    { $cos: { $degreesToRadians: { $subtract: ['$$loc.lng', userLng] } } }
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        ]
-                      },
-                      else: null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            $addFields: {
-              distance: {
-                $let: {
-                  vars: {
-                    validDistances: {
-                      $filter: {
-                        input: '$locationDistances',
-                        as: 'dist',
-                        cond: { $ne: ['$$dist', null] }
-                      }
-                    }
-                  },
-                  in: {
-                    $cond: {
-                      if: { $gt: [{ $size: '$$validDistances' }, 0] },
-                      then: { $min: '$$validDistances' },
-                      else: null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            $addFields: {
-              distanceText: {
-                $cond: {
-                  if: { $ne: ['$distance', null] },
-                  then: {
-                    $cond: {
-                      if: { $lt: ['$distance', 1] },
-                      then: {
-                        $concat: [
-                          { $toString: { $round: { $multiply: ['$distance', 1000] } } },
-                          'm'
-                        ]
-                      },
-                      else: {
-                        $cond: {
-                          if: { $lt: ['$distance', 10] },
-                          then: {
-                            $concat: [
-                              { $toString: { $round: ['$distance', 1] } },
-                              'km'
-                            ]
-                          },
-                          else: {
-                            $concat: [
-                              { $toString: { $round: ['$distance', 0] } },
-                              'km'
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  },
-                  else: null
-                }
-              },
-              isNearby: {
-                $cond: {
-                  if: { $and: [{ $ne: ['$distance', null] }, { $lte: ['$distance', 50] }] },
-                  then: true,
-                  else: false
-                }
-              }
-            }
-          }
-        ]
-      : []),
-    {
-      $project: {
-        _id: 0,
-        allLocations: 0,
-        locationDistances: 0,
-        merchantAsset: 0
-      }
-    },
-    {
-      $facet: {
-        metadata: [{ $count: 'total' }],
-        businesses: [
-          ...(hasLocation
-            ? [
-                {
-                  $addFields: {
-                    sortKey: {
-                      $cond: {
-                        if: { $eq: ['$distance', null] },
-                        then: 999999,
-                        else: '$distance'
-                      }
-                    }
-                  }
-                },
-                { $sort: { sortKey: 1, name: 1 } },
-                { $project: { sortKey: 0 } }
-              ]
-            : [{ $sort: { name: 1 } }]),
-          { $skip: offsetNum },
-          { $limit: limitNum }
-        ]
-      }
-    }
-  ];
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  const total = await merchantCollection.countDocuments(merchantQuery);
+  const merchantProjection = {
+    _id: 0,
+    merchantId: 1,
+    merchantName: 1,
+    merchantKey: 1,
+    kind: 1,
+    categories: 1,
+    locations: 1,
+    banks: 1,
+    aliases: 1,
+    subscriptionIds: 1,
+    hasOnlineBenefits: 1,
+    activeBenefitCount: 1,
+    benefitCount: 1,
+    maxDiscountPercentage: 1,
+    searchProfile: 1,
+    imageUrl: 1,
+    logoUrl: 1,
+    coverUrl: 1
+  };
 
-  const result = await db.collection(collectionName).aggregate(pipeline).toArray();
-  const total = result[0]?.metadata?.[0]?.total || 0;
-  const businesses = result[0]?.businesses || [];
+  let pagedMerchants = [];
+  if (hasLocation) {
+    try {
+      const withGeo = await merchantCollection
+        .aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [userLng, userLat] },
+              distanceField: 'distanceMeters',
+              spherical: true,
+              key: 'geoPoints',
+              query: merchantQuery
+            }
+          },
+          { $sort: { distanceMeters: 1, merchantName: 1 } },
+          {
+            $project: {
+              ...merchantProjection,
+              distanceMeters: 1
+            }
+          }
+        ])
+        .toArray();
+
+      const withoutGeo = await merchantCollection
+        .aggregate([
+          { $match: merchantQuery },
+          {
+            $addFields: {
+              geoPointCount: buildGeoPointCountExpression()
+            }
+          },
+          { $match: { geoPointCount: 0 } },
+          { $sort: { merchantName: 1 } },
+          {
+            $project: merchantProjection
+          }
+        ])
+        .toArray();
+
+      const merchantsWithDistance = withGeo.map((merchant) => ({
+        ...merchant,
+        distance: Number(merchant.distanceMeters) / 1000,
+        distanceText: formatDistanceText(Number(merchant.distanceMeters) / 1000),
+        isNearby: Number(merchant.distanceMeters) / 1000 <= 50
+      }));
+      const merchantsWithoutDistance = withoutGeo.map((merchant) => ({
+        ...merchant,
+        distance: null,
+        distanceText: null,
+        isNearby: false
+      }));
+      pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance].slice(offsetNum, offsetNum + limitNum);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const missingGeoIndex = message.includes('unable to find index for $geoNear query');
+      if (!missingGeoIndex) {
+        throw error;
+      }
+
+      console.warn('[businesses] Falling back to in-memory distance sort because geoPoints is not indexed');
+
+      const merchants = await merchantCollection
+        .find(merchantQuery, { projection: merchantProjection })
+        .toArray();
+
+      pagedMerchants = merchants
+        .map((merchant) => {
+          const validDistances = (Array.isArray(merchant.locations) ? merchant.locations : [])
+            .filter((location) => Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng)))
+            .map((location) => haversineKm(
+              userLat,
+              userLng,
+              Number(location.lat),
+              Number(location.lng)
+            ));
+
+          if (validDistances.length === 0) {
+            return {
+              ...merchant,
+              distance: null,
+              distanceText: null,
+              isNearby: false
+            };
+          }
+
+          const distance = Math.min(...validDistances);
+          return {
+            ...merchant,
+            distance,
+            distanceText: formatDistanceText(distance),
+            isNearby: distance <= 50
+          };
+        })
+        .sort((left, right) => {
+          const leftDistance = Number.isFinite(left.distance) ? left.distance : Number.POSITIVE_INFINITY;
+          const rightDistance = Number.isFinite(right.distance) ? right.distance : Number.POSITIVE_INFINITY;
+          if (leftDistance !== rightDistance) {
+            return leftDistance - rightDistance;
+          }
+          return String(left.merchantName || '').localeCompare(String(right.merchantName || ''));
+        })
+        .slice(offsetNum, offsetNum + limitNum);
+    }
+  } else {
+    pagedMerchants = await merchantCollection
+      .find(merchantQuery, {
+        projection: merchantProjection
+      })
+      .sort({ merchantName: 1 })
+      .skip(offsetNum)
+      .limit(limitNum)
+      .toArray();
+  }
+
+  const merchantIds = pagedMerchants.map((merchant) => merchant.merchantId).filter(Boolean);
+  const benefitQuery = {
+    merchantId: { $in: merchantIds }
+  };
+
+  if (bankFilter && bankFilter.length > 0) {
+    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  if (subscription) {
+    benefitQuery.subscription = subscription;
+  }
+  if (onlineOnly) {
+    benefitQuery.online = true;
+  }
+  applyActiveBenefitsFilter(benefitQuery, searchParams);
+
+  const rawBenefits = merchantIds.length > 0
+    ? await db.collection(collectionName).find(benefitQuery).sort({ bank: 1, benefitTitle: 1 }).toArray()
+    : [];
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefitsByMerchant = new Map();
+  for (const benefit of rawBenefits) {
+    const key = benefit.merchantId;
+    if (!key) continue;
+    if (!benefitsByMerchant.has(key)) {
+      benefitsByMerchant.set(key, []);
+    }
+    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
+  }
+
+  const businesses = pagedMerchants
+    .map((merchant) => ({
+      id: merchant.merchantId,
+      name: merchant.merchantName,
+      category: Array.isArray(merchant.categories) && merchant.categories.length > 0
+        ? merchant.categories[0]
+        : 'otros',
+      description: merchant.searchProfile?.description || '',
+      rating: 5,
+      locations: dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []),
+      image: pickBusinessImage(merchant),
+      logo: merchant.logoUrl || null,
+      coverImage: merchant.coverUrl || null,
+      benefits: benefitsByMerchant.get(merchant.merchantId) || [],
+      distance: merchant.distance ?? null,
+      distanceText: merchant.distanceText ?? null,
+      isNearby: Boolean(merchant.isNearby),
+      hasOnline: Boolean(merchant.hasOnlineBenefits)
+    }))
+    .filter((merchant) => merchant.benefits.length > 0);
 
   setCacheControl(res, hasExact ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {
@@ -1075,6 +1829,8 @@ async function handleGetBusinesses(req, res, url, db) {
       ...(category && { category }),
       ...(bank && { bank }),
       ...(search && { search }),
+      ...(onlineOnly && { online: 'true' }),
+      ...(subscription && { subscription }),
       includeExpired,
       ...(hasLocation && { lat: userLat, lng: userLng })
     }
@@ -1105,6 +1861,15 @@ async function handlePlaceDetails(req, res) {
   });
 }
 
+export {
+  buildBusinessBenefitSummary,
+  getActiveBenefitsMatch,
+  handleGetBenefitById,
+  handleGetBenefits,
+  handleGetBusinesses,
+  rehydrateBenefitDoc
+};
+
 export default async function handler(req, res) {
   const url = getParsedUrl(req);
   const path = resolveRequestPath(url);
@@ -1122,6 +1887,10 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/api/businesses') {
       return await handleGetBusinesses(req, res, url, db);
+    }
+
+    if (req.method === 'GET' && path === '/api/search') {
+      return await handleSearch(req, res, url, db);
     }
 
     if (req.method === 'GET' && path === '/api/categories') {
@@ -1159,6 +1928,7 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
         'GET /api/networks',

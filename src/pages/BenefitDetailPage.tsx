@@ -102,7 +102,15 @@ function BenefitDetailPage() {
         setLoading(true);
         const searchName = id.replace(/-/g, ' ');
         const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
-        if (response.success && response.businesses.length > 0) {
+        if (Array.isArray(response) && response.length > 0) {
+          const biz = response[0];
+          setBusiness(biz);
+          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
+          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
+          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
+          setBenefitPosition(resolvedIndex);
+          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
+        } else if (response.success && response.businesses.length > 0) {
           const biz = response.businesses[0];
           setBusiness(biz);
           const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;

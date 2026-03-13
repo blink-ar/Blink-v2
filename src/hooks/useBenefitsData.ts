@@ -48,7 +48,7 @@ export interface BenefitsFilters {
 
 /**
  * Hook for accessing benefits data with React Query
- * Uses the new /api/businesses endpoint with proper server-side pagination and filtering
+ * Uses /api/search when text query is present, otherwise /api/businesses for listing pagination.
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
