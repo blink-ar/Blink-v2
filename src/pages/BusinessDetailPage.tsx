@@ -129,6 +129,9 @@ function BusinessDetailPage() {
   const sortedBenefits = useMemo(() => {
     if (!business) return [];
     return [...business.benefits].sort((a, b) => {
+      const todayA = isBenefitAvailableToday(a) ? 1 : 0;
+      const todayB = isBenefitAvailableToday(b) ? 1 : 0;
+      if (todayB !== todayA) return todayB - todayA;
       const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
       const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
       if (dB !== dA) return dB - dA;
@@ -176,7 +179,7 @@ function BusinessDetailPage() {
         {/* Unified hero header */}
         <div
           className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260 }}
+          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 }}
         >
           {/* Floating nav buttons */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
