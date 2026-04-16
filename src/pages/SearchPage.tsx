@@ -10,6 +10,7 @@ import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { fetchBanks } from '../services/api';
 import { Business } from '../types';
+import { buildBankOptions, toBankDescriptor } from '../utils/banks';
 import {
   trackFilterApply,
   trackNoResults,
@@ -17,12 +18,6 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { formatDistance } from '../utils/distance';
-
-interface BankDescriptor {
-  token: string;
-  code: string;
-  label: string;
-}
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -36,100 +31,6 @@ interface SearchFilterState {
 }
 
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
-
-const KNOWN_BANKS: BankDescriptor[] = [
-  { token: 'galicia', code: 'GAL', label: 'GALICIA' },
-  { token: 'santander', code: 'SAN', label: 'SANTANDER' },
-  { token: 'bbva', code: 'BBVA', label: 'BBVA' },
-  { token: 'macro', code: 'MAC', label: 'MACRO' },
-  { token: 'modo', code: 'MODO', label: 'MODO' },
-  { token: 'icbc', code: 'ICBC', label: 'ICBC' },
-  { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
-  { token: 'amex', code: 'AMEX', label: 'AMEX' },
-  { token: 'naranja', code: 'NX', label: 'NARANJA X' },
-  { token: 'nacion', code: 'BNA', label: 'NACION' },
-  { token: 'ciudad', code: 'CIU', label: 'CIUDAD' },
-  { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
-  { token: 'visa', code: 'VISA', label: 'VISA' },
-  { token: 'mastercard', code: 'MC', label: 'MASTERCARD' },
-];
-
-const asBankText = (value: unknown): string => {
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (value && typeof value === 'object') {
-    const objectValue = value as Record<string, unknown>;
-    const candidates = [
-      objectValue.bank,
-      objectValue.name,
-      objectValue.label,
-      objectValue.code,
-      objectValue.value,
-      objectValue.id,
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string' || typeof candidate === 'number') {
-        return String(candidate);
-      }
-    }
-  }
-  return '';
-};
-
-const normalizeText = (value: unknown) =>
-  asBankText(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-const sanitizeBankName = (value: unknown) =>
-  normalizeText(value)
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
-  if (normalized.includes('galic')) return KNOWN_BANKS[0];
-  if (normalized.includes('santand')) return KNOWN_BANKS[1];
-  if (normalized.includes('bbva')) return KNOWN_BANKS[2];
-  if (normalized.includes('macro')) return KNOWN_BANKS[3];
-  if (normalized.includes('modo')) return KNOWN_BANKS[4];
-  if (normalized.includes('icbc')) return KNOWN_BANKS[5];
-  if (normalized.includes('hsbc')) return KNOWN_BANKS[6];
-  if (normalized.includes('amex') || normalized.includes('american express')) return KNOWN_BANKS[7];
-  if (normalized.includes('naranja x') || normalized.includes('naranjax') || normalized === 'nx') return KNOWN_BANKS[8];
-  if (normalized.includes('nacion')) return KNOWN_BANKS[9];
-  if (normalized.includes('ciudad')) return KNOWN_BANKS[10];
-  if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
-  if (normalized.includes('visa')) return KNOWN_BANKS[12];
-  if (normalized.includes('master')) return KNOWN_BANKS[13];
-  return null;
-};
-
-const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
-  const sanitized = sanitizeBankName(bankValue).replace(/^banco\s+/, '').trim();
-  if (!sanitized) {
-    return {
-      token: 'bank',
-      code: 'BANK',
-      label: 'BANCO',
-    };
-  }
-
-  const known = getKnownDescriptor(sanitized);
-  if (known) return known;
-
-  const words = sanitized.split(' ').filter(Boolean);
-  const token = words[0];
-  const codeSource = words.length > 1 ? words.map((word) => word[0]).join('') : words[0];
-  const code = codeSource.slice(0, 4).toUpperCase();
-
-  return {
-    token,
-    code,
-    label: sanitized.toUpperCase().slice(0, 18),
-  };
-};
 
 const readStoredBanks = (): string[] => {
   if (typeof window === 'undefined') return [];
@@ -186,11 +87,11 @@ function SearchPage() {
   const [showBankSheet, setShowBankSheet] = useState(false);
   const [showCategorySheet, setShowCategorySheet] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
-  const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
+  const [maxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
   const [availableDay, setAvailableDay] = useState<string | undefined>(searchParams.get('day') || undefined);
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
-  const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
+  const [network] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
   const [sortByDistance, setSortByDistance] = useState(searchParams.get('nearby') === '1');
 
@@ -279,41 +180,8 @@ function SearchPage() {
   }, [businesses]);
 
   const bankOptions = useMemo<BankFilterOption[]>(() => {
-    const optionMap = new Map<string, BankFilterOption>();
-    const knownOrder = new Map(KNOWN_BANKS.map((bank, index) => [bank.token, index]));
-
-    const addOption = (bankName: unknown) => {
-      const descriptor = toBankDescriptor(bankName);
-      if (!optionMap.has(descriptor.token)) {
-        optionMap.set(descriptor.token, descriptor);
-      }
-    };
-
-    availableBankNames.forEach(addOption);
-    businessBankNames.forEach(addOption);
-    selectedBanks.forEach(addOption);
-
-    return Array.from(optionMap.values()).sort((a, b) => {
-      const orderA = knownOrder.get(a.token);
-      const orderB = knownOrder.get(b.token);
-      if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
-      if (orderA !== undefined) return -1;
-      if (orderB !== undefined) return 1;
-      return a.label.localeCompare(b.label, 'es');
-    });
+    return buildBankOptions(availableBankNames, businessBankNames, selectedBanks);
   }, [availableBankNames, businessBankNames, selectedBanks]);
-
-  const bankMap = useMemo(
-    () => new Map(bankOptions.map((option) => [option.token, option])),
-    [bankOptions],
-  );
-
-  const selectedBankPreview = selectedBanks
-    .slice(0, 3)
-    .map((token) => ({
-      token,
-      code: bankMap.get(token)?.code || toBankDescriptor(token).code,
-    }));
 
   const activeFilterCount = [
     selectedBanks.length > 0,
@@ -576,15 +444,6 @@ function SearchPage() {
       if (benefit.installments && benefit.installments > max) max = benefit.installments;
     });
     return max;
-  };
-
-  // Get best benefit text
-  const getBestBenefitText = (business: Business) => {
-    const max = getMaxDiscount(business);
-    if (max > 0) return `HASTA ${max}% OFF`;
-    const withInstallments = business.benefits.find((benefit) => benefit.installments && benefit.installments > 0);
-    if (withInstallments) return `${withInstallments.installments} CUOTAS S/INT`;
-    return 'VER BENEFICIOS';
   };
 
   // Get abbreviated bank names
