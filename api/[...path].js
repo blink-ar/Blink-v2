@@ -1670,7 +1670,7 @@ async function handleGetBusinesses(req, res, url, db) {
               distanceMeters: 1
             }
           }
-        ])
+        ], { allowDiskUse: true })
         .toArray();
 
       const withoutGeo = await merchantCollection
