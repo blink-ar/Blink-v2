@@ -1686,7 +1686,7 @@ async function handleGetBusinesses(req, res, url, db) {
           {
             $project: merchantProjection
           }
-        ])
+        ], { allowDiskUse: true })
         .toArray();
 
       const merchantsWithDistance = withGeo.map((merchant) => ({
