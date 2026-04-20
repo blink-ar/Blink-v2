@@ -28,6 +28,12 @@ if (!globalState.__blinkMongo) {
     dbPromise: null
   };
 }
+if (!globalState.__blinkBankCards) {
+  globalState.__blinkBankCards = {
+    mapPromise: null,
+    loadedAt: 0
+  };
+}
 
 function json(res, statusCode, payload) {
   res.status(statusCode);
@@ -200,21 +206,34 @@ function dedupeLocations(locations) {
   return uniqueLocations;
 }
 
-function buildGeoPointCountExpression() {
+function buildUsableGeoMatch() {
   return {
-    $switch: {
-      branches: [
-        {
-          case: { $isArray: '$geoPoints' },
-          then: { $size: '$geoPoints' }
-        },
-        {
-          case: { $isArray: '$geoPoints.coordinates' },
-          then: { $size: '$geoPoints.coordinates' }
-        }
-      ],
-      default: 0
-    }
+    $or: [
+      { 'geoPoints.0': { $exists: true } },
+      { 'geoPoints.coordinates.0': { $exists: true } }
+    ]
+  };
+}
+
+function buildMissingGeoMatch() {
+  return {
+    $nor: [
+      { 'geoPoints.0': { $exists: true } },
+      { 'geoPoints.coordinates.0': { $exists: true } }
+    ]
+  };
+}
+
+function combineQueriesWithAnd(...conditions) {
+  const filtered = conditions.filter((condition) => condition && Object.keys(condition).length > 0);
+  if (filtered.length === 0) {
+    return {};
+  }
+  if (filtered.length === 1) {
+    return filtered[0];
+  }
+  return {
+    $and: filtered
   };
 }
 
@@ -296,23 +315,30 @@ async function resolveCardNameLookup(db, benefits) {
     return new Map();
   }
 
-  const cards = await db.collection(BANK_CARDS_COLLECTION)
-    .find(
-      {
-        _id: { $in: cardIds.map((value) => new ObjectId(value)) }
-      },
-      {
-        projection: { issuer: 1, tier: 1 }
-      }
-    )
-    .toArray();
+  const cacheTtlMs = 60 * 60 * 1000;
+  const bankCardsCache = globalState.__blinkBankCards;
+  const shouldRefresh = !bankCardsCache.mapPromise || (Date.now() - bankCardsCache.loadedAt) > cacheTtlMs;
 
-  return new Map(
-    cards.map((card) => {
-      const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim() || 'Tarjeta de credito';
-      return [card._id.toString(), name];
-    })
-  );
+  if (shouldRefresh) {
+    bankCardsCache.loadedAt = Date.now();
+    bankCardsCache.mapPromise = db.collection(BANK_CARDS_COLLECTION)
+      .find({}, { projection: { issuer: 1, tier: 1 } })
+      .toArray()
+      .then((cards) => new Map(
+        cards.map((card) => {
+          const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim() || 'Tarjeta de credito';
+          return [card._id.toString(), name];
+        })
+      ))
+      .catch((error) => {
+        bankCardsCache.mapPromise = null;
+        bankCardsCache.loadedAt = 0;
+        throw error;
+      });
+  }
+
+  const allCardNames = await bankCardsCache.mapPromise;
+  return new Map(cardIds.map((cardId) => [cardId, allCardNames.get(cardId)]).filter(([, name]) => Boolean(name)));
 }
 
 function formatBenefitValue(benefit) {
@@ -1627,67 +1653,84 @@ async function handleGetBusinesses(req, res, url, db) {
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
-  const total = await merchantCollection.countDocuments(merchantQuery);
+  const totalPromise = merchantCollection.countDocuments(merchantQuery);
   const merchantProjection = {
     _id: 0,
     merchantId: 1,
     merchantName: 1,
-    merchantKey: 1,
-    kind: 1,
     categories: 1,
     locations: 1,
-    banks: 1,
-    aliases: 1,
-    subscriptionIds: 1,
     hasOnlineBenefits: 1,
-    activeBenefitCount: 1,
-    benefitCount: 1,
-    maxDiscountPercentage: 1,
-    searchProfile: 1,
+    'searchProfile.description': 1,
     imageUrl: 1,
     logoUrl: 1,
     coverUrl: 1
+  };
+  const benefitSummaryProjection = {
+    _id: 1,
+    id: 1,
+    merchantId: 1,
+    bank: 1,
+    benefitTitle: 1,
+    availableDays: 1,
+    discountPercentage: 1,
+    caps: 1,
+    online: 1,
+    otherDiscounts: 1,
+    installments: 1,
+    description: 1,
+    termsAndConditions: 1,
+    link: 1,
+    validUntil: 1,
+    cardTypes: 1,
+    subscription: 1
   };
 
   let pagedMerchants = [];
   if (hasLocation) {
     try {
-      const withGeo = await merchantCollection
-        .aggregate([
-          {
-            $geoNear: {
-              near: { type: 'Point', coordinates: [userLng, userLat] },
-              distanceField: 'distanceMeters',
-              spherical: true,
-              key: 'geoPoints',
-              query: merchantQuery
+      const usableGeoMatch = buildUsableGeoMatch();
+      const withGeoQuery = combineQueriesWithAnd(merchantQuery, usableGeoMatch);
+      const withoutGeoQuery = combineQueriesWithAnd(merchantQuery, buildMissingGeoMatch());
+      const withGeo = limitNum > 0
+        ? await merchantCollection
+          .aggregate([
+            {
+              $geoNear: {
+                near: { type: 'Point', coordinates: [userLng, userLat] },
+                distanceField: 'distanceMeters',
+                spherical: true,
+                key: 'geoPoints',
+                query: withGeoQuery
+              }
+            },
+            { $skip: offsetNum },
+            { $limit: limitNum },
+            {
+              $project: {
+                ...merchantProjection,
+                distanceMeters: 1
+              }
             }
-          },
-          { $sort: { distanceMeters: 1, merchantName: 1 } },
-          {
-            $project: {
-              ...merchantProjection,
-              distanceMeters: 1
-            }
-          }
-        ])
-        .toArray();
+          ])
+          .toArray()
+        : [];
 
-      const withoutGeo = await merchantCollection
-        .aggregate([
-          { $match: merchantQuery },
-          {
-            $addFields: {
-              geoPointCount: buildGeoPointCountExpression()
-            }
-          },
-          { $match: { geoPointCount: 0 } },
-          { $sort: { merchantName: 1 } },
-          {
-            $project: merchantProjection
-          }
-        ])
-        .toArray();
+      let withoutGeoOffset = 0;
+      if (offsetNum > 0 && withGeo.length < limitNum) {
+        const withGeoCount = await merchantCollection.countDocuments(withGeoQuery);
+        withoutGeoOffset = Math.max(offsetNum - withGeoCount, 0);
+      }
+
+      const withoutGeoLimit = Math.max(limitNum - withGeo.length, 0);
+      const withoutGeo = withoutGeoLimit > 0
+        ? await merchantCollection
+          .find(withoutGeoQuery, { projection: merchantProjection })
+          .sort({ merchantName: 1 })
+          .skip(withoutGeoOffset)
+          .limit(withoutGeoLimit)
+          .toArray()
+        : [];
 
       const merchantsWithDistance = withGeo.map((merchant) => ({
         ...merchant,
@@ -1701,7 +1744,7 @@ async function handleGetBusinesses(req, res, url, db) {
         distanceText: null,
         isNearby: false
       }));
-      pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance].slice(offsetNum, offsetNum + limitNum);
+      pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance];
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const missingGeoIndex = message.includes('unable to find index for $geoNear query');
@@ -1781,7 +1824,10 @@ async function handleGetBusinesses(req, res, url, db) {
   applyActiveBenefitsFilter(benefitQuery, searchParams);
 
   const rawBenefits = merchantIds.length > 0
-    ? await db.collection(collectionName).find(benefitQuery).sort({ bank: 1, benefitTitle: 1 }).toArray()
+    ? await db.collection(collectionName)
+      .find(benefitQuery, { projection: benefitSummaryProjection })
+      .sort({ bank: 1, benefitTitle: 1 })
+      .toArray()
     : [];
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefitsByMerchant = new Map();
@@ -1814,6 +1860,7 @@ async function handleGetBusinesses(req, res, url, db) {
       hasOnline: Boolean(merchant.hasOnlineBenefits)
     }))
     .filter((merchant) => merchant.benefits.length > 0);
+  const total = await totalPromise;
 
   setCacheControl(res, hasExact ? CC_LOCATION : CC_CONTENT);
   return json(res, 200, {

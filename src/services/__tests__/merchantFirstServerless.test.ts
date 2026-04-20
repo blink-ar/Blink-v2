@@ -79,8 +79,8 @@ describe('merchant-first serverless helpers', () => {
   });
 
   it('handleGetBusinesses paginates merchants before benefit hydration', async () => {
-    const merchantQueries: any[] = [];
-    const benefitQueries: any[] = [];
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
 
     const merchants = [
       {
@@ -182,8 +182,8 @@ describe('merchant-first serverless helpers', () => {
     expect(payload.businesses).toHaveLength(1);
     expect(payload.businesses[0].id).toBe('merchant_1');
     expect(payload.businesses[0].benefits).toHaveLength(1);
-    expect(merchantQueries[0].categories).toEqual({ $in: ['shopping'] });
-    expect(benefitQueries[0].merchantId.$in).toEqual(['merchant_1']);
+    expect((merchantQueries[0] as { categories: unknown }).categories).toEqual({ $in: ['shopping'] });
+    expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
   });
 
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {
@@ -300,7 +300,8 @@ describe('merchant-first serverless helpers', () => {
   });
 
   it('handleGetBusinesses supports nearby queries with MultiPoint geoPoints merchants', async () => {
-    const aggregatePipelines: any[] = [];
+    const aggregatePipelines: unknown[][] = [];
+    const merchantCountQueries: unknown[] = [];
     const merchants = [
       {
         merchantId: 'merchant_1',
@@ -344,15 +345,13 @@ describe('merchant-first serverless helpers', () => {
       collection(name: string) {
         if (name === 'merchant_assets') {
           return {
-            async countDocuments() {
+            async countDocuments(query: unknown) {
+              merchantCountQueries.push(query);
               return merchants.length;
             },
             aggregate(pipeline: unknown[]) {
               aggregatePipelines.push(pipeline);
-              if (pipeline[0] && '$geoNear' in pipeline[0]) {
-                return createAggregateCursor(merchants);
-              }
-              return createAggregateCursor([]);
+              return createAggregateCursor(merchants);
             }
           };
         }
@@ -387,22 +386,153 @@ describe('merchant-first serverless helpers', () => {
     expect(res.statusCode).toBe(200);
     expect(payload.businesses).toHaveLength(1);
     expect(payload.businesses[0].distance).toBeCloseTo(0.25, 5);
-    expect(aggregatePipelines).toHaveLength(2);
-    expect(aggregatePipelines[1][1].$addFields.geoPointCount).toEqual({
-      $switch: {
-        branches: [
-          {
-            case: { $isArray: '$geoPoints' },
-            then: { $size: '$geoPoints' }
-          },
-          {
-            case: { $isArray: '$geoPoints.coordinates' },
-            then: { $size: '$geoPoints.coordinates' }
-          }
-        ],
-        default: 0
+    expect(merchantCountQueries).toHaveLength(1);
+    expect(aggregatePipelines).toHaveLength(1);
+    expect(aggregatePipelines[0][1]).toEqual({ $skip: 0 });
+    expect(aggregatePipelines[0][2]).toEqual({ $limit: 1 });
+  });
+
+  it('handleGetBusinesses paginates into withoutGeo merchants without aggregating them', async () => {
+    const aggregatePipelines: unknown[][] = [];
+    const merchantCountQueries: unknown[] = [];
+    const merchantFindQueries: unknown[] = [];
+    const merchantFindOps: Array<Record<string, unknown>> = [];
+    const withGeoMerchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Adidas',
+      merchantKey: 'adidas',
+      categories: ['shopping'],
+      locations: [{ formattedAddress: 'Store 1', lat: -34.6, lng: -58.38 }],
+      banks: ['BBVA'],
+      searchProfile: { description: 'Sportswear' },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: false,
+      imageUrl: 'https://cdn.example.com/adidas.jpg',
+      logoUrl: null,
+      coverUrl: null,
+      distanceMeters: 250
+    };
+    const withoutGeoMerchant = {
+      merchantId: 'merchant_2',
+      merchantName: 'Mostaza',
+      merchantKey: 'mostaza',
+      categories: ['gastronomia'],
+      locations: [],
+      banks: ['BBVA'],
+      searchProfile: { description: 'Fast food' },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: true,
+      imageUrl: 'https://cdn.example.com/mostaza.jpg',
+      logoUrl: null,
+      coverUrl: null
+    };
+    const benefits = [
+      {
+        id: 'benefit-2',
+        merchantId: 'merchant_2',
+        bank: 'BBVA',
+        benefitTitle: '10% OFF',
+        availableDays: ['Martes'],
+        discountPercentage: 10,
+        caps: [],
+        online: true,
+        otherDiscounts: null,
+        installments: null,
+        description: 'Promo',
+        termsAndConditions: '',
+        link: null,
+        validUntil: '2099-12-31',
+        cardTypes: []
       }
-    });
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantCountQueries.push(query);
+              if (typeof query === 'object' && query !== null && '$and' in query) {
+                return 1;
+              }
+              return 2;
+            },
+            aggregate(pipeline: unknown[]) {
+              aggregatePipelines.push(pipeline);
+              const skipStage = pipeline.find((stage) => '$skip' in (stage as Record<string, unknown>)) as { $skip: number } | undefined;
+              return createAggregateCursor(skipStage?.$skip === 1 ? [] : [withGeoMerchant]);
+            },
+            find(query: unknown) {
+              merchantFindQueries.push(query);
+              const cursor = {
+                sort(sortSpec: unknown) {
+                  merchantFindOps.push({ sort: sortSpec });
+                  return cursor;
+                },
+                skip(value: number) {
+                  merchantFindOps.push({ skip: value });
+                  return cursor;
+                },
+                limit(value: number) {
+                  merchantFindOps.push({ limit: value });
+                  return cursor;
+                },
+                async toArray() {
+                  return [withoutGeoMerchant];
+                }
+              };
+              return cursor;
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor(benefits);
+            }
+          };
+        }
+
+        if (name === 'bank_cards') {
+          return {
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?collection=confirmed_benefits&lat=-34.6037&lng=-58.3816&limit=1&offset=1');
+
+    await handleGetBusinesses(req as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.businesses).toHaveLength(1);
+    expect(payload.businesses[0].id).toBe('merchant_2');
+    expect(payload.businesses[0].distance).toBeNull();
+    expect(merchantCountQueries).toHaveLength(2);
+    expect(aggregatePipelines).toHaveLength(1);
+    expect(aggregatePipelines[0][1]).toEqual({ $skip: 1 });
+    expect(aggregatePipelines[0][2]).toEqual({ $limit: 1 });
+    expect(merchantFindQueries).toHaveLength(1);
+    expect((((merchantFindQueries[0] as { $and: Array<{ $nor?: unknown[] }> }).$and)[1]).$nor).toEqual([
+      { 'geoPoints.0': { $exists: true } },
+      { 'geoPoints.coordinates.0': { $exists: true } }
+    ]);
+    expect(merchantFindOps).toEqual([
+      { sort: { merchantName: 1 } },
+      { skip: 0 },
+      { limit: 1 }
+    ]);
   });
 
   it('getActiveBenefitsMatch keeps date-only validUntil values active through the end of the current day', () => {
