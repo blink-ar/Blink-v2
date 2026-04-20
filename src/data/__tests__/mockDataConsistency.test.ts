@@ -232,7 +232,7 @@ describe('Mock Data Consistency', () => {
         it('should use valid Tailwind color classes', () => {
             const validColorPattern = /^bg-(blue|green|purple|red|yellow|indigo|pink|teal|orange|cyan|lime|rose)-\d+$/;
 
-            const testBanks = ['Chase', 'Capital One', 'American Express', 'BBVA', 'Santander'];
+            const testBanks = ['Chase', 'Capital One', 'Amex', 'BBVA', 'Santander'];
             testBanks.forEach(bank => {
                 const color = transformationService.assignConsistentColor(bank);
                 expect(color, `Color for ${bank} should be valid Tailwind class`).toMatch(validColorPattern);
