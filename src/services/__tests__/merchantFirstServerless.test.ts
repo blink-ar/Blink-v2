@@ -186,6 +186,95 @@ describe('merchant-first serverless helpers', () => {
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
   });
 
+  it('handleGetBusinesses supports exact merchantId lookups without fuzzy search filters', async () => {
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Adidas',
+      merchantKey: 'adidas',
+      categories: ['shopping'],
+      locations: [{ formattedAddress: 'Store 1', lat: -34.6, lng: -58.38 }],
+      banks: ['BBVA'],
+      searchProfile: { description: 'Sportswear' },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: false,
+      imageUrl: 'https://cdn.example.com/adidas.jpg',
+      logoUrl: null,
+      coverUrl: null
+    };
+
+    const benefits = [
+      {
+        id: 'benefit-1',
+        merchantId: 'merchant_1',
+        bank: 'BBVA',
+        benefitTitle: '20% OFF',
+        availableDays: ['monday'],
+        discountPercentage: 20,
+        caps: [],
+        online: false,
+        validUntil: '2099-12-31'
+      }
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor(benefits);
+            }
+          };
+        }
+
+        if (name === 'bank_cards') {
+          return {
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?collection=confirmed_benefits&merchantId=merchant_1&limit=1&offset=0');
+
+    await handleGetBusinesses(req as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.businesses).toHaveLength(1);
+    expect(payload.businesses[0].id).toBe('merchant_1');
+    expect(payload.filters.merchantId).toBe('merchant_1');
+    expect(merchantQueries).toHaveLength(2);
+    expect((merchantQueries[0] as { merchantId: unknown }).merchantId).toBe('merchant_1');
+    expect((merchantQueries[1] as { merchantId: unknown }).merchantId).toBe('merchant_1');
+    expect(merchantQueries[0]).not.toHaveProperty('$or');
+    expect(merchantQueries[1]).not.toHaveProperty('$or');
+    expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+  });
+
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {
     const benefits = [
       {
