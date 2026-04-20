@@ -5,6 +5,7 @@ import { fetchBusinessesPaginated } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
+import { parseDayAvailabilityFromBenefit } from '../utils/dayAvailabilityParser';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -42,6 +43,18 @@ const getBankAccent = (name: string): { bg: string; text: string } => {
 };
 
 const bankAbbr = (name: string) => name.replace(/banco\s*/i, '').substring(0, 6).toUpperCase();
+
+const isBenefitAvailableToday = (benefit: BankBenefit): boolean => {
+  const availability = parseDayAvailabilityFromBenefit(benefit);
+  if (!availability) return true;
+  if (availability.allDays) return true;
+  const dayOfWeek = new Date().getDay();
+  const todayKey = (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const)[dayOfWeek];
+  const hasAnyDay = availability.monday || availability.tuesday || availability.wednesday ||
+    availability.thursday || availability.friday || availability.saturday || availability.sunday;
+  if (!hasAnyDay) return true;
+  return !!availability[todayKey];
+};
 
 
 function BusinessDetailPage() {
@@ -118,6 +131,9 @@ function BusinessDetailPage() {
   const sortedBenefits = useMemo(() => {
     if (!business) return [];
     return [...business.benefits].sort((a, b) => {
+      const todayA = isBenefitAvailableToday(a) ? 1 : 0;
+      const todayB = isBenefitAvailableToday(b) ? 1 : 0;
+      if (todayB !== todayA) return todayB - todayA;
       const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
       const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
       if (dB !== dA) return dB - dA;
@@ -165,7 +181,7 @@ function BusinessDetailPage() {
         {/* Unified hero header */}
         <div
           className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260 }}
+          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 }}
         >
           {/* Floating nav buttons */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
@@ -241,6 +257,7 @@ function BusinessDetailPage() {
                 const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
                 const isFirst = idx === 0;
                 const bankAccent = getBankAccent(benefit.bankName);
+                const availableToday = isBenefitAvailableToday(benefit);
                 return (
                   <div
                     key={`${benefit.bankName}-${idx}`}
@@ -253,30 +270,21 @@ function BusinessDetailPage() {
                       className="px-4 pt-4 pb-5"
                       style={{ background: isFirst ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : '#FAFAFA' }}
                     >
-                      {isFirst && (
-                        <div className="flex items-center justify-between mb-3">
-                          <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{ background: bankAccent.bg, color: bankAccent.text }}
-                          >
-                            {bankAbbr(benefit.bankName)}
-                          </span>
+                      <div className="flex items-center justify-between mb-3">
+                        <span
+                          className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                          style={{ background: bankAccent.bg, color: bankAccent.text }}
+                        >
+                          {bankAbbr(benefit.bankName)}
+                        </span>
+                        {availableToday ? (
+                          <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: '#FFF7ED', color: '#C2410C', border: '1px solid #FFEDD5' }}>Disponible hoy</span>
+                        ) : isFirst ? (
                           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white">Mejor opción</span>
-                        </div>
-                      )}
-                      {!isFirst && (
-                        <div className="flex items-center justify-between mb-3">
-                          <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{ background: bankAccent.bg, color: bankAccent.text }}
-                          >
-                            {bankAbbr(benefit.bankName)}
-                          </span>
-                          {benefit.cardName && (
-                            <span className="text-xs text-blink-muted font-medium">{String(benefit.cardName).replace(/ any$/i, '')}</span>
-                          )}
-                        </div>
-                      )}
+                        ) : benefit.cardName ? (
+                          <span className="text-xs text-blink-muted font-medium">{String(benefit.cardName).replace(/ any$/i, '')}</span>
+                        ) : null}
+                      </div>
 
                       {discount && parseInt(discount) > 0 ? (
                         <div>
@@ -355,6 +363,7 @@ function BusinessDetailPage() {
                 {otherBenefits.map((benefit, idx) => {
                   const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
                   const bankAccent = getBankAccent(benefit.bankName);
+                  const availableToday = isBenefitAvailableToday(benefit);
                   return (
                     <div
                       key={`other-${benefit.bankName}-${idx}`}
@@ -382,8 +391,12 @@ function BusinessDetailPage() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-blink-muted">{formatCuando(benefit.cuando)}</p>
+                      <div className="flex items-center gap-2">
+                        {availableToday ? (
+                          <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: '#FFF7ED', color: '#C2410C', border: '1px solid #FFEDD5' }}>Disponible hoy</span>
+                        ) : (
+                          <p className="text-xs font-medium text-blink-muted">{formatCuando(benefit.cuando)}</p>
+                        )}
                         <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
                       </div>
                     </div>
