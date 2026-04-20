@@ -417,6 +417,25 @@ const MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING = Number.parseInt(
   process.env.SEARCH_MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING || '3',
   10
 );
+const MERCHANT_EXACT_RESCUE_LIMIT = 25;
+const MERCHANT_PREFIX_RESCUE_LIMIT = 150;
+const MERCHANT_SEARCH_RESCUE_PROJECTION = {
+  _id: 0,
+  merchantId: 1,
+  merchantName: 1,
+  merchantKey: 1,
+  categories: 1,
+  banks: 1,
+  locations: 1,
+  maxDiscountPercentage: 1,
+  hasOnlineBenefits: 1,
+  activeBenefitCount: 1,
+  benefitCount: 1,
+  searchProfile: 1,
+  imageUrl: 1,
+  logoUrl: 1,
+  coverUrl: 1
+};
 
 function isFiniteDistanceKm(value) {
   return Number.isFinite(value);
@@ -482,6 +501,102 @@ function buildExpandedQueryTokens(query) {
   const normalized = normalizeSearchText(query);
   const tokens = tokenizeSearchText(query);
   return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
+}
+
+function buildActiveMerchantSearchQuery(filters, searchParams) {
+  const query = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    ...(shouldIncludeExpired(searchParams)
+      ? { benefitCount: { $gt: 0 } }
+      : { activeBenefitCount: { $gt: 0 } })
+  };
+
+  if (filters.category && filters.category !== 'all') {
+    query.categories = { $in: [filters.category] };
+  }
+
+  if (filters.bank) {
+    const bankPatterns = filters.bank
+      .split(',')
+      .map((bank) => bank.trim())
+      .filter(Boolean)
+      .map((bank) => new RegExp(escapeRegex(bank), 'i'));
+    if (bankPatterns.length > 0) {
+      query.banks = { $in: bankPatterns };
+    }
+  }
+
+  return query;
+}
+
+function buildMerchantNameRescueClauses(pattern) {
+  return [
+    { merchantName: { $regex: pattern } },
+    { merchantKey: { $regex: pattern } },
+    { aliases: { $elemMatch: { $regex: pattern } } },
+    { 'searchProfile.aliases': { $elemMatch: { $regex: pattern } } }
+  ];
+}
+
+function mergeMerchantDocsById(merchantLists) {
+  const mergedByMerchantId = new Map();
+  for (const merchants of merchantLists || []) {
+    for (const merchant of Array.isArray(merchants) ? merchants : []) {
+      const merchantId = merchant?.merchantId;
+      if (!merchantId || mergedByMerchantId.has(merchantId)) continue;
+      mergedByMerchantId.set(merchantId, merchant);
+    }
+  }
+  return Array.from(mergedByMerchantId.values());
+}
+
+async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchParams) {
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
+  const exactPattern = new RegExp(`^${escapeRegex(normalizedQuery)}$`, 'i');
+  const prefixPattern = new RegExp(`^${escapeRegex(normalizedQuery)}`, 'i');
+
+  const exactMatches = await merchantCollection
+    .find(
+      combineQueriesWithAnd(baseQuery, {
+        $or: buildMerchantNameRescueClauses(exactPattern)
+      }),
+      {
+        projection: MERCHANT_SEARCH_RESCUE_PROJECTION
+      }
+    )
+    .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
+    .limit(MERCHANT_EXACT_RESCUE_LIMIT)
+    .toArray();
+
+  if (normalizedQuery.length < 2) {
+    return exactMatches;
+  }
+
+  const exactIds = exactMatches.map((merchant) => merchant.merchantId).filter(Boolean);
+  const prefixMatches = await merchantCollection
+    .find(
+      combineQueriesWithAnd(
+        baseQuery,
+        exactIds.length > 0 ? { merchantId: { $nin: exactIds } } : null,
+        {
+          $or: buildMerchantNameRescueClauses(prefixPattern)
+        }
+      ),
+      {
+        projection: MERCHANT_SEARCH_RESCUE_PROJECTION
+      }
+    )
+    .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
+    .limit(MERCHANT_PREFIX_RESCUE_LIMIT)
+    .toArray();
+
+  return mergeMerchantDocsById([exactMatches, prefixMatches]);
 }
 
 function buildMeiliFilter(entityType, filters) {
@@ -780,44 +895,36 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
   const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
   const regex = new RegExp(regexSource, 'i');
 
-  const merchantQuery = {
-    isActive: { $ne: false },
-    merchantId: { $exists: true, $type: 'string' },
-    ...(shouldIncludeExpired(searchParams)
-      ? { benefitCount: { $gt: 0 } }
-      : { activeBenefitCount: { $gt: 0 } }),
-    $or: [
-      { merchantName: { $regex: regex } },
-      { aliases: { $regex: regex } },
-      { categories: { $regex: regex } },
-      { banks: { $regex: regex } },
-      { 'searchProfile.description': { $regex: regex } },
-      { 'searchProfile.productTags': { $regex: regex } },
-      { 'searchProfile.benefits.benefit': { $regex: regex } },
-      { 'searchProfile.benefits.description': { $regex: regex } }
-    ]
-  };
-
-  if (filters.category && filters.category !== 'all') {
-    merchantQuery.categories = { $in: [filters.category] };
-  }
-  if (filters.bank) {
-    const bankPatterns = filters.bank
-      .split(',')
-      .map((bank) => bank.trim())
-      .filter(Boolean)
-      .map((bank) => new RegExp(escapeRegex(bank), 'i'));
-    if (bankPatterns.length > 0) {
-      merchantQuery.banks = { $in: bankPatterns };
+  const merchantQuery = combineQueriesWithAnd(
+    buildActiveMerchantSearchQuery(filters, searchParams),
+    {
+      $or: [
+        { merchantName: { $regex: regex } },
+        { aliases: { $regex: regex } },
+        { categories: { $regex: regex } },
+        { banks: { $regex: regex } },
+        { 'searchProfile.description': { $regex: regex } },
+        { 'searchProfile.productTags': { $regex: regex } },
+        { 'searchProfile.benefits.benefit': { $regex: regex } },
+        { 'searchProfile.benefits.description': { $regex: regex } }
+      ]
     }
-  }
+  );
 
   const fallbackMerchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
     .find(merchantQuery)
     .limit(600)
     .toArray();
+  const rescueMerchants = await loadMerchantNameRescueDocs(
+    db,
+    normalizeSearchText(query),
+    filters,
+    searchParams
+  );
 
-  const dataset = buildSearchDatasetFromMerchantDocs(fallbackMerchants);
+  const dataset = buildSearchDatasetFromMerchantDocs(
+    mergeMerchantDocsById([fallbackMerchants, rescueMerchants])
+  );
   const normalizedQuery = normalizeSearchText(query);
   const intentTags = resolveIntentTagsFromTokens(expandedTokens);
 
@@ -918,10 +1025,12 @@ async function handleSearch(req, res, url, db) {
 
     const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
     const merchantBaseHits = Array.isArray(merchantSearch.hits) ? merchantSearch.hits : [];
-    let merchantCandidateHits = merchantBaseHits;
+    const rescueMerchantDocs = await loadMerchantNameRescueDocs(db, normalized, filters, searchParams);
+    const rescueMerchantHits = buildSearchDatasetFromMerchantDocs(rescueMerchantDocs).merchantDocuments;
+    let merchantCandidateHits = mergeMerchantHitCandidates([merchantBaseHits, rescueMerchantHits]);
 
     if (seedMerchantIds.length > 0) {
-      const currentIds = new Set(merchantBaseHits.map((hit) => hit?.merchantId).filter(Boolean));
+      const currentIds = new Set(merchantCandidateHits.map((hit) => hit?.merchantId).filter(Boolean));
       const missingSeedIds = seedMerchantIds.filter((id) => !currentIds.has(id));
 
       if (missingSeedIds.length > 0) {
@@ -931,10 +1040,10 @@ async function handleSearch(req, res, url, db) {
           showRankingScore: true
         });
 
-        merchantCandidateHits = [
-          ...merchantBaseHits,
-          ...(Array.isArray(seededMerchantSearch.hits) ? seededMerchantSearch.hits : [])
-        ];
+        merchantCandidateHits = mergeMerchantHitCandidates([
+          merchantCandidateHits,
+          Array.isArray(seededMerchantSearch.hits) ? seededMerchantSearch.hits : []
+        ]);
       }
     }
 
@@ -1014,6 +1123,7 @@ async function handleSearch(req, res, url, db) {
           ...debug,
           meiliEstimatedTotal: merchantSearch.estimatedTotalHits || null,
           meiliDistancePrunedTotal: distanceAwareMerchants.length,
+          meiliRescuedByNameCount: rescueMerchantHits.length,
           meiliCategoryExpanded: shouldExpandByCategory,
           meiliCategorySeeds: topSeedCategories
         }
@@ -1916,6 +2026,7 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleSearch,
   rehydrateBenefitDoc
 };
 
