@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
-import { fetchBusinessesPaginated } from '../services/api';
+import { fetchBusinessById } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
@@ -84,27 +84,52 @@ function BusinessDetailPage() {
   });
 
   useEffect(() => {
-    if (passedBusiness) return;
+    if (passedBusiness) {
+      setBusiness(passedBusiness);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
     const load = async () => {
-      if (!id) return;
+      if (!id) {
+        setBusiness(null);
+        setError('Comercio no encontrado');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const searchName = id.replace(/-/g, ' ');
-        const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
-        if (Array.isArray(response) && response.length > 0) {
-          setBusiness(response[0]);
-        } else if (response.success && response.businesses.length > 0) {
-          setBusiness(response.businesses[0]);
+        setError(null);
+        setBusiness(null);
+
+        const resolvedBusiness = await fetchBusinessById(id);
+        if (cancelled) return;
+
+        if (resolvedBusiness) {
+          setBusiness(resolvedBusiness);
         } else {
           setError('Comercio no encontrado');
         }
       } catch {
+        if (cancelled) return;
+        setBusiness(null);
         setError('Error al cargar');
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
+
     load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, passedBusiness]);
 
   useEffect(() => {

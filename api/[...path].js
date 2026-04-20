@@ -1584,6 +1584,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const bank = searchParams.get('bank');
   const subscription = searchParams.get('subscription');
   const search = searchParams.get('search');
+  const merchantId = searchParams.get('merchantId')?.trim() || null;
   const onlineOnly = searchParams.get('online') === 'true';
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
@@ -1611,7 +1612,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const merchantQuery = {
     isActive: { $ne: false },
-    merchantId: { $exists: true, $type: 'string' },
+    merchantId: merchantId || { $exists: true, $type: 'string' },
     ...(includeExpired ? { benefitCount: { $gt: 0 } } : { activeBenefitCount: { $gt: 0 } })
   };
 
@@ -1627,7 +1628,7 @@ async function handleGetBusinesses(req, res, url, db) {
   if (onlineOnly) {
     merchantQuery.hasOnlineBenefits = true;
   }
-  if (search) {
+  if (search && !merchantId) {
     const normalizedSearch = normalizeSearchText(search);
     const searchTerms = Array.from(
       new Set([
@@ -1873,6 +1874,7 @@ async function handleGetBusinesses(req, res, url, db) {
       hasMore: offsetNum + businesses.length < total
     },
     filters: {
+      ...(merchantId && { merchantId }),
       ...(category && { category }),
       ...(bank && { bank }),
       ...(search && { search }),

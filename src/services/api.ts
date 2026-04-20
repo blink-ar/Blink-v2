@@ -32,6 +32,7 @@ export interface BusinessesApiResponse {
     hasMore: boolean;
   };
   filters: {
+    merchantId?: string;
     category?: string;
     bank?: string;
     search?: string;
@@ -145,6 +146,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
 export async function fetchBusinessesPaginated(options: {
   limit?: number;
   offset?: number;
+  merchantId?: string;
   category?: string;
   bank?: string;
   search?: string;
@@ -154,9 +156,22 @@ export async function fetchBusinessesPaginated(options: {
   lng?: number;
   online?: boolean;
 } = {}): Promise<BusinessesApiResponse> {
-  const { limit = 20, offset = 0, category, bank, search, subscription, geohash, lat, lng, online } = options;
+  const {
+    limit = 20,
+    offset = 0,
+    merchantId,
+    category,
+    bank,
+    search,
+    subscription,
+    geohash,
+    lat,
+    lng,
+    online
+  } = options;
+  const normalizedMerchantId = merchantId?.trim();
 
-  if (search && search.trim()) {
+  if (!normalizedMerchantId && search && search.trim()) {
     try {
       const searchData = await fetchSearch({
         q: search.trim(),
@@ -183,6 +198,7 @@ export async function fetchBusinessesPaginated(options: {
   params.append('limit', limit.toString());
   params.append('offset', offset.toString());
   params.append('collection', COLLECTION);
+  if (normalizedMerchantId) params.append('merchantId', normalizedMerchantId);
   if (category) params.append('category', category);
   if (bank) params.append('bank', bank);
   if (search) params.append('search', search);
@@ -220,6 +236,25 @@ export async function fetchBusinessesPaginated(options: {
       filters: {}
     };
   }
+}
+
+export async function fetchBusinessById(merchantId: string): Promise<Business | null> {
+  const normalizedMerchantId = merchantId.trim();
+  if (!normalizedMerchantId) {
+    return null;
+  }
+
+  const response = await fetchBusinessesPaginated({
+    merchantId: normalizedMerchantId,
+    limit: 1,
+    offset: 0
+  });
+
+  if (!response.success) {
+    throw new Error(`Failed to fetch business ${normalizedMerchantId}`);
+  }
+
+  return response.businesses[0] || null;
 }
 
 class BenefitsAPI {
