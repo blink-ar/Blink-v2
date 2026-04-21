@@ -72,7 +72,7 @@ export default defineConfig(({ mode }) => {
     ],
     // Mobile-first build optimization
     build: {
-      target: 'es2015',
+      target: 'es2020',
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -86,6 +86,7 @@ export default defineConfig(({ mode }) => {
             // Split vendor code for better caching
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
             'lucide': ['lucide-react'],
+            'map-vendor': ['maplibre-gl'],
           },
         },
       },

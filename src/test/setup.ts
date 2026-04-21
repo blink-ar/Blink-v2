@@ -53,6 +53,20 @@ Object.defineProperty(window, 'matchMedia', {
     })),
 });
 
+if (!window.URL.createObjectURL) {
+    Object.defineProperty(window.URL, 'createObjectURL', {
+        writable: true,
+        value: vi.fn(() => 'blob:maplibre-worker'),
+    });
+}
+
+if (!window.URL.revokeObjectURL) {
+    Object.defineProperty(window.URL, 'revokeObjectURL', {
+        writable: true,
+        value: vi.fn(),
+    });
+}
+
 // Reset all mocks before each test
 beforeEach(() => {
     vi.clearAllMocks();

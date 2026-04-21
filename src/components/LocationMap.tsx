@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import type { CanonicalLocation } from "../types";
-import { getGoogleMaps } from "../services/googleMapsLoader";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import type { CanonicalLocation } from '../types';
+import { MAP_STYLE_URL } from '../config/map';
 
 interface LocationMapProps {
   locations: CanonicalLocation[];
@@ -11,45 +12,60 @@ interface LocationMapProps {
 
 const DEFAULT_ZOOM = 13;
 
-const MAP_STYLE = [
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#e9f2fe" }],
-  },
-  {
-    featureType: "landscape",
-    elementType: "geometry",
-    stylers: [{ color: "#f8f9fa" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#ffffff" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#e8f5e9" }],
-  },
-  {
-    featureType: "poi.business",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#74787c" }],
-  },
-  {
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-];
+const createMarkerElement = (isSelected: boolean) => {
+  const pinSize = isSelected ? 36 : 28;
+  const pinColor = isSelected ? '#3b82f6' : '#6366F1';
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.style.background = 'transparent';
+  element.style.border = 'none';
+  element.style.padding = '0';
+  element.style.cursor = 'pointer';
+  element.style.display = 'flex';
+  element.style.alignItems = 'center';
+  element.style.justifyContent = 'center';
+  element.style.width = `${pinSize}px`;
+  element.style.height = `${pinSize}px`;
+  element.innerHTML = `
+    <svg width="${pinSize}" height="${pinSize}" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+          <feOffset dx="0" dy="1.5" result="offsetblur"/>
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.3"/>
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <g filter="url(#shadow)">
+        <circle cx="24" cy="24" r="${isSelected ? 16 : 12}" fill="${pinColor}" stroke="#ffffff" stroke-width="2.5"/>
+        <circle cx="24" cy="24" r="${isSelected ? 6 : 4.5}" fill="#ffffff"/>
+      </g>
+    </svg>
+  `;
+  return element;
+};
+
+const getPopupContent = (location: CanonicalLocation, showSelectedState: boolean) => `
+  <div style="padding: 8px; min-width: 180px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <h3 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #111827;">
+      ${location.name || 'Ubicación'}
+    </h3>
+    <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
+      ${location.formattedAddress || ''}
+    </p>
+    ${showSelectedState ? `
+      <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px;">
+        <div style="width: 6px; height: 6px; border-radius: 50%; background: #3b82f6;"></div>
+        <span style="font-size: 11px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.025em;">Seleccionada</span>
+      </div>
+    ` : ''}
+  </div>
+`;
 
 const LocationMap: React.FC<LocationMapProps> = ({
   locations,
@@ -58,180 +74,143 @@ const LocationMap: React.FC<LocationMapProps> = ({
   className,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const infoWindowRef = useRef<any>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter out invalid locations (0,0 coordinates)
-  const validLocations = locations.filter(
-    (location) => location.lat !== 0 || location.lng !== 0
+  const validLocations = useMemo(
+    () => locations.filter((location) => location.lat !== 0 || location.lng !== 0),
+    [locations],
   );
+  const hasValidLocations = validLocations.length > 0;
 
-  const clearMarkers = () => {
-    markersRef.current.forEach((marker) => marker.setMap(null));
+  const clearMarkers = useCallback(() => {
+    markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
-  };
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!containerRef.current || mapRef.current || !hasValidLocations) return;
 
-    const initialiseMap = async () => {
-      if (!containerRef.current || validLocations.length === 0) {
-        return;
-      }
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: MAP_STYLE_URL,
+      center: [validLocations[0].lng, validLocations[0].lat],
+      zoom: DEFAULT_ZOOM,
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false,
+    });
 
-      try {
-        const googleMaps = (await getGoogleMaps()) as any;
-        if (cancelled || !containerRef.current) {
-          return;
-        }
+    map.touchZoomRotate.disableRotation();
+    map.addControl(
+      new maplibregl.AttributionControl({
+        compact: containerRef.current.clientWidth < 640,
+      }),
+      'bottom-right',
+    );
 
-        const firstLocation = validLocations[0];
-        const map =
-          mapRef.current ||
-          new googleMaps.maps.Map(containerRef.current, {
-            center: { lat: firstLocation.lat, lng: firstLocation.lng },
-            zoom: DEFAULT_ZOOM,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            streetViewControl: false,
-            clickableIcons: false, // Disable default POI clicks
-            disableDefaultUI: true,
-            gestureHandling: 'greedy', // Allow one-finger panning
-            styles: MAP_STYLE,
-          });
+    map.on('load', () => {
+      setMapReady(true);
+      setError(null);
+    });
 
-        // Prevent default map click behavior that shows blue dot
-        if (!mapRef.current) {
-          map.addListener("click", (event: any) => {
-            if (event && event.stop) event.stop();
-          });
-        }
+    map.on('error', (mapError) => {
+      console.error('Failed to initialise MapLibre', mapError.error);
+      setError('No se pudo cargar el mapa abierto.');
+    });
 
-        mapRef.current = map;
-        infoWindowRef.current =
-          infoWindowRef.current || new googleMaps.maps.InfoWindow();
+    map.on('click', () => {
+      popupRef.current?.remove();
+    });
 
-        clearMarkers();
+    mapRef.current = map;
+  }, [clearMarkers, hasValidLocations, validLocations]);
 
-        const bounds = new googleMaps.maps.LatLngBounds();
+  useEffect(() => {
+    if (hasValidLocations || !mapRef.current) return;
 
-        markersRef.current = validLocations.map((location) => {
-          const isSelected =
-            selectedLocation &&
-            selectedLocation.lat === location.lat &&
-            selectedLocation.lng === location.lng;
+    clearMarkers();
+    popupRef.current?.remove();
+    popupRef.current = null;
+    mapRef.current.remove();
+    mapRef.current = null;
+    setMapReady(false);
+  }, [clearMarkers, hasValidLocations]);
 
-          // Create modern custom marker - circle with dot and shadow
-          const pinSize = isSelected ? 36 : 28;
-          const pinColor = isSelected ? "#3b82f6" : "#6366F1";
-          
-          const customIcon = {
-            url:
-              "data:image/svg+xml;charset=UTF-8," +
-              encodeURIComponent(`
-            <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
-                  <feOffset dx="0" dy="1.5" result="offsetblur"/>
-                  <feComponentTransfer>
-                    <feFuncA type="linear" slope="0.3"/>
-                  </feComponentTransfer>
-                  <feMerge>
-                    <feMergeNode/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <g filter="url(#shadow)">
-                <circle cx="24" cy="24" r="${isSelected ? 16 : 12}" fill="${pinColor}" stroke="#ffffff" stroke-width="2.5"/>
-                <circle cx="24" cy="24" r="${isSelected ? 6 : 4.5}" fill="#ffffff"/>
-              </g>
-            </svg>
-          `),
-            scaledSize: new googleMaps.maps.Size(pinSize, pinSize),
-            anchor: new googleMaps.maps.Point(pinSize / 2, pinSize / 2),
-          };
+  useEffect(() => () => {
+    clearMarkers();
+    popupRef.current?.remove();
+    popupRef.current = null;
+    mapRef.current?.remove();
+    mapRef.current = null;
+    setMapReady(false);
+  }, [clearMarkers]);
 
-          const marker = new googleMaps.maps.Marker({
-            position: { lat: location.lat, lng: location.lng },
-            map,
-            title: location.name || location.formattedAddress || "Ubicación",
-            icon: customIcon,
-            optimized: false,
-            zIndex: isSelected ? 1000 : 1,
-            clickable: true,
-          });
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
 
-          marker.addListener("click", (event: any) => {
-            if (event && event.stop) event.stop();
+    const map = mapRef.current;
+    clearMarkers();
+    popupRef.current?.remove();
+    popupRef.current = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 18,
+      maxWidth: '220px',
+    });
 
-            if (onMarkerClick) {
-              onMarkerClick(location);
-            }
+    const bounds = new maplibregl.LngLatBounds();
 
-            const infoWindow = infoWindowRef.current;
-            if (infoWindow) {
-              const content = `
-                <div style="padding: 8px; min-width: 180px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                  <h3 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #111827;">
-                    ${location.name || "Ubicación"}
-                  </h3>
-                  <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
-                    ${location.formattedAddress || ""}
-                  </p>
-                  ${isSelected ? `
-                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px;">
-                      <div style="width: 6px; height: 6px; border-radius: 50%; background: #3b82f6;"></div>
-                      <span style="font-size: 11px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.025em;">Seleccionada</span>
-                    </div>
-                  ` : ""}
-                </div>
-              `;
-              infoWindow.setContent(content);
-              infoWindow.open({ anchor: marker, map });
-            }
-          });
+    markersRef.current = validLocations.map((location) => {
+      const isSelected =
+        selectedLocation?.lat === location.lat && selectedLocation?.lng === location.lng;
+      const markerElement = createMarkerElement(Boolean(isSelected));
+      markerElement.setAttribute(
+        'aria-label',
+        location.name || location.formattedAddress || 'Ubicación',
+      );
 
-          bounds.extend(marker.getPosition()!);
-          return marker;
-        });
+      markerElement.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onMarkerClick?.(location);
+        popupRef.current
+          ?.setLngLat([location.lng, location.lat])
+          .setHTML(getPopupContent(location, true))
+          .addTo(map);
+      });
 
-        if (selectedLocation) {
-          map.panTo({ lat: selectedLocation.lat, lng: selectedLocation.lng });
-          // Use a slightly more pulled-back zoom level
-          if (map.getZoom() < 14) {
-            map.setZoom(14);
-          }
-        } else if (validLocations.length > 1) {
-          map.fitBounds(bounds);
-        } else {
-          map.setCenter({ lat: validLocations[0].lat, lng: validLocations[0].lng });
-          map.setZoom(DEFAULT_ZOOM);
-        }
+      bounds.extend([location.lng, location.lat]);
 
-        setError(null);
-      } catch (mapError) {
-        if (!cancelled) {
-          console.error("Failed to initialise Google Maps", mapError);
-          setError(
-            "No se pudo cargar el mapa de Google. Verifica tu clave de Google Maps."
-          );
-        }
-      }
-    };
+      return new maplibregl.Marker({
+        element: markerElement,
+        anchor: 'center',
+      })
+        .setLngLat([location.lng, location.lat])
+        .addTo(map);
+    });
 
-    initialiseMap();
+    if (selectedLocation) {
+      map.easeTo({
+        center: [selectedLocation.lng, selectedLocation.lat],
+        zoom: Math.max(map.getZoom(), 14),
+        duration: 250,
+      });
+    } else if (validLocations.length > 1) {
+      map.fitBounds(bounds, { padding: 32, maxZoom: 15 });
+    } else {
+      map.easeTo({
+        center: [validLocations[0].lng, validLocations[0].lat],
+        zoom: DEFAULT_ZOOM,
+        duration: 250,
+      });
+    }
+  }, [mapReady, onMarkerClick, selectedLocation, validLocations]);
 
-    return () => {
-      cancelled = true;
-      clearMarkers();
-    };
-  }, [validLocations, onMarkerClick, selectedLocation]);
-
-  if (!validLocations?.length) {
+  if (!hasValidLocations) {
     return null;
   }
 
@@ -239,7 +218,7 @@ const LocationMap: React.FC<LocationMapProps> = ({
     <div className={className}>
       <div
         ref={containerRef}
-        className="w-full h-56 rounded-2xl border border-gray-200 shadow-lg overflow-hidden"
+        className="blink-map w-full h-56 rounded-2xl border border-gray-200 shadow-lg overflow-hidden"
         role="region"
         aria-label="Mapa de ubicaciones del beneficio"
       />
