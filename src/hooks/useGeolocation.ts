@@ -12,13 +12,56 @@ interface GeolocationState {
   permissionDenied: boolean;
 }
 
-export const useGeolocation = () => {
-  const [state, setState] = useState<GeolocationState>({
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+const getFreshCachedPosition = (): Coordinates | null => {
+  if (typeof window === 'undefined') return null;
+
+  const cachedPosition = localStorage.getItem('userPosition');
+  const cacheTimestamp = localStorage.getItem('userPositionTimestamp');
+
+  if (!cachedPosition || !cacheTimestamp) return null;
+
+  const cacheAge = Date.now() - parseInt(cacheTimestamp, 10);
+  if (Number.isNaN(cacheAge) || cacheAge >= FIVE_MINUTES_MS) return null;
+
+  try {
+    return JSON.parse(cachedPosition) as Coordinates;
+  } catch {
+    return null;
+  }
+};
+
+const getInitialGeolocationState = (): GeolocationState => {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    return {
+      position: null,
+      error: 'Geolocation is not supported by your browser',
+      loading: false,
+      permissionDenied: false,
+    };
+  }
+
+  const cachedPosition = getFreshCachedPosition();
+  if (cachedPosition) {
+    return {
+      position: cachedPosition,
+      error: null,
+      loading: false,
+      permissionDenied: false,
+    };
+  }
+
+  return {
     position: null,
     error: null,
     loading: true,
     permissionDenied: false,
-  });
+  };
+};
+
+export const useGeolocation = () => {
+  const [state, setState] = useState<GeolocationState>(getInitialGeolocationState);
 
   useEffect(() => {
     // Check if geolocation is supported
@@ -32,24 +75,15 @@ export const useGeolocation = () => {
       return;
     }
 
-    // Try to get cached position from localStorage
-    const cachedPosition = localStorage.getItem('userPosition');
-    const cacheTimestamp = localStorage.getItem('userPositionTimestamp');
-
-    if (cachedPosition && cacheTimestamp) {
-      const cacheAge = Date.now() - parseInt(cacheTimestamp);
-      const fiveMinutes = 5 * 60 * 1000;
-
-      // Use cached position if less than 5 minutes old
-      if (cacheAge < fiveMinutes) {
-        setState({
-          position: JSON.parse(cachedPosition),
-          error: null,
-          loading: false,
-          permissionDenied: false,
-        });
-        return;
-      }
+    const cachedPosition = getFreshCachedPosition();
+    if (cachedPosition) {
+      setState({
+        position: cachedPosition,
+        error: null,
+        loading: false,
+        permissionDenied: false,
+      });
+      return;
     }
 
     // Request current position

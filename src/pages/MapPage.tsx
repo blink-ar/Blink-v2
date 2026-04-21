@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
+import maplibregl from 'maplibre-gl';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getGoogleMaps } from '../services/googleMapsLoader';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { Business } from '../types';
 import BottomNav from '../components/neo/BottomNav';
 import FilterPanel from '../components/neo/FilterPanel';
+import { MAP_STYLE_URL } from '../config/map';
 import {
   trackFilterApply,
   trackMapInteraction,
@@ -20,19 +21,6 @@ const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 const KM5_IN_LAT = 0.045;
 const km5InLng = (lat: number) => 0.045 / Math.cos((lat * Math.PI) / 180);
 
-// Soft, minimal map style — light roads, no clutter
-const MAP_STYLE = [
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f7f6f4' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e8e6e1' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#ecfdf5' }] },
-  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-];
-
 const CATEGORY_CHIPS = [
   { id: 'nearby', label: '📍 Cerca de mí' },
   { id: 'gastronomia', label: '🍕 Gastronomía' },
@@ -44,6 +32,7 @@ const CATEGORY_CHIPS = [
 ];
 
 interface MapMarker {
+  id: string;
   business: Business;
   lat: number;
   lng: number;
@@ -60,6 +49,75 @@ interface MapFilterState {
   network: string | undefined;
   hasInstallments: boolean | undefined;
 }
+
+const createBusinessMarkerElement = (biz: Business, isSelected: boolean, benefitText: string) => {
+  const size = isSelected ? 52 : 42;
+  const imgSize = isSelected ? 34 : 26;
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.style.background = 'transparent';
+  element.style.border = 'none';
+  element.style.padding = '0';
+  element.style.cursor = 'pointer';
+  element.style.display = 'block';
+  element.style.zIndex = isSelected ? '100' : '10';
+  element.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;position:relative;transform:translateY(-4px);">
+      ${isSelected ? `
+        <div style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:10px;white-space:nowrap;
+          background:rgba(255,255,255,0.96);border-radius:12px;
+          box-shadow:0 4px 20px rgba(99,102,241,0.18),0 1px 4px rgba(0,0,0,0.08);
+          padding:7px 12px;display:flex;flex-direction:column;align-items:center;
+          z-index:200;pointer-events:none;border:1px solid rgba(199,210,254,0.8);">
+          <span style="color:#1C1C1E;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;line-height:1.3;">${biz.name}</span>
+          <span style="color:#6366F1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
+          <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:rgba(255,255,255,0.96);border-right:1px solid rgba(199,210,254,0.8);border-bottom:1px solid rgba(199,210,254,0.8);"></div>
+        </div>
+      ` : ''}
+      <div style="width:${size}px;height:${size}px;border-radius:50%;
+        ${isSelected
+          ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
+          : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;'}
+        display:flex;align-items:center;justify-content:center;position:relative;z-index:20;transition:all 0.15s;">
+        ${biz.image
+          ? `<img src="${biz.image}" alt="" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${isSelected ? '' : 'opacity:0.75;'}" />`
+          : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${isSelected ? 18 : 14}px;font-weight:700;color:${isSelected ? '#6366F1' : '#6B7280'};">${biz.name?.charAt(0) || '?'}</span>`
+        }
+      </div>
+      <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>
+    </div>
+  `;
+  return element;
+};
+
+const createUserLocationElement = () => {
+  const element = document.createElement('div');
+  element.style.pointerEvents = 'none';
+  element.innerHTML = `
+    <div style="position:relative;width:22px;height:22px;">
+      <div style="position:absolute;inset:0;background:rgba(99,102,241,0.20);border-radius:50%;animation:blink-ping 1.8s cubic-bezier(0,0,0.2,1) infinite;"></div>
+      <div style="position:absolute;inset:4px;background:#6366F1;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.40);"></div>
+    </div>
+  `;
+  return element;
+};
+
+const getNearestLocation = (
+  business: Business,
+  position?: { latitude: number; longitude: number } | null,
+) => {
+  const validLocations = business.location.filter((loc) => loc.lat !== 0 || loc.lng !== 0);
+  if (validLocations.length === 0) return null;
+  if (!position) return validLocations[0];
+
+  return validLocations.reduce((closest, candidate) => {
+    const closestDistance =
+      (closest.lat - position.latitude) ** 2 + (closest.lng - position.longitude) ** 2;
+    const candidateDistance =
+      (candidate.lat - position.latitude) ** 2 + (candidate.lng - position.longitude) ** 2;
+    return candidateDistance < closestDistance ? candidate : closest;
+  });
+};
 
 function MapPage() {
   const navigate = useNavigate();
@@ -110,14 +168,15 @@ function MapPage() {
   });
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const overlaysRef = useRef<any[]>([]);
-  const userOverlayRef = useRef<any>(null);
-  const googleRef = useRef<any>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRefs = useRef<maplibregl.Marker[]>([]);
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const lastAutoUserViewportKeyRef = useRef<string | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
@@ -174,23 +233,34 @@ function MapPage() {
   }, [focusBusinessId, businesses]);
 
   const mapMarkers: MapMarker[] = useMemo(() => {
-    const source = isSingleBusinessMode && focusedBusiness
-      ? [focusedBusiness]
-      : businesses;
-
     const markers: MapMarker[] = [];
-    source.forEach((biz) => {
-      biz.location.forEach((loc) => {
+
+    if (isSingleBusinessMode && focusedBusiness) {
+      focusedBusiness.location.forEach((loc, locIndex) => {
         if (loc.lat !== 0 || loc.lng !== 0) {
           markers.push({
-            business: biz,
+            id: `${focusedBusiness.id}:${locIndex}:${loc.lat}:${loc.lng}`,
+            business: focusedBusiness,
             lat: loc.lat,
             lng: loc.lng,
             address: loc.formattedAddress || loc.name || '',
           });
         }
       });
-    });
+    } else {
+      businesses.forEach((biz) => {
+        const primaryLocation = getNearestLocation(biz, position);
+        if (!primaryLocation) return;
+
+        markers.push({
+          id: `${biz.id}:${primaryLocation.lat}:${primaryLocation.lng}`,
+          business: biz,
+          lat: primaryLocation.lat,
+          lng: primaryLocation.lng,
+          address: primaryLocation.formattedAddress || primaryLocation.name || '',
+        });
+      });
+    }
 
     if (position) {
       const userLat = position.latitude;
@@ -291,282 +361,246 @@ function MapPage() {
     return bank || 'Ver beneficios';
   };
 
-  // ─── Overlays ──────────────────────────────────────────────────
-
-  const clearOverlays = useCallback(() => {
-    overlaysRef.current.forEach((o) => o.setMap(null));
-    overlaysRef.current = [];
+  const clearMarkers = useCallback(() => {
+    markerRefs.current.forEach((marker) => marker.remove());
+    markerRefs.current = [];
   }, []);
 
-  const buildOverlays = useCallback((google: any, map: any, selected: Business | null) => {
-    clearOverlays();
+  const getViewportPadding = useCallback(() => ({
+    top: isSingleBusinessMode ? 96 : 140,
+    right: 24,
+    bottom: sheetExpanded ? Math.round(window.innerHeight * 0.28) : 132,
+    left: 24,
+  }), [isSingleBusinessMode, sheetExpanded]);
 
-    class BusinessOverlay extends google.maps.OverlayView {
-      private pos: any;
-      private div: HTMLDivElement | null = null;
-      private biz: Business;
-      private isSelected: boolean;
-      private imgSrc: string;
-      private onSelect: () => void;
+  const buildUserBounds = useCallback((lat: number, lng: number) => {
+    const lngOffset = km5InLng(lat);
+    return new maplibregl.LngLatBounds(
+      [lng - lngOffset, lat - KM5_IN_LAT],
+      [lng + lngOffset, lat + KM5_IN_LAT],
+    );
+  }, []);
 
-      constructor(pos: any, biz: Business, isSelected: boolean, imgSrc: string, onSelect: () => void) {
-        super();
-        this.pos = pos;
-        this.biz = biz;
-        this.isSelected = isSelected;
-        this.imgSrc = imgSrc;
-        this.onSelect = onSelect;
-      }
+  const focusMapOnLocation = useCallback((lat: number, lng: number, minZoom = 15) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(map.getZoom(), minZoom),
+      offset: [0, sheetExpanded ? -96 : -48],
+      duration: 300,
+    });
+  }, [sheetExpanded]);
 
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
-        this.div.style.cursor = 'pointer';
-        this.div.style.zIndex = this.isSelected ? '100' : '10';
-        this.div.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onSelect();
-        });
-        this.render();
-        const panes = this.getPanes();
-        panes.overlayMouseTarget.appendChild(this.div);
-      }
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
 
-      render() {
-        if (!this.div) return;
-        const size = this.isSelected ? 52 : 42;
-        const imgSize = this.isSelected ? 34 : 26;
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: MAP_STYLE_URL,
+      center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+      zoom: 13,
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false,
+    });
 
-        let html = '';
+    map.touchZoomRotate.disableRotation();
+    map.addControl(
+      new maplibregl.AttributionControl({
+        compact: mapContainerRef.current.clientWidth < 640,
+      }),
+      'bottom-right',
+    );
 
-        // Soft glassmorphic tooltip for selected
-        if (this.isSelected) {
-          const benefitText = getShortBenefitForTooltip(this.biz);
-          html += `
-            <div style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:10px;white-space:nowrap;
-              background:rgba(255,255,255,0.96);border-radius:12px;
-              box-shadow:0 4px 20px rgba(99,102,241,0.18),0 1px 4px rgba(0,0,0,0.08);
-              padding:7px 12px;display:flex;flex-direction:column;align-items:center;
-              z-index:200;pointer-events:none;border:1px solid rgba(199,210,254,0.8);">
-              <span style="color:#1C1C1E;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;line-height:1.3;">${this.biz.name}</span>
-              <span style="color:#6366F1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
-              <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:rgba(255,255,255,0.96);border-right:1px solid rgba(199,210,254,0.8);border-bottom:1px solid rgba(199,210,254,0.8);"></div>
-            </div>`;
-        }
+    map.on('load', () => {
+      setMapReady(true);
+      setMapError(null);
+    });
 
-        // Marker: white circle with soft shadow + indigo ring when selected
-        const ringStyle = this.isSelected
-          ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
-          : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;';
+    map.on('error', (event) => {
+      console.error('MapLibre error', event.error);
+      setMapError('No se pudo cargar el mapa');
+    });
 
-        html += `
-          <div style="width:${size}px;height:${size}px;border-radius:50%;${ringStyle}
-            display:flex;align-items:center;justify-content:center;position:relative;z-index:20;
-            transition:all 0.15s;">
-            ${this.imgSrc
-              ? `<img src="${this.imgSrc}" alt="" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
-              : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
-            }
-          </div>`;
+    map.on('click', () => {
+      setSelectedBusiness(null);
+      setSelectedMarkerIdx(null);
+      trackMapInteractionThrottled('map_click', {
+        zoomLevel: map.getZoom() || undefined,
+        minIntervalMs: 500,
+      });
+    });
 
-        // Soft drop shadow dot
-        html += `<div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
+    map.on('dragend', () => {
+      trackMapInteractionThrottled('pan', {
+        zoomLevel: map.getZoom() || undefined,
+        minIntervalMs: 1500,
+      });
+    });
 
-        this.div.innerHTML = html;
-      }
+    map.on('zoomend', () => {
+      trackMapInteractionThrottled('zoom', {
+        zoomLevel: map.getZoom() || undefined,
+        minIntervalMs: 800,
+      });
+    });
 
-      draw() {
-        if (!this.div) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        const px = proj.fromLatLngToDivPixel(this.pos);
-        if (px) {
-          const size = this.isSelected ? 52 : 42;
-          this.div.style.left = (px.x - size / 2) + 'px';
-          this.div.style.top = (px.y - size - 4) + 'px';
-        }
-      }
+    mapRef.current = map;
 
-      onRemove() {
-        if (this.div && this.div.parentNode) {
-          this.div.parentNode.removeChild(this.div);
-          this.div = null;
-        }
-      }
+    return () => {
+      clearMarkers();
+      userMarkerRef.current?.remove();
+      userMarkerRef.current = null;
+      map.remove();
+      mapRef.current = null;
+      setMapReady(false);
+    };
+  }, [clearMarkers, trackMapInteractionThrottled]);
 
-      updateSelection(isSelected: boolean) {
-        this.isSelected = isSelected;
-        if (this.div) this.div.style.zIndex = isSelected ? '100' : '10';
-        this.render();
-        this.draw();
-      }
+  useEffect(() => {
+    if (isSingleBusinessMode && focusedBusiness) {
+      setSelectedBusiness(focusedBusiness);
+      setSelectedMarkerIdx(0);
     }
+  }, [focusedBusiness, isSingleBusinessMode]);
 
-    mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+
+    const map = mapRef.current;
+    clearMarkers();
+
+    markerRefs.current = mapMarkers.map(({ business: biz, lat, lng }, idx) => {
       const isSelected = isSingleBusinessMode
-        ? selected?.id === biz.id && idx === 0
-        : selected?.id === biz.id;
-      const pos = new google.maps.LatLng(lat, lng);
-      const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
-        trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
+        ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
+        : selectedBusiness?.id === biz.id;
+      const markerElement = createBusinessMarkerElement(
+        biz,
+        isSelected,
+        getShortBenefitForTooltip(biz),
+      );
+
+      markerElement.setAttribute('aria-label', `Ver ${biz.name} en el mapa`);
+      markerElement.addEventListener('click', (event) => {
+        event.stopPropagation();
+        trackMapInteractionThrottled('marker_click', {
+          businessId: biz.id,
+          zoomLevel: map.getZoom() || undefined,
+          minIntervalMs: 400,
+        });
         trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
         setSelectedBusiness(biz);
         setSelectedMarkerIdx(idx);
-        map.panTo(pos);
+        focusMapOnLocation(lat, lng);
       });
-      overlay.setMap(map);
-      (overlay as any).__businessId = biz.id;
-      (overlay as any).__markerIdx = idx;
-      overlaysRef.current.push(overlay);
+
+      return new maplibregl.Marker({
+        element: markerElement,
+        anchor: 'bottom',
+      })
+        .setLngLat([lng, lat])
+        .addTo(map);
     });
-  }, [mapMarkers, clearOverlays, isSingleBusinessMode, trackMapInteractionThrottled]);
-
-  // ─── User location overlay ────────────────────────────────────
-
-  const createUserLocationOverlay = useCallback((google: any, map: any, lat: number, lng: number) => {
-    if (userOverlayRef.current) userOverlayRef.current.setMap(null);
-
-    class UserLocationOverlay extends google.maps.OverlayView {
-      private pos: any;
-      private div: HTMLDivElement | null = null;
-      constructor(pos: any) { super(); this.pos = pos; }
-
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
-        this.div.style.zIndex = '5';
-        this.div.style.pointerEvents = 'none';
-        // Soft indigo pulse dot instead of harsh pink
-        this.div.innerHTML = `
-          <div style="position:relative;width:22px;height:22px;">
-            <div style="position:absolute;inset:0;background:rgba(99,102,241,0.20);border-radius:50%;animation:blink-ping 1.8s cubic-bezier(0,0,0.2,1) infinite;"></div>
-            <div style="position:absolute;inset:4px;background:#6366F1;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.40);"></div>
-          </div>
-        `;
-        this.getPanes().overlayLayer.appendChild(this.div);
-      }
-
-      draw() {
-        if (!this.div) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        const px = proj.fromLatLngToDivPixel(this.pos);
-        if (px) {
-          this.div.style.left = (px.x - 11) + 'px';
-          this.div.style.top = (px.y - 11) + 'px';
-        }
-      }
-
-      onRemove() {
-        if (this.div && this.div.parentNode) {
-          this.div.parentNode.removeChild(this.div);
-          this.div = null;
-        }
-      }
-    }
-
-    const overlay = new UserLocationOverlay(new google.maps.LatLng(lat, lng));
-    overlay.setMap(map);
-    userOverlayRef.current = overlay;
-  }, []);
-
-  // ─── Map init ──────────────────────────────────────────────────
-
-  const initMap = useCallback(async () => {
-    if (!mapContainerRef.current) return;
-    try {
-      const google = (await getGoogleMaps()) as any;
-      if (!mapContainerRef.current) return;
-      googleRef.current = google;
-
-      const center = position
-        ? { lat: position.latitude, lng: position.longitude }
-        : DEFAULT_CENTER;
-
-      if (!mapRef.current) {
-        mapRef.current = new google.maps.Map(mapContainerRef.current, {
-          center,
-          zoom: 15,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false,
-          zoomControl: false,
-          clickableIcons: false,
-          disableDefaultUI: true,
-          gestureHandling: 'greedy',
-          styles: MAP_STYLE,
-        });
-
-        mapRef.current.addListener('click', () => {
-          setSelectedBusiness(null);
-          trackMapInteractionThrottled('map_click', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
-        });
-      }
-
-      if (!(mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached) {
-        mapRef.current.addListener('dragend', () => {
-          trackMapInteractionThrottled('pan', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 1500 });
-        });
-        mapRef.current.addListener('zoom_changed', () => {
-          trackMapInteractionThrottled('zoom', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 800 });
-        });
-        (mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached = true;
-      }
-
-      if (position) {
-        createUserLocationOverlay(google, mapRef.current, position.latitude, position.longitude);
-      }
-
-      buildOverlays(google, mapRef.current, selectedBusiness);
-
-      if (isSingleBusinessMode) {
-        if (mapMarkers.length > 0) {
-          const bounds = new google.maps.LatLngBounds();
-          mapMarkers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
-          if (mapMarkers.length === 1) {
-            mapRef.current.setCenter({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
-            mapRef.current.setZoom(16);
-          } else {
-            mapRef.current.fitBounds(bounds);
-          }
-          if (focusedBusiness) {
-            setSelectedBusiness(focusedBusiness);
-            setSelectedMarkerIdx(0);
-            mapRef.current.panTo({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
-          }
-        }
-      } else if (position) {
-        const lat = position.latitude;
-        const lng = position.longitude;
-        const lngOff = km5InLng(lat);
-        const bounds = new google.maps.LatLngBounds(
-          { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
-          { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
-        );
-        mapRef.current.fitBounds(bounds);
-      }
-
-      setMapError(null);
-    } catch (err: any) {
-      console.error('Map init failed', err);
-      setMapError(err.message || 'No se pudo cargar el mapa');
-    }
-  }, [position, mapMarkers, isSingleBusinessMode, focusedBusiness, buildOverlays, createUserLocationOverlay, trackMapInteractionThrottled]);
+  }, [
+    clearMarkers,
+    focusMapOnLocation,
+    getShortBenefitForTooltip,
+    isSingleBusinessMode,
+    mapMarkers,
+    mapReady,
+    selectedBusiness,
+    selectedMarkerIdx,
+    trackMapInteractionThrottled,
+  ]);
 
   useEffect(() => {
-    if (!isLoading && rawBusinesses.length > 0) initMap();
-  }, [isLoading, rawBusinesses.length, initMap]);
+    if (!mapReady || !mapRef.current) return;
+
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = null;
+
+    if (!position) return;
+
+    userMarkerRef.current = new maplibregl.Marker({
+      element: createUserLocationElement(),
+      anchor: 'center',
+    })
+      .setLngLat([position.longitude, position.latitude])
+      .addTo(mapRef.current);
+  }, [mapReady, position]);
 
   useEffect(() => {
-    overlaysRef.current.forEach((o: any) => {
-      if (typeof o.updateSelection === 'function') {
-        const isSelected = isSingleBusinessMode
-          ? selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx
-          : selectedBusiness?.id === o.__businessId;
-        o.updateSelection(isSelected);
+    if (!mapReady || !mapRef.current) return;
+
+    const map = mapRef.current;
+    const padding = getViewportPadding();
+
+    if (isSingleBusinessMode) {
+      if (mapMarkers.length === 0) return;
+      const bounds = new maplibregl.LngLatBounds();
+      mapMarkers.forEach((marker) => bounds.extend([marker.lng, marker.lat]));
+      if (mapMarkers.length === 1) {
+        focusMapOnLocation(mapMarkers[0].lat, mapMarkers[0].lng, 16);
+      } else {
+        map.fitBounds(bounds, { padding, maxZoom: 16 });
       }
+      return;
+    }
+
+    if (position) {
+      const userViewportKey = [
+        position.latitude.toFixed(6),
+        position.longitude.toFixed(6),
+        padding.top,
+        padding.right,
+        padding.bottom,
+        padding.left,
+      ].join(':');
+
+      if (lastAutoUserViewportKeyRef.current === userViewportKey) {
+        return;
+      }
+
+      map.fitBounds(buildUserBounds(position.latitude, position.longitude), {
+        padding,
+        maxZoom: 15,
+        animate: lastAutoUserViewportKeyRef.current !== null,
+      });
+      lastAutoUserViewportKeyRef.current = userViewportKey;
+      return;
+    }
+
+    if (mapMarkers.length === 1) {
+      map.easeTo({
+        center: [mapMarkers[0].lng, mapMarkers[0].lat],
+        zoom: 15,
+        duration: 300,
+      });
+      return;
+    }
+
+    if (mapMarkers.length > 1) {
+      const bounds = new maplibregl.LngLatBounds();
+      mapMarkers.forEach((marker) => bounds.extend([marker.lng, marker.lat]));
+      map.fitBounds(bounds, { padding, maxZoom: 15 });
+      return;
+    }
+
+    map.easeTo({
+      center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+      zoom: 12,
+      duration: 300,
     });
-  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
+  }, [
+    buildUserBounds,
+    focusMapOnLocation,
+    getViewportPadding,
+    isSingleBusinessMode,
+    mapMarkers,
+    mapReady,
+    position,
+  ]);
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
@@ -579,6 +613,12 @@ function MapPage() {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
+
+  const mapContainerStyle = useMemo<CSSProperties>(() => ({
+    '--blink-map-attribution-bottom': sheetExpanded
+      ? 'calc(45vh - 64px + 12px)'
+      : 'calc(64px + 56px + 12px)',
+  }), [sheetExpanded]);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body h-[100dvh] flex flex-col overflow-hidden relative">
@@ -684,7 +724,11 @@ function MapPage() {
       </header>
 
       {/* ─── Map ─── */}
-      <div ref={mapContainerRef} className="flex-1 w-full" />
+      <div
+        ref={mapContainerRef}
+        className="blink-map flex-1 w-full"
+        style={mapContainerStyle}
+      />
 
       {/* Loading overlay */}
       {isLoading && (
@@ -708,16 +752,18 @@ function MapPage() {
       {position && (
         <button
           onClick={() => {
-            if (!mapRef.current || !googleRef.current) return;
-            trackMapInteractionThrottled('recenter_user_location', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
-            const lat = position.latitude;
-            const lng = position.longitude;
-            const lngOff = km5InLng(lat);
-            const bounds = new googleRef.current.maps.LatLngBounds(
-              { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
-              { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
+            if (!mapRef.current) return;
+            trackMapInteractionThrottled('recenter_user_location', {
+              zoomLevel: mapRef.current.getZoom() || undefined,
+              minIntervalMs: 500,
+            });
+            mapRef.current.fitBounds(
+              buildUserBounds(position.latitude, position.longitude),
+              {
+                padding: getViewportPadding(),
+                maxZoom: 15,
+              },
             );
-            mapRef.current.fitBounds(bounds);
           }}
           className="absolute right-4 z-20 w-11 h-11 flex items-center justify-center rounded-2xl active:scale-95 transition-all"
           style={{
@@ -807,8 +853,7 @@ function MapPage() {
                     trackSelectBusiness({ source: 'map_list', businessId: biz.id, category: biz.category, position: idx + 1 });
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
-                    mapRef.current?.panTo({ lat, lng });
-                    if ((mapRef.current?.getZoom() || 0) < 15) mapRef.current?.setZoom(15);
+                    focusMapOnLocation(lat, lng);
                   }}
                   className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.98] relative"
                   style={isSelected ? {
