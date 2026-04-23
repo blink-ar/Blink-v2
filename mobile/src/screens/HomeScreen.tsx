@@ -1,439 +1,328 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  StyleSheet,
+  Image,
+  StatusBar,
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../types/navigation';
-import { Header } from '../components/Header';
-import { SearchBar } from '../components/filters/SearchBar';
-import { FilterMenu } from '../components/filters/FilterMenu';
-import CategoryGrid from '../components/filters/CategoryGrid';
-import BankGrid from '../components/filters/BankGrid';
-import BusinessCard from '../components/cards/BusinessCard';
-import FeaturedBenefits from '../components/FeaturedBenefits';
-import ActiveOffers from '../components/ActiveOffers';
-import { SkeletonCard } from '../components/ui/Skeleton';
-import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Search, MapPin } from 'lucide-react-native';
+import type { HomeStackParamList } from '../types/navigation';
+import type { Business } from '../types';
+import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
-import { Business, Category } from '../types';
-import { RawMongoBenefit } from '../types/mongodb';
-import { CATEGORY_DATA, BANK_DATA } from '../constants';
-import { colors } from '../constants/theme';
+import { Ticker } from '../components/ui/Ticker';
+import { CategoryMarquee } from '../components/ui/CategoryMarquee';
+import { CATEGORY_MAP } from '../constants';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<HomeStackParamList>;
 
-type ActiveTab = 'inicio' | 'beneficios';
+function getMaxDiscount(business: Business): number {
+  let max = 0;
+  for (const b of business.benefits) {
+    const m = b.rewardRate.match(/(\d+)%/);
+    if (m) max = Math.max(max, parseInt(m[1]));
+  }
+  return max;
+}
 
-export default function HomeScreen() {
-  const navigation = useNavigation<NavigationProp>();
-  const route = useRoute();
+function BentoCard({ business, onPress }: { business: Business & { maxDiscount: number }; onPress: () => void }) {
+  const cat = CATEGORY_MAP[business.category] || { bg: '#F3F4F6', text: '#374151', emoji: '\u2728' };
+  const topBenefit = business.benefits.find((b) => {
+    const m = b.rewardRate.match(/(\d+)%/);
+    return m && parseInt(m[1]) === business.maxDiscount;
+  }) || business.benefits[0];
 
-  // Derive initial tab from the bottom tab route name
-  const tabFromRoute: ActiveTab = route.name === 'Beneficios' ? 'beneficios' : 'inicio';
-  const [activeTab, setActiveTab] = useState<ActiveTab>(tabFromRoute);
-
-  // Sync activeTab whenever this tab screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      setActiveTab(tabFromRoute);
-      // Clear filters when switching back to Inicio tab
-      if (tabFromRoute === 'inicio') {
-        setSearchTerm('');
-        setSelectedCategory('all');
-        setSelectedBanks([]);
-        setOnlineOnly(false);
-        setMinDiscount(undefined);
-        setCardMode(undefined);
-        setHasInstallments(undefined);
-      }
-    }, [tabFromRoute])
-  );
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-
-  // Filter states
-  const [onlineOnly, setOnlineOnly] = useState(false);
-  const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
-  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
-  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Auto-switch to beneficios when typing
-  useEffect(() => {
-    if (searchTerm.trim() !== '' && activeTab !== 'beneficios') {
-      setActiveTab('beneficios');
-    }
-  }, [searchTerm, activeTab]);
-
-  const filters: BenefitsFilters = {
-    search: debouncedSearchTerm.trim() || undefined,
-    category: selectedCategory !== 'all' ? selectedCategory : undefined,
-    bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
-    minDiscount,
-    cardMode,
-    hasInstallments,
-  };
-
-  const {
-    businesses: paginatedBusinesses,
-    featuredBenefits: rawBenefits,
-    isLoading,
-    isLoadingMore,
-    error,
-    hasMore,
-    loadMore,
-    refreshData,
-    totalBusinesses,
-  } = useBenefitsData(filters);
-
-  const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
-    onlineOnly,
-    minDiscount,
-    cardMode,
-    hasInstallments,
-  });
-
-  const activeFilterCount = [onlineOnly, minDiscount !== undefined, cardMode !== undefined, hasInstallments !== undefined]
-    .filter(Boolean).length;
-
-  const shouldShowFilteredResults =
-    searchTerm.trim() !== '' ||
-    selectedCategory !== 'all' ||
-    selectedBanks.length > 0 ||
-    activeFilterCount > 0 ||
-    activeTab === 'beneficios';
-
-  const featuredBenefits = useMemo(() => rawBenefits.slice(0, 1), [rawBenefits]);
-
-  const activeOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits.some((ben) => ben.rewardRate.includes('%') || ben.rewardRate.includes('x')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const santanderOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits?.length > 0 && b.benefits.every((ben) => ben?.bankName?.toLowerCase().includes('santander')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const bbvaOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits?.length > 0 && b.benefits.every((ben) => ben?.bankName?.toLowerCase().includes('bbva')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const foodOffers = useMemo(
-    () => enrichedBusinesses.filter((b) => b.category?.toLowerCase() === 'gastronomia').slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const biggestDiscountOffers = useMemo(
-    () => enrichedBusinesses
-      .map((business) => {
-        let maxDisc = 0;
-        business.benefits.forEach((benefit) => {
-          const match = benefit.rewardRate.match(/(\d+)%/);
-          if (match) maxDisc = Math.max(maxDisc, parseInt(match[1]));
-        });
-        return { ...business, maxDiscount: maxDisc };
-      })
-      .filter((b) => b.maxDiscount > 0)
-      .sort((a, b) => b.maxDiscount - a.maxDiscount)
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const handleBusinessClick = useCallback((businessId: string) => {
-    navigation.navigate('BenefitDetail', { businessId, benefitIndex: 0 });
-  }, [navigation]);
-
-  const handleBenefitSelect = useCallback((benefit: RawMongoBenefit) => {
-    const match = paginatedBusinesses.find(
-      (b) => b.name?.toLowerCase().includes(benefit.merchant?.name?.toLowerCase() || '')
-    );
-    if (match) {
-      navigation.navigate('BenefitDetail', { businessId: match.id, benefitIndex: 0, openDetails: true });
-    }
-  }, [navigation, paginatedBusinesses]);
-
-  const handleCategorySelect = useCallback((category: { id: string }) => {
-    setSelectedCategory((prev) => prev === category.id ? 'all' : category.id);
-  }, []);
-
-  const handleBankSelect = useCallback((bank: { id: string }) => {
-    setSelectedBanks((prev) =>
-      prev.includes(bank.id) ? prev.filter((id) => id !== bank.id) : [...prev, bank.id]
-    );
-  }, []);
-
-  const handleViewAllBenefits = useCallback(() => setActiveTab('beneficios'), []);
-
-  const clearAllFilters = () => {
-    setOnlineOnly(false);
-    setMinDiscount(undefined);
-    setCardMode(undefined);
-    setHasInstallments(undefined);
-  };
-
-  // Render Inicio tab content
-  const renderInicioContent = () => (
-    <View>
-      <FeaturedBenefits benefits={featuredBenefits} onBenefitSelect={handleBenefitSelect} />
-
-      {santanderOffers.length > 0 && (
-        <ActiveOffers
-          businesses={santanderOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedBanks(['santander']); setActiveTab('beneficios'); }}
-          title="Exclusivos Santander"
-        />
-      )}
-
-      {bbvaOffers.length > 0 && (
-        <ActiveOffers
-          businesses={bbvaOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedBanks(['bbva']); setActiveTab('beneficios'); }}
-          title="Exclusivos BBVA"
-        />
-      )}
-
-      {foodOffers.length > 0 && (
-        <ActiveOffers
-          businesses={foodOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedCategory('gastronomia'); setActiveTab('beneficios'); }}
-          title="Ofertas de Comida"
-        />
-      )}
-
-      <ActiveOffers
-        businesses={activeOffers}
-        onBusinessClick={handleBusinessClick}
-        onViewAll={handleViewAllBenefits}
-      />
-
-      {biggestDiscountOffers.length > 0 && (
-        <ActiveOffers
-          businesses={biggestDiscountOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={handleViewAllBenefits}
-          title="Mayores Descuentos"
-        />
-      )}
-
-      <View style={{ height: 80 }} />
-    </View>
-  );
-
-  // Render Beneficios tab content as FlatList
-  const renderBeneficiosHeader = () => (
-    <View>
-      <CategoryGrid
-        categories={CATEGORY_DATA}
-        onCategorySelect={handleCategorySelect}
-        selectedCategory={selectedCategory}
-      />
-      <BankGrid
-        banks={BANK_DATA}
-        onBankSelect={handleBankSelect}
-        selectedBanks={selectedBanks}
-      />
-      {totalBusinesses > 0 && (
-        <Text style={styles.resultCount}>
-          {totalBusinesses} comercios encontrados
-        </Text>
-      )}
-    </View>
-  );
-
-  const renderFooter = () => {
-    if (isLoadingMore) {
-      return (
-        <View style={styles.loadingMore}>
-          <ActivityIndicator size="small" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Cargando más...</Text>
-        </View>
-      );
-    }
-    if (!hasMore && enrichedBusinesses.length > 0) {
-      return (
-        <Text style={styles.endText}>No hay más resultados</Text>
-      );
-    }
-    return null;
-  };
-
-  // Loading skeleton
-  if (isLoading && !enrichedBusinesses.length) {
-    return (
-      <View style={styles.container}>
-        <Header />
-        <SearchBar
-          value={searchTerm}
-          onChange={setSearchTerm}
-          showFilter={activeTab !== 'inicio'}
-          activeFilterCount={activeFilterCount}
-          onFilterClick={() => setShowFilterMenu(true)}
-        />
-        <View style={styles.skeletonContainer}>
-          {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+  return (
+    <TouchableOpacity style={styles.bento} onPress={onPress} activeOpacity={0.85}>
+      <View style={[styles.bentoHeader, { backgroundColor: cat.bg }]}>
+        <Text style={styles.bentoEmoji}>{cat.emoji}</Text>
+        <View style={styles.bentoBadge}>
+          <Text style={styles.bentoBadgeText}>{topBenefit?.bankName?.split(' ')[0] || 'BANCO'}</Text>
         </View>
       </View>
-    );
-  }
+      <View style={styles.bentoBody}>
+        <Text style={styles.bentoName} numberOfLines={1}>{business.name}</Text>
+        <Text style={[styles.bentoDiscount, { color: cat.text }]}>{business.maxDiscount}% OFF</Text>
+        <Text style={styles.bentoBenefitCount}>
+          {business.benefits.length} beneficio{business.benefits.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {onSeeAll && (
+        <TouchableOpacity onPress={onSeeAll}>
+          <Text style={styles.seeAll}>Ver todos</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+export default function HomeScreen() {
+  const navigation = useNavigation<Nav>();
+  const { businesses, isLoading, refreshData } = useBenefitsData();
+  const enriched = useEnrichedBusinesses(businesses);
+
+  const top5 = useMemo(() => {
+    const seen = new Set<string>();
+    return enriched
+      .map((b) => ({ ...b, maxDiscount: getMaxDiscount(b) }))
+      .filter((b) => {
+        if (b.maxDiscount === 0) return false;
+        if (seen.has(b.name)) return false;
+        seen.add(b.name);
+        return true;
+      })
+      .sort((a, b) => b.maxDiscount - a.maxDiscount)
+      .slice(0, 5);
+  }, [enriched]);
+
+  const goToBusiness = (businessId: string, business: Business) =>
+    navigation.navigate('BusinessDetail', { businessId, business });
+
+  const goToSearch = (category?: string) =>
+    (navigation as any).getParent()?.navigate('SearchTab', { category });
 
   return (
     <View style={styles.container}>
-      <Header />
-      <SearchBar
-        value={searchTerm}
-        onChange={setSearchTerm}
-        showFilter={activeTab !== 'inicio'}
-        activeFilterCount={activeFilterCount}
-        onFilterClick={() => setShowFilterMenu(true)}
-      />
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>{error}</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F6F4" />
+      <SafeAreaView edges={["top"]} style={styles.safeTop}>
+        <Ticker />
+      </SafeAreaView>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={refreshData} tintColor="#6366F1" />
+        }
+      >
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={styles.heroEyebrow}>Descubrí beneficios</Text>
+          <Text style={styles.heroTitle}>Los mejores descuentos{'\n'}cerca tuyo</Text>
+          <Text style={styles.heroSub}>
+            Encontrá todos los beneficios de tus tarjetas en un solo lugar.
+          </Text>
+          <View style={styles.heroActions}>
+            <TouchableOpacity
+              style={styles.heroCTA}
+              onPress={() => (navigation as any).getParent()?.navigate('SearchTab')}
+              activeOpacity={0.85}
+            >
+              <Search size={16} color="#fff" />
+              <Text style={styles.heroCTAText}>Buscar beneficios</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.heroMapBtn}
+              onPress={() => (navigation as any).getParent()?.navigate('MapTab')}
+              activeOpacity={0.85}
+            >
+              <MapPin size={16} color="#6366F1" />
+              <Text style={styles.heroMapText}>Ver mapa</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      )}
 
-      {shouldShowFilteredResults ? (
-        <FlatList
-          data={enrichedBusinesses}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.cardWrapper}>
-              <BusinessCard business={item} onClick={handleBusinessClick} />
-            </View>
-          )}
-          ListHeaderComponent={renderBeneficiosHeader}
-          ListFooterComponent={renderFooter}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyText}>No se encontraron resultados</Text>
-            </View>
-          }
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.3}
-          refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refreshData} tintColor={colors.primary[600]} />
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={[1]}
-          keyExtractor={() => 'inicio'}
-          renderItem={() => renderInicioContent()}
-          refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refreshData} tintColor={colors.primary[600]} />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        {/* Top 5 */}
+        {top5.length > 0 && (
+          <View>
+            <SectionHeader title="Top descuentos" onSeeAll={() => goToSearch()} />
+            <FlatList
+              data={top5}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.bentoList}
+              renderItem={({ item }) => (
+                <BentoCard
+                  business={item}
+                  onPress={() => goToBusiness(item.id, item)}
+                />
+              )}
+            />
+          </View>
+        )}
 
-      <FilterMenu
-        visible={showFilterMenu}
-        onClose={() => setShowFilterMenu(false)}
-        onlineOnly={onlineOnly}
-        onOnlineChange={setOnlineOnly}
-        minDiscount={minDiscount}
-        onMinDiscountChange={setMinDiscount}
-        cardMode={cardMode}
-        onCardModeChange={setCardMode}
-        hasInstallments={hasInstallments}
-        onHasInstallmentsChange={setHasInstallments}
-        onClearAll={clearAllFilters}
-      />
+        {/* Categories */}
+        <View>
+          <SectionHeader title="Explorar categorías" />
+          <CategoryMarquee onCategoryPress={goToSearch} />
+        </View>
+
+        {/* Loading placeholder */}
+        {isLoading && businesses.length === 0 && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#6366F1" />
+          </View>
+        )}
+
+        {/* Newsletter CTA */}
+        <View style={styles.newsletter}>
+          <Text style={styles.newsletterTitle}>¿Tenés una tarjeta?</Text>
+          <Text style={styles.newsletterSub}>
+            Buscá beneficios por banco y encontrá los descuentos que más te convienen.
+          </Text>
+          <TouchableOpacity
+            style={styles.newsletterBtn}
+            onPress={() => (navigation as any).getParent()?.navigate('SearchTab')}
+          >
+            <Text style={styles.newsletterBtnText}>Explorar beneficios →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray[50],
+  container: { flex: 1, backgroundColor: '#F7F6F4' },
+  safeTop: { backgroundColor: '#F7F6F4' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  hero: {
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 24,
   },
-  skeletonContainer: {
-    padding: 16,
-    gap: 8,
-  },
-  cardWrapper: {
-    paddingHorizontal: 16,
-  },
-  listContent: {
-    paddingBottom: 100,
-  },
-  resultCount: {
+  heroEyebrow: {
     fontSize: 12,
-    color: colors.gray[500],
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    fontWeight: '700',
+    color: '#6366F1',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
-  loadingMore: {
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    lineHeight: 36,
+    marginBottom: 10,
+  },
+  heroSub: {
+    fontSize: 15,
+    color: '#6B7280',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  heroActions: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    gap: 10,
+  },
+  heroCTA: {
+    flex: 1,
+    backgroundColor: '#6366F1',
+    borderRadius: 14,
+    paddingVertical: 13,
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    justifyContent: 'center',
     gap: 8,
   },
-  loadingText: {
-    fontSize: 13,
-    color: colors.gray[500],
-  },
-  endText: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.gray[400],
-    padding: 16,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  errorText: {
+  heroCTAText: {
+    color: '#fff',
     fontSize: 14,
-    color: colors.red[600],
-    textAlign: 'center',
+    fontWeight: '700',
   },
-  emptyContainer: {
+  heroMapBtn: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 40,
+    gap: 6,
   },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 8,
+  heroMapText: {
+    color: '#6366F1',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  emptyText: {
-    fontSize: 15,
-    color: colors.gray[500],
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 12,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  seeAll: {
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+  bentoList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  bento: {
+    width: 160,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  bentoHeader: {
+    height: 80,
+    padding: 12,
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  bentoEmoji: { fontSize: 28 },
+  bentoBadge: {
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  bentoBadgeText: { fontSize: 9, fontWeight: '700', color: '#1C1C1E' },
+  bentoBody: { padding: 12 },
+  bentoName: { fontSize: 13, fontWeight: '700', color: '#1C1C1E', marginBottom: 4 },
+  bentoDiscount: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
+  bentoBenefitCount: { fontSize: 11, color: '#9CA3AF' },
+  loadingContainer: { paddingVertical: 40, alignItems: 'center' },
+  newsletter: {
+    margin: 20,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 20,
+    padding: 20,
+  },
+  newsletterTitle: { fontSize: 18, fontWeight: '700', color: '#1C1C1E', marginBottom: 6 },
+  newsletterSub: { fontSize: 13, color: '#6B7280', lineHeight: 19, marginBottom: 14 },
+  newsletterBtn: {
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+  },
+  newsletterBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
