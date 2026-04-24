@@ -9,7 +9,7 @@ import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { useFallbackSearch } from '../hooks/useFallbackSearch';
-import { fetchBanks } from '../services/api';
+import { fetchBanks, fetchBusinessesPaginated } from '../services/api';
 import { Business } from '../types';
 import { buildBankOptions, toBankDescriptor } from '../utils/banks';
 import {
@@ -305,7 +305,7 @@ function SearchPage() {
   // Derives the category from the first search result and fetches more businesses
   // from that category so the list never feels empty.
   const matchedCategory = hasSearchTerm && !isLoading && enrichedBusinesses.length > 0
-    ? (enrichedBusinesses[0].category as string | undefined)
+    ? (enrichedBusinesses[0].category as string | undefined)?.toLowerCase()
     : undefined;
 
   const primaryIds = useMemo(
@@ -315,7 +315,6 @@ function SearchPage() {
 
   const {
     data: relatedPages,
-    isLoading: isRelatedLoading,
     isFetchingNextPage: isRelatedFetchingMore,
     fetchNextPage: fetchRelatedNext,
     hasNextPage: relatedHasMore,
@@ -330,7 +329,7 @@ function SearchPage() {
       !sortByDistance && position ? encodeGeohash(position.latitude, position.longitude) : null,
     ],
     queryFn: async ({ pageParam = 0 }) =>
-      (await import('../services/api')).fetchBusinessesPaginated({
+      fetchBusinessesPaginated({
         limit: 20,
         offset: pageParam,
         category: matchedCategory,
@@ -1199,7 +1198,7 @@ function SearchPage() {
                     {/* Image */}
                     <div className="shrink-0 w-12 h-12 rounded-xl bg-blink-bg overflow-hidden flex items-center justify-center mr-4" style={{ border: '1px solid #E8E6E1' }}>
                       {business.image ? (
-                        <img src={business.image || ''} alt={business.name || 'Negocio'} className="w-full h-full object-cover" />
+                        <img src={business.image || ''} alt={business.name || 'Negocio'} className="w-full h-full object-contain p-1" />
                       ) : (
                         <span className="material-symbols-outlined text-blink-muted">storefront</span>
                       )}
