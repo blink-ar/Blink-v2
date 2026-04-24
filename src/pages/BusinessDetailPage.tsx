@@ -8,41 +8,62 @@ import { SkeletonBusinessDetailPage } from '../components/skeletons';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
-  lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié',
-  jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom',
+  lunes: 'L', martes: 'M', 'miércoles': 'X', miercoles: 'X',
+  jueves: 'J', viernes: 'V', 'sábado': 'S', sabado: 'S', domingo: 'D',
 };
+const DAY_ORDER = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
-const formatCuando = (cuando?: string): string => {
-  if (!cuando) return 'Todos los días';
+const isAllDays = (cuando?: string): boolean => {
+  if (!cuando) return true;
   const lower = cuando.toLowerCase();
-  const uniqueDays = new Set(ALL_DAYS.filter((d) => lower.includes(d)).map((d) => DAY_ABBR[d]));
-  if (uniqueDays.size >= 7) return 'Todos los días';
-  let result = cuando;
-  Object.entries(DAY_ABBR).forEach(([full, abbr]) => {
-    result = result.replace(new RegExp(full, 'gi'), abbr);
-  });
-  return result;
+  const found = new Set(ALL_DAYS.filter(d => lower.includes(d)).map(d => DAY_ABBR[d]));
+  return found.size >= 7;
 };
 
+const getActiveDays = (cuando?: string): Set<string> => {
+  if (!cuando) return new Set(DAY_ORDER);
+  const lower = cuando.toLowerCase();
+  return new Set(ALL_DAYS.filter(d => lower.includes(d)).map(d => DAY_ABBR[d]));
+};
 
-// Bank accent colors (soft versions)
 const getBankAccent = (name: string): { bg: string; text: string } => {
   const lower = name.toLowerCase();
   if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA' };
   if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B' };
   if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF' };
-  if (lower.includes('macro')) return { bg: '#EEF2FF', text: '#78350F' };
+  if (lower.includes('macro')) return { bg: '#FEF3C7', text: '#92400E' };
   if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8' };
   if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C' };
   if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B' };
   if (lower.includes('modo')) return { bg: '#EDE9FE', text: '#5B21B6' };
   if (lower.includes('naranja')) return { bg: '#FED7AA', text: '#9A3412' };
   if (lower.includes('ciudad')) return { bg: '#D1FAE5', text: '#065F46' };
+  if (lower.includes('personal')) return { bg: '#EDE9FE', text: '#5B21B6' };
+  if (lower.includes('patagonia')) return { bg: '#DBEAFE', text: '#1E40AF' };
   return { bg: '#F3F4F6', text: '#374151' };
 };
 
-const bankAbbr = (name: string) => name.replace(/banco\s*/i, '').substring(0, 6).toUpperCase();
+const formatDistanceText = (business: Business): string => {
+  if (business.distance === undefined || business.distance === null) {
+    return business.hasOnline ? 'Online' : '';
+  }
+  const km = business.distance;
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km`;
+};
 
+const bankShortName = (name: string) =>
+  name.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || name.substring(0, 8).toUpperCase();
+
+const INITIAL_SHOW = 2;
+
+type ActiveTab = 'mis-beneficios' | 'por-beneficio' | 'sucursal';
+
+const TABS: { key: ActiveTab; label: string; icon: string }[] = [
+  { key: 'mis-beneficios', label: 'Mis beneficios', icon: 'person' },
+  { key: 'por-beneficio', label: 'Por beneficio', icon: 'visibility' },
+  { key: 'sucursal', label: 'Sucursal', icon: 'storefront' },
+];
 
 function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +77,9 @@ function BusinessDetailPage() {
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
   const businessBenefitCount = business?.benefits.length || 0;
   const businessPath = id ? `/business/${id}` : '/business';
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>('mis-beneficios');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   useSEO({
     title: business
@@ -119,17 +143,12 @@ function BusinessDetailPage() {
         setBusiness(null);
         setError('Error al cargar');
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id, passedBusiness]);
 
   useEffect(() => {
@@ -138,6 +157,16 @@ function BusinessDetailPage() {
     if (businessViewSignatureRef.current === signature) return;
     businessViewSignatureRef.current = signature;
     trackSelectBusiness({ source: 'business_detail_page', businessId: business.id, category: business.category });
+  }, [business]);
+
+  const groupedBenefits = useMemo(() => {
+    if (!business) return {} as Record<string, BankBenefit[]>;
+    return business.benefits.reduce((acc, benefit) => {
+      const bank = benefit.bankName;
+      if (!acc[bank]) acc[bank] = [];
+      acc[bank].push(benefit);
+      return acc;
+    }, {} as Record<string, BankBenefit[]>);
   }, [business]);
 
   const sortedBenefits = useMemo(() => {
@@ -149,9 +178,6 @@ function BusinessDetailPage() {
       return (b.installments || 0) - (a.installments || 0);
     });
   }, [business]);
-
-  const topBenefits = sortedBenefits.slice(0, 2);
-  const otherBenefits = sortedBenefits.slice(2);
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
     if (!business) return;
@@ -167,9 +193,10 @@ function BusinessDetailPage() {
     navigate(`/map?business=${business.id}`);
   };
 
-  if (loading) {
-    return <SkeletonBusinessDetailPage />;
-  }
+  const toggleGroup = (bankName: string) =>
+    setExpandedGroups(prev => ({ ...prev, [bankName]: !prev[bankName] }));
+
+  if (loading) return <SkeletonBusinessDetailPage />;
 
   if (error || !business) {
     return (
@@ -183,261 +210,302 @@ function BusinessDetailPage() {
     );
   }
 
+  const distanceText = formatDistanceText(business);
+  const branchCount = business.location.length;
+  const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
-      <main className="flex-1 pb-32">
-        {/* Unified hero header */}
-        <div
-          className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260 }}
-        >
-          {/* Floating nav buttons */}
-          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
-            <button
-              onClick={() => navigate(-1)}
-              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.70)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
-              <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 20 }}>arrow_back</span>
-            </button>
-            <button
-              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.70)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>favorite_border</span>
-            </button>
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
+
+      {/* ── Sticky header ── */}
+      <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
+
+        {/* Top row */}
+        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
+          >
+            <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 22 }}>arrow_back</span>
+          </button>
+
+          <div
+            className="flex-shrink-0 w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden"
+            style={{ border: '1px solid #E8E6E1' }}
+          >
+            {business.image ? (
+              <img alt={business.name} className="w-full h-full object-contain p-1" src={business.image} />
+            ) : (
+              <span className="font-black text-xl text-blink-muted">{business.name?.charAt(0)}</span>
+            )}
           </div>
 
-          {/* Logo + name + badges — all inside the hero */}
-          <div className="relative z-10 flex flex-col items-center justify-end pt-24 pb-8 px-6 text-center">
-            <div
-              className="w-[84px] h-[84px] rounded-[22px] bg-white flex items-center justify-center overflow-hidden mb-4"
-              style={{ boxShadow: '0 8px 28px rgba(99,102,241,0.18)', border: '2px solid rgba(255,255,255,0.95)' }}
-            >
-              {business.image ? (
-                <img alt={business.name} className="w-full h-full object-contain p-2" src={business.image} />
-              ) : (
-                <span className="font-black text-3xl text-blink-muted">{business.name?.charAt(0)}</span>
-              )}
-            </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-[16px] text-blink-ink leading-tight truncate">{business.name}</h1>
+            <p className="text-xs text-blink-muted capitalize">{business.category || 'Comercio'}</p>
+          </div>
 
-            <h1 className="font-black text-[22px] text-blink-ink leading-tight mb-3">
-              {business.name}
-            </h1>
-
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <span
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-full capitalize"
-                style={{ background: 'rgba(255,255,255,0.72)', color: '#374151' }}
-              >
-                {business.category || 'Comercio'}
-              </span>
-              <span
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.72)', color: '#065F46' }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                Activo
-              </span>
-              {business.rating > 0 && (
-                <span
-                  className="flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.72)', color: '#4338CA' }}
-                >
-                  <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 12 }}>star</span>
-                  {business.rating.toFixed(1)}
-                </span>
-              )}
-            </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>notifications</span>
+            </button>
+            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>favorite_border</span>
+            </button>
+            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>more_vert</span>
+            </button>
           </div>
         </div>
 
-        <div className="px-4 pt-6 space-y-6">
-          {/* Top Benefits */}
-          {topBenefits.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="font-semibold text-base text-blink-ink">Mis beneficios</h2>
-                <span className="text-base">✦</span>
-              </div>
+        {/* Tab row */}
+        <div className="flex items-center overflow-x-auto" style={{ borderTop: '1px solid #E8E6E1' }}>
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="flex items-center gap-1.5 px-3 py-3 text-[13px] font-medium whitespace-nowrap transition-colors flex-shrink-0"
+              style={{
+                color: activeTab === tab.key ? '#1C1C1E' : '#9CA3AF',
+                borderBottom: activeTab === tab.key ? '2px solid #1C1C1E' : '2px solid transparent',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>calendar_month</span>
+          </button>
+        </div>
+      </header>
 
-              {topBenefits.map((benefit, idx) => {
-                const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-                const isFirst = idx === 0;
-                const bankAccent = getBankAccent(benefit.bankName);
-                return (
-                  <div
-                    key={`${benefit.bankName}-${idx}`}
-                    onClick={() => handleBenefitSelect(benefit, idx + 1)}
-                    className="w-full bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
-                    style={{ boxShadow: isFirst ? '0 4px 20px rgba(99,102,241,0.12)' : '0 2px 8px rgba(0,0,0,0.06)', border: isFirst ? '1.5px solid #C7D2FE' : '1px solid #E8E6E1' }}
-                  >
-                    {/* Card top - colored band */}
+      {/* ── Content ── */}
+      <main className="flex-1 pb-10">
+
+        {/* Mis beneficios — grouped by bank */}
+        {activeTab === 'mis-beneficios' && (
+          <div className="space-y-3 pt-3 px-4">
+            {Object.entries(groupedBenefits).map(([bankName, bankBenefits]) => {
+              const accent = getBankAccent(bankName);
+              const expanded = expandedGroups[bankName];
+              const visible = expanded ? bankBenefits : bankBenefits.slice(0, INITIAL_SHOW);
+              const hiddenCount = bankBenefits.length - INITIAL_SHOW;
+
+              return (
+                <div
+                  key={bankName}
+                  className="bg-white rounded-2xl overflow-hidden"
+                  style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                >
+                  {/* Bank section header */}
+                  <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: accent.bg }}>
                     <div
-                      className="px-4 pt-4 pb-5"
-                      style={{ background: isFirst ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : '#FAFAFA' }}
+                      className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+                      style={{ background: accent.text }}
                     >
-                      {isFirst && (
-                        <div className="flex items-center justify-between mb-3">
-                          <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{ background: bankAccent.bg, color: bankAccent.text }}
-                          >
-                            {bankAbbr(benefit.bankName)}
-                          </span>
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white">Mejor opción</span>
-                        </div>
-                      )}
-                      {!isFirst && (
-                        <div className="flex items-center justify-between mb-3">
-                          <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{ background: bankAccent.bg, color: bankAccent.text }}
-                          >
-                            {bankAbbr(benefit.bankName)}
-                          </span>
-                          {benefit.cardName && (
-                            <span className="text-xs text-blink-muted font-medium">{String(benefit.cardName).replace(/ any$/i, '')}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {discount && parseInt(discount) > 0 ? (
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <span
-                              className="font-bold leading-none"
-                              style={{
-                                fontSize: isFirst ? 52 : 40,
-                                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                              }}
-                            >
-                              {discount}%
-                            </span>
-                            <span className="font-semibold text-blink-muted text-lg">OFF</span>
-                          </div>
-                          {!!benefit.tope && (
-                            <p className="text-xs font-medium mt-1" style={{ color: '#4338CA' }}>
-                              {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
-                            </p>
-                          )}
-                          {(benefit.installments ?? 0) > 0 && (
-                            <p className="text-sm font-medium text-blink-muted mt-0.5">+ {benefit.installments} cuotas s/int.</p>
-                          )}
-                        </div>
-                      ) : benefit.installments && benefit.installments > 0 ? (
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <span
-                              className="font-bold leading-none"
-                              style={{
-                                fontSize: isFirst ? 52 : 40,
-                                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                              }}
-                            >
-                              {benefit.installments}
-                            </span>
-                            <span className="font-semibold text-blink-muted text-lg">cuotas</span>
-                          </div>
-                          <p className="text-sm font-medium text-primary mt-0.5">Sin interés</p>
-                        </div>
-                      ) : (
-                        <p className="font-semibold text-blink-ink leading-snug">{benefit.benefit}</p>
-                      )}
+                      {bankShortName(bankName).substring(0, 2)}
                     </div>
+                    <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: accent.text }}>
+                      {bankName}
+                    </span>
+                  </div>
 
-                    {/* Card bottom */}
-                    <div className="px-4 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #E8E6E1' }}>
-                      <div>
-                        <p className="text-[10px] text-blink-muted font-medium uppercase tracking-wide">Disponible</p>
-                        <p className="text-sm font-semibold text-blink-ink">{formatCuando(benefit.cuando)}</p>
-                      </div>
-                      <span
-                        className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors"
-                        style={{ background: '#EEF2FF', color: '#4338CA' }}
+                  {/* Benefit rows */}
+                  {visible.map((benefit, i) => {
+                    const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
+                    const hasDiscount = !!(discount && parseInt(discount) > 0);
+                    const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
+                    const allDays = isAllDays(benefit.cuando);
+                    const activeDays = !allDays ? getActiveDays(benefit.cuando) : new Set<string>();
+                    const benefitIdx = business.benefits.indexOf(benefit);
+
+                    return (
+                      <div
+                        key={`${bankName}-${i}`}
+                        onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
+                        className="px-4 py-4 cursor-pointer active:bg-gray-50 transition-colors"
+                        style={{ borderTop: '1px solid #E8E6E1' }}
                       >
-                        Ver detalles →
-                      </span>
+                        <div className="flex items-start gap-2">
+
+                          {/* Left content */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-[15px] text-blink-ink leading-tight mb-1">
+                              {benefit.benefit || benefit.cardName}
+                            </p>
+
+                            {(distanceText || branchLabel) && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 12 }}>location_on</span>
+                                <span className="text-xs text-blink-muted">
+                                  {[distanceText, branchLabel].filter(Boolean).join(' • ')}
+                                </span>
+                              </div>
+                            )}
+
+                            {benefit.cardName && (
+                              <p className="text-xs text-blink-muted mb-2">{benefit.cardName}</p>
+                            )}
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                style={{ background: accent.bg, color: accent.text }}
+                              >
+                                {bankShortName(bankName)}
+                              </span>
+
+                              {allDays ? (
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wide"
+                                  style={{ border: '1px solid #DC2626', color: '#DC2626' }}
+                                >
+                                  Todos los días
+                                </span>
+                              ) : activeDays.size > 0 ? (
+                                <div className="flex gap-0.5">
+                                  {DAY_ORDER.map(d => (
+                                    <span
+                                      key={d}
+                                      className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[8px] font-bold"
+                                      style={
+                                        activeDays.has(d)
+                                          ? { background: accent.text, color: '#fff' }
+                                          : { background: '#F3F4F6', color: '#9CA3AF' }
+                                      }
+                                    >
+                                      {d}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Right content */}
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            <div className="text-right">
+                              {hasDiscount ? (
+                                <>
+                                  <p className="font-black text-[26px] leading-tight text-blink-ink">{discount}%</p>
+                                  <p className="text-[11px] text-blink-muted -mt-0.5">de ahorro</p>
+                                  {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
+                                    <p className="text-[10px] text-blink-muted mt-0.5 leading-tight">
+                                      Tope: {benefit.tope}
+                                    </p>
+                                  )}
+                                </>
+                              ) : hasInstallments ? (
+                                <>
+                                  <p className="font-black text-[22px] leading-tight text-blink-ink">{benefit.installments}</p>
+                                  <p className="text-[11px] text-primary font-semibold -mt-0.5">cuotas sin int.</p>
+                                </>
+                              ) : (
+                                <p className="text-xs font-medium text-blink-muted max-w-[80px] text-right leading-tight">
+                                  {benefit.rewardRate}
+                                </p>
+                              )}
+                            </div>
+                            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>chevron_right</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Expand button */}
+                  {!expanded && hiddenCount > 0 && (
+                    <button
+                      onClick={() => toggleGroup(bankName)}
+                      className="w-full py-3 text-sm font-semibold flex items-center justify-center gap-1"
+                      style={{ color: '#DC2626', borderTop: '1px solid #E8E6E1' }}
+                    >
+                      Ver otros {hiddenCount} beneficio{hiddenCount !== 1 ? 's' : ''} ↓
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Por beneficio — flat sorted list */}
+        {activeTab === 'por-beneficio' && (
+          <div className="space-y-2 pt-3 px-4">
+            {sortedBenefits.map((benefit, idx) => {
+              const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
+              const hasDiscount = !!(discount && parseInt(discount) > 0);
+              const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
+              const accent = getBankAccent(benefit.bankName);
+              const benefitIdx = business.benefits.indexOf(benefit);
+
+              return (
+                <div
+                  key={`flat-${idx}`}
+                  onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, idx + 1); }}
+                  className="bg-white rounded-xl px-4 py-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+                  style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0"
+                      style={{ background: accent.bg, color: accent.text }}
+                    >
+                      {bankShortName(benefit.bankName)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-blink-ink leading-tight truncate">
+                        {benefit.benefit || benefit.cardName}
+                      </p>
+                      {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
+                        <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </section>
-          )}
-
-          {/* Other Benefits */}
-          {otherBenefits.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="font-semibold text-base text-blink-ink">Más beneficios</h2>
-              <div className="space-y-2">
-                {otherBenefits.map((benefit, idx) => {
-                  const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-                  const bankAccent = getBankAccent(benefit.bankName);
-                  return (
-                    <div
-                      key={`other-${benefit.bankName}-${idx}`}
-                      onClick={() => handleBenefitSelect(benefit, topBenefits.length + idx + 1)}
-                      className="bg-white rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer transition-all duration-150 active:scale-[0.98]"
-                      style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="text-xs font-semibold px-2 py-1 rounded-lg"
-                          style={{ background: bankAccent.bg, color: bankAccent.text }}
-                        >
-                          {bankAbbr(benefit.bankName)}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-sm text-blink-ink leading-none">
-                            {discount && parseInt(discount) > 0
-                              ? `${discount}% OFF`
-                              : benefit.installments && benefit.installments > 0
-                                ? `${benefit.installments} cuotas s/int.`
-                                : benefit.benefit}
-                          </p>
-                          {!!benefit.tope && (
-                            <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-blink-muted">{formatCuando(benefit.cuando)}</p>
-                        <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
-                      </div>
+                  <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
+                    <div className="text-right">
+                      {hasDiscount ? (
+                        <p className="font-bold text-base text-blink-ink">{discount}%</p>
+                      ) : hasInstallments ? (
+                        <p className="font-bold text-sm text-primary">{benefit.installments} cuotas</p>
+                      ) : (
+                        <p className="text-xs text-blink-muted">{benefit.rewardRate}</p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </div>
-      </main>
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Fixed CTA */}
-      <div
-        className="fixed bottom-0 left-0 w-full z-50 p-4"
-        style={{
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(12px)',
-          borderTop: '1px solid #E8E6E1',
-        }}
-      >
-        <button
-          onClick={handleOpenMap}
-          className="w-full text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
-          Ver ubicación
-        </button>
-      </div>
+        {/* Sucursal — map CTA */}
+        {activeTab === 'sucursal' && (
+          <div className="flex flex-col items-center gap-5 pt-14 px-6">
+            <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 40 }}>map</span>
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-lg text-blink-ink mb-1">
+                {branchCount} sucursal{branchCount !== 1 ? 'es' : ''}
+              </h3>
+              <p className="text-sm text-blink-muted">Encontrá la sucursal más cercana</p>
+            </div>
+            <button
+              onClick={handleOpenMap}
+              className="w-full text-white font-semibold py-4 rounded-2xl text-base active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
+              Ver en el mapa
+            </button>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
