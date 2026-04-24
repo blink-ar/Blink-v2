@@ -55,6 +55,14 @@ const formatDistanceText = (business: Business): string => {
 const bankShortName = (name: string) =>
   name.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || name.substring(0, 8).toUpperCase();
 
+const TODAY_ABBR = (() => {
+  const names = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  return DAY_ABBR[names[new Date().getDay()]] || '';
+})();
+
+const isBenefitAvailableToday = (b: BankBenefit): boolean =>
+  isAllDays(b.cuando) || getActiveDays(b.cuando).has(TODAY_ABBR);
+
 const INITIAL_SHOW = 2;
 
 type ActiveTab = 'mis-beneficios' | 'por-beneficio' | 'sucursal';
@@ -80,6 +88,7 @@ function BusinessDetailPage() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('mis-beneficios');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [filterToday, setFilterToday] = useState(false);
 
   useSEO({
     title: business
@@ -179,6 +188,21 @@ function BusinessDetailPage() {
     });
   }, [business]);
 
+  const filteredGroupedBenefits = useMemo(() => {
+    if (!filterToday) return groupedBenefits;
+    const result: Record<string, BankBenefit[]> = {};
+    for (const [bank, benefits] of Object.entries(groupedBenefits)) {
+      const filtered = benefits.filter(isBenefitAvailableToday);
+      if (filtered.length > 0) result[bank] = filtered;
+    }
+    return result;
+  }, [groupedBenefits, filterToday]);
+
+  const filteredSortedBenefits = useMemo(
+    () => filterToday ? sortedBenefits.filter(isBenefitAvailableToday) : sortedBenefits,
+    [sortedBenefits, filterToday],
+  );
+
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
     if (!business) return;
     const selectedIndex = business.benefits.indexOf(selectedBenefit);
@@ -262,26 +286,35 @@ function BusinessDetailPage() {
           </div>
         </div>
 
-        {/* Tab row */}
-        <div className="flex items-center overflow-x-auto" style={{ borderTop: '1px solid #E8E6E1' }}>
-          {TABS.map(tab => (
+        {/* Filter pills — same style as SearchPage */}
+        <div className="w-full overflow-x-auto no-scrollbar py-3 px-4" style={{ borderTop: '1px solid #E8E6E1' }}>
+          <div className="flex gap-2 min-w-max items-center">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                  activeTab === tab.key
+                    ? 'bg-primary text-white'
+                    : 'bg-blink-bg border border-blink-border text-blink-ink'
+                }`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="flex items-center gap-1.5 px-3 py-3 text-[13px] font-medium whitespace-nowrap transition-colors flex-shrink-0"
-              style={{
-                color: activeTab === tab.key ? '#1C1C1E' : '#9CA3AF',
-                borderBottom: activeTab === tab.key ? '2px solid #1C1C1E' : '2px solid transparent',
-              }}
+              onClick={() => setFilterToday(f => !f)}
+              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                filterToday
+                  ? 'bg-primary text-white'
+                  : 'bg-blink-bg border border-blink-border text-blink-ink'
+              }`}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{tab.icon}</span>
-              {tab.label}
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>today</span>
+              Hoy
             </button>
-          ))}
-          <div className="flex-1" />
-          <button className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>calendar_month</span>
-          </button>
+          </div>
         </div>
       </header>
 
@@ -291,7 +324,7 @@ function BusinessDetailPage() {
         {/* Mis beneficios — grouped by bank */}
         {activeTab === 'mis-beneficios' && (
           <div className="space-y-3 pt-3 px-4">
-            {Object.entries(groupedBenefits).map(([bankName, bankBenefits]) => {
+            {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
               const accent = getBankAccent(bankName);
               const expanded = expandedGroups[bankName];
               const visible = expanded ? bankBenefits : bankBenefits.slice(0, INITIAL_SHOW);
@@ -438,7 +471,7 @@ function BusinessDetailPage() {
         {/* Por beneficio — flat sorted list */}
         {activeTab === 'por-beneficio' && (
           <div className="space-y-2 pt-3 px-4">
-            {sortedBenefits.map((benefit, idx) => {
+            {filteredSortedBenefits.map((benefit, idx) => {
               const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
