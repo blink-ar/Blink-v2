@@ -1,34 +1,30 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, Text } from 'react-native';
 
-const MESSAGES = [
-  '✦ Beneficios activos',
-  '✦ Ahorrá hoy',
-  '✦ Descubrí ofertas cerca tuyo',
-  '✦ Cuotas sin interés',
-  '✦ Cashback en tus compras',
-  '✦ Descuentos exclusivos',
-];
-
 interface TickerProps {
   count?: number;
 }
 
-export function Ticker({ count }: TickerProps) {
+export function Ticker({ count = 0 }: TickerProps) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const containerWidth = 800;
+  const formatted = count.toLocaleString('es-AR');
 
-  const messages = count
-    ? [`✦ ${count.toLocaleString()} beneficios activos`, ...MESSAGES.slice(1)]
-    : MESSAGES;
+  const items = [
+    `✦ ${formatted} beneficios activos`,
+    'Ahorrá hoy',
+    `✦ ${formatted} beneficios activos`,
+    'Descubrí ofertas',
+    `✦ ${formatted} beneficios activos`,
+    'Ahorrá hoy',
+  ];
 
-  const text = messages.join('   ');
+  const text = items.join('          ');
 
   useEffect(() => {
     const anim = Animated.loop(
       Animated.timing(translateX, {
-        toValue: -containerWidth,
-        duration: 18000,
+        toValue: -600,
+        duration: 14000,
         useNativeDriver: true,
       }),
     );
@@ -39,7 +35,7 @@ export function Ticker({ count }: TickerProps) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.track, { transform: [{ translateX }] }]}>
-        <Text style={styles.text}>{text + '   ' + text}</Text>
+        <Text style={styles.text}>{text + '          ' + text}</Text>
       </Animated.View>
     </View>
   );
@@ -47,18 +43,17 @@ export function Ticker({ count }: TickerProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1C1C1E',
-    paddingVertical: 8,
     overflow: 'hidden',
+    paddingVertical: 6,
+    backgroundColor: '#EEF2FF',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(99,102,241,0.12)',
   },
-  track: {
-    flexDirection: 'row',
-  },
+  track: { flexDirection: 'row' },
   text: {
-    color: '#F7F6F4',
     fontSize: 12,
     fontWeight: '500',
-    letterSpacing: 0.5,
-    whiteSpace: 'nowrap',
+    color: 'rgba(99,102,241,0.8)',
+    letterSpacing: 0.3,
   } as any,
 });
