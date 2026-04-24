@@ -311,47 +311,6 @@ function HomePage() {
         {/* Category Marquee */}
         <CategoryMarquee />
 
-        {/* Newsletter CTA - Bento style */}
-        <section className="px-4">
-          <div
-            className="p-5 rounded-2xl relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-              boxShadow: '0 8px 24px rgba(99,102,241,0.25)',
-            }}
-          >
-            {/* Decorative elements */}
-            <div
-              className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20"
-              style={{ background: 'white' }}
-            />
-            <div
-              className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full opacity-10"
-              style={{ background: 'white' }}
-            />
-
-            <h3 className="font-bold text-xl text-white mb-1 relative">¿Querés más?</h3>
-            <p className="text-white/80 text-sm mb-4 relative">
-              Recibí las mejores ofertas antes que nadie.
-            </p>
-            <div className="flex gap-2 relative">
-              <input
-                className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/60 focus:outline-none transition-all"
-                style={{
-                  background: 'rgba(255,255,255,0.20)',
-                  border: '1px solid rgba(255,255,255,0.30)',
-                }}
-                placeholder="tu@email.com"
-                type="email"
-              />
-              <button
-                className="bg-white text-primary font-semibold px-4 rounded-xl text-sm transition-all duration-150 active:scale-95 whitespace-nowrap"
-              >
-                Suscribirse
-              </button>
-            </div>
-          </div>
-        </section>
       </main>
 
       <BottomNav />
