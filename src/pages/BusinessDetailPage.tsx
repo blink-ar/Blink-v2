@@ -89,10 +89,35 @@ function BusinessDetailPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('mis-beneficios');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
-  const [isCompact, setIsCompact] = useState(false);
+
+  // Refs for scroll-driven header collapse — no setState, zero re-renders
+  const topRowRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLHeadingElement>(null);
+  const secondaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const onScroll = () => setIsCompact(window.scrollY > 56);
+    let compact = false;
+    const apply = (next: boolean) => {
+      if (next === compact) return;
+      compact = next;
+      if (topRowRef.current) {
+        topRowRef.current.style.paddingTop = next ? '8px' : '16px';
+        topRowRef.current.style.paddingBottom = next ? '8px' : '16px';
+      }
+      if (logoRef.current) {
+        logoRef.current.style.width = next ? '36px' : '64px';
+        logoRef.current.style.height = next ? '36px' : '64px';
+        logoRef.current.style.borderRadius = next ? '10px' : '16px';
+        logoRef.current.style.boxShadow = next ? 'none' : '0 2px 12px rgba(0,0,0,0.10)';
+      }
+      if (nameRef.current) nameRef.current.style.fontSize = next ? '15px' : '17px';
+      if (secondaryRef.current) {
+        secondaryRef.current.style.maxHeight = next ? '0px' : '52px';
+        secondaryRef.current.style.opacity = next ? '0' : '1';
+      }
+    };
+    const onScroll = () => apply(window.scrollY > 56);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -253,10 +278,11 @@ function BusinessDetailPage() {
 
         {/* Top row */}
         <div
+          ref={topRowRef}
           className="flex items-center gap-3 px-4"
           style={{
-            paddingTop: isCompact ? 8 : 16,
-            paddingBottom: isCompact ? 8 : 16,
+            paddingTop: 16,
+            paddingBottom: 16,
             transition: 'padding 250ms cubic-bezier(0.4,0,0.2,1)',
           }}
         >
@@ -269,35 +295,38 @@ function BusinessDetailPage() {
 
           {/* Logo — shrinks on scroll */}
           <div
+            ref={logoRef}
             className="flex-shrink-0 bg-white flex items-center justify-center overflow-hidden"
             style={{
-              width: isCompact ? 36 : 64,
-              height: isCompact ? 36 : 64,
-              borderRadius: isCompact ? 10 : 16,
+              width: 64,
+              height: 64,
+              borderRadius: 16,
               border: '1px solid #E8E6E1',
-              boxShadow: isCompact ? 'none' : '0 2px 12px rgba(0,0,0,0.10)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
               transition: 'width 250ms cubic-bezier(0.4,0,0.2,1), height 250ms cubic-bezier(0.4,0,0.2,1), border-radius 250ms ease, box-shadow 250ms ease',
             }}
           >
             {business.image ? (
               <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
             ) : (
-              <span className="font-black text-blink-muted" style={{ fontSize: isCompact ? 14 : 24 }}>{business.name?.charAt(0)}</span>
+              <span className="font-black text-2xl text-blink-muted">{business.name?.charAt(0)}</span>
             )}
           </div>
 
           {/* Name + collapsible secondary info */}
           <div className="flex-1 min-w-0">
             <h1
+              ref={nameRef}
               className="font-bold text-blink-ink leading-tight truncate"
-              style={{ fontSize: isCompact ? 15 : 17, transition: 'font-size 250ms ease' }}
+              style={{ fontSize: 17, transition: 'font-size 250ms ease' }}
             >
               {business.name}
             </h1>
             <div
+              ref={secondaryRef}
               style={{
-                maxHeight: isCompact ? 0 : 52,
-                opacity: isCompact ? 0 : 1,
+                maxHeight: 52,
+                opacity: 1,
                 overflow: 'hidden',
                 transition: 'max-height 250ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease',
               }}
