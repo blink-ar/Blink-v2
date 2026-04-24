@@ -117,9 +117,13 @@ function BusinessDetailPage() {
         secondaryRef.current.style.opacity = next ? '0' : '1';
       }
     };
-    const onScroll = () => apply(window.scrollY > 56);
+    let rafId = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => apply(window.scrollY > 56));
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(rafId); };
   }, []);
 
   useSEO({
