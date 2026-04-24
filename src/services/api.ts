@@ -127,6 +127,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
 
     const business: any = {
       ...raw,
+      category: raw.category || raw.categories?.[0] || 'otros',
       benefits,
       location: uniqueLocations
     };
@@ -392,11 +393,6 @@ class BenefitsAPI {
 const benefitsAPI = new BenefitsAPI();
 
 // ===== BANK SUBSCRIPTIONS API =====
-
-interface BankSubscriptionsResponse {
-  success: boolean;
-  subscriptions: RawBankSubscription[];
-}
 
 /**
  * Fetch all bank subscriptions from the bank_subscriptions collection

@@ -172,9 +172,18 @@ function SearchPage() {
     hasInstallments,
   });
 
+  const strictMatches = useMemo(() => {
+    const term = debouncedSearch.trim().toLowerCase();
+    if (!term) return enrichedBusinesses;
+    return enrichedBusinesses.filter((b) => 
+      b.name.toLowerCase().includes(term) || 
+      (b as any).aliases?.some((a: string) => a.toLowerCase().includes(term))
+    );
+  }, [enrichedBusinesses, debouncedSearch]);
+
   const hasSelectedBanks = selectedBanks.length > 0;
   const hasSearchTerm = debouncedSearch.trim().length > 0;
-  const primaryResultsEmpty = !isLoading && enrichedBusinesses.length === 0 && hasSearchTerm;
+  const primaryResultsEmpty = !isLoading && strictMatches.length === 0 && hasSearchTerm;
 
   // Stable signature to re-trigger fallback queries when intent changes
   const searchIntentSignature = [
@@ -305,12 +314,12 @@ function SearchPage() {
   // Derives the category from the first search result and fetches more businesses
   // from that category so the list never feels empty.
   const matchedCategory = hasSearchTerm && !isLoading && enrichedBusinesses.length > 0
-    ? (enrichedBusinesses[0].category as string | undefined)?.toLowerCase()
+    ? (enrichedBusinesses[0].category || (enrichedBusinesses[0] as any).categories?.[0] as string | undefined)?.toLowerCase()
     : undefined;
 
   const primaryIds = useMemo(
-    () => new Set(enrichedBusinesses.map((b) => b.id)),
-    [enrichedBusinesses],
+    () => new Set(strictMatches.map((b) => b.id)),
+    [strictMatches],
   );
 
   const {
@@ -1034,7 +1043,7 @@ function SearchPage() {
               </>
             )}
           </div>
-        ) : enrichedBusinesses.length === 0 ? (
+        ) : strictMatches.length === 0 ? (
           /* ── Generic empty (filters applied, no search term) ── */
           <div className="text-center py-16">
             <div
@@ -1047,7 +1056,7 @@ function SearchPage() {
             <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
-          enrichedBusinesses.map((business, index) => {
+          strictMatches.map((business, index) => {
             const bankBadges = getBankBadges(business);
             const visibleBadges = bankBadges.slice(0, 3);
             const remaining = bankBadges.length - 3;
@@ -1167,7 +1176,8 @@ function SearchPage() {
         )}
 
         {/* ── Related by Category ── */}
-        {!isLoading && !isLoadingMore && !hasMore && relatedBusinesses.length > 0 && (
+        {/* Related by category - show when we have results and no primary loading is happening */}
+        {!isLoading && relatedBusinesses.length > 0 && (
           <div className="mt-8 pt-6 border-t border-blink-border">
             <h2 className="px-5 mb-4 font-bold text-lg text-blink-ink">
               {relatedCategoryLabel ? `Más en ${relatedCategoryLabel}` : 'Más opciones relacionadas'}
