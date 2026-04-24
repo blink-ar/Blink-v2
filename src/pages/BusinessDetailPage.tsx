@@ -221,7 +221,7 @@ function BusinessDetailPage() {
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
 
         {/* Top row */}
-        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+        <div className="flex items-center gap-3 px-4 py-4">
           <button
             onClick={() => navigate(-1)}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
@@ -230,19 +230,23 @@ function BusinessDetailPage() {
           </button>
 
           <div
-            className="flex-shrink-0 w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden"
-            style={{ border: '1px solid #E8E6E1' }}
+            className="flex-shrink-0 w-[64px] h-[64px] rounded-2xl bg-white flex items-center justify-center overflow-hidden"
+            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
           >
             {business.image ? (
-              <img alt={business.name} className="w-full h-full object-contain p-1" src={business.image} />
+              <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
             ) : (
-              <span className="font-black text-xl text-blink-muted">{business.name?.charAt(0)}</span>
+              <span className="font-black text-2xl text-blink-muted">{business.name?.charAt(0)}</span>
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-[16px] text-blink-ink leading-tight truncate">{business.name}</h1>
-            <p className="text-xs text-blink-muted capitalize">{business.category || 'Comercio'}</p>
+            <h1 className="font-bold text-[17px] text-blink-ink leading-tight truncate">{business.name}</h1>
+            <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-0.5 flex-shrink-0">
