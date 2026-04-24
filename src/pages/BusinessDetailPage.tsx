@@ -89,6 +89,13 @@ function BusinessDetailPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('mis-beneficios');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setIsCompact(window.scrollY > 56);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useSEO({
     title: business
@@ -245,7 +252,14 @@ function BusinessDetailPage() {
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
 
         {/* Top row */}
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div
+          className="flex items-center gap-3 px-4"
+          style={{
+            paddingTop: isCompact ? 8 : 16,
+            paddingBottom: isCompact ? 8 : 16,
+            transition: 'padding 250ms cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
           <button
             onClick={() => navigate(-1)}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
@@ -253,23 +267,46 @@ function BusinessDetailPage() {
             <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
 
+          {/* Logo — shrinks on scroll */}
           <div
-            className="flex-shrink-0 w-[64px] h-[64px] rounded-2xl bg-white flex items-center justify-center overflow-hidden"
-            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
+            className="flex-shrink-0 bg-white flex items-center justify-center overflow-hidden"
+            style={{
+              width: isCompact ? 36 : 64,
+              height: isCompact ? 36 : 64,
+              borderRadius: isCompact ? 10 : 16,
+              border: '1px solid #E8E6E1',
+              boxShadow: isCompact ? 'none' : '0 2px 12px rgba(0,0,0,0.10)',
+              transition: 'width 250ms cubic-bezier(0.4,0,0.2,1), height 250ms cubic-bezier(0.4,0,0.2,1), border-radius 250ms ease, box-shadow 250ms ease',
+            }}
           >
             {business.image ? (
               <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
             ) : (
-              <span className="font-black text-2xl text-blink-muted">{business.name?.charAt(0)}</span>
+              <span className="font-black text-blink-muted" style={{ fontSize: isCompact ? 14 : 24 }}>{business.name?.charAt(0)}</span>
             )}
           </div>
 
+          {/* Name + collapsible secondary info */}
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-[17px] text-blink-ink leading-tight truncate">{business.name}</h1>
-            <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-              <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
+            <h1
+              className="font-bold text-blink-ink leading-tight truncate"
+              style={{ fontSize: isCompact ? 15 : 17, transition: 'font-size 250ms ease' }}
+            >
+              {business.name}
+            </h1>
+            <div
+              style={{
+                maxHeight: isCompact ? 0 : 52,
+                opacity: isCompact ? 0 : 1,
+                overflow: 'hidden',
+                transition: 'max-height 250ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease',
+              }}
+            >
+              <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
+              </div>
             </div>
           </div>
 
