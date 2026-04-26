@@ -97,6 +97,13 @@ function BusinessDetailPage() {
   const secondaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Only enable in standalone PWA — browser chrome causes viewport resize
+    // events at page bottom that make the animation shake.
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true;
+    if (!isStandalone) return;
+
     let compact = false;
     const apply = (next: boolean) => {
       if (next === compact) return;
@@ -117,13 +124,9 @@ function BusinessDetailPage() {
         secondaryRef.current.style.opacity = next ? '0' : '1';
       }
     };
-    let rafId = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => apply(window.scrollY > 56));
-    };
+    const onScroll = () => apply(window.scrollY > 56);
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(rafId); };
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useSEO({
