@@ -102,6 +102,8 @@ function BusinessDetailPage() {
     // events at page bottom that make the animation shake.
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
     if (!isStandalone) return;
 
@@ -124,16 +126,25 @@ function BusinessDetailPage() {
         secondaryRef.current.style.opacity = next ? '0' : '1';
       }
     };
-    // Hysteresis: collapse at 56px, but only expand again when back near top (< 10px).
-    // Without this, pages barely taller than the viewport oscillate: collapsing the
-    // header shrinks max-scrollY below 56px, triggering an expand, which pushes
-    // max-scrollY back above 56px, triggering a collapse again — infinite shake.
+
+    let expandTimer = 0;
     const onScroll = () => {
       const y = window.scrollY;
-      apply(isCompactRef.current ? y > 10 : y > 56);
+      // Collapse immediately when scrolled down enough.
+      if (y > 56) { clearTimeout(expandTimer); apply(true); return; }
+      // Expand only after a 200ms quiet period — filters the spurious near-zero
+      // scroll event WebKit fires when the page shrinks after a collapse, which
+      // would otherwise cause an instant expand → grow → collapse → oscillation.
+      if (isCompactRef.current) {
+        clearTimeout(expandTimer);
+        expandTimer = window.setTimeout(() => {
+          if (window.scrollY <= 56) apply(false);
+        }, 200);
+      }
     };
+
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(expandTimer); };
   }, []);
 
   useSEO({
