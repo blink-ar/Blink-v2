@@ -90,62 +90,6 @@ function BusinessDetailPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
 
-  // Refs for scroll-driven header collapse — no setState, zero re-renders
-  const isCompactRef = useRef(false);
-  const topRowRef = useRef<HTMLDivElement>(null);
-  const logoRef = useRef<HTMLDivElement>(null);
-  const nameRef = useRef<HTMLHeadingElement>(null);
-  const secondaryRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Only enable in standalone PWA — browser chrome causes viewport resize
-    // events at page bottom that make the animation shake.
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.matchMedia('(display-mode: fullscreen)').matches ||
-      window.matchMedia('(display-mode: minimal-ui)').matches ||
-      (navigator as unknown as { standalone?: boolean }).standalone === true;
-    if (!isStandalone) return;
-
-    const apply = (next: boolean) => {
-      if (next === isCompactRef.current) return;
-      isCompactRef.current = next;
-      if (topRowRef.current) {
-        topRowRef.current.style.paddingTop = next ? '8px' : '16px';
-        topRowRef.current.style.paddingBottom = next ? '8px' : '16px';
-      }
-      if (logoRef.current) {
-        logoRef.current.style.width = next ? '36px' : '64px';
-        logoRef.current.style.height = next ? '36px' : '64px';
-        logoRef.current.style.borderRadius = next ? '10px' : '16px';
-        logoRef.current.style.boxShadow = next ? 'none' : '0 2px 12px rgba(0,0,0,0.10)';
-      }
-      if (nameRef.current) nameRef.current.style.fontSize = next ? '15px' : '17px';
-      if (secondaryRef.current) {
-        secondaryRef.current.style.maxHeight = next ? '0px' : '52px';
-        secondaryRef.current.style.opacity = next ? '0' : '1';
-      }
-    };
-
-    let expandTimer = 0;
-    const onScroll = () => {
-      const y = window.scrollY;
-      // Collapse immediately when scrolled down enough.
-      if (y > 56) { clearTimeout(expandTimer); apply(true); return; }
-      // Expand only after a 200ms quiet period — filters the spurious near-zero
-      // scroll event WebKit fires when the page shrinks after a collapse, which
-      // would otherwise cause an instant expand → grow → collapse → oscillation.
-      if (isCompactRef.current) {
-        clearTimeout(expandTimer);
-        expandTimer = window.setTimeout(() => {
-          if (window.scrollY <= 56) apply(false);
-        }, 200);
-      }
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(expandTimer); };
-  }, []);
 
   useSEO({
     title: business
@@ -302,15 +246,7 @@ function BusinessDetailPage() {
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
 
         {/* Top row */}
-        <div
-          ref={topRowRef}
-          className="flex items-center gap-3 px-4"
-          style={{
-            paddingTop: isCompactRef.current ? 8 : 16,
-            paddingBottom: isCompactRef.current ? 8 : 16,
-            transition: 'padding 250ms cubic-bezier(0.4,0,0.2,1)',
-          }}
-        >
+        <div className="flex items-center gap-3 px-4 py-4">
           <button
             onClick={() => navigate(-1)}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
@@ -318,18 +254,9 @@ function BusinessDetailPage() {
             <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
 
-          {/* Logo — shrinks on scroll */}
           <div
-            ref={logoRef}
-            className="flex-shrink-0 bg-white flex items-center justify-center overflow-hidden"
-            style={{
-              width: isCompactRef.current ? 36 : 64,
-              height: isCompactRef.current ? 36 : 64,
-              borderRadius: isCompactRef.current ? 10 : 16,
-              border: '1px solid #E8E6E1',
-              boxShadow: isCompactRef.current ? 'none' : '0 2px 12px rgba(0,0,0,0.10)',
-              transition: 'width 250ms cubic-bezier(0.4,0,0.2,1), height 250ms cubic-bezier(0.4,0,0.2,1), border-radius 250ms ease, box-shadow 250ms ease',
-            }}
+            className="flex-shrink-0 w-[64px] h-[64px] rounded-2xl bg-white flex items-center justify-center overflow-hidden"
+            style={{ border: '1px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,0,0,0.10)' }}
           >
             {business.image ? (
               <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
@@ -338,29 +265,12 @@ function BusinessDetailPage() {
             )}
           </div>
 
-          {/* Name + collapsible secondary info */}
           <div className="flex-1 min-w-0">
-            <h1
-              ref={nameRef}
-              className="font-bold text-blink-ink leading-tight truncate"
-              style={{ fontSize: isCompactRef.current ? 15 : 17, transition: 'font-size 250ms ease' }}
-            >
-              {business.name}
-            </h1>
-            <div
-              ref={secondaryRef}
-              style={{
-                maxHeight: isCompactRef.current ? 0 : 52,
-                opacity: isCompactRef.current ? 0 : 1,
-                overflow: 'hidden',
-                transition: 'max-height 250ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease',
-              }}
-            >
-              <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
-              </div>
+            <h1 className="font-bold text-[17px] text-blink-ink leading-tight truncate">{business.name}</h1>
+            <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
