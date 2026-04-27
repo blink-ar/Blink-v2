@@ -82,6 +82,7 @@ function BusinessDetailPage() {
   const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
   const businessViewSignatureRef = useRef('');
+  const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
@@ -163,14 +164,16 @@ function BusinessDetailPage() {
   }, [id, passedBusiness]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     const onScroll = () => {
       isScrollingRef.current = true;
       clearTimeout(scrollTimerRef.current);
       scrollTimerRef.current = setTimeout(() => { isScrollingRef.current = false; }, 300);
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
+    container.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      window.removeEventListener('scroll', onScroll);
+      container.removeEventListener('scroll', onScroll);
       clearTimeout(scrollTimerRef.current);
     };
   }, []);
@@ -256,7 +259,11 @@ function BusinessDetailPage() {
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
+    <div
+      ref={containerRef}
+      className="bg-blink-bg text-blink-ink font-body flex flex-col"
+      style={{ height: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain' }}
+    >
 
       {/* ── Sticky header ── */}
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
