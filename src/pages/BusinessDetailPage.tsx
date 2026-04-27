@@ -320,7 +320,7 @@ function BusinessDetailPage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 pb-24">
+      <main className="flex-1 pb-10">
 
         {/* Mis beneficios — grouped by bank */}
         {activeTab === 'mis-beneficios' && (
