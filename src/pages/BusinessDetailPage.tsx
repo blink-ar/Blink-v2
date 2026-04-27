@@ -82,6 +82,8 @@ function BusinessDetailPage() {
   const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
   const businessViewSignatureRef = useRef('');
+  const isScrollingRef = useRef(false);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
   const businessBenefitCount = business?.benefits.length || 0;
   const businessPath = id ? `/business/${id}` : '/business';
@@ -161,6 +163,19 @@ function BusinessDetailPage() {
   }, [id, passedBusiness]);
 
   useEffect(() => {
+    const onScroll = () => {
+      isScrollingRef.current = true;
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(() => { isScrollingRef.current = false; }, 300);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(scrollTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!business) return;
     const signature = `${business.id}|business_detail`;
     if (businessViewSignatureRef.current === signature) return;
@@ -204,7 +219,7 @@ function BusinessDetailPage() {
   );
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
-    if (!business) return;
+    if (!business || isScrollingRef.current) return;
     const selectedIndex = business.benefits.indexOf(selectedBenefit);
     if (selectedIndex < 0) return;
     trackViewBenefit({ source: 'business_detail_benefit_list', benefitId: `${business.id}:${selectedIndex}`, businessId: business.id, category: business.category, position });
@@ -217,8 +232,10 @@ function BusinessDetailPage() {
     navigate(`/map?business=${business.id}`);
   };
 
-  const toggleGroup = (bankName: string) =>
+  const toggleGroup = (bankName: string) => {
+    if (isScrollingRef.current) return;
     setExpandedGroups(prev => ({ ...prev, [bankName]: !prev[bankName] }));
+  };
 
   if (loading) return <SkeletonBusinessDetailPage />;
 
@@ -319,7 +336,7 @@ function BusinessDetailPage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 pb-10">
+      <main className="flex-1 pb-24">
 
         {/* Mis beneficios — grouped by bank */}
         {activeTab === 'mis-beneficios' && (
