@@ -240,7 +240,7 @@ function BusinessDetailPage() {
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col" style={{ overscrollBehavior: 'none' }}>
 
       {/* ── Sticky header ── */}
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
@@ -320,7 +320,7 @@ function BusinessDetailPage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 pb-10">
+      <main className="flex-1 pb-24">
 
         {/* Mis beneficios — grouped by bank */}
         {activeTab === 'mis-beneficios' && (
@@ -456,6 +456,7 @@ function BusinessDetailPage() {
                   {/* Expand button */}
                   {!expanded && hiddenCount > 0 && (
                     <button
+                      type="button"
                       onClick={() => toggleGroup(bankName)}
                       className="w-full py-3 text-sm font-semibold flex items-center justify-center gap-1"
                       style={{ color: '#DC2626', borderTop: '1px solid #E8E6E1' }}
