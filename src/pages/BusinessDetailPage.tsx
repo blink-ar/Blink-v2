@@ -124,7 +124,14 @@ function BusinessDetailPage() {
         secondaryRef.current.style.opacity = next ? '0' : '1';
       }
     };
-    const onScroll = () => apply(window.scrollY > 56);
+    // Hysteresis: collapse at 56px, but only expand again when back near top (< 10px).
+    // Without this, pages barely taller than the viewport oscillate: collapsing the
+    // header shrinks max-scrollY below 56px, triggering an expand, which pushes
+    // max-scrollY back above 56px, triggering a collapse again — infinite shake.
+    const onScroll = () => {
+      const y = window.scrollY;
+      apply(isCompactRef.current ? y > 10 : y > 56);
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
