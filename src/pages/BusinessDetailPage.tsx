@@ -259,14 +259,10 @@ function BusinessDetailPage() {
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div
-      ref={containerRef}
-      className="bg-blink-bg text-blink-ink font-body flex flex-col"
-      style={{ height: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain' }}
-    >
+    <div className="bg-blink-bg text-blink-ink font-body flex flex-col" style={{ height: '100dvh' }}>
 
-      {/* ── Sticky header ── */}
-      <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
+      {/* ── Header ── */}
+      <header className="bg-white flex-shrink-0" style={{ borderBottom: '1px solid #E8E6E1' }}>
 
         {/* Top row */}
         <div className="flex items-center gap-3 px-4 py-4">
@@ -343,7 +339,11 @@ function BusinessDetailPage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 pb-24">
+      <main
+        ref={containerRef}
+        className="flex-1 pb-4"
+        style={{ overflowY: 'auto', overscrollBehavior: 'contain' }}
+      >
 
         {/* Mis beneficios — grouped by bank */}
         {activeTab === 'mis-beneficios' && (
