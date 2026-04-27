@@ -91,6 +91,7 @@ function BusinessDetailPage() {
   const [filterToday, setFilterToday] = useState(false);
 
   // Refs for scroll-driven header collapse — no setState, zero re-renders
+  const isCompactRef = useRef(false);
   const topRowRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLHeadingElement>(null);
@@ -104,10 +105,9 @@ function BusinessDetailPage() {
       (navigator as unknown as { standalone?: boolean }).standalone === true;
     if (!isStandalone) return;
 
-    let compact = false;
     const apply = (next: boolean) => {
-      if (next === compact) return;
-      compact = next;
+      if (next === isCompactRef.current) return;
+      isCompactRef.current = next;
       if (topRowRef.current) {
         topRowRef.current.style.paddingTop = next ? '8px' : '16px';
         topRowRef.current.style.paddingBottom = next ? '8px' : '16px';
@@ -288,8 +288,8 @@ function BusinessDetailPage() {
           ref={topRowRef}
           className="flex items-center gap-3 px-4"
           style={{
-            paddingTop: 16,
-            paddingBottom: 16,
+            paddingTop: isCompactRef.current ? 8 : 16,
+            paddingBottom: isCompactRef.current ? 8 : 16,
             transition: 'padding 250ms cubic-bezier(0.4,0,0.2,1)',
           }}
         >
@@ -305,11 +305,11 @@ function BusinessDetailPage() {
             ref={logoRef}
             className="flex-shrink-0 bg-white flex items-center justify-center overflow-hidden"
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
+              width: isCompactRef.current ? 36 : 64,
+              height: isCompactRef.current ? 36 : 64,
+              borderRadius: isCompactRef.current ? 10 : 16,
               border: '1px solid #E8E6E1',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
+              boxShadow: isCompactRef.current ? 'none' : '0 2px 12px rgba(0,0,0,0.10)',
               transition: 'width 250ms cubic-bezier(0.4,0,0.2,1), height 250ms cubic-bezier(0.4,0,0.2,1), border-radius 250ms ease, box-shadow 250ms ease',
             }}
           >
@@ -325,15 +325,15 @@ function BusinessDetailPage() {
             <h1
               ref={nameRef}
               className="font-bold text-blink-ink leading-tight truncate"
-              style={{ fontSize: 17, transition: 'font-size 250ms ease' }}
+              style={{ fontSize: isCompactRef.current ? 15 : 17, transition: 'font-size 250ms ease' }}
             >
               {business.name}
             </h1>
             <div
               ref={secondaryRef}
               style={{
-                maxHeight: 52,
-                opacity: 1,
+                maxHeight: isCompactRef.current ? 0 : 52,
+                opacity: isCompactRef.current ? 0 : 1,
                 overflow: 'hidden',
                 transition: 'max-height 250ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease',
               }}
