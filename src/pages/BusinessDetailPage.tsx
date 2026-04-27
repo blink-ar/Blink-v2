@@ -90,7 +90,6 @@ function BusinessDetailPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
 
-
   useSEO({
     title: business
       ? `${business.name}: descuentos y beneficios bancarios | Blink`
@@ -240,7 +239,7 @@ function BusinessDetailPage() {
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col" style={{ overscrollBehavior: 'none' }}>
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
 
       {/* ── Sticky header ── */}
       <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E8E6E1' }}>
@@ -256,7 +255,7 @@ function BusinessDetailPage() {
 
           <div
             className="flex-shrink-0 w-[64px] h-[64px] rounded-2xl bg-white flex items-center justify-center overflow-hidden"
-            style={{ border: '1px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,0,0,0.10)' }}
+            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
           >
             {business.image ? (
               <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
@@ -456,7 +455,6 @@ function BusinessDetailPage() {
                   {/* Expand button */}
                   {!expanded && hiddenCount > 0 && (
                     <button
-                      type="button"
                       onClick={() => toggleGroup(bankName)}
                       className="w-full py-3 text-sm font-semibold flex items-center justify-center gap-1"
                       style={{ color: '#DC2626', borderTop: '1px solid #E8E6E1' }}
