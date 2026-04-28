@@ -1913,7 +1913,7 @@ async function handleGetBusinesses(req, res, url, db) {
         projection: merchantProjection
       })
       .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
-      .skip(offsetNum)
+      .skip(offsetNum + 8)
       .limit(limitNum)
       .toArray();
   }
