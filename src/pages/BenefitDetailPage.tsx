@@ -14,6 +14,7 @@ import {
   trackUnsaveBenefit,
   trackViewBenefit,
 } from '../analytics/intentTracking';
+import { getBankAccent } from '../utils/bankColors';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -28,20 +29,6 @@ const BENEFIT_DAYS = [
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
-const getBankAccent = (name: string): { bg: string; text: string; border: string } => {
-  const lower = name.toLowerCase();
-  if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA', border: '#C7D2FE' };
-  if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
-  if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' };
-  if (lower.includes('macro')) return { bg: '#EEF2FF', text: '#78350F', border: '#C7D2FE' };
-  if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8', border: '#BFDBFE' };
-  if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' };
-  if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
-  if (lower.includes('modo')) return { bg: '#EDE9FE', text: '#5B21B6', border: '#DDD6FE' };
-  if (lower.includes('naranja')) return { bg: '#FED7AA', text: '#9A3412', border: '#FDBA74' };
-  if (lower.includes('ciudad')) return { bg: '#D1FAE5', text: '#065F46', border: '#A7F3D0' };
-  return { bg: '#F3F4F6', text: '#374151', border: '#E5E7EB' };
-};
 
 // Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
 const parseTopeAmount = (tope: unknown): number | null => {
