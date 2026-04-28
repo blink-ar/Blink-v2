@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
+import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { fetchBanks, fetchMongoStats } from '../services/api';
 import { Business } from '../types';
@@ -310,6 +311,9 @@ function HomePage() {
 
         {/* Category Marquee */}
         <CategoryMarquee />
+
+        {/* Coming Soon Banks */}
+        <ComingSoonSection />
 
       </main>
 

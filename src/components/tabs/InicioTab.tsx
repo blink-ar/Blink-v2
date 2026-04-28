@@ -3,7 +3,6 @@ import { Business } from "../../types";
 import { RawMongoBenefit } from "../../types/mongodb";
 import FeaturedBenefits from "../FeaturedBenefits";
 import ActiveOffers from "../ActiveOffers";
-import ComingSoonSection from "../ComingSoonSection";
 
 interface InicioTabProps {
   featuredBenefits: RawMongoBenefit[];
@@ -127,10 +126,6 @@ const InicioTab: React.FC<InicioTabProps> = ({
         </div>
       )}
 
-      {/* Coming Soon */}
-      <div className="animate-fade-in-up" style={{ animationDelay: "450ms" }}>
-        <ComingSoonSection />
-      </div>
     </div>
   );
 };
