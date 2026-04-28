@@ -12,20 +12,7 @@ const COMING_SOON_BANKS = [
 ];
 
 const ComingSoonSection: React.FC = () => (
-  <section className="px-4 flex flex-col gap-3">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <h2 className="font-semibold text-base text-blink-ink">Próximamente</h2>
-        <span className="text-base">🏦</span>
-      </div>
-      <span
-        className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
-        style={{ background: '#EEF2FF', color: '#4338CA' }}
-      >
-        Novedades
-      </span>
-    </div>
-
+  <section className="px-4">
     <div
       className="rounded-[24px] px-4 py-4"
       style={{
