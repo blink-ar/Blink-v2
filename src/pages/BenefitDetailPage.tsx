@@ -299,33 +299,38 @@ function BenefitDetailPage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       <main className="flex-1 overflow-y-auto pb-32">
 
-        {/* Hero — dark indigo gradient */}
+        {/* Hero — bank accent color, sticky */}
         <div
-          className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)', minHeight: 240 }}
+          className="relative"
+          style={{
+            background: bankAccent.bg,
+            minHeight: 220,
+            position: 'sticky',
+            top: 0,
+            zIndex: 50,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+          }}
         >
           {/* Floating nav */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
             <button
               onClick={() => navigate(-1)}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}
+              style={{ background: 'rgba(0,0,0,0.07)', border: `1px solid ${bankAccent.border}` }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 20 }}>arrow_back</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: bankAccent.text }}>arrow_back</span>
             </button>
             <button
               onClick={handleToggleSave}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{
-                background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.25)',
+                background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(0,0,0,0.07)',
+                border: `1px solid ${isSaved ? 'transparent' : bankAccent.border}`,
               }}
             >
               <span
-                className="material-symbols-outlined text-white"
-                style={{ fontSize: 20, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
+                className="material-symbols-outlined"
+                style={{ fontSize: 20, color: isSaved ? 'white' : bankAccent.text, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
               >
                 favorite
               </span>
@@ -333,29 +338,46 @@ function BenefitDetailPage() {
           </div>
 
           {/* Hero content */}
-          <div className="relative z-10 flex flex-col items-center pt-20 pb-8 px-6 text-center">
-            <div
-              className="w-[72px] h-[72px] rounded-[20px] bg-white flex items-center justify-center overflow-hidden mb-3"
-              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.30)', border: '2px solid rgba(255,255,255,0.20)' }}
-            >
-              {business.image ? (
-                <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
-              ) : (
-                <span className="font-black text-2xl text-primary">{business.name?.charAt(0)}</span>
-              )}
+          <div className="relative z-10 flex flex-col items-center pt-20 pb-7 px-6 text-center">
+
+            {/* Business logo with bank badge overlaid */}
+            <div className="relative mb-3">
+              <div
+                className="w-[72px] h-[72px] rounded-[20px] bg-white flex items-center justify-center overflow-hidden"
+                style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.12)', border: `2px solid ${bankAccent.border}` }}
+              >
+                {business.image ? (
+                  <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
+                ) : (
+                  <span className="font-black text-2xl" style={{ color: bankAccent.text }}>{business.name?.charAt(0)}</span>
+                )}
+              </div>
+              {/* Bank badge */}
+              <div
+                className="absolute -bottom-2 -right-2 w-[26px] h-[26px] rounded-full flex items-center justify-center"
+                style={{ background: bankAccent.text, border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
+              >
+                <span className="font-black text-white" style={{ fontSize: 8, letterSpacing: '-0.02em' }}>
+                  {benefit.bankName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
+                </span>
+              </div>
             </div>
-            <h1 className="font-black text-[20px] text-white leading-tight mb-2.5">{business.name}</h1>
+
+            <h1 className="font-black text-[20px] leading-tight mb-2.5" style={{ color: bankAccent.text }}>
+              {business.name}
+            </h1>
+
             <div className="flex items-center gap-2 flex-wrap justify-center">
               <span
-                className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
-                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                className="px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ background: bankAccent.text, color: 'white' }}
               >
                 {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
               {subscriptionName && (
                 <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
-                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                  className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: bankAccent.border, color: bankAccent.text }}
                 >
                   {subscriptionName}
                 </span>
