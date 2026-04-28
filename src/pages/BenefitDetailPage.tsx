@@ -92,7 +92,7 @@ function BenefitDetailPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [showAllLocations, setShowAllLocations] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
-  const { getSubscriptionName } = useSubscriptions();
+  const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
   const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
   const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
 
@@ -258,6 +258,7 @@ function BenefitDetailPage() {
   }
 
   const subscriptionName = getSubscriptionName(benefit.subscription);
+  const subscription = getSubscriptionById(benefit.subscription);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const bankAccent = getBankAccent(benefit.bankName);
 
@@ -564,7 +565,7 @@ function BenefitDetailPage() {
           )}
 
           {/* ── Accede al beneficio ── */}
-          {cards.length > 0 && (
+          {(cards.length > 0 || subscription) && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
@@ -609,6 +610,39 @@ function BenefitDetailPage() {
                       </div>
                     );
                   })}
+
+                  {/* Subscription entry */}
+                  {subscription && (
+                    <>
+                      {cards.length > 0 && (
+                        <div className="pt-1 pb-0.5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted">
+                            Membresía requerida
+                          </p>
+                        </div>
+                      )}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+                        style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
+                      >
+                        {subscription.icon ? (
+                          <img
+                            src={subscription.icon}
+                            alt={subscription.name}
+                            className="w-6 h-6 rounded object-contain flex-shrink-0"
+                          />
+                        ) : (
+                          <span
+                            className="material-symbols-outlined flex-shrink-0"
+                            style={{ fontSize: 18, color: bankAccent.text }}
+                          >
+                            loyalty
+                          </span>
+                        )}
+                        <span className="text-sm font-medium text-blink-ink">{subscription.name}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
