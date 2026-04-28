@@ -78,6 +78,7 @@ function BenefitDetailPage() {
   const [benefitPosition, setBenefitPosition] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [showAllLocations, setShowAllLocations] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
   const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
@@ -663,15 +664,28 @@ function BenefitDetailPage() {
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
             >
-              <div className="px-5 pt-5 pb-5">
-                <div className="flex items-center gap-2.5 mb-4">
+              <button
+                onClick={() => setShowTerms(!showTerms)}
+                className="w-full px-5 py-4 flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
                     <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
                   </div>
                   <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
                 </div>
-                <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap">{termsText}</p>
-              </div>
+                <span
+                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
+                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+              {showTerms && (
+                <div className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>
+                </div>
+              )}
             </div>
           ) : null}
 
