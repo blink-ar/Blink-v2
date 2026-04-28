@@ -44,11 +44,12 @@ const getBankAccent = (name: string): { bg: string; text: string; border: string
 };
 
 // Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
-const parseTopeAmount = (tope: string): number | null => {
-  if (!tope) return null;
-  if (/sin tope|sin l[ií]mite/i.test(tope)) return null;
+const parseTopeAmount = (tope: unknown): number | null => {
+  if (tope == null) return null;
+  const s = String(tope).trim();
+  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
   // Argentine format: "." = thousands separator, "," = decimal
-  const cleaned = tope.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  const cleaned = s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
   const num = parseFloat(cleaned);
   return isNaN(num) ? null : num;
 };
@@ -261,8 +262,9 @@ function BenefitDetailPage() {
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const bankAccent = getBankAccent(benefit.bankName);
 
-  const isNoLimit = !benefit.tope || /sin tope|sin l[ií]mite/i.test(String(benefit.tope));
-  const topeAmount = !isNoLimit && benefit.tope ? parseTopeAmount(benefit.tope) : null;
+  const topeStr = benefit.tope != null ? String(benefit.tope) : '';
+  const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
+  const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
 
@@ -288,9 +290,10 @@ function BenefitDetailPage() {
   const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
   const displayLocations = showAllLocations ? locations : locations.slice(0, LOCATIONS_PREVIEW_COUNT);
 
-  const cards = benefit.cardTypes && benefit.cardTypes.length > 0
+  const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
     ? benefit.cardTypes
-    : benefit.cardName ? [benefit.cardName] : [];
+    : benefit.cardName ? [benefit.cardName] : []
+  ).filter((c): c is string => typeof c === 'string' && c.trim().length > 0);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
@@ -593,7 +596,7 @@ function BenefitDetailPage() {
 
                 <div className="space-y-2.5">
                   {cards.map((card, i) => {
-                    const cardClean = card.replace(/ any$/i, '');
+                    const cardClean = String(card ?? '').replace(/ any$/i, '');
                     const dark = isPremiumCard(cardClean);
                     const network = detectCardNetwork(cardClean) || detectCardNetwork(benefit.bankName);
 
