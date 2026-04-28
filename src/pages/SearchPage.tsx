@@ -9,7 +9,7 @@ import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { useFallbackSearch } from '../hooks/useFallbackSearch';
-import { fetchBanks, fetchBusinessesPaginated } from '../services/api';
+import { fetchBanks, fetchBusinessesPaginated, fetchBusinessById } from '../services/api';
 import { Business } from '../types';
 import { buildBankOptions, toBankDescriptor } from '../utils/banks';
 import {
@@ -183,6 +183,25 @@ function SearchPage() {
 
   const hasSelectedBanks = selectedBanks.length > 0;
   const hasSearchTerm = debouncedSearch.trim().length > 0;
+
+  // When a bank filter is active the API only returns filtered benefits per merchant.
+  // Batch-fetch full business data so cards can show all their bank badges.
+  const [fullBusinessesMap, setFullBusinessesMap] = useState<Map<string, Business>>(new Map());
+  const enrichedIds = useMemo(() => enrichedBusinesses.map(b => b.id).join(','), [enrichedBusinesses]);
+
+  useEffect(() => {
+    if (!hasSelectedBanks || !enrichedIds) { setFullBusinessesMap(new Map()); return; }
+    let cancelled = false;
+    Promise.all(enrichedIds.split(',').map(id => fetchBusinessById(id))).then(results => {
+      if (cancelled) return;
+      setFullBusinessesMap(prev => {
+        const next = new Map(prev);
+        results.forEach(b => { if (b) next.set(b.id, b); });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [enrichedIds, hasSelectedBanks]);
   const primaryResultsEmpty = !isLoading && strictMatches.length === 0 && hasSearchTerm;
 
   // Stable signature to re-trigger fallback queries when intent changes
@@ -597,11 +616,12 @@ function SearchPage() {
     return max;
   };
 
-  // Get abbreviated bank names
+  // Get abbreviated bank names — use full business data when available (bank filter strips benefits)
   const getBankBadges = (business: Business) => {
+    const source = fullBusinessesMap.get(business.id) ?? business;
     const seen = new Set<string>();
     const badges: string[] = [];
-    business.benefits.forEach((benefit) => {
+    source.benefits.forEach((benefit) => {
       if (benefit.bankName && !seen.has(benefit.bankName)) {
         seen.add(benefit.bankName);
         badges.push(toBankDescriptor(benefit.bankName).code);
