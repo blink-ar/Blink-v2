@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessById } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
+import { getBankAccent } from '../utils/bankColors';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
 
@@ -26,22 +27,6 @@ const getActiveDays = (cuando?: string): Set<string> => {
   return new Set(ALL_DAYS.filter(d => lower.includes(d)).map(d => DAY_ABBR[d]));
 };
 
-const getBankAccent = (name: string): { bg: string; text: string } => {
-  const lower = name.toLowerCase();
-  if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA' };
-  if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B' };
-  if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF' };
-  if (lower.includes('macro')) return { bg: '#FEF3C7', text: '#92400E' };
-  if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8' };
-  if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C' };
-  if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B' };
-  if (lower.includes('modo')) return { bg: '#EDE9FE', text: '#5B21B6' };
-  if (lower.includes('naranja')) return { bg: '#FED7AA', text: '#9A3412' };
-  if (lower.includes('ciudad')) return { bg: '#D1FAE5', text: '#065F46' };
-  if (lower.includes('personal')) return { bg: '#EDE9FE', text: '#5B21B6' };
-  if (lower.includes('patagonia')) return { bg: '#DBEAFE', text: '#1E40AF' };
-  return { bg: '#F3F4F6', text: '#374151' };
-};
 
 const formatDistanceText = (business: Business): string => {
   if (business.distance === undefined || business.distance === null) {
