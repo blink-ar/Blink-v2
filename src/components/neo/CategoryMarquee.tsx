@@ -54,8 +54,6 @@ const CategoryMarquee: React.FC = () => {
       className="overflow-hidden py-4"
       style={{
         background: 'linear-gradient(180deg, #F7F6F4 0%, #FFFFFF 50%, #F7F6F4 100%)',
-        borderTop: '1px solid #E8E6E1',
-        borderBottom: '1px solid #E8E6E1',
       }}
     >
       <div className="flex animate-marquee mb-2.5 gap-2.5 w-[200%]">
