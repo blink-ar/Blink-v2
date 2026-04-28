@@ -91,7 +91,6 @@ function BenefitDetailPage() {
   const [benefitPosition, setBenefitPosition] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [showAllLocations, setShowAllLocations] = useState(false);
-  const [showFullTerms, setShowFullTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName } = useSubscriptions();
   const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
@@ -479,36 +478,16 @@ function BenefitDetailPage() {
 
               </div>
 
-              {/* Condiciones especiales */}
-              {termsText ? (
+              {/* Benefit description */}
+              {benefit.description ? (
                 <div className="mt-4 pt-4" style={{ borderTop: '1px solid #E8E6E1' }}>
-                  <p className="font-semibold text-sm text-blink-ink mb-2">Condiciones especiales:</p>
-                  <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap">
-                    {showFullTerms ? termsText : termsText.slice(0, 220) + (termsText.length > 220 ? '…' : '')}
-                  </p>
-                  {termsText.length > 220 && (
-                    <button
-                      onClick={() => setShowFullTerms(!showFullTerms)}
-                      className="mt-2 text-sm font-semibold"
-                      style={{ color: '#6366F1' }}
-                    >
-                      {showFullTerms ? 'Ver menos' : 'Ver más'}
-                    </button>
-                  )}
+                  <p className="text-sm text-blink-muted leading-relaxed">{benefit.description}</p>
                 </div>
               ) : null}
 
               <p className="text-xs text-blink-muted mt-4 leading-relaxed">
                 El beneficio puede tener condiciones o restricciones especiales no listadas aquí.
               </p>
-
-              <button
-                onClick={() => setShowFullTerms(true)}
-                className="mt-3 text-sm font-semibold"
-                style={{ color: '#6366F1' }}
-              >
-                Ver todos los términos y condiciones
-              </button>
             </div>
           </div>
 
@@ -634,6 +613,24 @@ function BenefitDetailPage() {
               </div>
             </div>
           )}
+
+          {/* ── Términos y condiciones ── */}
+          {termsText ? (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <div className="px-5 pt-5 pb-5">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
+                  </div>
+                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
+                </div>
+                <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap">{termsText}</p>
+              </div>
+            </div>
+          ) : null}
 
         </div>
       </main>
