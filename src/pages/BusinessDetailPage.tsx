@@ -75,7 +75,7 @@ function BusinessDetailPage() {
   const location = useLocation();
   const passedBusiness = (location.state as { business?: Business } | null)?.business;
   const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
-  const [loading, setLoading] = useState(!passedBusiness);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const businessViewSignatureRef = useRef('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -124,13 +124,6 @@ function BusinessDetailPage() {
   });
 
   useEffect(() => {
-    if (passedBusiness) {
-      setBusiness(passedBusiness);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     const load = async () => {
@@ -144,7 +137,6 @@ function BusinessDetailPage() {
       try {
         setLoading(true);
         setError(null);
-        setBusiness(null);
 
         const resolvedBusiness = await fetchBusinessById(id);
         if (cancelled) return;
@@ -156,7 +148,6 @@ function BusinessDetailPage() {
         }
       } catch {
         if (cancelled) return;
-        setBusiness(null);
         setError('Error al cargar');
       } finally {
         if (!cancelled) setLoading(false);
@@ -165,7 +156,7 @@ function BusinessDetailPage() {
 
     load();
     return () => { cancelled = true; };
-  }, [id, passedBusiness]);
+  }, [id]);
 
   useEffect(() => {
     const container = containerRef.current;
