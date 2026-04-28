@@ -67,7 +67,6 @@ const INITIAL_SHOW = 2;
 
 type ViewMode = 'por-beneficio' | 'sucursal' | null;
 
-const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
 
 function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,16 +85,8 @@ function BusinessDetailPage() {
   const businessPath = id ? `/business/${id}` : '/business';
 
   const [viewMode, setViewMode] = useState<ViewMode>(null);
-  const [filterMyBanks, setFilterMyBanks] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
-
-  const myBanks = useMemo<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(BANK_STORAGE_KEY);
-      return stored ? (JSON.parse(stored) as string[]) : [];
-    } catch { return []; }
-  }, []);
 
   useSEO({
     title: business
@@ -216,23 +207,6 @@ function BusinessDetailPage() {
     [sortedBenefits, filterToday],
   );
 
-  const displayedGroupedBenefits = useMemo(() => {
-    if (!filterMyBanks || myBanks.length === 0) return filteredGroupedBenefits;
-    const result: Record<string, BankBenefit[]> = {};
-    for (const [bank, benefits] of Object.entries(filteredGroupedBenefits)) {
-      if (myBanks.some(b => bank.toLowerCase().includes(b.toLowerCase()) || b.toLowerCase().includes(bank.toLowerCase()))) {
-        result[bank] = benefits;
-      }
-    }
-    return result;
-  }, [filteredGroupedBenefits, filterMyBanks, myBanks]);
-
-  const displayedSortedBenefits = useMemo(() => {
-    if (!filterMyBanks || myBanks.length === 0) return filteredSortedBenefits;
-    return filteredSortedBenefits.filter(b =>
-      myBanks.some(m => b.bankName.toLowerCase().includes(m.toLowerCase()) || m.toLowerCase().includes(b.bankName.toLowerCase()))
-    );
-  }, [filteredSortedBenefits, filterMyBanks, myBanks]);
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
     if (!business || isScrollingRef.current) return;
@@ -323,15 +297,15 @@ function BusinessDetailPage() {
         <div className="w-full overflow-x-auto no-scrollbar py-3 px-4" style={{ borderTop: '1px solid #E8E6E1' }}>
           <div className="flex gap-2 min-w-max items-center">
             <button
-              onClick={() => setFilterMyBanks(f => !f)}
+              onClick={() => setFilterToday(f => !f)}
               className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                filterMyBanks
+                filterToday
                   ? 'bg-primary text-white'
                   : 'bg-blink-bg border border-blink-border text-blink-ink'
               }`}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>person</span>
-              Mis beneficios
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>today</span>
+              Hoy
             </button>
             <button
               onClick={() => setViewMode(v => v === 'por-beneficio' ? null : 'por-beneficio')}
@@ -355,22 +329,11 @@ function BusinessDetailPage() {
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>storefront</span>
               Sucursal
             </button>
-            <button
-              onClick={() => setFilterToday(f => !f)}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                filterToday
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>today</span>
-              Hoy
-            </button>
           </div>
         </div>
       </header>
 
-      {/* ── Content ── */}
+{/* ── Content ── */}
       <main
         ref={containerRef}
         className="flex-1 pb-4"
@@ -380,7 +343,7 @@ function BusinessDetailPage() {
         {/* Grouped by bank — default view */}
         {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (
           <div className="space-y-3 pt-3 px-4">
-            {Object.entries(displayedGroupedBenefits).map(([bankName, bankBenefits]) => {
+            {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
               const accent = getBankAccent(bankName);
               const expanded = expandedGroups[bankName];
               const visible = expanded ? bankBenefits : bankBenefits.slice(0, INITIAL_SHOW);
@@ -527,7 +490,7 @@ function BusinessDetailPage() {
         {/* Por beneficio — flat sorted list */}
         {viewMode === 'por-beneficio' && (
           <div className="space-y-2 pt-3 px-4">
-            {displayedSortedBenefits.map((benefit, idx) => {
+            {filteredSortedBenefits.map((benefit, idx) => {
               const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
