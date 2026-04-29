@@ -157,7 +157,7 @@ const InstallPWABanner: React.FC = () => {
         </div>
 
         <button className="flex-1 text-left min-w-0" onClick={() => setShowSheet(true)}>
-          <p className="text-sm font-semibold text-blink-ink leading-tight">Instalá Blink</p>
+          <p className="text-sm font-semibold text-blink-ink leading-tight">Instalá la app de Blink</p>
           <p className="text-xs text-blink-muted mt-0.5 truncate">Agregá la app a tu pantalla de inicio</p>
         </button>
 
@@ -210,7 +210,7 @@ const InstallPWABanner: React.FC = () => {
                   style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
                 />
                 <div>
-                  <h2 className="font-bold text-blink-ink text-base leading-tight">Instalá Blink</h2>
+                  <h2 className="font-bold text-blink-ink text-base leading-tight">Instalá la app de Blink</h2>
                   <p className="text-blink-muted text-sm mt-0.5">{subtitleMap[platform]}</p>
                 </div>
               </div>
