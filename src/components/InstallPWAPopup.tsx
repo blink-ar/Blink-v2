@@ -69,9 +69,12 @@ const IOSSafariSteps = () => (
       en la barra inferior de Safari
     </Step>
     <Step num={2}>
-      Desplazate y tocá <strong>"Agregar a inicio"</strong>
+      Tocá <strong>"Ver más"</strong> al final de la lista de opciones
     </Step>
     <Step num={3}>
+      Tocá <strong>"Agregar a inicio"</strong>
+    </Step>
+    <Step num={4}>
       Confirmá tocando <strong>"Agregar"</strong>
     </Step>
   </div>
@@ -85,9 +88,12 @@ const IOSChromeSteps = () => (
       en la barra inferior de Chrome
     </Step>
     <Step num={2}>
-      Tocá <strong>"Agregar a inicio"</strong>
+      Tocá <strong>"Ver más"</strong> al final de la lista de opciones
     </Step>
     <Step num={3}>
+      Tocá <strong>"Agregar a inicio"</strong>
+    </Step>
+    <Step num={4}>
       Confirmá tocando <strong>"Agregar"</strong>
     </Step>
   </div>
