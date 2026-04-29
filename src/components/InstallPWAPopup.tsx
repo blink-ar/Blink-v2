@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-type Platform = 'ios' | 'android';
+type Platform = 'ios-safari' | 'ios-chrome' | 'android';
 
 function detectPlatform(): Platform | null {
   const ua = navigator.userAgent;
-  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
-  if (/android/i.test(ua)) return 'android';
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const isAndroid = /android/i.test(ua);
+
+  if (isIOS) {
+    // CriOS = Chrome, FxiOS = Firefox, OPiOS = Opera, EdgiOS = Edge on iOS
+    const isSafari = /safari/i.test(ua) && !/crios|fxios|opios|edgios/i.test(ua);
+    return isSafari ? 'ios-safari' : 'ios-chrome';
+  }
+
+  if (isAndroid) return 'android';
   return null;
 }
 
@@ -53,15 +61,31 @@ const Step: React.FC<{ num: number; children: React.ReactNode }> = ({ num, child
   </div>
 );
 
-const IOSSteps = () => (
+const IOSSafariSteps = () => (
   <div className="space-y-4">
     <Step num={1}>
-      En Safari, tocá
+      Tocá
       <Pill icon={<ShareIcon />} label="Compartir" />
-      en la barra inferior de la pantalla
+      en la barra inferior de Safari
     </Step>
     <Step num={2}>
       Desplazate y tocá <strong>"Agregar a inicio"</strong>
+    </Step>
+    <Step num={3}>
+      Confirmá tocando <strong>"Agregar"</strong>
+    </Step>
+  </div>
+);
+
+const IOSChromeSteps = () => (
+  <div className="space-y-4">
+    <Step num={1}>
+      Tocá
+      <Pill icon={<ShareIcon />} label="Compartir" />
+      en la barra inferior de Chrome
+    </Step>
+    <Step num={2}>
+      Tocá <strong>"Agregar a inicio"</strong>
     </Step>
     <Step num={3}>
       Confirmá tocando <strong>"Agregar"</strong>
@@ -84,6 +108,12 @@ const AndroidSteps = () => (
     </Step>
   </div>
 );
+
+const subtitleMap: Record<Platform, string> = {
+  'ios-safari': 'Seguí estos pasos en Safari',
+  'ios-chrome': 'Seguí estos pasos en Chrome',
+  'android': 'Seguí estos pasos en Chrome',
+};
 
 const InstallPWAPopup: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -142,15 +172,15 @@ const InstallPWAPopup: React.FC = () => {
                 Instalá Blink
               </h2>
               <p className="text-blink-muted text-sm mt-0.5">
-                {platform === 'ios'
-                  ? 'Seguí estos pasos en Safari'
-                  : 'Seguí estos pasos en Chrome'}
+                {subtitleMap[platform]}
               </p>
             </div>
           </div>
 
           {/* Steps */}
-          {platform === 'ios' ? <IOSSteps /> : <AndroidSteps />}
+          {platform === 'ios-safari' && <IOSSafariSteps />}
+          {platform === 'ios-chrome' && <IOSChromeSteps />}
+          {platform === 'android' && <AndroidSteps />}
 
           {/* Dismiss button */}
           <button
