@@ -1,439 +1,498 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  StyleSheet,
+  Image,
+  Platform,
+  StatusBar,
+  TextInput,
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../types/navigation';
-import { Header } from '../components/Header';
-import { SearchBar } from '../components/filters/SearchBar';
-import { FilterMenu } from '../components/filters/FilterMenu';
-import CategoryGrid from '../components/filters/CategoryGrid';
-import BankGrid from '../components/filters/BankGrid';
-import BusinessCard from '../components/cards/BusinessCard';
-import FeaturedBenefits from '../components/FeaturedBenefits';
-import ActiveOffers from '../components/ActiveOffers';
-import { SkeletonCard } from '../components/ui/Skeleton';
-import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
+import type { HomeStackParamList } from '../types/navigation';
+import type { Business } from '../types';
+import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
-import { Business, Category } from '../types';
-import { RawMongoBenefit } from '../types/mongodb';
-import { CATEGORY_DATA, BANK_DATA } from '../constants';
-import { colors } from '../constants/theme';
+import { Ticker } from '../components/ui/Ticker';
+import { CategoryMarquee } from '../components/ui/CategoryMarquee';
+import { buildBankOptions } from '../utils/banks';
+import { fetchBanks, fetchMongoStats } from '../services/api';
+import { formatDistance } from '../utils/distance';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<HomeStackParamList>;
 
-type ActiveTab = 'inicio' | 'beneficios';
+function getMaxDiscount(b: Business): number {
+  let max = 0;
+  for (const ben of b.benefits) {
+    const m = ben.rewardRate.match(/(\d+)%/);
+    if (m) max = Math.max(max, parseInt(m[1]));
+  }
+  return max;
+}
 
-export default function HomeScreen() {
-  const navigation = useNavigation<NavigationProp>();
-  const route = useRoute();
-
-  // Derive initial tab from the bottom tab route name
-  const tabFromRoute: ActiveTab = route.name === 'Beneficios' ? 'beneficios' : 'inicio';
-  const [activeTab, setActiveTab] = useState<ActiveTab>(tabFromRoute);
-
-  // Sync activeTab whenever this tab screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      setActiveTab(tabFromRoute);
-      // Clear filters when switching back to Inicio tab
-      if (tabFromRoute === 'inicio') {
-        setSearchTerm('');
-        setSelectedCategory('all');
-        setSelectedBanks([]);
-        setOnlineOnly(false);
-        setMinDiscount(undefined);
-        setCardMode(undefined);
-        setHasInstallments(undefined);
-      }
-    }, [tabFromRoute])
-  );
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-
-  // Filter states
-  const [onlineOnly, setOnlineOnly] = useState(false);
-  const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
-  const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
-  const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Auto-switch to beneficios when typing
-  useEffect(() => {
-    if (searchTerm.trim() !== '' && activeTab !== 'beneficios') {
-      setActiveTab('beneficios');
-    }
-  }, [searchTerm, activeTab]);
-
-  const filters: BenefitsFilters = {
-    search: debouncedSearchTerm.trim() || undefined,
-    category: selectedCategory !== 'all' ? selectedCategory : undefined,
-    bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
-    minDiscount,
-    cardMode,
-    hasInstallments,
-  };
-
-  const {
-    businesses: paginatedBusinesses,
-    featuredBenefits: rawBenefits,
-    isLoading,
-    isLoadingMore,
-    error,
-    hasMore,
-    loadMore,
-    refreshData,
-    totalBusinesses,
-  } = useBenefitsData(filters);
-
-  const enrichedBusinesses = useEnrichedBusinesses(paginatedBusinesses, {
-    onlineOnly,
-    minDiscount,
-    cardMode,
-    hasInstallments,
-  });
-
-  const activeFilterCount = [onlineOnly, minDiscount !== undefined, cardMode !== undefined, hasInstallments !== undefined]
-    .filter(Boolean).length;
-
-  const shouldShowFilteredResults =
-    searchTerm.trim() !== '' ||
-    selectedCategory !== 'all' ||
-    selectedBanks.length > 0 ||
-    activeFilterCount > 0 ||
-    activeTab === 'beneficios';
-
-  const featuredBenefits = useMemo(() => rawBenefits.slice(0, 1), [rawBenefits]);
-
-  const activeOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits.some((ben) => ben.rewardRate.includes('%') || ben.rewardRate.includes('x')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const santanderOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits?.length > 0 && b.benefits.every((ben) => ben?.bankName?.toLowerCase().includes('santander')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const bbvaOffers = useMemo(
-    () => enrichedBusinesses
-      .filter((b) => b.benefits?.length > 0 && b.benefits.every((ben) => ben?.bankName?.toLowerCase().includes('bbva')))
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const foodOffers = useMemo(
-    () => enrichedBusinesses.filter((b) => b.category?.toLowerCase() === 'gastronomia').slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const biggestDiscountOffers = useMemo(
-    () => enrichedBusinesses
-      .map((business) => {
-        let maxDisc = 0;
-        business.benefits.forEach((benefit) => {
-          const match = benefit.rewardRate.match(/(\d+)%/);
-          if (match) maxDisc = Math.max(maxDisc, parseInt(match[1]));
-        });
-        return { ...business, maxDiscount: maxDisc };
-      })
-      .filter((b) => b.maxDiscount > 0)
-      .sort((a, b) => b.maxDiscount - a.maxDiscount)
-      .slice(0, 8),
-    [enrichedBusinesses]
-  );
-
-  const handleBusinessClick = useCallback((businessId: string) => {
-    navigation.navigate('BenefitDetail', { businessId, benefitIndex: 0 });
-  }, [navigation]);
-
-  const handleBenefitSelect = useCallback((benefit: RawMongoBenefit) => {
-    const match = paginatedBusinesses.find(
-      (b) => b.name?.toLowerCase().includes(benefit.merchant?.name?.toLowerCase() || '')
-    );
-    if (match) {
-      navigation.navigate('BenefitDetail', { businessId: match.id, benefitIndex: 0, openDetails: true });
-    }
-  }, [navigation, paginatedBusinesses]);
-
-  const handleCategorySelect = useCallback((category: { id: string }) => {
-    setSelectedCategory((prev) => prev === category.id ? 'all' : category.id);
-  }, []);
-
-  const handleBankSelect = useCallback((bank: { id: string }) => {
-    setSelectedBanks((prev) =>
-      prev.includes(bank.id) ? prev.filter((id) => id !== bank.id) : [...prev, bank.id]
-    );
-  }, []);
-
-  const handleViewAllBenefits = useCallback(() => setActiveTab('beneficios'), []);
-
-  const clearAllFilters = () => {
-    setOnlineOnly(false);
-    setMinDiscount(undefined);
-    setCardMode(undefined);
-    setHasInstallments(undefined);
-  };
-
-  // Render Inicio tab content
-  const renderInicioContent = () => (
-    <View>
-      <FeaturedBenefits benefits={featuredBenefits} onBenefitSelect={handleBenefitSelect} />
-
-      {santanderOffers.length > 0 && (
-        <ActiveOffers
-          businesses={santanderOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedBanks(['santander']); setActiveTab('beneficios'); }}
-          title="Exclusivos Santander"
-        />
-      )}
-
-      {bbvaOffers.length > 0 && (
-        <ActiveOffers
-          businesses={bbvaOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedBanks(['bbva']); setActiveTab('beneficios'); }}
-          title="Exclusivos BBVA"
-        />
-      )}
-
-      {foodOffers.length > 0 && (
-        <ActiveOffers
-          businesses={foodOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={() => { setSelectedCategory('gastronomia'); setActiveTab('beneficios'); }}
-          title="Ofertas de Comida"
-        />
-      )}
-
-      <ActiveOffers
-        businesses={activeOffers}
-        onBusinessClick={handleBusinessClick}
-        onViewAll={handleViewAllBenefits}
-      />
-
-      {biggestDiscountOffers.length > 0 && (
-        <ActiveOffers
-          businesses={biggestDiscountOffers}
-          onBusinessClick={handleBusinessClick}
-          onViewAll={handleViewAllBenefits}
-          title="Mayores Descuentos"
-        />
-      )}
-
-      <View style={{ height: 80 }} />
-    </View>
-  );
-
-  // Render Beneficios tab content as FlatList
-  const renderBeneficiosHeader = () => (
-    <View>
-      <CategoryGrid
-        categories={CATEGORY_DATA}
-        onCategorySelect={handleCategorySelect}
-        selectedCategory={selectedCategory}
-      />
-      <BankGrid
-        banks={BANK_DATA}
-        onBankSelect={handleBankSelect}
-        selectedBanks={selectedBanks}
-      />
-      {totalBusinesses > 0 && (
-        <Text style={styles.resultCount}>
-          {totalBusinesses} comercios encontrados
-        </Text>
-      )}
-    </View>
-  );
-
-  const renderFooter = () => {
-    if (isLoadingMore) {
-      return (
-        <View style={styles.loadingMore}>
-          <ActivityIndicator size="small" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Cargando más...</Text>
+function TopBenefitCard({
+  item,
+  idx,
+  onPress,
+}: {
+  item: { business: Business; benefit: Business['benefits'][number]; benefitIndex: number; discount: number };
+  idx: number;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
+      {/* Card image header */}
+      <View style={styles.cardHeader}>
+        {item.business.image ? (
+          <Image source={{ uri: item.business.image }} style={styles.cardImg} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardImgPlaceholder} />
+        )}
+        {/* Dark scrim */}
+        <View style={styles.cardScrim} />
+        {/* Discount badge */}
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountNum}>{item.discount}%</Text>
+          <Text style={styles.discountOff}>OFF</Text>
         </View>
-      );
-    }
-    if (!hasMore && enrichedBusinesses.length > 0) {
-      return (
-        <Text style={styles.endText}>No hay más resultados</Text>
-      );
-    }
-    return null;
-  };
-
-  // Loading skeleton
-  if (isLoading && !enrichedBusinesses.length) {
-    return (
-      <View style={styles.container}>
-        <Header />
-        <SearchBar
-          value={searchTerm}
-          onChange={setSearchTerm}
-          showFilter={activeTab !== 'inicio'}
-          activeFilterCount={activeFilterCount}
-          onFilterClick={() => setShowFilterMenu(true)}
-        />
-        <View style={styles.skeletonContainer}>
-          {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+        {/* Rank badge */}
+        <View style={styles.rankBadge}>
+          <Text style={styles.rankText}>#{idx + 1}</Text>
         </View>
       </View>
-    );
-  }
+      {/* Card body */}
+      <View style={styles.cardBody}>
+        <View style={styles.cardNameRow}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.business.name}</Text>
+          {item.business.distanceText && (
+            <>
+              <Text style={styles.cardDot}>·</Text>
+              <Text style={styles.cardDistance}>{item.business.distanceText}</Text>
+            </>
+          )}
+        </View>
+        <Text style={styles.cardBank} numberOfLines={1}>
+          {item.benefit.bankName} · {item.benefit.cardName}
+        </Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardCuando}>
+            {item.benefit.cuando ? String(item.benefit.cuando).substring(0, 20) : 'Disponible hoy'}
+          </Text>
+          <Text style={{ fontSize: 16 }}>🔖</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function HomeScreen() {
+  const navigation = useNavigation<Nav>();
+  const { businesses, isLoading, refreshData } = useBenefitsData({});
+
+  const { data: statsResponse } = useQuery({
+    queryKey: ['home-ticker-stats'],
+    queryFn: fetchMongoStats,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: availableBankNames = [] } = useQuery({
+    queryKey: ['availableBanks'],
+    queryFn: fetchBanks,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const activeBenefitsCount = statsResponse?.stats?.totalBenefits || 0;
+  const enriched = useEnrichedBusinesses(businesses);
+
+  const top5 = useMemo(() => {
+    const all: { business: Business; benefit: Business['benefits'][number]; benefitIndex: number; discount: number }[] = [];
+    businesses.forEach((business) => {
+      business.benefits.forEach((b, bIdx) => {
+        const m = String(b.rewardRate).match(/(\d+)%/);
+        if (m) all.push({ business, benefit: b, benefitIndex: bIdx, discount: parseInt(m[1]) });
+      });
+    });
+    const sorted = all.sort((a, b) => b.discount - a.discount);
+    const selected: typeof all = [];
+    const seen = new Set<string>();
+    for (const item of sorted) {
+      const key = (item.business.id || item.business.name || '').trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      selected.push(item);
+      seen.add(key);
+      if (selected.length === 5) break;
+    }
+    return selected;
+  }, [businesses]);
+
+  const businessBankNames = useMemo(() => {
+    const names: string[] = [];
+    businesses.forEach((b) => b.benefits.forEach((ben) => { if (ben.bankName) names.push(ben.bankName); }));
+    return names;
+  }, [businesses]);
+
+  const indexedEntities = useMemo(
+    () => buildBankOptions(availableBankNames, businessBankNames),
+    [availableBankNames, businessBankNames],
+  );
+
+  const goToSearch = (params?: { bank?: string; category?: string }) =>
+    (navigation as any).getParent()?.navigate('SearchTab', params);
 
   return (
     <View style={styles.container}>
-      <Header />
-      <SearchBar
-        value={searchTerm}
-        onChange={setSearchTerm}
-        showFilter={activeTab !== 'inicio'}
-        activeFilterCount={activeFilterCount}
-        onFilterClick={() => setShowFilterMenu(true)}
-      />
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>{error}</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <SafeAreaView edges={['top']} style={styles.header}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <Text style={styles.brand}>Blink</Text>
+          <View style={styles.topBarRight}>
+            <TouchableOpacity style={styles.iconBtn}>
+              <Text style={{ fontSize: 20 }}>🔔</Text>
+            </TouchableOpacity>
+            <View style={styles.avatar}>
+              <Text style={{ fontSize: 14 }}>👤</Text>
+            </View>
+          </View>
         </View>
-      )}
+        <Ticker count={activeBenefitsCount} />
+      </SafeAreaView>
 
-      {shouldShowFilteredResults ? (
-        <FlatList
-          data={enrichedBusinesses}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.cardWrapper}>
-              <BusinessCard business={item} onClick={handleBusinessClick} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refreshData} tintColor="#6366F1" />}
+      >
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>
+            Todos tus descuentos{'\n'}
+            <Text style={styles.heroGradientText}>en un solo lugar</Text>
+          </Text>
+          <Text style={styles.heroSub}>Bancos · Billeteras · Clubes · Suscripciones</Text>
+
+          {/* CTA */}
+          <TouchableOpacity style={styles.cta} onPress={() => goToSearch()} activeOpacity={0.88}>
+            <Text style={styles.ctaText}>Buscá beneficios</Text>
+            <View style={styles.ctaArrow}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>→</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Entity pills */}
+          {indexedEntities.length > 0 && (
+            <View style={styles.entityCard}>
+              <Text style={styles.entityTitle}>Estamos en Beta! Estos son los emisores disponibles hoy en Blink.</Text>
+              <View style={styles.entityPills}>
+                {indexedEntities.map((entity) => (
+                  <TouchableOpacity
+                    key={entity.token}
+                    style={styles.entityPill}
+                    onPress={() => goToSearch({ bank: entity.token })}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.entityPillText}>{entity.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
-          ListHeaderComponent={renderBeneficiosHeader}
-          ListFooterComponent={renderFooter}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyText}>No se encontraron resultados</Text>
-            </View>
-          }
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.3}
-          refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refreshData} tintColor={colors.primary[600]} />
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={[1]}
-          keyExtractor={() => 'inicio'}
-          renderItem={() => renderInicioContent()}
-          refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refreshData} tintColor={colors.primary[600]} />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        </View>
 
-      <FilterMenu
-        visible={showFilterMenu}
-        onClose={() => setShowFilterMenu(false)}
-        onlineOnly={onlineOnly}
-        onOnlineChange={setOnlineOnly}
-        minDiscount={minDiscount}
-        onMinDiscountChange={setMinDiscount}
-        cardMode={cardMode}
-        onCardModeChange={setCardMode}
-        hasInstallments={hasInstallments}
-        onHasInstallmentsChange={setHasInstallments}
-        onClearAll={clearAllFilters}
-      />
+        {/* Top 5 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Top 5 hoy</Text>
+              <Text style={{ fontSize: 16 }}>🔥</Text>
+            </View>
+            <TouchableOpacity onPress={() => goToSearch()}>
+              <Text style={styles.seeAll}>Ver todo →</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={isLoading ? (Array(3).fill(null) as null[]) : top5}
+            keyExtractor={(item, i) => item ? `${item.business.id}-${i}` : `sk-${i}`}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardList}
+            renderItem={({ item, index }) =>
+              item ? (
+                <TopBenefitCard
+                  item={item}
+                  idx={index}
+                  onPress={() =>
+                    navigation.navigate('BenefitDetail', {
+                      businessId: item.business.id,
+                      benefitIndex: item.benefitIndex,
+                      business: item.business,
+                    })
+                  }
+                />
+              ) : (
+                <View style={styles.skeleton} />
+              )
+            }
+          />
+        </View>
+
+        {/* Category Marquee */}
+        <CategoryMarquee onCategoryPress={(cat) => goToSearch({ category: cat })} />
+
+        {/* Newsletter CTA */}
+        <View style={styles.newsletter}>
+          <View style={styles.newsletterCircle1} />
+          <View style={styles.newsletterCircle2} />
+          <Text style={styles.newsletterTitle}>¿Querés más?</Text>
+          <Text style={styles.newsletterSub}>Recibí las mejores ofertas antes que nadie.</Text>
+          <View style={styles.newsletterRow}>
+            <TextInput
+              style={styles.newsletterInput}
+              placeholder="tu@email.com"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.newsletterBtn}>
+              <Text style={styles.newsletterBtnText}>Suscribirse</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray[50],
+  container: { flex: 1, backgroundColor: '#F7F6F4' },
+  header: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(232,230,225,0.8)',
   },
-  skeletonContainer: {
-    padding: 16,
-    gap: 8,
-  },
-  cardWrapper: {
-    paddingHorizontal: 16,
-  },
-  listContent: {
-    paddingBottom: 100,
-  },
-  resultCount: {
-    fontSize: 12,
-    color: colors.gray[500],
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  loadingMore: {
+  topBar: {
+    height: 56,
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  brand: { fontSize: 20, fontWeight: '700', color: '#1C1C1E', letterSpacing: -0.5 },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#6366F1',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  hero: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 },
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    lineHeight: 38,
+    marginBottom: 8,
+  },
+  heroGradientText: { color: '#6366F1' },
+  heroSub: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  cta: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#6366F1',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+    marginBottom: 16,
+  },
+  ctaText: { fontSize: 15, fontWeight: '600', color: '#fff', letterSpacing: -0.3 },
+  ctaArrow: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  entityCard: {
+    borderRadius: 20,
     padding: 16,
-    gap: 8,
+    backgroundColor: 'rgba(238,242,255,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.18)',
   },
-  loadingText: {
-    fontSize: 13,
-    color: colors.gray[500],
-  },
-  endText: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.gray[400],
-    padding: 16,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  errorText: {
+  entityTitle: {
     fontSize: 14,
-    color: colors.red[600],
+    fontWeight: '600',
+    color: '#1C1C1E',
     textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 20,
   },
-  emptyContainer: {
+  entityPills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  entityPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#E8E6E1',
+  },
+  entityPillText: { fontSize: 13, fontWeight: '500', color: '#1C1C1E' },
+  section: { marginTop: 24 },
+  sectionHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 40,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 8,
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
+  seeAll: { fontSize: 12, fontWeight: '600', color: '#6366F1' },
+  cardList: { paddingHorizontal: 16, gap: 12 },
+  card: {
+    width: 220,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8E6E1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  emptyText: {
-    fontSize: 15,
-    color: colors.gray[500],
+  cardHeader: {
+    height: 112,
+    backgroundColor: '#6366F1',
+    position: 'relative',
   },
+  cardImg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  cardImgPlaceholder: { ...StyleSheet.absoluteFillObject, backgroundColor: '#4F46E5' },
+  cardScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    // gradient scrim via overlay — approximate with semi-transparent black
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  discountNum: { fontSize: 22, fontWeight: '700', color: '#fff', lineHeight: 26 },
+  discountOff: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.8)', marginBottom: 2 },
+  rankBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  rankText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  cardBody: { padding: 12, backgroundColor: '#fff' },
+  cardNameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  cardName: { fontSize: 13, fontWeight: '600', color: '#1C1C1E', flex: 1 },
+  cardDot: { fontSize: 11, color: '#9CA3AF', marginHorizontal: 3 },
+  cardDistance: { fontSize: 11, color: '#9CA3AF', flexShrink: 0 },
+  cardBank: { fontSize: 11, color: '#9CA3AF', marginBottom: 8 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardCuando: { fontSize: 10, color: '#9CA3AF', fontWeight: '500' },
+  skeleton: {
+    width: 220,
+    height: 192,
+    borderRadius: 16,
+    backgroundColor: '#D1D5DB',
+  },
+  newsletter: {
+    margin: 16,
+    borderRadius: 16,
+    padding: 20,
+    backgroundColor: '#6366F1',
+    overflow: 'hidden',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+    marginTop: 24,
+  },
+  newsletterCircle1: {
+    position: 'absolute',
+    top: -24,
+    right: -24,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  newsletterCircle2: {
+    position: 'absolute',
+    bottom: -32,
+    left: -16,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  newsletterTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  newsletterSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 16 },
+  newsletterRow: { flexDirection: 'row', gap: 8 },
+  newsletterInput: {
+    flex: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  newsletterBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  newsletterBtnText: { fontSize: 13, fontWeight: '600', color: '#6366F1' },
 });
