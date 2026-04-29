@@ -417,17 +417,26 @@ function SearchPage() {
     return cat ? cat.label : '';
   }, [matchedCategory]);
 
-  // Scroll position restoration on mount
+  // Scroll position restoration: read saved Y on mount, then apply once data is loaded
+  const pendingScrollRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     const key = 'blink.search.scrollY';
     const saved = sessionStorage.getItem(key);
     if (saved) {
       sessionStorage.removeItem(key);
-      window.scrollTo({ top: Number(saved), behavior: 'instant' });
+      pendingScrollRef.current = Number(saved);
     } else {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && pendingScrollRef.current !== null) {
+      const y = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+      window.scrollTo({ top: y, behavior: 'instant' });
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     if (!hasInitializedFiltersRef.current) {
