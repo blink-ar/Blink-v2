@@ -265,17 +265,6 @@ function BusinessDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>notifications</span>
-            </button>
-            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>favorite_border</span>
-            </button>
-            <button className="w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors">
-              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 22 }}>more_vert</span>
-            </button>
-          </div>
         </div>
 
         {/* Filter pills */}
