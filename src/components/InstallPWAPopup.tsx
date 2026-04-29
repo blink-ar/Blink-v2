@@ -7,13 +7,10 @@ function detectPlatform(): Platform | null {
   const ua = navigator.userAgent;
   const isIOS = /iphone|ipad|ipod/i.test(ua);
   const isAndroid = /android/i.test(ua);
-
   if (isIOS) {
-    // CriOS = Chrome, FxiOS = Firefox, OPiOS = Opera, EdgiOS = Edge on iOS
     const isSafari = /safari/i.test(ua) && !/crios|fxios|opios|edgios/i.test(ua);
     return isSafari ? 'ios-safari' : 'ios-chrome';
   }
-
   if (isAndroid) return 'android';
   return null;
 }
@@ -121,8 +118,9 @@ const subtitleMap: Record<Platform, string> = {
   'android': 'Seguí estos pasos en Chrome',
 };
 
-const InstallPWAPopup: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
+const InstallPWABanner: React.FC = () => {
+  const [showBanner, setShowBanner] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
   const [platform, setPlatform] = useState<Platform | null>(null);
 
   useEffect(() => {
@@ -130,76 +128,110 @@ const InstallPWAPopup: React.FC = () => {
     const p = detectPlatform();
     if (!p) return;
     setPlatform(p);
-    const timer = setTimeout(() => setIsVisible(true), 1500);
-    return () => clearTimeout(timer);
+    setShowBanner(true);
   }, []);
 
-  const dismiss = () => {
-    setIsVisible(false);
+  const dismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowBanner(false);
+    setShowSheet(false);
     localStorage.setItem(DISMISSED_KEY, '1');
   };
 
-  if (!isVisible || !platform) return null;
+  if (!showBanner || !platform) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end"
-      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
-      onClick={dismiss}
-    >
+    <>
+      {/* Banner card */}
       <div
-        className="w-full bg-blink-surface rounded-t-3xl relative animate-slide-up"
-        style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
-        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white"
+        style={{
+          border: '1.5px solid rgba(99,102,241,0.2)',
+          boxShadow: '0 2px 12px rgba(99,102,241,0.08)',
+        }}
       >
-        <div className="px-6 pt-5 pb-8">
-          {/* Handle bar */}
-          <div className="w-10 h-1 bg-blink-border rounded-full mx-auto mb-5" />
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <span className="material-symbols-outlined text-primary" style={{ fontSize: 20 }}>
+            install_mobile
+          </span>
+        </div>
 
-          {/* Close button */}
-          <button
-            onClick={dismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-blink-bg flex items-center justify-center"
-            aria-label="Cerrar"
+        <button className="flex-1 text-left min-w-0" onClick={() => setShowSheet(true)}>
+          <p className="text-sm font-semibold text-blink-ink leading-tight">Instalá Blink</p>
+          <p className="text-xs text-blink-muted mt-0.5 truncate">Agregá la app a tu pantalla de inicio</p>
+        </button>
+
+        <button
+          onClick={() => setShowSheet(true)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-primary flex-shrink-0"
+          style={{ background: 'rgba(99,102,241,0.08)' }}
+        >
+          Cómo
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
+        </button>
+
+        <button
+          onClick={dismiss}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-blink-muted flex-shrink-0"
+          aria-label="Cerrar"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Instruction sheet */}
+      {showSheet && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end"
+          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onClick={() => setShowSheet(false)}
+        >
+          <div
+            className="w-full bg-blink-surface rounded-t-3xl relative animate-slide-up"
+            style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <X size={16} className="text-blink-muted" />
-          </button>
+            <div className="px-6 pt-5 pb-8">
+              <div className="w-10 h-1 bg-blink-border rounded-full mx-auto mb-5" />
 
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-5">
-            <img
-              src="/pwa-192x192.png"
-              alt="Blink"
-              className="w-12 h-12 rounded-2xl flex-shrink-0"
-              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
-            />
-            <div>
-              <h2 className="font-bold text-blink-ink text-base leading-tight">
-                Instalá Blink
-              </h2>
-              <p className="text-blink-muted text-sm mt-0.5">
-                {subtitleMap[platform]}
-              </p>
+              <button
+                onClick={() => setShowSheet(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-blink-bg flex items-center justify-center"
+                aria-label="Cerrar"
+              >
+                <X size={16} className="text-blink-muted" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-5">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="Blink"
+                  className="w-12 h-12 rounded-2xl flex-shrink-0"
+                  style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+                />
+                <div>
+                  <h2 className="font-bold text-blink-ink text-base leading-tight">Instalá Blink</h2>
+                  <p className="text-blink-muted text-sm mt-0.5">{subtitleMap[platform]}</p>
+                </div>
+              </div>
+
+              {platform === 'ios-safari' && <IOSSafariSteps />}
+              {platform === 'ios-chrome' && <IOSChromeSteps />}
+              {platform === 'android' && <AndroidSteps />}
+
+              <button
+                onClick={() => setShowSheet(false)}
+                className="mt-6 w-full py-3.5 rounded-xl text-sm font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
+              >
+                Entendido
+              </button>
             </div>
           </div>
-
-          {/* Steps */}
-          {platform === 'ios-safari' && <IOSSafariSteps />}
-          {platform === 'ios-chrome' && <IOSChromeSteps />}
-          {platform === 'android' && <AndroidSteps />}
-
-          {/* Dismiss button */}
-          <button
-            onClick={dismiss}
-            className="mt-6 w-full py-3.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-          >
-            Entendido
-          </button>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
-export default InstallPWAPopup;
+export default InstallPWABanner;

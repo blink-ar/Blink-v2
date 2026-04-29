@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
-import InstallPWAPopup from './components/InstallPWAPopup';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -35,7 +34,6 @@ function App() {
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
-      <InstallPWAPopup />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
