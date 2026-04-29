@@ -11,6 +11,7 @@ import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
+import InstallPWABanner from '../components/InstallPWAPopup';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -199,6 +200,11 @@ function HomePage() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* Install banner */}
+        <section className="px-4 -mt-4">
+          <InstallPWABanner />
         </section>
 
         {/* Top 5 Hoy - Bento Cards */}
