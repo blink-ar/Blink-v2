@@ -1,5 +1,6 @@
 // Removed mockBusinesses import - using only real MongoDB data
 import { Business, BankBenefit, SearchApiResponse } from "../types";
+import { getCategoryDefaultImage } from '../utils/categoryImages';
 import {
   Benefit,
   RawMongoBenefit,
@@ -594,7 +595,7 @@ export async function fetchBusinesses(options: {
           description: benefit.description,
           rating: 5,
           location: [...benefit.locations],
-          image: 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400',
+          image: getCategoryDefaultImage(benefit.categories[0]),
           benefits: []
         };
 
