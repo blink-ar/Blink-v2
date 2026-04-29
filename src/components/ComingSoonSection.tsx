@@ -1,14 +1,14 @@
 import React from 'react';
 
 const COMING_SOON_BANKS = [
-  { name: 'Macro',         initials: 'MA', color: '#E8A200' },
-  { name: 'HSBC',          initials: 'HS', color: '#DB0011' },
-  { name: 'Supervielle',   initials: 'SV', color: '#FF6B35' },
-  { name: 'Credicoop',     initials: 'CC', color: '#004F9F' },
-  { name: 'Brubank',       initials: 'BR', color: '#1A1A2E' },
-  { name: 'Mercado Pago',  initials: 'MP', color: '#00BCFF' },
-  { name: 'Ualá',          initials: 'UA', color: '#5C2D8C' },
-  { name: 'NaranjaX',      initials: 'NX', color: '#F15A22' },
+  { name: 'Modo',           initials: 'MO', color: '#7B2D8B' },
+  { name: 'Mercado Pago',   initials: 'MP', color: '#00BCFF' },
+  { name: 'Brubank',        initials: 'BR', color: '#1A1A2E' },
+  { name: 'Ualá',           initials: 'UA', color: '#5C2D8C' },
+  { name: 'Club La Nación', initials: 'CL', color: '#003087' },
+  { name: 'Banco Nación',   initials: 'BN', color: '#009FD9' },
+  { name: 'Banco Ciudad',   initials: 'BC', color: '#E32629' },
+  { name: 'Hipotecario',    initials: 'HI', color: '#0B4EA2' },
 ];
 
 const ComingSoonSection: React.FC = () => (
