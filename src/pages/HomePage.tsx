@@ -176,20 +176,20 @@ function HomePage() {
           </button>
 
           {/* Indexed Entities */}
-          {isBanksLoading ? (
-            <SkeletonAvailableBanks />
-          ) : (
-            <div
-              className="mt-4 rounded-[28px] px-4 py-4"
-              style={{
-                background: 'linear-gradient(180deg, rgba(238,242,255,0.9) 0%, rgba(255,255,255,0.96) 100%)',
-                border: '1px solid rgba(99,102,241,0.18)',
-                boxShadow: '0 10px 28px rgba(99,102,241,0.08)',
-              }}
-            >
-              <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
-                Estamos en Beta! Estos son los emisores disponibles hoy en Blink.
-              </p>
+          <div
+            className="mt-4 rounded-[28px] px-4 py-4"
+            style={{
+              background: 'linear-gradient(180deg, rgba(238,242,255,0.9) 0%, rgba(255,255,255,0.96) 100%)',
+              border: '1px solid rgba(99,102,241,0.18)',
+              boxShadow: '0 10px 28px rgba(99,102,241,0.08)',
+            }}
+          >
+            <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
+              Estamos en Beta! Estos son los emisores disponibles hoy en Blink.
+            </p>
+            {isBanksLoading ? (
+              <SkeletonAvailableBanks />
+            ) : (
               <div className="flex flex-wrap justify-center gap-2">
                 {indexedEntities.map((entity) => (
                   <button
@@ -202,8 +202,8 @@ function HomePage() {
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
 
         {/* Top 5 Hoy - Bento Cards */}

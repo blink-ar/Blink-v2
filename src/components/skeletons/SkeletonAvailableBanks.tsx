@@ -15,11 +15,6 @@ const SkeletonAvailableBanks: React.FC = () => {
       }}
       aria-hidden="true"
     >
-      {/* Heading */}
-      <div className="flex justify-center mb-4">
-        <Skeleton variant="text" width={260} height={15} />
-      </div>
-
       {/* Pill grid */}
       <div className="flex flex-wrap justify-center gap-2">
         {PILL_WIDTHS.map((w, i) => (
