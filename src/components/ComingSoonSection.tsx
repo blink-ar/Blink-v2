@@ -1,7 +1,7 @@
 import React from 'react';
 
 const COMING_SOON_BANKS = [
-  { name: 'Modo',           initials: 'MO', color: '#7B2D8B' },
+  { name: 'Modo',           initials: 'M',  color: '#22C55E' },
   { name: 'Mercado Pago',   initials: 'MP', color: '#00BCFF' },
   { name: 'Brubank',        initials: 'BR', color: '#1A1A2E' },
   { name: 'Ualá',           initials: 'UA', color: '#5C2D8C' },
