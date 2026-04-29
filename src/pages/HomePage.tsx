@@ -6,6 +6,7 @@ import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
+import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
@@ -20,7 +21,7 @@ function HomePage() {
     queryKey: ['home-ticker-active-benefits-count'],
     queryFn: fetchMongoStats,
   });
-  const { data: availableBankNames = [] } = useQuery({
+  const { data: availableBankNames = [], isLoading: isBanksLoading } = useQuery({
     queryKey: ['availableBanks'],
     queryFn: fetchBanks,
     staleTime: 1000 * 60 * 30,
@@ -187,18 +188,22 @@ function HomePage() {
             <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
               Estamos en Beta! Estos son los emisores disponibles hoy en Blink.
             </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {indexedEntities.map((entity) => (
-                <button
-                  key={entity.token}
-                  onClick={() => handleEntityClick(entity)}
-                  className="px-4 py-2 rounded-full text-sm font-medium text-blink-ink transition-all duration-150 active:scale-95"
-                  style={{ background: '#FFFFFF', border: '1.5px solid #E8E6E1' }}
-                >
-                  {entity.label}
-                </button>
-              ))}
-            </div>
+            {isBanksLoading ? (
+              <SkeletonAvailableBanks />
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2">
+                {indexedEntities.map((entity) => (
+                  <button
+                    key={entity.token}
+                    onClick={() => handleEntityClick(entity)}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-blink-ink transition-all duration-150 active:scale-95"
+                    style={{ background: '#FFFFFF', border: '1.5px solid #E8E6E1' }}
+                  >
+                    {entity.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
