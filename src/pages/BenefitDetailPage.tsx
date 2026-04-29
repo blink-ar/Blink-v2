@@ -335,7 +335,7 @@ function BenefitDetailPage() {
                 style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.12)', border: `2px solid ${bankAccent.border}` }}
               >
                 {business.image ? (
-                  <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
+                  <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
                 ) : (
                   <span className="font-black text-2xl" style={{ color: bankAccent.text }}>{business.name?.charAt(0)}</span>
                 )}
