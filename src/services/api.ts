@@ -126,11 +126,19 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
         }))
       : raw.benefits;
 
+    const category = raw.category || raw.categories?.[0] || 'otros';
+    const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
+    const image =
+      !raw.image || raw.image.includes(GENERIC_DEFAULT)
+        ? getCategoryDefaultImage(category)
+        : raw.image;
+
     const business: any = {
       ...raw,
-      category: raw.category || raw.categories?.[0] || 'otros',
+      category,
       benefits,
-      location: uniqueLocations
+      location: uniqueLocations,
+      image
     };
 
     if ("locations" in business) {
