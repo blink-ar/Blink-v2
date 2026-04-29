@@ -41,7 +41,7 @@ const DEFAULT_CACHE_CONFIG: CacheConfig = {
     defaultTtl: 3600000, // 1 hour
     maxSize: 100,
     maxStorageSize: 5 * 1024 * 1024, // 5MB
-    version: '1.0.0',
+    version: '1.1.0',
     cleanupInterval: 300000 // 5 minutes
 };
 

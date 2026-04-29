@@ -932,7 +932,7 @@ function SearchPage() {
                         style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
                       >
                         {business.image ? (
-                          <img alt={business.name} className="w-full h-full object-contain p-1" src={business.image} loading="lazy" />
+                          <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
                         ) : (
                           <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
                         )}
@@ -1023,7 +1023,7 @@ function SearchPage() {
                             style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
                           >
                             {business.image ? (
-                              <img alt={business.name} className="w-full h-full object-contain p-1" src={business.image} loading="lazy" />
+                              <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
                             ) : (
                               <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
                             )}
@@ -1110,7 +1110,7 @@ function SearchPage() {
                     {business.image ? (
                       <img
                         alt={business.name}
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-cover"
                         src={business.image}
                         loading="lazy"
                       />
@@ -1250,7 +1250,7 @@ function SearchPage() {
                           {business.image ? (
                             <img
                               alt={business.name}
-                              className="w-full h-full object-contain p-1"
+                              className="w-full h-full object-cover"
                               src={business.image}
                               loading="lazy"
                             />

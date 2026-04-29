@@ -250,7 +250,7 @@ function BusinessDetailPage() {
             style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
           >
             {business.image ? (
-              <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
+              <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
             ) : (
               <span className="font-black text-2xl text-blink-muted">{business.name?.charAt(0)}</span>
             )}
