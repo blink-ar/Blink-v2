@@ -9,6 +9,7 @@ const COMING_SOON_BANKS = [
   { name: 'Banco Nación',   initials: 'BN', color: '#009FD9' },
   { name: 'Banco Ciudad',   initials: 'BC', color: '#E32629' },
   { name: 'Hipotecario',    initials: 'HI', color: '#0B4EA2' },
+  { name: 'HSBC',           initials: 'HS', color: '#DB0011' },
 ];
 
 const ComingSoonSection: React.FC = () => (
