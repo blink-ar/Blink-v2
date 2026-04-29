@@ -100,7 +100,7 @@ const AndroidSteps = () => (
   <div className="space-y-4">
     <Step num={1}>
       En Chrome, tocá el menú
-      <Pill icon={<DotsIcon />} label="⋮" />
+      <Pill icon={<DotsIcon />} label="Menú" />
       en la esquina superior derecha
     </Step>
     <Step num={2}>
