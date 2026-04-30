@@ -26,7 +26,7 @@ function DesktopUnsupportedPage() {
           </span>
         </h1>
         <p className="text-blink-muted text-sm leading-relaxed">
-          Blink está hecho para que encuentres tus descuentos en el momento justo, desde tu celu.
+          Por ahora Blink solo está disponible para celulares. Abrilo desde el tuyo y encontrá todos tus descuentos.
         </p>
       </div>
     </div>
