@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
-import { fetchBusinessesPaginated } from '../services/api';
+import { fetchBusinessById, fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { SkeletonBenefitDetailPage } from '../components/skeletons';
 import { parseDayAvailability } from '../utils/dayAvailabilityParser';
@@ -29,6 +29,43 @@ const BENEFIT_DAYS = [
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
+const parseBenefitIndex = (benefitIndex?: string): number => {
+  const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
+  return Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
+};
+
+const resolveBenefitSelection = (
+  business: Business,
+  benefitIndex?: string
+): { benefit: BankBenefit | null; position: number } => {
+  const safeIndex = parseBenefitIndex(benefitIndex);
+  const position = business.benefits[safeIndex] ? safeIndex : 0;
+
+  return {
+    benefit: business.benefits[position] || business.benefits[0] || null,
+    position
+  };
+};
+
+const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null> => {
+  try {
+    const exactBusiness = await fetchBusinessById(routeId);
+    if (exactBusiness) return exactBusiness;
+  } catch (error) {
+    console.error('[BenefitDetailPage] exact merchant lookup failed:', error);
+  }
+
+  const searchName = routeId.replace(/-/g, ' ');
+  const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
+
+  if (Array.isArray(response)) {
+    return response[0] || null;
+  }
+
+  return response.success && response.businesses.length > 0
+    ? response.businesses[0]
+    : null;
+};
 
 // Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
 const parseTopeAmount = (tope: unknown): number | null => {
@@ -110,46 +147,58 @@ function BenefitDetailPage() {
 
   useEffect(() => {
     if (passedBusiness) {
-      const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-      const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-      const resolvedIndex = passedBusiness.benefits[safeIndex] ? safeIndex : 0;
-      setBenefitPosition(resolvedIndex);
-      setBenefit(passedBusiness.benefits[resolvedIndex] || passedBusiness.benefits[0] || null);
+      const selection = resolveBenefitSelection(passedBusiness, benefitIndex);
+      setBusiness(passedBusiness);
+      setBenefitPosition(selection.position);
+      setBenefit(selection.benefit);
+      setError(null);
+      setLoading(false);
       return;
     }
 
+    let cancelled = false;
+
     const load = async () => {
-      if (!id) return;
+      if (!id) {
+        setBusiness(null);
+        setBenefit(null);
+        setError('Beneficio no encontrado');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const searchName = id.replace(/-/g, ' ');
-        const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
-        if (Array.isArray(response) && response.length > 0) {
-          const biz = response[0];
-          setBusiness(biz);
-          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
-          setBenefitPosition(resolvedIndex);
-          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
-        } else if (response.success && response.businesses.length > 0) {
-          const biz = response.businesses[0];
-          setBusiness(biz);
-          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
-          setBenefitPosition(resolvedIndex);
-          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
+        setError(null);
+
+        const resolvedBusiness = await fetchBusinessForRouteId(id);
+        if (cancelled) return;
+
+        if (resolvedBusiness) {
+          const selection = resolveBenefitSelection(resolvedBusiness, benefitIndex);
+          setBusiness(resolvedBusiness);
+          setBenefitPosition(selection.position);
+          setBenefit(selection.benefit);
         } else {
+          setBusiness(null);
+          setBenefit(null);
           setError('Beneficio no encontrado');
         }
       } catch {
+        if (cancelled) return;
+        setBusiness(null);
+        setBenefit(null);
         setError('Error al cargar');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
     load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, benefitIndex, passedBusiness]);
 
   useEffect(() => {
