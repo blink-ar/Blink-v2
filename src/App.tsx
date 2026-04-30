@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
 import { useResponsive } from './hooks/useResponsive';
-import DesktopUnsupportedPage from './pages/DesktopUnsupportedPage';
+import PhoneMirror from './components/PhoneMirror';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -33,11 +33,7 @@ const PageLoader = () => (
 function AppContent() {
   const { isDesktop } = useResponsive();
 
-  if (isDesktop) {
-    return <DesktopUnsupportedPage />;
-  }
-
-  return (
+  const mobileContent = (
     <>
       <ScrollToTop />
       <AnalyticsTracker />
@@ -58,6 +54,12 @@ function AppContent() {
       </Suspense>
     </>
   );
+
+  if (isDesktop) {
+    return <PhoneMirror>{mobileContent}</PhoneMirror>;
+  }
+
+  return mobileContent;
 }
 
 function App() {
