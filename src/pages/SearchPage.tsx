@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import { SkeletonCard } from '../components/skeletons';
@@ -8,8 +8,10 @@ import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/Categor
 import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/UnifiedFilterSheet';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
-import { fetchBanks } from '../services/api';
+import { useFallbackSearch } from '../hooks/useFallbackSearch';
+import { fetchBanks, fetchBusinessesPaginated, fetchBusinessById } from '../services/api';
 import { Business } from '../types';
+import { buildBankOptions, toBankDescriptor } from '../utils/banks';
 import {
   trackFilterApply,
   trackNoResults,
@@ -17,12 +19,8 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { formatDistance } from '../utils/distance';
-
-interface BankDescriptor {
-  token: string;
-  code: string;
-  label: string;
-}
+import { useGeolocation } from '../hooks/useGeolocation';
+import { encodeGeohash } from '../utils/geohash';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -36,100 +34,6 @@ interface SearchFilterState {
 }
 
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
-
-const KNOWN_BANKS: BankDescriptor[] = [
-  { token: 'galicia', code: 'GAL', label: 'GALICIA' },
-  { token: 'santander', code: 'SAN', label: 'SANTANDER' },
-  { token: 'bbva', code: 'BBVA', label: 'BBVA' },
-  { token: 'macro', code: 'MAC', label: 'MACRO' },
-  { token: 'modo', code: 'MODO', label: 'MODO' },
-  { token: 'icbc', code: 'ICBC', label: 'ICBC' },
-  { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
-  { token: 'amex', code: 'AMEX', label: 'AMEX' },
-  { token: 'naranja', code: 'NX', label: 'NARANJA X' },
-  { token: 'nacion', code: 'BNA', label: 'NACION' },
-  { token: 'ciudad', code: 'CIU', label: 'CIUDAD' },
-  { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
-  { token: 'visa', code: 'VISA', label: 'VISA' },
-  { token: 'mastercard', code: 'MC', label: 'MASTERCARD' },
-];
-
-const asBankText = (value: unknown): string => {
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (value && typeof value === 'object') {
-    const objectValue = value as Record<string, unknown>;
-    const candidates = [
-      objectValue.bank,
-      objectValue.name,
-      objectValue.label,
-      objectValue.code,
-      objectValue.value,
-      objectValue.id,
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string' || typeof candidate === 'number') {
-        return String(candidate);
-      }
-    }
-  }
-  return '';
-};
-
-const normalizeText = (value: unknown) =>
-  asBankText(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-const sanitizeBankName = (value: unknown) =>
-  normalizeText(value)
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
-  if (normalized.includes('galic')) return KNOWN_BANKS[0];
-  if (normalized.includes('santand')) return KNOWN_BANKS[1];
-  if (normalized.includes('bbva')) return KNOWN_BANKS[2];
-  if (normalized.includes('macro')) return KNOWN_BANKS[3];
-  if (normalized.includes('modo')) return KNOWN_BANKS[4];
-  if (normalized.includes('icbc')) return KNOWN_BANKS[5];
-  if (normalized.includes('hsbc')) return KNOWN_BANKS[6];
-  if (normalized.includes('amex') || normalized.includes('american express')) return KNOWN_BANKS[7];
-  if (normalized.includes('naranja x') || normalized.includes('naranjax') || normalized === 'nx') return KNOWN_BANKS[8];
-  if (normalized.includes('nacion')) return KNOWN_BANKS[9];
-  if (normalized.includes('ciudad')) return KNOWN_BANKS[10];
-  if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
-  if (normalized.includes('visa')) return KNOWN_BANKS[12];
-  if (normalized.includes('master')) return KNOWN_BANKS[13];
-  return null;
-};
-
-const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
-  const sanitized = sanitizeBankName(bankValue).replace(/^banco\s+/, '').trim();
-  if (!sanitized) {
-    return {
-      token: 'bank',
-      code: 'BANK',
-      label: 'BANCO',
-    };
-  }
-
-  const known = getKnownDescriptor(sanitized);
-  if (known) return known;
-
-  const words = sanitized.split(' ').filter(Boolean);
-  const token = words[0];
-  const codeSource = words.length > 1 ? words.map((word) => word[0]).join('') : words[0];
-  const code = codeSource.slice(0, 4).toUpperCase();
-
-  return {
-    token,
-    code,
-    label: sanitized.toUpperCase().slice(0, 18),
-  };
-};
 
 const readStoredBanks = (): string[] => {
   if (typeof window === 'undefined') return [];
@@ -186,11 +90,11 @@ function SearchPage() {
   const [showBankSheet, setShowBankSheet] = useState(false);
   const [showCategorySheet, setShowCategorySheet] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(searchParams.get('online') === '1');
-  const [maxDistance, setMaxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
+  const [maxDistance] = useState<number | undefined>(searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(searchParams.get('discount') ? Number(searchParams.get('discount')) : undefined);
   const [availableDay, setAvailableDay] = useState<string | undefined>(searchParams.get('day') || undefined);
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
-  const [network, setNetwork] = useState<string | undefined>(searchParams.get('network') || undefined);
+  const [network] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
   const [sortByDistance, setSortByDistance] = useState(searchParams.get('nearby') === '1');
 
@@ -235,6 +139,8 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
+  const { position } = useGeolocation();
+
   const {
     businesses,
     isLoading,
@@ -266,6 +172,83 @@ function SearchPage() {
     hasInstallments,
   });
 
+  const strictMatches = useMemo(() => {
+    const term = debouncedSearch.trim().toLowerCase();
+    if (!term) return enrichedBusinesses;
+    return enrichedBusinesses.filter((b) => 
+      b.name.toLowerCase().includes(term) || 
+      (b as any).aliases?.some((a: string) => a.toLowerCase().includes(term))
+    );
+  }, [enrichedBusinesses, debouncedSearch]);
+
+  const hasSelectedBanks = selectedBanks.length > 0;
+  const hasSearchTerm = debouncedSearch.trim().length > 0;
+
+  // When a bank filter is active the API only returns filtered benefits per merchant.
+  // Batch-fetch full business data so cards can show all their bank badges.
+  const [fullBusinessesMap, setFullBusinessesMap] = useState<Map<string, Business>>(new Map());
+  const enrichedIds = useMemo(() => enrichedBusinesses.map(b => b.id).join(','), [enrichedBusinesses]);
+
+  useEffect(() => {
+    if (!hasSelectedBanks || !enrichedIds) { setFullBusinessesMap(new Map()); return; }
+    let cancelled = false;
+    Promise.all(enrichedIds.split(',').map(id => fetchBusinessById(id))).then(results => {
+      if (cancelled) return;
+      setFullBusinessesMap(prev => {
+        const next = new Map(prev);
+        results.forEach(b => { if (b) next.set(b.id, b); });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [enrichedIds, hasSelectedBanks]);
+  const primaryResultsEmpty = !isLoading && strictMatches.length === 0 && hasSearchTerm;
+
+  // Stable signature to re-trigger fallback queries when intent changes
+  const searchIntentSignature = [
+    debouncedSearch.trim(),
+    selectedCategory,
+    selectedBanks.join(','),
+  ].join('|');
+
+  const {
+    otherBanksBusinesses,
+    resolvedTotalOtherBanks,
+    isOtherBanksLoading,
+    relativeBusinesses,
+    isRelativeLoading,
+  } = useFallbackSearch({
+    primaryResultsEmpty,
+    filters: {
+      search: debouncedSearch.trim() || undefined,
+      category: selectedCategory && selectedCategory !== 'all' ? selectedCategory : undefined,
+      bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
+      onlineOnly,
+      sortByDistance,
+    },
+    searchIntentSignature,
+  });
+
+  // Case 1: bank filter active + empty primary + other-bank results exist
+  const showOtherBanksFallback = primaryResultsEmpty && hasSelectedBanks && otherBanksBusinesses.length > 0;
+  // Case 2: still empty (no banks narrowing things down, or banks also failed)
+  const showRelativesFallback = primaryResultsEmpty && !showOtherBanksFallback;
+
+  // Label for the relatives section
+  const relativesLabel = (() => {
+    const cat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+    return cat ? `Otros beneficios en ${cat.label}` : 'Quizás te interese';
+  })();
+
+  // Typed display arrays for the two fallback lists
+  const otherBanksItems: (Business | null)[] = isOtherBanksLoading
+    ? Array.from({ length: 3 }, () => null)
+    : otherBanksBusinesses;
+
+  const relativeItems: (Business | null)[] = isRelativeLoading
+    ? Array.from({ length: 4 }, () => null)
+    : relativeBusinesses;
+
   const businessBankNames = useMemo(() => {
     const names = new Set<string>();
     businesses.forEach((business) => {
@@ -279,41 +262,8 @@ function SearchPage() {
   }, [businesses]);
 
   const bankOptions = useMemo<BankFilterOption[]>(() => {
-    const optionMap = new Map<string, BankFilterOption>();
-    const knownOrder = new Map(KNOWN_BANKS.map((bank, index) => [bank.token, index]));
-
-    const addOption = (bankName: unknown) => {
-      const descriptor = toBankDescriptor(bankName);
-      if (!optionMap.has(descriptor.token)) {
-        optionMap.set(descriptor.token, descriptor);
-      }
-    };
-
-    availableBankNames.forEach(addOption);
-    businessBankNames.forEach(addOption);
-    selectedBanks.forEach(addOption);
-
-    return Array.from(optionMap.values()).sort((a, b) => {
-      const orderA = knownOrder.get(a.token);
-      const orderB = knownOrder.get(b.token);
-      if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
-      if (orderA !== undefined) return -1;
-      if (orderB !== undefined) return 1;
-      return a.label.localeCompare(b.label, 'es');
-    });
+    return buildBankOptions(availableBankNames, businessBankNames, selectedBanks);
   }, [availableBankNames, businessBankNames, selectedBanks]);
-
-  const bankMap = useMemo(
-    () => new Map(bankOptions.map((option) => [option.token, option])),
-    [bankOptions],
-  );
-
-  const selectedBankPreview = selectedBanks
-    .slice(0, 3)
-    .map((token) => ({
-      token,
-      code: bankMap.get(token)?.code || toBankDescriptor(token).code,
-    }));
 
   const activeFilterCount = [
     selectedBanks.length > 0,
@@ -351,7 +301,7 @@ function SearchPage() {
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
 
-  // Infinite scroll sentinel
+  // Infinite scroll sentinel — primary results
   const sentinelRef = useRef<HTMLDivElement>(null);
   const infiniteScrollStateRef = useRef({ hasMore, isLoadingMore, loadMore });
 
@@ -379,17 +329,114 @@ function SearchPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Scroll position restoration on mount
+  // ── Related by category (infinite scroll tail) ──────────────────────────────
+  // Derives the category from the first search result and fetches more businesses
+  // from that category so the list never feels empty.
+  const matchedCategory = hasSearchTerm && !isLoading && enrichedBusinesses.length > 0
+    ? (enrichedBusinesses[0].category || (enrichedBusinesses[0] as any).categories?.[0] as string | undefined)?.toLowerCase()
+    : undefined;
+
+  const primaryIds = useMemo(
+    () => new Set(strictMatches.map((b) => b.id)),
+    [strictMatches],
+  );
+
+  const {
+    data: relatedPages,
+    isLoading: isRelatedLoading,
+    isFetchingNextPage: isRelatedFetchingMore,
+    fetchNextPage: fetchRelatedNext,
+    hasNextPage: relatedHasMore,
+  } = useInfiniteQuery({
+    queryKey: [
+      'related_by_category',
+      matchedCategory,
+      selectedBanks.join(','),
+      sortByDistance,
+      sortByDistance && position ? position.latitude : null,
+      sortByDistance && position ? position.longitude : null,
+      !sortByDistance && position ? encodeGeohash(position.latitude, position.longitude) : null,
+    ],
+    queryFn: async ({ pageParam = 0 }) =>
+      fetchBusinessesPaginated({
+        limit: 20,
+        offset: pageParam,
+        category: matchedCategory,
+        bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
+        ...(sortByDistance && position 
+          ? { lat: position.latitude, lng: position.longitude }
+          : position ? { geohash: encodeGeohash(position.latitude, position.longitude) } : {}),
+      }),
+    getNextPageParam: (last) =>
+      last.pagination.hasMore
+        ? last.pagination.offset + last.pagination.limit
+        : undefined,
+    initialPageParam: 0,
+    enabled: !!matchedCategory,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const relatedBusinesses = useMemo(() => {
+    const all = relatedPages?.pages.flatMap((p) => p.businesses) ?? [];
+    // deduplicate against primary results and within related pages
+    const seen = new Set(primaryIds);
+    return all.filter((b) => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+  }, [relatedPages, primaryIds]);
+
+  const relatedSentinelRef = useRef<HTMLDivElement>(null);
+  const relatedScrollStateRef = useRef({ relatedHasMore, isRelatedFetchingMore, fetchRelatedNext });
+
+  useEffect(() => {
+    relatedScrollStateRef.current = { relatedHasMore, isRelatedFetchingMore, fetchRelatedNext };
+  });
+
+  useEffect(() => {
+    const sentinel = relatedSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          const { relatedHasMore: more, isRelatedFetchingMore: loading, fetchRelatedNext: load } =
+            relatedScrollStateRef.current;
+          if (more && !loading) load();
+        }
+      },
+      { rootMargin: '300px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // Category label for the related section
+  const relatedCategoryLabel = useMemo(() => {
+    const cat = CATEGORY_OPTIONS.find((o) => o.token === matchedCategory);
+    return cat ? cat.label : '';
+  }, [matchedCategory]);
+
+  // Scroll position restoration: read saved Y on mount, then apply once data is loaded
+  const pendingScrollRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     const key = 'blink.search.scrollY';
     const saved = sessionStorage.getItem(key);
     if (saved) {
       sessionStorage.removeItem(key);
-      window.scrollTo({ top: Number(saved), behavior: 'instant' });
+      pendingScrollRef.current = Number(saved);
     } else {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && pendingScrollRef.current !== null) {
+      const y = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+      window.scrollTo({ top: y, behavior: 'instant' });
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     if (!hasInitializedFiltersRef.current) {
@@ -578,20 +625,12 @@ function SearchPage() {
     return max;
   };
 
-  // Get best benefit text
-  const getBestBenefitText = (business: Business) => {
-    const max = getMaxDiscount(business);
-    if (max > 0) return `HASTA ${max}% OFF`;
-    const withInstallments = business.benefits.find((benefit) => benefit.installments && benefit.installments > 0);
-    if (withInstallments) return `${withInstallments.installments} CUOTAS S/INT`;
-    return 'VER BENEFICIOS';
-  };
-
-  // Get abbreviated bank names
+  // Get abbreviated bank names — use full business data when available (bank filter strips benefits)
   const getBankBadges = (business: Business) => {
+    const source = fullBusinessesMap.get(business.id) ?? business;
     const seen = new Set<string>();
     const badges: string[] = [];
-    business.benefits.forEach((benefit) => {
+    source.benefits.forEach((benefit) => {
       if (benefit.bankName && !seen.has(benefit.bankName)) {
         seen.add(benefit.bankName);
         badges.push(toBankDescriptor(benefit.bankName).code);
@@ -846,7 +885,196 @@ function SearchPage() {
           Array.from({ length: 5 }).map((_, index) => (
             <SkeletonCard key={index} />
           ))
-        ) : enrichedBusinesses.length === 0 ? (
+        ) : showOtherBanksFallback ? (
+          /* ── CASE 1: Selected banks have no match, but other banks do ── */
+          <div>
+            {/* Friendly notice banner */}
+            <div
+              className="flex items-center gap-3 p-4 rounded-2xl mb-5"
+              style={{
+                background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
+                border: '1px solid #C7D2FE',
+              }}
+            >
+              <span className="material-symbols-outlined shrink-0" style={{ fontSize: 22, color: '#6366F1' }}>
+                account_balance
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm" style={{ color: '#3730A3' }}>
+                  No hay resultados para tus bancos
+                </p>
+                <p className="text-xs mt-0.5 leading-snug" style={{ color: '#4338CA' }}>
+                  Encontramos{' '}
+                  <span className="font-bold">
+                    {resolvedTotalOtherBanks > 1 ? `${resolvedTotalOtherBanks} opciones` : '1 opción'}
+                  </span>{' '}
+                  en otros bancos
+                </p>
+              </div>
+
+            </div>
+
+            {/* Preview list of other-bank businesses */}
+            <div className="space-y-3">
+              {otherBanksItems.map((business, index) => {
+                if (!business) return <SkeletonCard key={index} />;
+                const bankBadges = getBankBadges(business);
+                const visibleBadges = bankBadges.slice(0, 3);
+                const remaining = bankBadges.length - 3;
+                const maxDiscount = getMaxDiscount(business);
+                const maxInstallments = getMaxInstallments(business);
+                const categoryStyle = {
+                  gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
+                  moda:        { bg: '#EDE9FE', color: '#7C3AED' },
+                  viajes:      { bg: '#E0F2FE', color: '#0284C7' },
+                }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
+                return (
+                  <div
+                    key={business.id}
+                    onClick={() => handleBusinessSelect(business, index + 1)}
+                    className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
+                    style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
+                  >
+                    <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
+                      <div
+                        className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+                        style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
+                      >
+                        {business.image ? (
+                          <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
+                        ) : (
+                          <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
+                        <div className="flex items-center gap-1.5">
+                          {visibleBadges.map((badge) => (
+                            <span key={`ob-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                          ))}
+                          {remaining > 0 && (
+                            <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                          )}
+                          <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
+                        </div>
+                      </div>
+                      {maxDiscount > 0 ? (
+                        <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                          <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+                          <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
+                          <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+                        </div>
+                      ) : maxInstallments > 0 ? (
+                        <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                          <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+                          <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
+                          <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+                        </div>
+                      ) : (
+                        <div className="shrink-0" style={{ minWidth: 38 }} />
+                      )}
+                      <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : showRelativesFallback ? (
+          /* ── CASE 2: No results at all — show "not found" + category relatives ── */
+          <div>
+            {/* Not-found header */}
+            <div className="text-center pt-8 pb-6">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                style={{ background: '#FEF3C7' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#D97706' }}>search_off</span>
+              </div>
+              <p className="font-semibold text-lg text-blink-ink">
+                No encontramos "{debouncedSearch.trim()}"
+              </p>
+              <p className="text-sm text-blink-muted mt-1">
+                No tenemos ese negocio todavía
+              </p>
+            </div>
+
+            {/* Relatives section — category-based or general popular */}
+            {(isRelativeLoading || relativeBusinesses.length > 0) && (
+              <>
+                <div className="flex items-center gap-2 mb-3 px-0.5">
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#6366F1' }}>auto_awesome</span>
+                  <p className="font-semibold text-sm text-blink-ink">{relativesLabel}</p>
+                </div>
+                <div className="space-y-3">
+                  {relativeItems.map((business, index) => {
+                    if (!business) return <SkeletonCard key={index} />;
+                    const bankBadges = getBankBadges(business);
+                    const visibleBadges = bankBadges.slice(0, 3);
+                    const remaining = bankBadges.length - 3;
+                    const maxDiscount = getMaxDiscount(business);
+                    const maxInstallments = getMaxInstallments(business);
+                    const categoryStyle = {
+                      gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
+                      moda:        { bg: '#EDE9FE', color: '#7C3AED' },
+                      viajes:      { bg: '#E0F2FE', color: '#0284C7' },
+                    }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
+                    return (
+                      <div
+                        key={business.id}
+                        onClick={() => handleBusinessSelect(business, index + 1)}
+                        className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
+                        style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
+                      >
+                        <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
+                          <div
+                            className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+                            style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
+                          >
+                            {business.image ? (
+                              <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
+                            ) : (
+                              <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
+                            <div className="flex items-center gap-1.5">
+                              {visibleBadges.map((badge) => (
+                                <span key={`rel-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                              ))}
+                              {remaining > 0 && (
+                                <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                              )}
+                              <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
+                            </div>
+                          </div>
+                          {maxDiscount > 0 ? (
+                            <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                              <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+                              <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
+                              <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+                            </div>
+                          ) : maxInstallments > 0 ? (
+                            <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                              <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+                              <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
+                              <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+                            </div>
+                          ) : (
+                            <div className="shrink-0" style={{ minWidth: 38 }} />
+                          )}
+                          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : strictMatches.length === 0 ? (
+          /* ── Generic empty (filters applied, no search term) ── */
           <div className="text-center py-16">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
@@ -858,7 +1086,7 @@ function SearchPage() {
             <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
-          enrichedBusinesses.map((business, index) => {
+          strictMatches.map((business, index) => {
             const bankBadges = getBankBadges(business);
             const visibleBadges = bankBadges.slice(0, 3);
             const remaining = bankBadges.length - 3;
@@ -891,7 +1119,7 @@ function SearchPage() {
                     {business.image ? (
                       <img
                         alt={business.name}
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-cover"
                         src={business.image}
                         loading="lazy"
                       />
@@ -974,6 +1202,144 @@ function SearchPage() {
         {isLoadingMore && (
           <div className="flex justify-center py-4">
             <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Related by category - show when we have results or when starting to load them */}
+        {!isLoading && (isRelatedLoading || relatedBusinesses.length > 0) && (
+          <div className="mt-8 pt-10 border-t border-blink-border">
+            <h2 className="mb-4 font-bold text-lg text-blink-ink">
+              {relatedCategoryLabel ? `Más en ${relatedCategoryLabel}` : 'Más opciones relacionadas'}
+            </h2>
+            
+            <div className="space-y-3">
+              {isRelatedLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <SkeletonCard key={`related-skeleton-${i}`} />
+                ))
+              ) : (
+                relatedBusinesses.map((business, index) => {
+                  const bankBadges = getBankBadges(business);
+                  const visibleBadges = bankBadges.slice(0, 3);
+                  const remaining = bankBadges.length - 3;
+                  const maxDiscount = getMaxDiscount(business);
+                  const maxInstallments = getMaxInstallments(business);
+
+                  const categoryStyle = {
+                    gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
+                    moda:        { bg: '#EDE9FE', color: '#7C3AED' },
+                    viajes:      { bg: '#E0F2FE', color: '#0284C7' },
+                  }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
+
+                  return (
+                    <div
+                      key={`related-${business.id}-${index}`}
+                      onClick={() => {
+                        if (!business.id) return;
+                        trackSelectBusiness({
+                          source: 'search_related',
+                          businessId: business.id,
+                          category: business.category,
+                          position: index,
+                        });
+                        navigate(`/business/${business.id}`, { state: { business } });
+                      }}
+                      className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
+                      style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
+                    >
+                      <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
+                        {/* Logo */}
+                        <div
+                          className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+                          style={{
+                            background: business.image ? '#F7F6F4' : categoryStyle.bg,
+                            border: '1px solid rgba(0,0,0,0.07)',
+                          }}
+                        >
+                          {business.image ? (
+                            <img
+                              alt={business.name}
+                              className="w-full h-full object-cover"
+                              src={business.image}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
+                              {business.name?.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
+                            <span className="truncate">{business.name}</span>
+                            {(business.distanceText || business.distance !== undefined) && (
+                              <>
+                                <span className="shrink-0 font-normal text-blink-muted">·</span>
+                                <span className="shrink-0 text-[11px] font-normal text-blink-muted">
+                                  {business.distanceText || formatDistance(business.distance!)}
+                                </span>
+                              </>
+                            )}
+                          </h2>
+
+                          <div className="flex items-center gap-1.5">
+                            {visibleBadges.map((badge) => (
+                              <span
+                                key={`rel-${business.id}-${badge}`}
+                                className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                                style={{ background: '#1E293B', color: '#E2E8F0' }}
+                              >
+                                {badge}
+                              </span>
+                            ))}
+                            {remaining > 0 && (
+                              <span
+                                className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                                style={{ background: '#F1F5F9', color: '#94A3B8' }}
+                              >
+                                +{remaining}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-blink-muted ml-1.5">
+                              {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {maxDiscount > 0 ? (
+                          <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                            <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+                            <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
+                            <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+                          </div>
+                        ) : maxInstallments > 0 ? (
+                          <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                            <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+                            <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
+                            <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+                          </div>
+                        ) : (
+                          <div className="shrink-0" style={{ minWidth: 38 }} />
+                        )}
+                        <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Infinite scroll sentinel for related category */}
+            <div ref={relatedSentinelRef} className="h-px mt-4" aria-hidden="true" />
+            
+            {/* Loading more indicator for related */}
+            {isRelatedFetchingMore && (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              </div>
+            )}
           </div>
         )}
       </main>

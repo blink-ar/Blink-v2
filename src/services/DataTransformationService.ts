@@ -1,5 +1,6 @@
 import { Business, BankBenefit, Category } from '../types';
 import { AbstractBaseService, Logger, ValidationError } from './base';
+import { getCategoryDefaultImage } from '../utils/categoryImages';
 
 /**
  * Raw API response interfaces
@@ -174,7 +175,7 @@ export class DataTransformationService extends AbstractBaseService {
                 description: this.sanitizeText(description) || fallbackValues.description,
                 rating: fallbackValues.rating,
                 location: fallbackValues.location,
-                image: this.validateImageUrl(benefit.details.beneficio.imagen),
+                image: this.validateImageUrl(benefit.details.beneficio.imagen, category),
                 benefits: [],
                 lastUpdated: Date.now()
             };
@@ -400,8 +401,8 @@ export class DataTransformationService extends AbstractBaseService {
         return validCategories.includes(normalizedCategory) ? normalizedCategory : 'otros';
     }
 
-    private validateImageUrl(url?: string): string {
-        const defaultImage = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+    private validateImageUrl(url?: string, category?: string): string {
+        const defaultImage = getCategoryDefaultImage(category);
 
         if (!url || typeof url !== 'string') return defaultImage;
 
