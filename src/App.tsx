@@ -30,6 +30,21 @@ const PageLoader = () => (
   </div>
 );
 
+export function RootRedirect() {
+  const { search, hash } = useLocation();
+
+  return (
+    <Navigate
+      to={{
+        pathname: '/home',
+        search,
+        hash,
+      }}
+      replace
+    />
+  );
+}
+
 function AppContent() {
   const { isDesktop } = useResponsive();
 
@@ -40,7 +55,7 @@ function AppContent() {
       <RouteSEO />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/business/:id" element={<BusinessDetailPage />} />
