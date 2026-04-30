@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
+import UpdatePrompt from './components/UpdatePrompt';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -34,6 +35,7 @@ function App() {
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
+      <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
