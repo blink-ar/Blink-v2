@@ -3,6 +3,8 @@ import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
 import UpdatePrompt from './components/UpdatePrompt';
+import { useResponsive } from './hooks/useResponsive';
+import DesktopUnsupportedPage from './pages/DesktopUnsupportedPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -29,9 +31,15 @@ const PageLoader = () => (
   </div>
 );
 
-function App() {
+function AppContent() {
+  const { isDesktop } = useResponsive();
+
+  if (isDesktop) {
+    return <DesktopUnsupportedPage />;
+  }
+
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
@@ -50,6 +58,14 @@ function App() {
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
       </Suspense>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
