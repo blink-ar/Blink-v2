@@ -21,78 +21,126 @@ const CATEGORIES = [
 const row1 = CATEGORIES.slice(0, 7);
 const row2 = CATEGORIES.slice(7);
 
-const SCROLL_SPEED = 0.45; // px per animation frame — slow and relaxed
+// px per animation frame — relaxed pace (~30px/s at 60fps)
+const SPEED = 0.5;
 
-function useAutoScrollRow(reverse = false) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isPaused = useRef(false);
+interface MarqueeRowProps {
+  items: typeof CATEGORIES;
+  /** true = row scrolls right-to-left, false = left-to-right */
+  reverse?: boolean;
+  className?: string;
+  onCategoryClick: (id: string) => void;
+}
+
+const MarqueeRow: React.FC<MarqueeRowProps> = ({ items, reverse = false, className = '', onCategoryClick }) => {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const posRef = useRef(0);
+  const isPausedRef = useRef(false);
+  const initDoneRef = useRef(false);
+  // Track drag to suppress click after swipe
+  const dragRef = useRef({ startX: 0, startPos: 0, hasMoved: false });
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    // For the reverse row, start at the midpoint so it scrolls "backwards" into view
-    const initScroll = () => {
-      if (reverse) {
-        el.scrollLeft = el.scrollWidth / 2;
-      }
-    };
-
-    // Small delay to let layout paint before reading scrollWidth
-    const initTimer = setTimeout(initScroll, 50);
+    const track = trackRef.current;
+    if (!track) return;
 
     let rafId: number;
 
     const tick = () => {
-      if (!isPaused.current) {
-        if (reverse) {
-          el.scrollLeft -= SCROLL_SPEED;
-        } else {
-          el.scrollLeft += SCROLL_SPEED;
-        }
-      }
+      // offsetWidth of inline-flex gives full content width once layout is done
+      const totalW = track.offsetWidth;
+      const halfW = totalW / 2;
 
-      // Seamless loop: when reaching midpoint, jump back to start (or vice-versa)
-      if (!reverse && el.scrollLeft >= el.scrollWidth / 2) {
-        el.scrollLeft -= el.scrollWidth / 2;
-      } else if (reverse && el.scrollLeft <= 0) {
-        el.scrollLeft += el.scrollWidth / 2;
+      if (halfW > 0) {
+        // First valid frame: initialize reverse row at midpoint
+        if (!initDoneRef.current) {
+          initDoneRef.current = true;
+          if (reverse) posRef.current = -halfW;
+        }
+
+        if (!isPausedRef.current) {
+          // reverse=false → scroll left (pos decrements toward -halfW)
+          // reverse=true  → scroll right (pos increments toward 0)
+          posRef.current += reverse ? SPEED : -SPEED;
+        }
+
+        // Seamless loop: keep pos in the range [-halfW, 0)
+        if (posRef.current < -halfW) posRef.current += halfW;
+        if (posRef.current >= 0) posRef.current -= halfW;
+
+        track.style.transform = `translateX(${posRef.current}px)`;
       }
 
       rafId = requestAnimationFrame(tick);
     };
 
     rafId = requestAnimationFrame(tick);
-
-    const pause = () => { isPaused.current = true; };
-    const resume = () => { isPaused.current = false; };
-
-    el.addEventListener('touchstart', pause, { passive: true });
-    el.addEventListener('touchend', resume, { passive: true });
-    el.addEventListener('touchcancel', resume, { passive: true });
-    el.addEventListener('mousedown', pause);
-    el.addEventListener('mouseup', resume);
-    el.addEventListener('mouseleave', resume);
-
-    return () => {
-      clearTimeout(initTimer);
-      cancelAnimationFrame(rafId);
-      el.removeEventListener('touchstart', pause);
-      el.removeEventListener('touchend', resume);
-      el.removeEventListener('touchcancel', resume);
-      el.removeEventListener('mousedown', pause);
-      el.removeEventListener('mouseup', resume);
-      el.removeEventListener('mouseleave', resume);
-    };
+    return () => cancelAnimationFrame(rafId);
   }, [reverse]);
 
-  return ref;
-}
+  const handleTouchStart = (e: React.TouchEvent) => {
+    isPausedRef.current = true;
+    dragRef.current = { startX: e.touches[0].clientX, startPos: posRef.current, hasMoved: false };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const dx = e.touches[0].clientX - dragRef.current.startX;
+    if (Math.abs(dx) > 5) dragRef.current.hasMoved = true;
+    const track = trackRef.current;
+    if (!track) return;
+    const halfW = track.offsetWidth / 2;
+    let p = dragRef.current.startPos + dx;
+    if (halfW > 0) {
+      while (p < -halfW * 2) p += halfW;
+      while (p >= 0) p -= halfW;
+      if (p < -halfW) p += halfW;
+    }
+    posRef.current = p;
+  };
+
+  const handleTouchEnd = () => {
+    isPausedRef.current = false;
+  };
+
+  const renderButtons = (suffix = '') =>
+    items.map((cat) => (
+      <button
+        key={`${cat.id}${suffix}`}
+        onPointerDown={() => { dragRef.current.hasMoved = false; }}
+        onClick={() => {
+          if (dragRef.current.hasMoved) return;
+          onCategoryClick(cat.id);
+        }}
+        className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-150 active:scale-95"
+        style={{
+          backgroundColor: cat.bg,
+          color: cat.text,
+          border: `1px solid ${cat.text}20`,
+        }}
+      >
+        {cat.emoji} {cat.label}
+      </button>
+    ));
+
+  return (
+    <div
+      className={`overflow-hidden ${className}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
+      {/* inline-flex so offsetWidth = full content width (used for seamless loop) */}
+      <div ref={trackRef} className="inline-flex gap-2.5 py-1">
+        {renderButtons()}
+        {renderButtons('-dup')}
+      </div>
+    </div>
+  );
+};
 
 const CategoryMarquee: React.FC = () => {
   const navigate = useNavigate();
-  const row1Ref = useAutoScrollRow(false);
-  const row2Ref = useAutoScrollRow(true);
 
   const handleClick = (categoryId: string) => {
     trackFilterApply({
@@ -104,21 +152,6 @@ const CategoryMarquee: React.FC = () => {
     navigate(`/search?category=${categoryId}`);
   };
 
-  const renderButton = (cat: typeof CATEGORIES[0], keySuffix = '') => (
-    <button
-      key={`${cat.id}${keySuffix ? `-${keySuffix}` : ''}`}
-      onClick={() => handleClick(cat.id)}
-      className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 whitespace-nowrap"
-      style={{
-        backgroundColor: cat.bg,
-        color: cat.text,
-        border: `1px solid ${cat.text}20`,
-      }}
-    >
-      {cat.emoji} {cat.label}
-    </button>
-  );
-
   return (
     <section
       className="overflow-hidden py-4"
@@ -126,25 +159,8 @@ const CategoryMarquee: React.FC = () => {
         background: 'linear-gradient(180deg, #F7F6F4 0%, #FFFFFF 50%, #F7F6F4 100%)',
       }}
     >
-      {/* Row 1 — scrolls forward, user can swipe to browse */}
-      <div
-        ref={row1Ref}
-        className="flex overflow-x-auto no-scrollbar mb-2.5 gap-2.5 py-1 cursor-grab active:cursor-grabbing"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        {row1.map((c) => renderButton(c))}
-        {row1.map((c) => renderButton(c, 'dup'))}
-      </div>
-
-      {/* Row 2 — scrolls in reverse, user can swipe to browse */}
-      <div
-        ref={row2Ref}
-        className="flex overflow-x-auto no-scrollbar gap-2.5 py-1 cursor-grab active:cursor-grabbing"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        {row2.map((c) => renderButton(c))}
-        {row2.map((c) => renderButton(c, 'dup'))}
-      </div>
+      <MarqueeRow items={row1} reverse={false} className="mb-2.5" onCategoryClick={handleClick} />
+      <MarqueeRow items={row2} reverse={true} onCategoryClick={handleClick} />
     </section>
   );
 };

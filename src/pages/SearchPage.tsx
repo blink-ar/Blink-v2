@@ -708,22 +708,6 @@ function SearchPage() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
-              activeFilterCount > 0
-                ? 'bg-primary text-white'
-                : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
-            }`}
-            aria-label="Abrir filtros"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>tune</span>
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Quick filter pills — active ones float to the front */}
@@ -862,6 +846,23 @@ function SearchPage() {
           return (
             <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
               <div className="flex gap-2 min-w-max items-center">
+                {/* Filter button pinned to the left of the pill row */}
+                <button
+                  onClick={() => setShowFilters(true)}
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0 transition-all duration-150 active:scale-95 ${
+                    activeFilterCount > 0
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
+                  }`}
+                  aria-label="Abrir filtros"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
                 {sorted.map((p) => p.node)}
               </div>
             </div>
