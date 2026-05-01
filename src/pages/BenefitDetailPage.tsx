@@ -563,69 +563,6 @@ function BenefitDetailPage() {
             </div>
           </div>
 
-          {/* ── Savings Simulator ── */}
-          {discount > 0 && (
-            <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
-          )}
-
-          {/* ── Disponible en ── */}
-          {locations.length > 0 && (
-            <div
-              className="bg-white rounded-2xl overflow-hidden"
-              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
-            >
-              <div className="px-5 pt-5 pb-3">
-                <p className="font-bold text-[15px] text-blink-ink mb-1">Disponible en:</p>
-
-                <div className="divide-y divide-blink-border">
-                  {displayLocations.map((loc, i) => {
-                    const streetLine = loc.addressComponents?.route
-                      ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ' ' + loc.addressComponents.streetNumber : ''}`
-                      : loc.name || (loc.formattedAddress?.split(',')[0] ?? 'Dirección no disponible');
-
-                    const cityLine = loc.addressComponents
-                      ? [
-                          loc.addressComponents.locality,
-                          loc.addressComponents.adminAreaLevel1,
-                          loc.addressComponents.country,
-                        ].filter(Boolean).join(', ')
-                      : loc.formattedAddress ?? '';
-
-                    return (
-                      <div key={i} className="flex items-start gap-3 py-3">
-                        <span
-                          className="material-symbols-outlined flex-shrink-0 mt-0.5"
-                          style={{ fontSize: 18, color: '#9CA3AF' }}
-                        >
-                          location_on
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-blink-ink leading-tight">{streetLine}</p>
-                          {cityLine && (
-                            <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {locations.length > LOCATIONS_PREVIEW_COUNT && (
-                  <button
-                    onClick={() => { setLocationSearch(''); setShowLocationPopup(true); }}
-                    className="flex items-center gap-1 py-3 text-sm font-semibold"
-                    style={{ color: '#6366F1' }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                      expand_more
-                    </span>
-                    Ver todas las ubicaciones ({locations.length})
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* ── Accede al beneficio ── */}
           {(cards.length > 0 || subscription) && (
             <div
@@ -706,6 +643,69 @@ function BenefitDetailPage() {
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Savings Simulator ── */}
+          {discount > 0 && (
+            <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
+          )}
+
+          {/* ── Disponible en ── */}
+          {locations.length > 0 && (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <div className="px-5 pt-5 pb-3">
+                <p className="font-bold text-[15px] text-blink-ink mb-1">Disponible en:</p>
+
+                <div className="divide-y divide-blink-border">
+                  {displayLocations.map((loc, i) => {
+                    const streetLine = loc.addressComponents?.route
+                      ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ' ' + loc.addressComponents.streetNumber : ''}`
+                      : loc.name || (loc.formattedAddress?.split(',')[0] ?? 'Dirección no disponible');
+
+                    const cityLine = loc.addressComponents
+                      ? [
+                          loc.addressComponents.locality,
+                          loc.addressComponents.adminAreaLevel1,
+                          loc.addressComponents.country,
+                        ].filter(Boolean).join(', ')
+                      : loc.formattedAddress ?? '';
+
+                    return (
+                      <div key={i} className="flex items-start gap-3 py-3">
+                        <span
+                          className="material-symbols-outlined flex-shrink-0 mt-0.5"
+                          style={{ fontSize: 18, color: '#9CA3AF' }}
+                        >
+                          location_on
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-blink-ink leading-tight">{streetLine}</p>
+                          {cityLine && (
+                            <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {locations.length > LOCATIONS_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => { setLocationSearch(''); setShowLocationPopup(true); }}
+                    className="flex items-center gap-1 py-3 text-sm font-semibold"
+                    style={{ color: '#6366F1' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                      expand_more
+                    </span>
+                    Ver todas las ubicaciones ({locations.length})
+                  </button>
+                )}
               </div>
             </div>
           )}
