@@ -60,9 +60,11 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 
   // State for dropdown
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [showAllLocations, setShowAllLocations] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const dropdownMenuRef = React.useRef<HTMLDivElement>(null);
   const [dropdownMaxHeight, setDropdownMaxHeight] = React.useState<number>(240);
+  const MAX_VISIBLE_LOCATIONS = 8;
 
   // Calculate dropdown max height based on available space below
   React.useEffect(() => {
@@ -365,20 +367,20 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                         className="absolute top-full z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto pb-2"
                         style={{ maxHeight: `${dropdownMaxHeight}px` }}
                         onWheel={(e) => {
-                          // Prevent scroll from bubbling to parent
                           e.stopPropagation();
                         }}
                         onTouchMove={(e) => {
-                          // Prevent scroll from bubbling on touch devices
                           e.stopPropagation();
                         }}
                       >
-                        {physicalLocations.map((location, index) => {
+                        {(showAllLocations
+                          ? physicalLocations
+                          : physicalLocations.slice(0, MAX_VISIBLE_LOCATIONS)
+                        ).map((location, index) => {
                           const isSelected = selectedLocation?.placeId
                             ? location.placeId === selectedLocation.placeId
                             : selectedLocation?.formattedAddress === location.formattedAddress;
 
-                          // Calculate distance if user position is available
                           const distance = userCoords
                             ? calculateDistance(
                                 userCoords.latitude,
@@ -388,6 +390,8 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                               )
                             : null;
 
+                          const isNearest = userCoords && index === 0;
+
                           return (
                             <button
                               key={location.placeId || index}
@@ -396,26 +400,31 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                                 setIsDropdownOpen(false);
                               }}
                               className={`w-full text-left p-3 border-b border-gray-100 last:border-b-0 transition-colors ${
-                                isSelected
-                                  ? 'bg-blue-50'
-                                  : 'hover:bg-gray-50'
+                                isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
                                     {location.name && (
-                                      <p className={`text-sm font-medium mb-1 truncate ${
+                                      <p className={`text-sm font-medium truncate ${
                                         isSelected ? 'text-blue-900' : 'text-gray-900'
                                       }`}>
                                         {location.name}
                                       </p>
                                     )}
-                                    <p className={`text-xs truncate ${
-                                      isSelected ? 'text-blue-700' : 'text-gray-600'
-                                    }`}>
-                                      {location.formattedAddress}
-                                    </p>
+                                    {isNearest && (
+                                      <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        Más cercana
+                                      </span>
+                                    )}
                                   </div>
+                                  <p className={`text-xs truncate ${
+                                    isSelected ? 'text-blue-700' : 'text-gray-600'
+                                  }`}>
+                                    {location.formattedAddress}
+                                  </p>
+                                </div>
                                 {distance !== null && (
                                   <span className={`text-xs font-semibold flex-shrink-0 ${
                                     isSelected ? 'text-blue-600' : 'text-gray-500'
@@ -429,6 +438,21 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                             </button>
                           );
                         })}
+
+                        {/* Show more / show less toggle */}
+                        {physicalLocations.length > MAX_VISIBLE_LOCATIONS && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAllLocations((v) => !v);
+                            }}
+                            className="w-full p-3 text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors text-center"
+                          >
+                            {showAllLocations
+                              ? 'Ver menos sucursales'
+                              : `Ver todas las sucursales (${physicalLocations.length})`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

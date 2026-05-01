@@ -768,7 +768,10 @@ function SearchPage() {
                       : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat ? activeCat.icon : 'category'}</span>
+                  {activeCat
+                    ? <span style={{ fontSize: 16, lineHeight: 1 }}>{activeCat.emoji}</span>
+                    : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                  }
                   <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
                   <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
                 </button>
@@ -777,6 +780,7 @@ function SearchPage() {
             {
               key: 'proximity',
               active: sortByDistance,
+              pinned: true,
               node: (
                 <button
                   key="proximity"
@@ -788,7 +792,7 @@ function SearchPage() {
                   }`}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
-                  <span>Más cercanos</span>
+                  <span>Cerca tuyo</span>
                 </button>
               ),
             },
@@ -846,7 +850,14 @@ function SearchPage() {
             },
           ];
 
-          const sorted = [...pills.filter((p) => p.active), ...pills.filter((p) => !p.active)];
+          // Pinned pills always stay first; remaining pills sort active-first
+          const pinnedPills = pills.filter((p) => (p as any).pinned);
+          const otherPills = pills.filter((p) => !(p as any).pinned);
+          const sorted = [
+            ...pinnedPills,
+            ...otherPills.filter((p) => p.active),
+            ...otherPills.filter((p) => !p.active),
+          ];
 
           return (
             <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">

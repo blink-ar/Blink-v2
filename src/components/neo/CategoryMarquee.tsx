@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { trackFilterApply } from '../../analytics/intentTracking';
 
@@ -21,8 +21,78 @@ const CATEGORIES = [
 const row1 = CATEGORIES.slice(0, 7);
 const row2 = CATEGORIES.slice(7);
 
+const SCROLL_SPEED = 0.45; // px per animation frame — slow and relaxed
+
+function useAutoScrollRow(reverse = false) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isPaused = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // For the reverse row, start at the midpoint so it scrolls "backwards" into view
+    const initScroll = () => {
+      if (reverse) {
+        el.scrollLeft = el.scrollWidth / 2;
+      }
+    };
+
+    // Small delay to let layout paint before reading scrollWidth
+    const initTimer = setTimeout(initScroll, 50);
+
+    let rafId: number;
+
+    const tick = () => {
+      if (!isPaused.current) {
+        if (reverse) {
+          el.scrollLeft -= SCROLL_SPEED;
+        } else {
+          el.scrollLeft += SCROLL_SPEED;
+        }
+      }
+
+      // Seamless loop: when reaching midpoint, jump back to start (or vice-versa)
+      if (!reverse && el.scrollLeft >= el.scrollWidth / 2) {
+        el.scrollLeft -= el.scrollWidth / 2;
+      } else if (reverse && el.scrollLeft <= 0) {
+        el.scrollLeft += el.scrollWidth / 2;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+
+    const pause = () => { isPaused.current = true; };
+    const resume = () => { isPaused.current = false; };
+
+    el.addEventListener('touchstart', pause, { passive: true });
+    el.addEventListener('touchend', resume, { passive: true });
+    el.addEventListener('touchcancel', resume, { passive: true });
+    el.addEventListener('mousedown', pause);
+    el.addEventListener('mouseup', resume);
+    el.addEventListener('mouseleave', resume);
+
+    return () => {
+      clearTimeout(initTimer);
+      cancelAnimationFrame(rafId);
+      el.removeEventListener('touchstart', pause);
+      el.removeEventListener('touchend', resume);
+      el.removeEventListener('touchcancel', resume);
+      el.removeEventListener('mousedown', pause);
+      el.removeEventListener('mouseup', resume);
+      el.removeEventListener('mouseleave', resume);
+    };
+  }, [reverse]);
+
+  return ref;
+}
+
 const CategoryMarquee: React.FC = () => {
   const navigate = useNavigate();
+  const row1Ref = useAutoScrollRow(false);
+  const row2Ref = useAutoScrollRow(true);
 
   const handleClick = (categoryId: string) => {
     trackFilterApply({
@@ -56,11 +126,22 @@ const CategoryMarquee: React.FC = () => {
         background: 'linear-gradient(180deg, #F7F6F4 0%, #FFFFFF 50%, #F7F6F4 100%)',
       }}
     >
-      <div className="flex animate-marquee mb-2.5 gap-2.5 w-[200%]">
+      {/* Row 1 — scrolls forward, user can swipe to browse */}
+      <div
+        ref={row1Ref}
+        className="flex overflow-x-auto no-scrollbar mb-2.5 gap-2.5 py-1 cursor-grab active:cursor-grabbing"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {row1.map((c) => renderButton(c))}
         {row1.map((c) => renderButton(c, 'dup'))}
       </div>
-      <div className="flex animate-marquee-reverse gap-2.5 w-[200%]">
+
+      {/* Row 2 — scrolls in reverse, user can swipe to browse */}
+      <div
+        ref={row2Ref}
+        className="flex overflow-x-auto no-scrollbar gap-2.5 py-1 cursor-grab active:cursor-grabbing"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {row2.map((c) => renderButton(c))}
         {row2.map((c) => renderButton(c, 'dup'))}
       </div>

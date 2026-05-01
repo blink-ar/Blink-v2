@@ -6,33 +6,18 @@ interface TickerProps {
 
 const Ticker: React.FC<TickerProps> = ({ count }) => {
   const formattedCount = count.toLocaleString('es-AR');
-  const items = [
-    `✦ ${formattedCount} beneficios activos`,
-    'Ahorrá hoy',
-    `✦ ${formattedCount} beneficios activos`,
-    'Descubrí ofertas',
-    `✦ ${formattedCount} beneficios activos`,
-    'Ahorrá hoy',
-  ];
 
   return (
     <div
-      className="overflow-hidden whitespace-nowrap relative py-1.5"
+      className="py-1.5 px-4 flex items-center justify-center gap-2"
       style={{
         background: 'linear-gradient(135deg, #EEF2FF 0%, #e0e7ff 100%)',
         borderBottom: '1px solid rgba(99,102,241,0.12)',
       }}
     >
-      <div className="inline-flex animate-marquee">
-        {items.map((text, i) => (
-          <span
-            key={i}
-            className="text-xs font-medium mx-5 text-primary/80 tracking-wide"
-          >
-            {text}
-          </span>
-        ))}
-      </div>
+      <span className="text-xs font-medium text-primary/80 tracking-wide">
+        ✦ {formattedCount} beneficios activos
+      </span>
     </div>
   );
 };
