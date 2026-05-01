@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessById, fetchBusinessesPaginated } from '../services/api';
@@ -15,6 +16,8 @@ import {
   trackViewBenefit,
 } from '../analytics/intentTracking';
 import { getBankAccent } from '../utils/bankColors';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { calculateDistance } from '../utils/distance';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -114,7 +117,9 @@ function BenefitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [benefitPosition, setBenefitPosition] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
-  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [showLocationPopup, setShowLocationPopup] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
+  const { position: userPosition } = useGeolocation();
   const [showTerms, setShowTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
@@ -324,8 +329,15 @@ function BenefitDetailPage() {
     .filter(Boolean)
     .join('\n\n');
 
-  const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
-  const displayLocations = showAllLocations ? locations : locations.slice(0, LOCATIONS_PREVIEW_COUNT);
+  const locations = (() => {
+    const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+    if (!userPosition) return valid;
+    return [...valid].sort((a, b) =>
+      calculateDistance(userPosition.latitude, userPosition.longitude, a.lat, a.lng) -
+      calculateDistance(userPosition.latitude, userPosition.longitude, b.lat, b.lng)
+    );
+  })();
+  const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
 
   const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
     ? benefit.cardTypes
@@ -600,23 +612,14 @@ function BenefitDetailPage() {
 
                 {locations.length > LOCATIONS_PREVIEW_COUNT && (
                   <button
-                    onClick={() => setShowAllLocations(!showAllLocations)}
+                    onClick={() => { setLocationSearch(''); setShowLocationPopup(true); }}
                     className="flex items-center gap-1 py-3 text-sm font-semibold"
                     style={{ color: '#6366F1' }}
                   >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{
-                        fontSize: 18,
-                        transform: showAllLocations ? 'rotate(180deg)' : 'none',
-                        transition: 'transform 200ms',
-                      }}
-                    >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
                       expand_more
                     </span>
-                    {showAllLocations
-                      ? 'Ver menos ubicaciones'
-                      : `Ver otras ${locations.length - LOCATIONS_PREVIEW_COUNT} ubicaciones`}
+                    Ver todas las ubicaciones ({locations.length})
                   </button>
                 )}
               </div>
@@ -766,6 +769,139 @@ function BenefitDetailPage() {
         </button>
       </div>
     </div>
+
+    {/* ── Locations popup — portal to escape any stacking context ── */}
+    {showLocationPopup && createPortal(
+      <div
+        className="fixed inset-0 z-[200] bg-black/50"
+        onClick={() => setShowLocationPopup(false)}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
+          style={{ borderRadius: '20px 20px 0 0', maxHeight: '85vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
+            <div>
+              <h3 className="font-semibold text-base text-blink-ink">Todas las ubicaciones</h3>
+              <p className="text-xs text-blink-muted mt-0.5">
+                {locations.length} sucursales
+                {userPosition ? ' · ordenadas por cercanía' : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowLocationPopup(false)}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+            </button>
+          </div>
+
+          {/* Search bar */}
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
+            <div className="relative">
+              <span
+                className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted"
+                style={{ fontSize: 18 }}
+              >
+                search
+              </span>
+              <input
+                autoFocus
+                className="w-full h-10 bg-blink-bg border border-blink-border rounded-xl pl-9 pr-9 text-sm text-blink-ink placeholder-blink-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                placeholder="Buscar por dirección o nombre..."
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+              />
+              {locationSearch && (
+                <button
+                  onClick={() => setLocationSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-blink-muted"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Location list */}
+          <div className="flex-1 overflow-y-auto divide-y divide-blink-border">
+            {(() => {
+              const q = locationSearch.trim().toLowerCase();
+              const filtered = q
+                ? locations.filter((loc) =>
+                    (loc.name || '').toLowerCase().includes(q) ||
+                    (loc.formattedAddress || '').toLowerCase().includes(q)
+                  )
+                : locations;
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-blink-muted text-sm">
+                    Sin resultados para "{locationSearch}"
+                  </div>
+                );
+              }
+
+              return filtered.map((loc, i) => {
+                const streetLine = loc.addressComponents?.route
+                  ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ' ' + loc.addressComponents.streetNumber : ''}`
+                  : loc.name || (loc.formattedAddress?.split(',')[0] ?? 'Dirección no disponible');
+
+                const cityLine = loc.addressComponents
+                  ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
+                  : loc.formattedAddress ?? '';
+
+                const dist = userPosition
+                  ? calculateDistance(userPosition.latitude, userPosition.longitude, loc.lat, loc.lng)
+                  : null;
+
+                const isNearest = !q && userPosition && i === 0;
+
+                return (
+                  <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                    <div
+                      className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: '#F3F4F6' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6B7280' }}>
+                        location_on
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-sm font-medium text-blink-ink leading-tight truncate">{streetLine}</p>
+                        {isNearest && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                            Más cercana
+                          </span>
+                        )}
+                      </div>
+                      {cityLine && (
+                        <p className="text-xs text-blink-muted">{cityLine}</p>
+                      )}
+                    </div>
+                    {dist !== null && (
+                      <span className="text-xs font-semibold flex-shrink-0 mt-0.5 text-blink-muted">
+                        {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
+                      </span>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+            <div className="h-6" />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
   );
 }
 
