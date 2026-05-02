@@ -699,13 +699,11 @@ function BenefitDetailPage() {
                 {locations.length > LOCATIONS_PREVIEW_COUNT && (
                   <button
                     onClick={() => { setLocationSearch(''); setShowLocationSearch(false); setShowLocationPopup(true); }}
-                    className="flex items-center gap-1 py-3 text-sm font-semibold"
-                    style={{ color: '#6366F1' }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+                    style={{ background: '#EEF2FF', color: '#6366F1' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                      expand_more
-                    </span>
-                    Ver todas las ubicaciones ({locations.length})
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
+                    Ver las {locations.length} ubicaciones
                   </button>
                 )}
               </div>
