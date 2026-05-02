@@ -119,6 +119,7 @@ function BenefitDetailPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
   const { position: userPosition } = useGeolocation();
   const [showTerms, setShowTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
@@ -697,7 +698,7 @@ function BenefitDetailPage() {
 
                 {locations.length > LOCATIONS_PREVIEW_COUNT && (
                   <button
-                    onClick={() => { setLocationSearch(''); setShowLocationPopup(true); }}
+                    onClick={() => { setLocationSearch(''); setShowLocationSearch(false); setShowLocationPopup(true); }}
                     className="flex items-center gap-1 py-3 text-sm font-semibold"
                     style={{ color: '#6366F1' }}
                   >
@@ -779,7 +780,7 @@ function BenefitDetailPage() {
       >
         <div
           className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
-          style={{ borderRadius: '20px 20px 0 0', maxHeight: '85vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          style={{ borderRadius: '20px 20px 0 0', maxHeight: '65vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Drag handle */}
@@ -796,40 +797,53 @@ function BenefitDetailPage() {
                 {userPosition ? ' · ordenadas por cercanía' : ''}
               </p>
             </div>
-            <button
-              onClick={() => setShowLocationPopup(false)}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
-            </button>
-          </div>
-
-          {/* Search bar */}
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
-            <div className="relative">
-              <span
-                className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted"
-                style={{ fontSize: 18 }}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (showLocationSearch) { setLocationSearch(''); }
+                  setShowLocationSearch(!showLocationSearch);
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors text-base"
               >
-                search
-              </span>
-              <input
-                autoFocus
-                className="w-full h-10 bg-blink-bg border border-blink-border rounded-xl pl-9 pr-9 text-sm text-blink-ink placeholder-blink-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="Buscar por dirección o nombre..."
-                value={locationSearch}
-                onChange={(e) => setLocationSearch(e.target.value)}
-              />
-              {locationSearch && (
-                <button
-                  onClick={() => setLocationSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-blink-muted"
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                </button>
-              )}
+                🔍
+              </button>
+              <button
+                onClick={() => setShowLocationPopup(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+              </button>
             </div>
           </div>
+
+          {/* Collapsible search bar */}
+          {showLocationSearch && (
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
+              <div className="relative">
+                <span
+                  className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted"
+                  style={{ fontSize: 18 }}
+                >
+                  search
+                </span>
+                <input
+                  autoFocus
+                  className="w-full h-10 bg-blink-bg border border-blink-border rounded-xl pl-9 pr-9 text-sm text-blink-ink placeholder-blink-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="Buscar por dirección o nombre..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                />
+                {locationSearch && (
+                  <button
+                    onClick={() => setLocationSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blink-muted"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Location list */}
           <div className="flex-1 overflow-y-auto divide-y divide-blink-border">
