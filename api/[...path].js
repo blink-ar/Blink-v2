@@ -1,4 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
@@ -18,12 +19,20 @@ const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
 const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
+const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme-set-JWT_SECRET-in-env';
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
   globalState.__blinkMongo = {
+    clientPromise: null,
+    dbPromise: null
+  };
+}
+if (!globalState.__blinkMongoWrite) {
+  globalState.__blinkMongoWrite = {
     clientPromise: null,
     dbPromise: null
   };
@@ -33,6 +42,51 @@ if (!globalState.__blinkBankCards) {
     mapPromise: null,
     loadedAt: 0
   };
+}
+
+// --- Auth utilities ---
+
+function base64url(value) {
+  return Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url');
+}
+
+function signJwt(payload) {
+  const header = base64url({ alg: 'HS256', typ: 'JWT' });
+  const now = Math.floor(Date.now() / 1000);
+  const body = base64url({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 });
+  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${sig}`;
+}
+
+function verifyJwt(token) {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) throw new Error('Invalid token');
+  const [header, body, sig] = parts;
+  const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  const sigBuf = Buffer.from(sig, 'base64url');
+  const expBuf = Buffer.from(expected, 'base64url');
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) throw new Error('Invalid signature');
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired');
+  return payload;
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, hash, salt) {
+  const derived = scryptSync(password, salt, 64);
+  const stored = Buffer.from(hash, 'hex');
+  return derived.length === stored.length && timingSafeEqual(derived, stored);
+}
+
+function getAuthToken(req) {
+  const auth = req.headers['authorization'] || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
 }
 
 function json(res, statusCode, payload) {
@@ -1189,6 +1243,105 @@ async function getDb() {
   return globalState.__blinkMongo.dbPromise;
 }
 
+async function getWriteDb() {
+  if (!globalState.__blinkMongoWrite.clientPromise) {
+    const client = new MongoClient(MONGODB_URI);
+    globalState.__blinkMongoWrite.clientPromise = client.connect();
+  }
+
+  if (!globalState.__blinkMongoWrite.dbPromise) {
+    globalState.__blinkMongoWrite.dbPromise = globalState.__blinkMongoWrite.clientPromise.then((client) => client.db(DATABASE_NAME));
+  }
+
+  return globalState.__blinkMongoWrite.dbPromise;
+}
+
+async function handleSignup(req, res) {
+  const body = await readJsonBody(req);
+  const { name, email, password } = body || {};
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return json(res, 400, { error: 'El nombre es requerido' });
+  }
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json(res, 400, { error: 'Email inválido' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return json(res, 400, { error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
+  const db = await getWriteDb();
+  const users = db.collection('users');
+
+  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
+
+  const existing = await users.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    return json(res, 409, { error: 'Ya existe una cuenta con ese email' });
+  }
+
+  const { hash, salt } = hashPassword(password);
+  const result = await users.insertOne({
+    name: name.trim(),
+    email: email.toLowerCase(),
+    passwordHash: hash,
+    passwordSalt: salt,
+    createdAt: new Date(),
+    isActive: true
+  });
+
+  const token = signJwt({ sub: result.insertedId.toString(), email: email.toLowerCase() });
+  return json(res, 201, {
+    success: true,
+    token,
+    user: { id: result.insertedId.toString(), name: name.trim(), email: email.toLowerCase() }
+  });
+}
+
+async function handleLogin(req, res) {
+  const body = await readJsonBody(req);
+  const { email, password } = body || {};
+
+  if (!email || !password) {
+    return json(res, 400, { error: 'Email y contraseña son requeridos' });
+  }
+
+  const db = await getWriteDb();
+  const user = await db.collection('users').findOne({ email: email.toLowerCase() });
+
+  if (!user || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+    return json(res, 401, { error: 'Email o contraseña incorrectos' });
+  }
+
+  const token = signJwt({ sub: user._id.toString(), email: user.email });
+  return json(res, 200, {
+    success: true,
+    token,
+    user: { id: user._id.toString(), name: user.name, email: user.email }
+  });
+}
+
+async function handleGetMe(req, res) {
+  const token = getAuthToken(req);
+  if (!token) return json(res, 401, { error: 'No autenticado' });
+
+  let payload;
+  try {
+    payload = verifyJwt(token);
+  } catch {
+    return json(res, 401, { error: 'Token inválido o expirado' });
+  }
+
+  const db = await getWriteDb();
+  const user = await db.collection('users').findOne({ _id: new ObjectId(payload.sub) });
+  if (!user) return json(res, 404, { error: 'Usuario no encontrado' });
+
+  return json(res, 200, {
+    success: true,
+    user: { id: user._id.toString(), name: user.name, email: user.email }
+  });
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') {
     return req.body;
@@ -2073,6 +2226,18 @@ export default async function handler(req, res) {
       return await handlePlaceDetails(req, res);
     }
 
+    if (req.method === 'POST' && path === '/api/auth/signup') {
+      return await handleSignup(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/auth/login') {
+      return await handleLogin(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/me') {
+      return await handleGetMe(req, res);
+    }
+
     if (req.method === 'GET') {
       const benefitByIdMatch = path.match(/^\/api\/benefits\/([^/]+)$/);
       if (benefitByIdMatch) {
@@ -2093,7 +2258,10 @@ export default async function handler(req, res) {
         'GET /api/banks',
         'GET /api/networks',
         'GET /api/stats',
-        'POST /api/places/details'
+        'POST /api/places/details',
+        'POST /api/auth/signup',
+        'POST /api/auth/login',
+        'GET /api/auth/me'
       ]
     });
   } catch (error) {

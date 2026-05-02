@@ -4,6 +4,7 @@ import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
 import { useResponsive } from './hooks/useResponsive';
 import PhoneMirror from './components/PhoneMirror';
+import { AuthProvider } from './contexts/AuthContext';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -23,6 +24,8 @@ const SavedPage = lazy(() => import('./pages/SavedPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -63,6 +66,8 @@ function AppContent() {
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
@@ -80,7 +85,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }
