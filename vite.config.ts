@@ -23,6 +23,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
+          // Pull in push notification event handlers
+          importScripts: ['sw-push.js'],
           // Smart caching for better mobile performance
           runtimeCaching: [
             {

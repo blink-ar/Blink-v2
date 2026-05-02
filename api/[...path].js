@@ -1,4 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import webpush from 'web-push';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
@@ -14,16 +15,33 @@ const ALLOWED_COLLECTIONS = new Set([
 
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
+const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
 const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
+const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
+const NOTIFICATIONS_SECRET = process.env.NOTIFICATIONS_SECRET;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
   globalState.__blinkMongo = {
+    clientPromise: null,
+    dbPromise: null
+  };
+}
+if (!globalState.__blinkMongoWrite) {
+  globalState.__blinkMongoWrite = {
     clientPromise: null,
     dbPromise: null
   };
@@ -1189,6 +1207,23 @@ async function getDb() {
   return globalState.__blinkMongo.dbPromise;
 }
 
+async function getWritableDb() {
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is required for write operations');
+  }
+
+  if (!globalState.__blinkMongoWrite.clientPromise) {
+    const client = new MongoClient(MONGODB_URI);
+    globalState.__blinkMongoWrite.clientPromise = client.connect();
+  }
+
+  if (!globalState.__blinkMongoWrite.dbPromise) {
+    globalState.__blinkMongoWrite.dbPromise = globalState.__blinkMongoWrite.clientPromise.then((client) => client.db(DATABASE_NAME));
+  }
+
+  return globalState.__blinkMongoWrite.dbPromise;
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') {
     return req.body;
@@ -2030,6 +2065,89 @@ export {
   rehydrateBenefitDoc
 };
 
+async function handleNotificationSubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint, keys, expirationTime } = body;
+
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return json(res, 400, { error: 'Invalid subscription: endpoint, keys.p256dh and keys.auth are required' });
+  }
+
+  const db = await getWritableDb();
+  const collection = db.collection(PUSH_SUBSCRIPTIONS_COLLECTION);
+
+  await collection.updateOne(
+    { endpoint },
+    {
+      $set: { endpoint, keys, expirationTime: expirationTime || null, updatedAt: new Date() },
+      $setOnInsert: { createdAt: new Date() },
+    },
+    { upsert: true }
+  );
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationUnsubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint } = body;
+
+  if (!endpoint) {
+    return json(res, 400, { error: 'endpoint is required' });
+  }
+
+  const db = await getWritableDb();
+  await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteOne({ endpoint });
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationSend(req, res) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return json(res, 503, { error: 'Push notifications not configured (missing VAPID keys)' });
+  }
+
+  const body = await readJsonBody(req);
+
+  if (NOTIFICATIONS_SECRET && body.secret !== NOTIFICATIONS_SECRET) {
+    return json(res, 401, { error: 'Unauthorized' });
+  }
+
+  const { title, body: notifBody, url, options } = body;
+
+  if (!title) {
+    return json(res, 400, { error: 'title is required' });
+  }
+
+  const db = await getWritableDb();
+  const subscriptions = await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).find({}).toArray();
+
+  if (subscriptions.length === 0) {
+    return json(res, 200, { success: true, sent: 0, total: 0 });
+  }
+
+  const payload = JSON.stringify({ title, body: notifBody || '', url: url || '/', ...options });
+
+  const results = await Promise.allSettled(
+    subscriptions.map((sub) =>
+      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
+    )
+  );
+
+  // Remove subscriptions that are gone (410) or not found (404)
+  const expiredEndpoints = results
+    .map((result, i) => ({ result, sub: subscriptions[i] }))
+    .filter(({ result }) => result.status === 'rejected' && [410, 404].includes(result.reason?.statusCode))
+    .map(({ sub }) => sub.endpoint);
+
+  if (expiredEndpoints.length > 0) {
+    await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteMany({ endpoint: { $in: expiredEndpoints } });
+  }
+
+  const sent = results.filter((r) => r.status === 'fulfilled').length;
+  return json(res, 200, { success: true, sent, total: subscriptions.length, expired: expiredEndpoints.length });
+}
+
 export default async function handler(req, res) {
   const url = getParsedUrl(req);
   const path = resolveRequestPath(url);
@@ -2073,6 +2191,18 @@ export default async function handler(req, res) {
       return await handlePlaceDetails(req, res);
     }
 
+    if (req.method === 'POST' && path === '/api/notifications/subscribe') {
+      return await handleNotificationSubscribe(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/unsubscribe') {
+      return await handleNotificationUnsubscribe(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/send') {
+      return await handleNotificationSend(req, res);
+    }
+
     if (req.method === 'GET') {
       const benefitByIdMatch = path.match(/^\/api\/benefits\/([^/]+)$/);
       if (benefitByIdMatch) {
@@ -2093,7 +2223,10 @@ export default async function handler(req, res) {
         'GET /api/banks',
         'GET /api/networks',
         'GET /api/stats',
-        'POST /api/places/details'
+        'POST /api/places/details',
+        'POST /api/notifications/subscribe',
+        'POST /api/notifications/unsubscribe',
+        'POST /api/notifications/send'
       ]
     });
   } catch (error) {
