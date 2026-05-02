@@ -721,23 +721,36 @@ function SearchPage() {
               active: selectedBanks.length > 0,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="banks"
-                  onClick={() => setShowBankSheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     selectedBanks.length > 0
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
-                  {selectedBanks.length > 0 ? (
-                    <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
-                  ) : (
-                    <span>Bancos</span>
+                  <button
+                    onClick={() => setShowBankSheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                    {selectedBanks.length > 0 ? (
+                      <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
+                    ) : (
+                      <span>Bancos</span>
+                    )}
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {selectedBanks.length > 0 && (
+                    <button
+                      onClick={() => setSelectedBanks([])}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar bancos"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
                   )}
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                </div>
               ),
             },
             {
@@ -745,22 +758,35 @@ function SearchPage() {
               active: !!activeCat,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="category"
-                  onClick={() => setShowCategorySheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     activeCat
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  {activeCat
-                    ? <span style={{ fontSize: 16, lineHeight: 1 }}>{activeCat.emoji}</span>
-                    : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
-                  }
-                  <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                  <button
+                    onClick={() => setShowCategorySheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    {activeCat
+                      ? <span style={{ fontSize: 16, lineHeight: 1 }}>{activeCat.emoji}</span>
+                      : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                    }
+                    <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {activeCat && (
+                    <button
+                      onClick={() => setSelectedCategory('')}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar categoría"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
+                  )}
+                </div>
               ),
             },
             {
