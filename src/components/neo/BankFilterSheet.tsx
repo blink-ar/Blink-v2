@@ -6,6 +6,28 @@ export interface BankFilterOption {
   label: string;
 }
 
+// Brand colors keyed by token
+const BANK_BRAND: Record<string, { bg: string; color: string }> = {
+  galicia:    { bg: '#FFF0F0', color: '#E31837' },
+  santander:  { bg: '#FFF0F0', color: '#EC0000' },
+  bbva:       { bg: '#EBF4FF', color: '#004481' },
+  macro:      { bg: '#E8F5EE', color: '#00754A' },
+  modo:       { bg: '#F3E8FF', color: '#6D28D9' },
+  icbc:       { bg: '#FFF0F0', color: '#C8102E' },
+  hsbc:       { bg: '#FFF0F0', color: '#DB0011' },
+  amex:       { bg: '#EBF4FF', color: '#007BC1' },
+  naranja:    { bg: '#FFF3E8', color: '#EA580C' },
+  nacion:     { bg: '#EBF4FF', color: '#1A5E96' },
+  ciudad:     { bg: '#EBF4FF', color: '#0070B9' },
+  patagonia:  { bg: '#FFF8E8', color: '#D97706' },
+  visa:       { bg: '#EBF4FF', color: '#1A1F71' },
+  mastercard: { bg: '#FFF3E8', color: '#EB001B' },
+  lagaceta:   { bg: '#EBF4FF', color: '#0E5FA0' },
+};
+
+const getBrand = (token: string) =>
+  BANK_BRAND[token] ?? { bg: '#F7F6F4', color: '#374151' };
+
 interface BankFilterSheetProps {
   isOpen: boolean;
   options: BankFilterOption[];
@@ -42,13 +64,11 @@ const BankFilterSheet = ({
   const filteredOptions = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return options;
-    return options.filter((option) => {
-      return (
-        option.code.toLowerCase().includes(query) ||
-        option.label.toLowerCase().includes(query) ||
-        option.token.toLowerCase().includes(query)
-      );
-    });
+    return options.filter((option) =>
+      option.code.toLowerCase().includes(query) ||
+      option.label.toLowerCase().includes(query) ||
+      option.token.toLowerCase().includes(query)
+    );
   }, [options, searchTerm]);
 
   const toggleToken = (token: string) => {
@@ -132,26 +152,38 @@ const BankFilterSheet = ({
           <div className="grid grid-cols-3 gap-2.5">
             {filteredOptions.map((option) => {
               const isSelected = draftTokens.includes(option.token);
+              const brand = getBrand(option.token);
               return (
                 <button
                   key={option.token}
                   onClick={() => toggleToken(option.token)}
-                  className={`aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 active:scale-95 ${
-                    isSelected
-                      ? 'bg-primary/10 ring-2 ring-primary/40'
-                      : 'bg-blink-bg border border-blink-border hover:border-primary/30'
-                  }`}
+                  className="aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 active:scale-95"
+                  style={isSelected ? {
+                    backgroundColor: brand.bg,
+                    outline: `2px solid ${brand.color}50`,
+                    outlineOffset: '0px',
+                  } : {
+                    backgroundColor: brand.bg,
+                    border: `1px solid ${brand.color}25`,
+                  }}
                 >
                   <span
-                    className={`font-bold text-lg tracking-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}
+                    className="font-bold text-lg tracking-tight"
+                    style={{ color: brand.color }}
                   >
                     {option.code}
                   </span>
-                  <span className={`text-[10px] font-medium mt-0.5 text-center leading-tight ${isSelected ? 'text-primary/80' : 'text-blink-muted'}`}>
+                  <span
+                    className="text-[10px] font-medium mt-0.5 text-center leading-tight"
+                    style={{ color: isSelected ? brand.color : `${brand.color}CC` }}
+                  >
                     {option.label}
                   </span>
                   {isSelected && (
-                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <div
+                      className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: brand.color }}
+                    >
                       <span className="material-symbols-outlined text-white" style={{ fontSize: 12 }}>check</span>
                     </div>
                   )}
