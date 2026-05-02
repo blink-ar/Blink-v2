@@ -345,6 +345,7 @@ function BenefitDetailPage() {
   ).filter((c): c is string => typeof c === 'string' && c.trim().length > 0);
 
   return (
+    <>
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       <main className="flex-1 overflow-y-auto pb-32">
 
@@ -902,6 +903,7 @@ function BenefitDetailPage() {
       </div>,
       document.body
     )}
+    </>
   );
 }
 
