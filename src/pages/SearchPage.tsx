@@ -713,6 +713,8 @@ function SearchPage() {
         {/* Quick filter pills — active ones float to the front */}
         {(() => {
           const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+          const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          const todayKey = DAY_KEYS[new Date().getDay()];
           const pills = [
             {
               key: 'banks',
@@ -795,6 +797,24 @@ function SearchPage() {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>language</span>
                   <span>Online</span>
+                </button>
+              ),
+            },
+            {
+              key: 'today',
+              active: availableDay === todayKey,
+              node: (
+                <button
+                  key="today"
+                  onClick={() => setAvailableDay(availableDay === todayKey ? undefined : todayKey)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    availableDay === todayKey
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span style={{ fontSize: 15, lineHeight: 1 }}>📅</span>
+                  <span>Hoy</span>
                 </button>
               ),
             },
