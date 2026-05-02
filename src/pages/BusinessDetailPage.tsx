@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessById } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
+import AdBanner, { AD_SLOTS } from '../components/AdBanner';
 import { getBankAccent } from '../utils/bankColors';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
@@ -534,6 +535,11 @@ function BusinessDetailPage() {
             </button>
           </div>
         )}
+
+        {/* Below-the-fold ad — shown after the user has consumed the main content */}
+        <div className="px-4 pt-6 pb-2" style={{ borderTop: '1px solid #E8E6E1', marginTop: 24 }}>
+          <AdBanner slot={AD_SLOTS.businessDetail} format="rectangle" />
+        </div>
 
       </main>
     </div>

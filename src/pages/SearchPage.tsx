@@ -18,6 +18,7 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
+import AdBanner, { AD_SLOTS } from '../components/AdBanner';
 import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
@@ -1100,96 +1101,102 @@ function SearchPage() {
             }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
 
             return (
-              <div
-                key={business.id}
-                onClick={() => handleBusinessSelect(business, index + 1)}
-                className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
-                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
-              >
+              <div key={business.id}>
+                <div
+                  onClick={() => handleBusinessSelect(business, index + 1)}
+                  className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
+                  style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
+                >
 
-                <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
-                  {/* Logo */}
-                  <div
-                    className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-                    style={{
-                      background: business.image ? '#F7F6F4' : categoryStyle.bg,
-                      border: '1px solid rgba(0,0,0,0.07)',
-                    }}
-                  >
-                    {business.image ? (
-                      <img
-                        alt={business.name}
-                        className="w-full h-full object-cover"
-                        src={business.image}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
-                        {business.name?.charAt(0)}
-                      </span>
-                    )}
-                  </div>
+                  <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
+                    {/* Logo */}
+                    <div
+                      className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+                      style={{
+                        background: business.image ? '#F7F6F4' : categoryStyle.bg,
+                        border: '1px solid rgba(0,0,0,0.07)',
+                      }}
+                    >
+                      {business.image ? (
+                        <img
+                          alt={business.name}
+                          className="w-full h-full object-cover"
+                          src={business.image}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
+                          {business.name?.charAt(0)}
+                        </span>
+                      )}
+                    </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    {/* Name + distance row */}
-                    <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
-                      <span className="truncate">{business.name}</span>
-                      {(business.distanceText || business.distance !== undefined) && (
-                        <>
-                          <span className="shrink-0 font-normal text-blink-muted">·</span>
-                          <span className="shrink-0 text-[11px] font-normal text-blink-muted">
-                            {business.distanceText || formatDistance(business.distance!)}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Name + distance row */}
+                      <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
+                        <span className="truncate">{business.name}</span>
+                        {(business.distanceText || business.distance !== undefined) && (
+                          <>
+                            <span className="shrink-0 font-normal text-blink-muted">·</span>
+                            <span className="shrink-0 text-[11px] font-normal text-blink-muted">
+                              {business.distanceText || formatDistance(business.distance!)}
+                            </span>
+                          </>
+                        )}
+                      </h2>
+
+                      {/* Banks + count row */}
+                      <div className="flex items-center gap-1.5">
+                        {visibleBadges.map((badge) => (
+                          <span
+                            key={`${business.id}-${badge}`}
+                            className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                            style={{ background: '#1E293B', color: '#E2E8F0' }}
+                          >
+                            {badge}
                           </span>
-                        </>
-                      )}
-                    </h2>
-
-                    {/* Banks + count row */}
-                    <div className="flex items-center gap-1.5">
-                      {visibleBadges.map((badge) => (
-                        <span
-                          key={`${business.id}-${badge}`}
-                          className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
-                          style={{ background: '#1E293B', color: '#E2E8F0' }}
-                        >
-                          {badge}
+                        ))}
+                        {remaining > 0 && (
+                          <span
+                            className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                            style={{ background: '#F1F5F9', color: '#94A3B8' }}
+                          >
+                            +{remaining}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-blink-muted ml-1.5">
+                          {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
                         </span>
-                      ))}
-                      {remaining > 0 && (
-                        <span
-                          className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
-                          style={{ background: '#F1F5F9', color: '#94A3B8' }}
-                        >
-                          +{remaining}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-blink-muted ml-1.5">
-                        {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                      </span>
+                      </div>
                     </div>
+
+                    {/* Benefit — typographic right column, no box */}
+                    {maxDiscount > 0 ? (
+                      <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                        <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+                        <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
+                        <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+                      </div>
+                    ) : maxInstallments > 0 ? (
+                      <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
+                        <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+                        <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
+                        <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+                      </div>
+                    ) : (
+                      <div className="shrink-0" style={{ minWidth: 38 }} />
+                    )}
+
+                    {/* Chevron — always at far right, vertically centered */}
+                    <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
                   </div>
-
-                  {/* Benefit — typographic right column, no box */}
-                  {maxDiscount > 0 ? (
-                    <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                      <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
-                      <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
-                      <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
-                    </div>
-                  ) : maxInstallments > 0 ? (
-                    <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                      <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
-                      <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
-                      <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
-                    </div>
-                  ) : (
-                    <div className="shrink-0" style={{ minWidth: 38 }} />
-                  )}
-
-                  {/* Chevron — always at far right, vertically centered */}
-                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
                 </div>
+
+                {/* Inline feed ad — inserted after every 5th result */}
+                {(index + 1) % 5 === 0 && (
+                  <AdBanner slot={AD_SLOTS.searchFeed} format="auto" className="py-2" />
+                )}
               </div>
             );
           })
