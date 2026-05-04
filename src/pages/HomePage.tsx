@@ -9,6 +9,7 @@ import TodayDealsReel from '../components/todayDeals/TodayDealsReel';
 import { getBenefitPath, getTodayDeals, type TodayDeal } from '../components/todayDeals/todayDeals';
 import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
+import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
 import { Business } from '../types';
@@ -20,6 +21,7 @@ import InstallPWABanner from '../components/InstallPWAPopup';
 function HomePage() {
   const navigate = useNavigate();
   const { businesses, isLoading } = useBenefitsData({});
+  const enrichedBusinesses = useEnrichedBusinesses(businesses);
   const [isTodayDealsOpen, setIsTodayDealsOpen] = useState(false);
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -78,7 +80,7 @@ function HomePage() {
     navigate(getBenefitPath(deal), { state: { business: deal.business } });
   }, [navigate]);
 
-  const todayDeals = useMemo(() => getTodayDeals(businesses), [businesses]);
+  const todayDeals = useMemo(() => getTodayDeals(enrichedBusinesses), [enrichedBusinesses]);
 
   // Top 5 individual benefits by discount, ensuring different merchants
   const top5 = useMemo(() => {
