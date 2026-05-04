@@ -17,22 +17,6 @@ interface TodayDealsReelProps {
 
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 
-const getCountdownText = () => {
-  const now = new Date();
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const remainingMs = Math.max(0, endOfDay.getTime() - now.getTime());
-  const hours = Math.floor(remainingMs / 3_600_000);
-  const minutes = Math.max(1, Math.ceil((remainingMs % 3_600_000) / 60_000));
-
-  if (hours <= 0) {
-    return `Quedan ${minutes}m`;
-  }
-
-  return `Quedan ${hours}h ${minutes}m`;
-};
-
 const parseSavedBenefitIds = (storedValue: string | null): string[] => {
   if (!storedValue) return [];
 
@@ -64,7 +48,6 @@ const getShareUrl = (deal: TodayDeal) => {
 
 function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsReelProps) {
   const modalRef = useModalFocusTrap(true, onClose);
-  const [countdownText, setCountdownText] = useState(getCountdownText);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => readSavedBenefitIds());
 
   useEffect(() => {
@@ -78,14 +61,6 @@ function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsR
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overscrollBehavior = previousOverscrollBehavior;
     };
-  }, []);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setCountdownText(getCountdownText());
-    }, 60_000);
-
-    return () => window.clearInterval(intervalId);
   }, []);
 
   const handleToggleFavorite = (deal: TodayDeal) => {
@@ -216,7 +191,6 @@ function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsR
             <TodayDealCard
               key={deal.id}
               deal={deal}
-              countdownText={countdownText}
               isFavorite={favoriteIds.has(getBenefitId(deal))}
               onToggleFavorite={handleToggleFavorite}
               onShare={(selectedDeal) => void handleShare(selectedDeal)}

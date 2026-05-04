@@ -1,8 +1,8 @@
 import { TodayDeal } from './todayDeals';
+import { formatDistance } from '../../utils/distance';
 
 interface TodayDealCardProps {
   deal: TodayDeal;
-  countdownText: string;
   isFavorite: boolean;
   onToggleFavorite: (deal: TodayDeal) => void;
   onShare: (deal: TodayDeal) => void;
@@ -16,6 +16,18 @@ const getMerchantInitials = (name: string) => {
 };
 
 const getDealTitle = (deal: TodayDeal) => deal.benefit.benefit?.trim() || deal.business.name;
+
+const getDistanceLabel = (deal: TodayDeal) => {
+  if (deal.business.distanceText) {
+    return `${deal.business.distanceText} de vos`;
+  }
+
+  if (typeof deal.business.distance === 'number' && Number.isFinite(deal.business.distance)) {
+    return `${formatDistance(deal.business.distance)} de vos`;
+  }
+
+  return deal.business.location.length > 0 ? 'Sucursal disponible' : 'Distancia no disponible';
+};
 
 const getDealDescription = (deal: TodayDeal) => {
   const candidates = [
@@ -31,18 +43,32 @@ const getDealDescription = (deal: TodayDeal) => {
 
 function TodayDealCard({
   deal,
-  countdownText,
   isFavorite,
   onToggleFavorite,
   onShare,
   onOpenDetail,
 }: TodayDealCardProps) {
-  const title = getDealTitle(deal);
+  const merchantName = deal.business.name.trim() || 'Comercio';
+  const benefitTitle = getDealTitle(deal);
   const description = getDealDescription(deal);
+  const distanceLabel = getDistanceLabel(deal);
 
   return (
     <article className="relative min-h-[100dvh] snap-start snap-always overflow-hidden bg-black text-white">
-      <div className="mx-auto flex min-h-[100dvh] max-w-[720px] flex-col px-5 pb-6 pt-32 sm:px-8">
+      {deal.business.image && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+          <img
+            alt=""
+            className="h-[58vh] w-[120%] object-contain opacity-[0.18] saturate-[0.85]"
+            src={deal.business.image}
+            loading="lazy"
+          />
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black via-black/70 to-black" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48vh] bg-gradient-to-t from-black via-black/95 to-transparent" aria-hidden="true" />
+
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-[720px] flex-col px-5 pb-6 pt-32 sm:px-8">
         <div className="w-fit -rotate-2 rounded-[20px] bg-[#ff3b30] px-6 py-3.5 shadow-[0_18px_40px_rgba(255,59,48,0.22)]">
           <span className="block text-[40px] font-black leading-none tracking-normal text-white sm:text-[52px]">
             {deal.discount}% OFF
@@ -51,7 +77,7 @@ function TodayDealCard({
 
         <div className="mt-auto">
           <div className="relative pr-[82px]">
-            <div className="mb-5 flex items-center gap-4">
+            <div className="mb-5 flex items-start gap-4">
               <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full bg-white text-black ring-1 ring-white/20">
                 {deal.business.image ? (
                   <img
@@ -67,9 +93,14 @@ function TodayDealCard({
                 )}
               </div>
 
-              <h3 className="line-clamp-2 min-w-0 break-words text-[34px] font-black leading-[1.08] tracking-normal text-white sm:text-[44px]">
-                {title}
-              </h3>
+              <div className="min-w-0 flex-1">
+                <h3 className="break-words text-[38px] font-black leading-[0.98] tracking-normal text-white sm:text-[52px]">
+                  {merchantName}
+                </h3>
+                <p className="mt-3 line-clamp-2 break-words text-[18px] font-black leading-tight tracking-normal text-white/90 sm:text-[22px]">
+                  {benefitTitle}
+                </p>
+              </div>
             </div>
 
             <p className="line-clamp-2 break-words text-[22px] font-medium leading-snug tracking-normal text-white/80 sm:text-[26px]">
@@ -78,9 +109,9 @@ function TodayDealCard({
 
             <div className="mt-6 inline-flex h-12 max-w-full items-center gap-3 rounded-[14px] border border-white/20 bg-black px-4 text-[#ffd60a] shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 21 }}>
-                schedule
+                location_on
               </span>
-              <span className="truncate text-base font-black leading-none tracking-normal">{countdownText}</span>
+              <span className="truncate text-base font-black leading-none tracking-normal">{distanceLabel}</span>
             </div>
 
             <div className="absolute bottom-0 right-0 flex flex-col gap-4">
