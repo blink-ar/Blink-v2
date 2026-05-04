@@ -8,7 +8,7 @@ import TodayDealsEntryPoint from '../components/todayDeals/TodayDealsEntryPoint'
 import TodayDealsReel from '../components/todayDeals/TodayDealsReel';
 import { getBenefitPath, getTodayDeals, type TodayDeal } from '../components/todayDeals/todayDeals';
 import ComingSoonSection from '../components/ComingSoonSection';
-import { useBenefitsData } from '../hooks/useBenefitsData';
+import { useBenefitsData, useTodayDealsBusinessesData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
@@ -21,7 +21,14 @@ import InstallPWABanner from '../components/InstallPWAPopup';
 function HomePage() {
   const navigate = useNavigate();
   const { businesses, isLoading } = useBenefitsData({});
-  const enrichedBusinesses = useEnrichedBusinesses(businesses);
+  const {
+    businesses: todayDealBusinesses,
+    isLoading: isTodayDealsLoading,
+    isLoadingMore: isTodayDealsLoadingMore,
+    hasMore: hasMoreTodayDeals,
+    loadMore: loadMoreTodayDeals,
+  } = useTodayDealsBusinessesData();
+  const enrichedTodayDealBusinesses = useEnrichedBusinesses(todayDealBusinesses);
   const [isTodayDealsOpen, setIsTodayDealsOpen] = useState(false);
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -80,7 +87,10 @@ function HomePage() {
     navigate(getBenefitPath(deal), { state: { business: deal.business } });
   }, [navigate]);
 
-  const todayDeals = useMemo(() => getTodayDeals(enrichedBusinesses), [enrichedBusinesses]);
+  const todayDeals = useMemo(
+    () => getTodayDeals(enrichedTodayDealBusinesses, { limit: 60 }),
+    [enrichedTodayDealBusinesses],
+  );
 
   // Top 5 individual benefits by discount, ensuring different merchants
   const top5 = useMemo(() => {
@@ -242,7 +252,7 @@ function HomePage() {
         <TodayDealsEntryPoint
           dealCount={todayDeals.length}
           topDiscount={todayDeals[0]?.discount}
-          isLoading={isLoading}
+          isLoading={isTodayDealsLoading}
           onOpen={handleOpenTodayDeals}
         />
 
@@ -367,7 +377,10 @@ function HomePage() {
       {isTodayDealsOpen && (
         <TodayDealsReel
           deals={todayDeals}
-          isLoading={isLoading}
+          isLoading={isTodayDealsLoading}
+          isLoadingMore={isTodayDealsLoadingMore}
+          hasMore={hasMoreTodayDeals}
+          onLoadMore={loadMoreTodayDeals}
           onClose={handleCloseTodayDeals}
           onOpenDetail={handleTodayDealDetailClick}
         />

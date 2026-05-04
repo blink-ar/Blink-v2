@@ -15,6 +15,7 @@ export const queryKeys = {
 };
 
 const ITEMS_PER_PAGE = 20;
+const TODAY_DEALS_ITEMS_PER_PAGE = 80;
 
 interface UseBenefitsDataReturn {
     businesses: Business[];
@@ -232,6 +233,69 @@ export function useBusinessesData() {
                 fetchNextPage();
             }
         },
+    };
+}
+
+/**
+ * Dedicated business feed for the full-screen today deals reel.
+ * It intentionally uses a larger page size than Home/Search so the reel has
+ * enough percent-discount merchants after filtering and merchant dedupe.
+ */
+export function useTodayDealsBusinessesData() {
+    const { position, loading: positionLoading } = useGeolocation();
+    const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
+
+    const {
+        data,
+        isLoading,
+        isFetchingNextPage,
+        error,
+        fetchNextPage,
+        hasNextPage,
+    } = useInfiniteQuery({
+        queryKey: [...queryKeys.businesses, 'todayDeals', geohash],
+        queryFn: async ({ pageParam = 0 }) => {
+            return fetchBusinessesPaginated({
+                limit: TODAY_DEALS_ITEMS_PER_PAGE,
+                offset: pageParam,
+                ...(geohash && { geohash }),
+            });
+        },
+        getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (lastPage.pagination.hasMore) {
+                return lastPage.pagination.offset + lastPage.pagination.limit;
+            }
+            return undefined;
+        },
+        initialPageParam: 0,
+        enabled: !positionLoading,
+        staleTime: 0,
+    });
+
+    const businesses = useMemo(() => {
+        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const seenIds = new Set<string>();
+        return allBusinesses.filter((business) => {
+            if (seenIds.has(business.id)) {
+                return false;
+            }
+            seenIds.add(business.id);
+            return true;
+        });
+    }, [data?.pages]);
+
+    return {
+        businesses,
+        isLoading,
+        isLoadingMore: isFetchingNextPage,
+        error: error ? (error as Error).message : null,
+        hasMore: hasNextPage ?? false,
+        loadMore: () => {
+            if (hasNextPage && !isFetchingNextPage) {
+                fetchNextPage();
+            }
+        },
+        totalBusinesses: data?.pages[0]?.pagination.total ?? 0,
     };
 }
 

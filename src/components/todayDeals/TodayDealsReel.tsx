@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useModalFocusTrap } from '../../hooks/useFocusManagement';
 import {
   trackSaveBenefit,
@@ -11,6 +11,9 @@ import { getBenefitId, getBenefitPath, TodayDeal } from './todayDeals';
 interface TodayDealsReelProps {
   deals: TodayDeal[];
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
   onClose: () => void;
   onOpenDetail: (deal: TodayDeal) => void;
 }
@@ -46,8 +49,17 @@ const getShareUrl = (deal: TodayDeal) => {
   return new URL(path, window.location.origin).toString();
 };
 
-function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsReelProps) {
+function TodayDealsReel({
+  deals,
+  isLoading,
+  isLoadingMore,
+  hasMore,
+  onLoadMore,
+  onClose,
+  onOpenDetail,
+}: TodayDealsReelProps) {
   const modalRef = useModalFocusTrap(true, onClose);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => readSavedBenefitIds());
 
   useEffect(() => {
@@ -62,6 +74,16 @@ function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsR
       document.documentElement.style.overscrollBehavior = previousOverscrollBehavior;
     };
   }, []);
+
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !hasMore || isLoadingMore) return;
+
+    const remainingScroll = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (remainingScroll < container.clientHeight * 2) {
+      onLoadMore();
+    }
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   const handleToggleFavorite = (deal: TodayDeal) => {
     const benefitId = getBenefitId(deal);
@@ -169,7 +191,11 @@ function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsR
         </div>
       </header>
 
-      <div className="h-[100dvh] overflow-y-auto overscroll-contain snap-y snap-mandatory no-scrollbar">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="h-[100dvh] overflow-y-auto overscroll-contain snap-y snap-mandatory no-scrollbar"
+      >
         {isLoading && deals.length === 0 ? (
           <div className="mx-auto flex min-h-[100dvh] max-w-[720px] flex-col bg-black px-5 pb-6 pt-32 sm:px-8">
             <div className="h-[72px] w-[236px] -rotate-2 animate-pulse rounded-[20px] bg-[#ff3b30]/70" />
@@ -187,16 +213,23 @@ function TodayDealsReel({ deals, isLoading, onClose, onOpenDetail }: TodayDealsR
             </div>
           </div>
         ) : deals.length > 0 ? (
-          deals.map((deal) => (
-            <TodayDealCard
-              key={deal.id}
-              deal={deal}
-              isFavorite={favoriteIds.has(getBenefitId(deal))}
-              onToggleFavorite={handleToggleFavorite}
-              onShare={(selectedDeal) => void handleShare(selectedDeal)}
-              onOpenDetail={onOpenDetail}
-            />
-          ))
+          <>
+            {deals.map((deal) => (
+              <TodayDealCard
+                key={deal.id}
+                deal={deal}
+                isFavorite={favoriteIds.has(getBenefitId(deal))}
+                onToggleFavorite={handleToggleFavorite}
+                onShare={(selectedDeal) => void handleShare(selectedDeal)}
+                onOpenDetail={onOpenDetail}
+              />
+            ))}
+            {isLoadingMore && (
+              <div className="pointer-events-none fixed bottom-28 left-1/2 z-[130] -translate-x-1/2 rounded-full border border-white/15 bg-black/80 px-4 py-2 text-xs font-black text-white/80">
+                Cargando descuentos
+              </div>
+            )}
+          </>
         ) : (
           <div className="mx-auto flex min-h-[100dvh] max-w-[720px] flex-col justify-end bg-black px-5 pb-6 pt-32 sm:px-8">
             <div className="mb-10">
