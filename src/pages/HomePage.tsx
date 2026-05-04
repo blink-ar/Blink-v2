@@ -1,11 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
+import TodayDealsEntryPoint from '../components/todayDeals/TodayDealsEntryPoint';
+import TodayDealsReel from '../components/todayDeals/TodayDealsReel';
+import { getBenefitPath, getTodayDeals, type TodayDeal } from '../components/todayDeals/todayDeals';
 import ComingSoonSection from '../components/ComingSoonSection';
-import { useBenefitsData } from '../hooks/useBenefitsData';
+import { useBenefitsData, useTodayDealsBusinessesData } from '../hooks/useBenefitsData';
+import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
 import { Business } from '../types';
@@ -17,6 +21,15 @@ import InstallPWABanner from '../components/InstallPWAPopup';
 function HomePage() {
   const navigate = useNavigate();
   const { businesses, isLoading } = useBenefitsData({});
+  const {
+    businesses: todayDealBusinesses,
+    isLoading: isTodayDealsLoading,
+    isLoadingMore: isTodayDealsLoadingMore,
+    hasMore: hasMoreTodayDeals,
+    loadMore: loadMoreTodayDeals,
+  } = useTodayDealsBusinessesData();
+  const enrichedTodayDealBusinesses = useEnrichedBusinesses(todayDealBusinesses);
+  const [isTodayDealsOpen, setIsTodayDealsOpen] = useState(false);
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
     queryFn: fetchMongoStats,
@@ -54,6 +67,30 @@ function HomePage() {
     });
     navigate(`/benefit/${businessId}/${benefitIndex}`, { state: { business } });
   };
+
+  const handleOpenTodayDeals = useCallback(() => {
+    setIsTodayDealsOpen(true);
+  }, []);
+
+  const handleCloseTodayDeals = useCallback(() => {
+    setIsTodayDealsOpen(false);
+  }, []);
+
+  const handleTodayDealDetailClick = useCallback((deal: TodayDeal) => {
+    trackViewBenefit({
+      source: 'today_deals_reel',
+      benefitId: `${deal.business.id}:${deal.benefitIndex}`,
+      businessId: deal.business.id,
+      category: deal.business.category,
+      position: deal.benefitIndex + 1,
+    });
+    navigate(getBenefitPath(deal), { state: { business: deal.business } });
+  }, [navigate]);
+
+  const todayDeals = useMemo(
+    () => getTodayDeals(enrichedTodayDealBusinesses, { limit: 60 }),
+    [enrichedTodayDealBusinesses],
+  );
 
   // Top 5 individual benefits by discount, ensuring different merchants
   const top5 = useMemo(() => {
@@ -212,6 +249,13 @@ function HomePage() {
           <InstallPWABanner />
         </section>
 
+        <TodayDealsEntryPoint
+          dealCount={todayDeals.length}
+          topDiscount={todayDeals[0]?.discount}
+          isLoading={isTodayDealsLoading}
+          onOpen={handleOpenTodayDeals}
+        />
+
         {/* Top 5 Hoy - Bento Cards */}
         <section className="flex flex-col gap-3">
           <div className="px-4 flex items-center justify-between">
@@ -329,6 +373,18 @@ function HomePage() {
       </main>
 
       <BottomNav />
+
+      {isTodayDealsOpen && (
+        <TodayDealsReel
+          deals={todayDeals}
+          isLoading={isTodayDealsLoading}
+          isLoadingMore={isTodayDealsLoadingMore}
+          hasMore={hasMoreTodayDeals}
+          onLoadMore={loadMoreTodayDeals}
+          onClose={handleCloseTodayDeals}
+          onOpenDetail={handleTodayDealDetailClick}
+        />
+      )}
     </div>
   );
 }
