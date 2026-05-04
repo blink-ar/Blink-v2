@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TodayDeal } from './todayDeals';
 import { formatDistance } from '../../utils/distance';
 
@@ -48,10 +49,35 @@ function TodayDealCard({
   onShare,
   onOpenDetail,
 }: TodayDealCardProps) {
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
   const merchantName = deal.business.name.trim() || 'Comercio';
   const benefitTitle = getDealTitle(deal);
   const description = getDealDescription(deal);
   const distanceLabel = getDistanceLabel(deal);
+
+  const measureDescription = useCallback(() => {
+    const element = descriptionRef.current;
+    if (!element) return;
+
+    const styles = window.getComputedStyle(element);
+    const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+    const parsedFontSize = Number.parseFloat(styles.fontSize);
+    const lineHeight = Number.isFinite(parsedLineHeight)
+      ? parsedLineHeight
+      : parsedFontSize * 1.25;
+
+    setIsDescriptionTruncated(element.scrollHeight > lineHeight * 2 + 1);
+  }, []);
+
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+    measureDescription();
+
+    window.addEventListener('resize', measureDescription);
+    return () => window.removeEventListener('resize', measureDescription);
+  }, [description, measureDescription]);
 
   return (
     <article className="relative min-h-[100dvh] snap-start snap-always overflow-hidden bg-black text-white">
@@ -104,11 +130,25 @@ function TodayDealCard({
               </div>
             </div>
 
-            <p className="line-clamp-2 break-words text-[22px] font-medium leading-snug tracking-normal text-white/80 sm:text-[26px]">
+            <p
+              ref={descriptionRef}
+              className={`${isDescriptionExpanded ? '' : 'line-clamp-2'} break-words text-[22px] font-medium leading-snug tracking-normal text-white/80 sm:text-[26px]`}
+            >
               {description}
             </p>
 
-            <div className="mt-6 inline-flex h-12 max-w-full items-center gap-3 rounded-[14px] border border-white/20 bg-black px-4 text-[#ffd60a] shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+            {isDescriptionTruncated && (
+              <button
+                type="button"
+                aria-expanded={isDescriptionExpanded}
+                onClick={() => setIsDescriptionExpanded((current) => !current)}
+                className="mt-2 block text-sm font-black tracking-normal text-white underline underline-offset-4 transition-opacity duration-150 active:opacity-70"
+              >
+                {isDescriptionExpanded ? 'Ver menos' : 'Ver más'}
+              </button>
+            )}
+
+            <div className={`${isDescriptionTruncated ? 'mt-4' : 'mt-6'} inline-flex h-12 max-w-full items-center gap-3 rounded-[14px] border border-white/20 bg-black px-4 text-[#ffd60a] shadow-[0_0_0_1px_rgba(255,255,255,0.04)]`}>
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 21 }}>
                 location_on
               </span>
