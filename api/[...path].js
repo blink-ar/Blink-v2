@@ -1912,8 +1912,8 @@ async function handleGetBusinesses(req, res, url, db) {
       .find(merchantQuery, {
         projection: merchantProjection
       })
-      .sort({ merchantName: 1 })
-      .skip(offsetNum)
+      .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
+      .skip(merchantId ? offsetNum : offsetNum + 8)
       .limit(limitNum)
       .toArray();
   }

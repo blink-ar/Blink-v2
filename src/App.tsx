@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
+import { useResponsive } from './hooks/useResponsive';
+import PhoneMirror from './components/PhoneMirror';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -28,15 +30,32 @@ const PageLoader = () => (
   </div>
 );
 
-function App() {
+export function RootRedirect() {
+  const { search, hash } = useLocation();
+
   return (
-    <Router>
+    <Navigate
+      to={{
+        pathname: '/home',
+        search,
+        hash,
+      }}
+      replace
+    />
+  );
+}
+
+function AppContent() {
+  const { isDesktop } = useResponsive();
+
+  const mobileContent = (
+    <>
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/business/:id" element={<BusinessDetailPage />} />
@@ -48,6 +67,20 @@ function App() {
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
       </Suspense>
+    </>
+  );
+
+  if (isDesktop) {
+    return <PhoneMirror>{mobileContent}</PhoneMirror>;
+  }
+
+  return mobileContent;
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

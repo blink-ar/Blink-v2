@@ -831,13 +831,13 @@ function MapPage() {
 
                   {/* Logo */}
                   <div
-                    className="w-14 h-14 shrink-0 rounded-xl flex items-center justify-center p-1.5 overflow-hidden"
+                    className="w-14 h-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
                     style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
                   >
                     {biz.image ? (
                       <img
                         alt={biz.name}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                         src={biz.image}
                         loading="lazy"
                       />

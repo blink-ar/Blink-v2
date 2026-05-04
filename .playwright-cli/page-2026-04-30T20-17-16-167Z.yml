@@ -1,0 +1,116 @@
+- generic [ref=e14]:
+  - banner [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]: Blink
+      - generic [ref=e18]:
+        - button "notifications" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: notifications
+        - generic [ref=e22]: person
+    - generic [ref=e24]:
+      - generic [ref=e25]: ✦ 0 beneficios activos
+      - generic [ref=e26]: Ahorrá hoy
+      - generic [ref=e27]: ✦ 0 beneficios activos
+      - generic [ref=e28]: Descubrí ofertas
+      - generic [ref=e29]: ✦ 0 beneficios activos
+      - generic [ref=e30]: Ahorrá hoy
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - heading "Todos tus descuentos en un solo lugar" [level=1] [ref=e33]:
+        - text: Todos tus descuentos
+        - text: en un solo lugar
+      - paragraph [ref=e34]: Bancos - Billeteras - Clubes - Suscripciones
+      - button "Buscá beneficios arrow_forward" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: Buscá beneficios
+        - generic [ref=e38]: arrow_forward
+      - paragraph [ref=e40]: Estamos en Beta! Estos son los emisores disponibles hoy en Blink.
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - heading "Top 5 hoy" [level=2] [ref=e58]
+        - generic [ref=e59]: 🔥
+      - button "Ver todo →" [ref=e60] [cursor=pointer]
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - button "🍕 Gastronomía" [ref=e67] [cursor=pointer]
+        - button "👗 Moda" [ref=e68] [cursor=pointer]
+        - button "🎮 Entretenimiento" [ref=e69] [cursor=pointer]
+        - button "⚽ Deportes" [ref=e70] [cursor=pointer]
+        - button "🎁 Regalos" [ref=e71] [cursor=pointer]
+        - button "✈️ Viajes" [ref=e72] [cursor=pointer]
+        - button "🚗 Automotores" [ref=e73] [cursor=pointer]
+        - button "🍕 Gastronomía" [ref=e74] [cursor=pointer]
+        - button "👗 Moda" [ref=e75] [cursor=pointer]
+        - button "🎮 Entretenimiento" [ref=e76] [cursor=pointer]
+        - button "⚽ Deportes" [ref=e77] [cursor=pointer]
+        - button "🎁 Regalos" [ref=e78] [cursor=pointer]
+        - button "✈️ Viajes" [ref=e79] [cursor=pointer]
+        - button "🚗 Automotores" [ref=e80] [cursor=pointer]
+      - generic [ref=e81]:
+        - button "💄 Belleza" [ref=e82] [cursor=pointer]
+        - button "🧸 Jugueterías" [ref=e83] [cursor=pointer]
+        - button "🏠 Hogar" [ref=e84] [cursor=pointer]
+        - button "💻 Electro" [ref=e85] [cursor=pointer]
+        - button "🛒 Supermercado" [ref=e86] [cursor=pointer]
+        - button "📦 Otros" [ref=e87] [cursor=pointer]
+        - button "💄 Belleza" [ref=e88] [cursor=pointer]
+        - button "🧸 Jugueterías" [ref=e89] [cursor=pointer]
+        - button "🏠 Hogar" [ref=e90] [cursor=pointer]
+        - button "💻 Electro" [ref=e91] [cursor=pointer]
+        - button "🛒 Supermercado" [ref=e92] [cursor=pointer]
+        - button "📦 Otros" [ref=e93] [cursor=pointer]
+    - generic [ref=e95]:
+      - paragraph [ref=e96]: Más emisores se suman a Blink. ¡Avisanos si querés ver el tuyo antes!
+      - generic [ref=e97]:
+        - generic [ref=e98]:
+          - generic [ref=e99]: M
+          - generic [ref=e100]: Modo
+          - generic [ref=e101]: Pronto
+        - generic [ref=e102]:
+          - generic [ref=e103]: MP
+          - generic [ref=e104]: Mercado Pago
+          - generic [ref=e105]: Pronto
+        - generic [ref=e106]:
+          - generic [ref=e107]: BR
+          - generic [ref=e108]: Brubank
+          - generic [ref=e109]: Pronto
+        - generic [ref=e110]:
+          - generic [ref=e111]: UA
+          - generic [ref=e112]: Ualá
+          - generic [ref=e113]: Pronto
+        - generic [ref=e114]:
+          - generic [ref=e115]: CL
+          - generic [ref=e116]: Club La Nación
+          - generic [ref=e117]: Pronto
+        - generic [ref=e118]:
+          - generic [ref=e119]: BN
+          - generic [ref=e120]: Banco Nación
+          - generic [ref=e121]: Pronto
+        - generic [ref=e122]:
+          - generic [ref=e123]: BC
+          - generic [ref=e124]: Banco Ciudad
+          - generic [ref=e125]: Pronto
+        - generic [ref=e126]:
+          - generic [ref=e127]: HI
+          - generic [ref=e128]: Hipotecario
+          - generic [ref=e129]: Pronto
+        - generic [ref=e130]:
+          - generic [ref=e131]: HS
+          - generic [ref=e132]: HSBC
+          - generic [ref=e133]: Pronto
+  - navigation [ref=e134]:
+    - generic [ref=e135]:
+      - link "home Inicio" [ref=e136] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=e138]: home
+        - generic [ref=e139]: Inicio
+      - link "search Buscar" [ref=e140] [cursor=pointer]:
+        - /url: /search
+        - generic [ref=e142]: search
+        - generic [ref=e143]: Buscar
+      - link "map Mapa" [ref=e144] [cursor=pointer]:
+        - /url: /map
+        - generic [ref=e146]: map
+        - generic [ref=e147]: Mapa
+      - link "favorite Guardados" [ref=e148] [cursor=pointer]:
+        - /url: /saved
+        - generic [ref=e150]: favorite
+        - generic [ref=e151]: Guardados
