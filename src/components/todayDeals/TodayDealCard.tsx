@@ -56,17 +56,18 @@ function TodayDealCard({
   return (
     <article className="relative min-h-[100dvh] snap-start snap-always overflow-hidden bg-black text-white">
       {deal.business.image && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-x-0 top-[220px] h-[46vh] overflow-hidden sm:top-[240px]" aria-hidden="true">
           <img
             alt=""
-            className="h-[58vh] w-[120%] object-contain opacity-[0.18] saturate-[0.85]"
+            className="h-full w-full object-cover opacity-70 saturate-[1.05]"
             src={deal.business.image}
             loading="lazy"
           />
+          <div className="absolute inset-0 bg-black/18" />
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black via-black/70 to-black" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48vh] bg-gradient-to-t from-black via-black/95 to-transparent" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] bg-gradient-to-b from-black via-black/80 to-transparent" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[58vh] bg-gradient-to-t from-black via-black/92 to-transparent" aria-hidden="true" />
 
       <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-[720px] flex-col px-5 pb-6 pt-32 sm:px-8">
         <div className="w-fit -rotate-2 rounded-[20px] bg-[#ff3b30] px-6 py-3.5 shadow-[0_18px_40px_rgba(255,59,48,0.22)]">
