@@ -31,33 +31,59 @@ function SignupPage() {
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 w-full border-b-2 border-blink-ink bg-blink-surface">
-        <div className="h-12 flex items-center justify-center px-4">
-          <span className="font-display text-lg tracking-tighter uppercase">Crear cuenta</span>
+      {/* Header */}
+      <header
+        className="sticky top-0 z-50 w-full"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(232,230,225,0.8)',
+        }}
+      >
+        <div className="h-14 flex items-center px-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
+          </button>
+          <span className="flex-1 text-center font-semibold text-base text-blink-ink">Crear cuenta</span>
+          <div className="w-9" />
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-10">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blink-accent shadow-hard flex items-center justify-center">
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 32 }}>
-                person_add
-              </span>
-            </div>
-            <h1 className="font-display text-2xl uppercase tracking-tight">Bienvenido a Blink</h1>
-            <p className="font-mono text-xs text-blink-muted mt-1">Creá tu cuenta para guardar beneficios</p>
-          </div>
+      <main className="flex-1 flex flex-col items-center px-4 py-8 gap-6">
+        {/* Icon */}
+        <div
+          className="w-20 h-20 rounded-2xl flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.30)' }}
+        >
+          <span className="material-symbols-outlined text-white" style={{ fontSize: 36 }}>person_add</span>
+        </div>
 
+        <div className="text-center">
+          <h1 className="font-bold text-2xl text-blink-ink tracking-tight">Bienvenido a Blink</h1>
+          <p className="text-sm text-blink-muted mt-1">Creá tu cuenta para guardar tus beneficios</p>
+        </div>
+
+        {/* Form card */}
+        <div
+          className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4"
+          style={{ background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}
+        >
           {error && (
-            <div className="mb-4 p-3 border-2 border-blink-ink bg-red-50 text-red-700 font-mono text-xs rounded-sm">
+            <div
+              className="px-4 py-3 rounded-xl text-sm text-red-700"
+              style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
+            >
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="font-mono text-xs font-bold uppercase tracking-wider">Nombre</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-blink-muted tracking-wide">NOMBRE</label>
               <input
                 type="text"
                 autoComplete="name"
@@ -65,12 +91,13 @@ function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Tu nombre"
-                className="w-full border-2 border-blink-ink bg-blink-surface px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blink-accent rounded-sm"
+                className="w-full rounded-xl px-4 py-3 text-sm text-blink-ink bg-blink-bg focus:outline-none focus:ring-2 focus:ring-blink-accent/30 transition-shadow"
+                style={{ border: '1px solid #E8E6E1' }}
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="font-mono text-xs font-bold uppercase tracking-wider">Email</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-blink-muted tracking-wide">EMAIL</label>
               <input
                 type="email"
                 autoComplete="email"
@@ -78,12 +105,13 @@ function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
-                className="w-full border-2 border-blink-ink bg-blink-surface px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blink-accent rounded-sm"
+                className="w-full rounded-xl px-4 py-3 text-sm text-blink-ink bg-blink-bg focus:outline-none focus:ring-2 focus:ring-blink-accent/30 transition-shadow"
+                style={{ border: '1px solid #E8E6E1' }}
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="font-mono text-xs font-bold uppercase tracking-wider">Contraseña</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-blink-muted tracking-wide">CONTRASEÑA</label>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -92,30 +120,34 @@ function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full border-2 border-blink-ink bg-blink-surface px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blink-accent rounded-sm"
+                className="w-full rounded-xl px-4 py-3 text-sm text-blink-ink bg-blink-bg focus:outline-none focus:ring-2 focus:ring-blink-accent/30 transition-shadow"
+                style={{ border: '1px solid #E8E6E1' }}
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full bg-blink-accent text-white font-display uppercase tracking-wider py-3 border-2 border-blink-ink shadow-hard disabled:opacity-50 disabled:cursor-not-allowed rounded-sm"
+              className="w-full h-13 rounded-2xl flex items-center justify-center font-semibold text-base text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+              style={{
+                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
+                boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
+                height: 52,
+              }}
             >
               {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
 
-          <div className="mt-4">
-            <SocialAuthButtons label="Registrarse" />
-          </div>
-
-          <p className="mt-6 text-center font-mono text-xs text-blink-muted">
-            ¿Ya tenés cuenta?{' '}
-            <Link to="/login" className="text-blink-accent font-bold underline">
-              Iniciá sesión
-            </Link>
-          </p>
+          <SocialAuthButtons label="Registrarse" />
         </div>
+
+        <p className="text-sm text-blink-muted text-center">
+          ¿Ya tenés cuenta?{' '}
+          <Link to="/login" className="font-semibold text-blink-accent">
+            Iniciá sesión
+          </Link>
+        </p>
       </main>
     </div>
   );
