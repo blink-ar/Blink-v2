@@ -1,5 +1,3 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-
 function GoogleIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -33,7 +31,7 @@ export default function SocialAuthButtons({ label = 'Continuar' }: SocialAuthBut
       </div>
 
       <a
-        href={`${API_BASE}/api/auth/google`}
+        href="/api/auth/google"
         className="flex items-center justify-center gap-3 w-full border-2 border-blink-ink bg-blink-surface py-3 font-display uppercase tracking-wider text-sm shadow-hard hover:bg-blink-bg transition-colors rounded-sm"
       >
         <GoogleIcon />
@@ -41,7 +39,7 @@ export default function SocialAuthButtons({ label = 'Continuar' }: SocialAuthBut
       </a>
 
       <a
-        href={`${API_BASE}/api/auth/facebook`}
+        href="/api/auth/facebook"
         className="flex items-center justify-center gap-3 w-full border-2 border-blink-ink bg-[#1877F2] text-white py-3 font-display uppercase tracking-wider text-sm shadow-hard hover:opacity-90 transition-opacity rounded-sm"
       >
         <FacebookIcon />
