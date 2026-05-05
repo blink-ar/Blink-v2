@@ -26,6 +26,7 @@ const MapPage = lazy(() => import('./pages/MapPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -68,6 +69,7 @@ function AppContent() {
           <Route path="/map" element={<MapPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>

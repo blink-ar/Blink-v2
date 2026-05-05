@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import SocialAuthButtons from '../components/SocialAuthButtons';
 
 function LoginPage() {
   const { login } = useAuth();
@@ -88,6 +89,10 @@ function LoginPage() {
               {isLoading ? 'Ingresando...' : 'Iniciar sesión'}
             </button>
           </form>
+
+          <div className="mt-4">
+            <SocialAuthButtons label="Iniciar sesión" />
+          </div>
 
           <p className="mt-6 text-center font-mono text-xs text-blink-muted">
             ¿No tenés cuenta?{' '}

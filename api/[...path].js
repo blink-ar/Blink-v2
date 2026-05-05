@@ -23,6 +23,11 @@ const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme-set-JWT_SECRET-in-env';
+const APP_URL = (process.env.APP_URL || process.env.VITE_SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || '';
+const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || '';
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
@@ -87,6 +92,49 @@ function getAuthToken(req) {
   const auth = req.headers['authorization'] || '';
   if (auth.startsWith('Bearer ')) return auth.slice(7);
   return null;
+}
+
+function buildOAuthState() {
+  const ts = Date.now().toString();
+  const sig = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
+  return `${Buffer.from(ts).toString('base64url')}.${sig}`;
+}
+
+function verifyOAuthState(state) {
+  const [tsPart, sig] = (state || '').split('.');
+  if (!tsPart || !sig) return false;
+  const ts = Buffer.from(tsPart, 'base64url').toString();
+  const expected = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
+  const sigBuf = Buffer.from(sig, 'hex');
+  const expBuf = Buffer.from(expected, 'hex');
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return false;
+  return Date.now() - Number(ts) < 10 * 60 * 1000; // 10 minutes
+}
+
+async function upsertSocialUser(db, { email, name, googleId, facebookId }) {
+  const users = db.collection('users');
+  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
+
+  const providerQuery = googleId ? { googleId } : { facebookId };
+  const existing = await users.findOne(providerQuery);
+  if (existing) {
+    return existing;
+  }
+
+  const byEmail = await users.findOne({ email });
+  if (byEmail) {
+    await users.updateOne({ _id: byEmail._id }, { $set: googleId ? { googleId } : { facebookId } });
+    return { ...byEmail, ...(googleId ? { googleId } : { facebookId }) };
+  }
+
+  const result = await users.insertOne({
+    name,
+    email,
+    ...(googleId ? { googleId } : { facebookId }),
+    createdAt: new Date(),
+    isActive: true
+  });
+  return { _id: result.insertedId, name, email };
 }
 
 function json(res, statusCode, payload) {
@@ -1321,6 +1369,125 @@ async function handleLogin(req, res) {
   });
 }
 
+function redirect(res, location) {
+  res.status(302);
+  res.setHeader('Location', location);
+  res.end();
+}
+
+async function handleGoogleAuth(req, res) {
+  if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google OAuth no configurado' });
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `${APP_URL}/api/auth/google/callback`,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: buildOAuthState(),
+    access_type: 'online',
+    prompt: 'select_account'
+  });
+  return redirect(res, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}
+
+async function handleGoogleCallback(req, res, url) {
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const errorParam = url.searchParams.get('error');
+
+  if (errorParam || !code || !verifyOAuthState(state)) {
+    return redirect(res, `${APP_URL}/auth/callback?error=acceso_denegado`);
+  }
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${APP_URL}/api/auth/google/callback`,
+        grant_type: 'authorization_code'
+      })
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('No access token from Google');
+
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const profile = await profileRes.json();
+    if (!profile.email) throw new Error('No email returned from Google');
+
+    const db = await getWriteDb();
+    const user = await upsertSocialUser(db, {
+      email: profile.email.toLowerCase(),
+      name: profile.name || profile.email,
+      googleId: profile.id
+    });
+
+    const token = signJwt({ sub: user._id.toString(), email: user.email });
+    return redirect(res, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('[OAuth] Google callback error:', err);
+    return redirect(res, `${APP_URL}/auth/callback?error=error_de_servidor`);
+  }
+}
+
+async function handleFacebookAuth(req, res) {
+  if (!FACEBOOK_APP_ID) return json(res, 503, { error: 'Facebook OAuth no configurado' });
+  const params = new URLSearchParams({
+    client_id: FACEBOOK_APP_ID,
+    redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
+    response_type: 'code',
+    scope: 'email,public_profile',
+    state: buildOAuthState()
+  });
+  return redirect(res, `https://www.facebook.com/v19.0/dialog/oauth?${params}`);
+}
+
+async function handleFacebookCallback(req, res, url) {
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const errorParam = url.searchParams.get('error');
+
+  if (errorParam || !code || !verifyOAuthState(state)) {
+    return redirect(res, `${APP_URL}/auth/callback?error=acceso_denegado`);
+  }
+
+  try {
+    const tokenRes = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?${new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        client_secret: FACEBOOK_APP_SECRET,
+        redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
+        code
+      })}`
+    );
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('No access token from Facebook');
+
+    const profileRes = await fetch(
+      `https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${tokenData.access_token}`
+    );
+    const profile = await profileRes.json();
+    if (!profile.email) throw new Error('No email returned from Facebook');
+
+    const db = await getWriteDb();
+    const user = await upsertSocialUser(db, {
+      email: profile.email.toLowerCase(),
+      name: profile.name || profile.email,
+      facebookId: profile.id
+    });
+
+    const token = signJwt({ sub: user._id.toString(), email: user.email });
+    return redirect(res, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('[OAuth] Facebook callback error:', err);
+    return redirect(res, `${APP_URL}/auth/callback?error=error_de_servidor`);
+  }
+}
+
 async function handleGetMe(req, res) {
   const token = getAuthToken(req);
   if (!token) return json(res, 401, { error: 'No autenticado' });
@@ -2238,6 +2405,22 @@ export default async function handler(req, res) {
       return await handleGetMe(req, res);
     }
 
+    if (req.method === 'GET' && path === '/api/auth/google') {
+      return await handleGoogleAuth(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/google/callback') {
+      return await handleGoogleCallback(req, res, url);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/facebook') {
+      return await handleFacebookAuth(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/facebook/callback') {
+      return await handleFacebookCallback(req, res, url);
+    }
+
     if (req.method === 'GET') {
       const benefitByIdMatch = path.match(/^\/api\/benefits\/([^/]+)$/);
       if (benefitByIdMatch) {
@@ -2261,7 +2444,11 @@ export default async function handler(req, res) {
         'POST /api/places/details',
         'POST /api/auth/signup',
         'POST /api/auth/login',
-        'GET /api/auth/me'
+        'GET /api/auth/me',
+        'GET /api/auth/google',
+        'GET /api/auth/google/callback',
+        'GET /api/auth/facebook',
+        'GET /api/auth/facebook/callback'
       ]
     });
   } catch (error) {
