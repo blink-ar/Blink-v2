@@ -6,6 +6,7 @@ import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../
 import { getBankAccent } from '../utils/bankColors';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
+import { useFavorites } from '../context/FavoritesContext';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -72,6 +73,7 @@ function BusinessDetailPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   useSEO({
     title: business
@@ -264,6 +266,23 @@ function BusinessDetailPage() {
               <span className="text-xs font-medium text-blink-muted">{businessBenefitCount} beneficio{businessBenefitCount !== 1 ? 's' : ''} activo{businessBenefitCount !== 1 ? 's' : ''}</span>
             </div>
           </div>
+
+          <button
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
+            onClick={() => toggleFavorite(business)}
+            aria-label={isFavorite(business.id) ? 'Quitar de guardados' : 'Guardar'}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{
+                fontSize: 24,
+                color: isFavorite(business.id) ? '#ef4444' : '#9ca3af',
+                fontVariationSettings: isFavorite(business.id) ? "'FILL' 1" : "'FILL' 0",
+              }}
+            >
+              favorite
+            </span>
+          </button>
 
         </div>
 
