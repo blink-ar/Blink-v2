@@ -19,6 +19,18 @@ const STORAGE_KEYS = {
   permission: 'locationPermission',
 } as const;
 
+// Module-level listeners so all hook instances stay in sync when any one
+// instance successfully obtains or loses location.
+type LocationUpdate =
+  | { type: 'position'; coordinates: Coordinates }
+  | { type: 'denied' };
+
+const locationListeners = new Set<(update: LocationUpdate) => void>();
+
+const notifyListeners = (update: LocationUpdate) => {
+  locationListeners.forEach((fn) => fn(update));
+};
+
 const getCachedPosition = (): Coordinates | null => {
   const cached = localStorage.getItem(STORAGE_KEYS.position);
   const timestamp = localStorage.getItem(STORAGE_KEYS.timestamp);
@@ -34,6 +46,19 @@ export const useGeolocation = () => {
     loading: true,
     permissionDenied: false,
   });
+
+  useEffect(() => {
+    // Subscribe to updates from other instances (e.g. requestPermission called elsewhere)
+    const handleUpdate = (update: LocationUpdate) => {
+      if (update.type === 'position') {
+        setState({ position: update.coordinates, error: null, loading: false, permissionDenied: false });
+      } else {
+        setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
+      }
+    };
+    locationListeners.add(handleUpdate);
+    return () => { locationListeners.delete(handleUpdate); };
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -61,11 +86,15 @@ export const useGeolocation = () => {
       localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
       localStorage.setItem(STORAGE_KEYS.permission, 'granted');
       setState({ position: coordinates, error: null, loading: false, permissionDenied: false });
+      notifyListeners({ type: 'position', coordinates });
     };
 
     const onError = (err: GeolocationPositionError) => {
       const isDenied = err.code === err.PERMISSION_DENIED;
-      if (isDenied) localStorage.setItem(STORAGE_KEYS.permission, 'denied');
+      if (isDenied) {
+        localStorage.setItem(STORAGE_KEYS.permission, 'denied');
+        notifyListeners({ type: 'denied' });
+      }
       setState({ position: null, error: err.message, loading: false, permissionDenied: isDenied });
     };
 
@@ -83,16 +112,10 @@ export const useGeolocation = () => {
         if (result.state === 'denied') {
           localStorage.setItem(STORAGE_KEYS.permission, 'denied');
           setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
-        } else if (result.state === 'granted') {
-          requestLocation();
         } else {
-          // 'prompt': only auto-request if user previously granted (avoids repeated dialogs on iOS PWA)
-          const stored = localStorage.getItem(STORAGE_KEYS.permission);
-          if (stored === 'granted') {
-            requestLocation();
-          } else {
-            setState({ position: null, error: null, loading: false, permissionDenied: false });
-          }
+          // 'granted' or 'prompt': always request. The 24h cache above prevents spam —
+          // this code only runs when cache is expired or absent (i.e. first visit or stale).
+          requestLocation();
         }
       });
     } else {
@@ -119,10 +142,14 @@ export const useGeolocation = () => {
         localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
         localStorage.setItem(STORAGE_KEYS.permission, 'granted');
         setState({ position: coordinates, error: null, loading: false, permissionDenied: false });
+        notifyListeners({ type: 'position', coordinates });
       },
       (err) => {
         const isDenied = err.code === err.PERMISSION_DENIED;
-        if (isDenied) localStorage.setItem(STORAGE_KEYS.permission, 'denied');
+        if (isDenied) {
+          localStorage.setItem(STORAGE_KEYS.permission, 'denied');
+          notifyListeners({ type: 'denied' });
+        }
         setState({ position: null, error: err.message, loading: false, permissionDenied: isDenied });
       },
       { enableHighAccuracy: true, timeout: 10000 }
