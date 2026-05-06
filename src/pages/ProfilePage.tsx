@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import { useAuth } from '../contexts/AuthContext';
 
 function ProfilePage() {
   const { user, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
@@ -17,8 +18,15 @@ function ProfilePage() {
           borderBottom: '1px solid rgba(232,230,225,0.8)',
         }}
       >
-        <div className="h-14 flex items-center justify-center px-4">
-          <span className="font-semibold text-base text-blink-ink">Perfil</span>
+        <div className="h-14 flex items-center px-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
+          </button>
+          <span className="flex-1 text-center font-semibold text-base text-blink-ink">Perfil</span>
+          <div className="w-9" />
         </div>
       </header>
 
