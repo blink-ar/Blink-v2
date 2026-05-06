@@ -300,6 +300,14 @@ function SearchPage() {
   const hasInitializedFiltersRef = useRef(false);
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the search input when navigated here via the home search icon
+  useEffect(() => {
+    if (searchParams.get('focus') === '1') {
+      searchInputRef.current?.focus();
+    }
+  }, []);
 
   // Infinite scroll sentinel — primary results
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -692,12 +700,12 @@ function SearchPage() {
           >
             <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
             <input
+              ref={searchInputRef}
               className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
               placeholder="Buscar tiendas y beneficios..."
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              autoFocus={false}
             />
             {searchTerm && (
               <button

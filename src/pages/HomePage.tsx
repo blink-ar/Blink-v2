@@ -123,6 +123,14 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/search?focus=1')}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
+                search
+              </span>
+            </button>
             <button className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
                 notifications
