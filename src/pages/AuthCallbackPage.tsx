@@ -1,27 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  acceso_denegado: 'Cancelaste el inicio de sesión.',
-  error_de_servidor: 'Ocurrió un error. Intentá de nuevo.',
-};
+import { useAuth0 } from '@auth0/auth0-react';
 
 function AuthCallbackPage() {
+  const { isLoading, isAuthenticated, error } = useAuth0();
   const navigate = useNavigate();
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const err = params.get('error');
-
-    if (token) {
-      localStorage.setItem('blink_auth_token', token);
-      window.location.replace('/profile');
-    } else {
-      setError(ERROR_MESSAGES[err || ''] || 'Error desconocido.');
+    if (isLoading) return;
+    if (isAuthenticated) {
+      navigate('/profile', { replace: true });
+    } else if (error) {
+      navigate('/login', { replace: true });
     }
-  }, [navigate]);
+  }, [isLoading, isAuthenticated, error, navigate]);
 
   if (error) {
     return (
@@ -34,7 +26,7 @@ function AuthCallbackPage() {
         </div>
         <div className="text-center">
           <h2 className="font-bold text-lg text-blink-ink mb-1">Algo salió mal</h2>
-          <p className="text-sm text-blink-muted">{error}</p>
+          <p className="text-sm text-blink-muted">{error.message}</p>
         </div>
         <button
           onClick={() => navigate('/login')}
@@ -55,7 +47,10 @@ function AuthCallbackPage() {
     <div className="bg-blink-bg min-h-screen flex flex-col items-center justify-center gap-4">
       <div
         className="w-14 h-14 rounded-2xl flex items-center justify-center"
-        style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.30)' }}
+        style={{
+          background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
+          boxShadow: '0 8px 24px rgba(99,102,241,0.30)',
+        }}
       >
         <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
       </div>

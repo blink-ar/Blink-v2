@@ -1,67 +1,84 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 
-interface User {
+interface AuthUser {
   id: string;
   name: string;
   email: string;
+  picture?: string;
 }
 
 interface AuthContextValue {
-  user: User | null;
-  token: string | null;
+  user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  isAuthenticated: boolean;
+  loginWithGoogle: () => void;
+  loginWithApple: () => void;
+  loginWithEmail: (email: string) => void;
+  loginWithPasskey: () => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const TOKEN_KEY = 'blink_auth_token';
-const API_BASE = '';
+const CALLBACK_URL = `${window.location.origin}/auth/callback`;
+const LOGOUT_URL = window.location.origin;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [isLoading, setIsLoading] = useState(true);
+  const { user: auth0User, isLoading, isAuthenticated, loginWithRedirect, logout: auth0Logout } = useAuth0();
+
+  const user: AuthUser | null = auth0User
+    ? {
+        id: auth0User.sub ?? '',
+        name: auth0User.name ?? auth0User.email ?? '',
+        email: auth0User.email ?? '',
+        picture: auth0User.picture,
+      }
+    : null;
+
+  const loginWithGoogle = useCallback(() => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'google-oauth2',
+        redirect_uri: CALLBACK_URL,
+      },
+    });
+  }, [loginWithRedirect]);
+
+  const loginWithApple = useCallback(() => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'apple',
+        redirect_uri: CALLBACK_URL,
+      },
+    });
+  }, [loginWithRedirect]);
+
+  const loginWithEmail = useCallback((email: string) => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'email',
+        login_hint: email,
+        send: 'code',
+        redirect_uri: CALLBACK_URL,
+      },
+    });
+  }, [loginWithRedirect]);
+
+  const loginWithPasskey = useCallback(() => {
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: CALLBACK_URL,
+      },
+    });
+  }, [loginWithRedirect]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
-    setUser(null);
-  }, []);
-
-  useEffect(() => {
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-    axios
-      .get(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => setUser(res.data.user))
-      .catch(() => logout())
-      .finally(() => setIsLoading(false));
-  }, [token, logout]);
-
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password });
-    const { token: newToken, user: newUser } = res.data;
-    localStorage.setItem(TOKEN_KEY, newToken);
-    setToken(newToken);
-    setUser(newUser);
-  }, []);
-
-  const signup = useCallback(async (name: string, email: string, password: string) => {
-    const res = await axios.post(`${API_BASE}/api/auth/signup`, { name, email, password });
-    const { token: newToken, user: newUser } = res.data;
-    localStorage.setItem(TOKEN_KEY, newToken);
-    setToken(newToken);
-    setUser(newUser);
-  }, []);
+    auth0Logout({ logoutParams: { returnTo: LOGOUT_URL } });
+  }, [auth0Logout]);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, loginWithGoogle, loginWithApple, loginWithEmail, loginWithPasskey, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -44,12 +44,14 @@ function ProfilePage() {
           <>
             {/* Avatar */}
             <div
-              className="w-24 h-24 rounded-2xl flex items-center justify-center"
+              className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.30)' }}
             >
-              <span className="font-bold text-white text-4xl uppercase">
-                {user.name.charAt(0)}
-              </span>
+              {user.picture ? (
+                <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-bold text-white text-4xl uppercase">{user.name.charAt(0)}</span>
+              )}
             </div>
 
             {/* User info */}
