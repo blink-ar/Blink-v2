@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
+          navigateFallbackDenylist: [/^\/api\//],
           // Smart caching for better mobile performance
           runtimeCaching: [
             {
