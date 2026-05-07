@@ -139,7 +139,7 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position } = useGeolocation();
+  const { position, permissionDenied, requestPermission } = useGeolocation();
 
   const {
     businesses,
@@ -796,7 +796,14 @@ function SearchPage() {
               node: (
                 <button
                   key="proximity"
-                  onClick={() => setSortByDistance(!sortByDistance)}
+                  onClick={() => {
+                    if (permissionDenied) {
+                      requestPermission();
+                      setSortByDistance(true);
+                    } else {
+                      setSortByDistance(!sortByDistance);
+                    }
+                  }}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                     sortByDistance
                       ? 'bg-primary text-white'
