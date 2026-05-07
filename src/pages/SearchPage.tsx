@@ -1007,15 +1007,15 @@ function SearchPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
                           {visibleBadges.map((badge) => (
-                            <span key={`ob-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                            <span key={`ob-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                           ))}
                           {remaining > 0 && (
-                            <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                            <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                           )}
-                          <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                         </div>
+                        <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                       </div>
                       {maxDiscount > 0 ? (
                         <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1098,15 +1098,15 @@ function SearchPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
                               {visibleBadges.map((badge) => (
-                                <span key={`rel-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                                <span key={`rel-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                               ))}
                               {remaining > 0 && (
-                                <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                                <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                               )}
-                              <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                             </div>
+                            <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                           </div>
                           {maxDiscount > 0 ? (
                             <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1205,11 +1205,11 @@ function SearchPage() {
                     </h2>
 
                     {/* Banks + count row */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-hidden">
                       {visibleBadges.map((badge) => (
                         <span
                           key={`${business.id}-${badge}`}
-                          className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#1E293B', color: '#E2E8F0' }}
                         >
                           {badge}
@@ -1217,16 +1217,16 @@ function SearchPage() {
                       ))}
                       {remaining > 0 && (
                         <span
-                          className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#F1F5F9', color: '#94A3B8' }}
                         >
                           +{remaining}
                         </span>
                       )}
-                      <span className="text-[10px] text-blink-muted ml-1.5">
-                        {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                      </span>
                     </div>
+                    <span className="text-[10px] text-blink-muted mt-[3px]">
+                      {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                    </span>
                   </div>
 
                   {/* Benefit — typographic right column, no box */}
@@ -1343,11 +1343,11 @@ function SearchPage() {
                             )}
                           </h2>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
                             {visibleBadges.map((badge) => (
                               <span
                                 key={`rel-${business.id}-${badge}`}
-                                className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#1E293B', color: '#E2E8F0' }}
                               >
                                 {badge}
@@ -1355,16 +1355,16 @@ function SearchPage() {
                             ))}
                             {remaining > 0 && (
                               <span
-                                className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#F1F5F9', color: '#94A3B8' }}
                               >
                                 +{remaining}
                               </span>
                             )}
-                            <span className="text-[10px] text-blink-muted ml-1.5">
-                              {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                            </span>
                           </div>
+                          <span className="text-[10px] text-blink-muted mt-[3px]">
+                            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                          </span>
                         </div>
 
                         {maxDiscount > 0 ? (
