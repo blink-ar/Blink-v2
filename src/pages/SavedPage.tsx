@@ -1,11 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
-import BusinessCard from '../components/BusinessCard';
+import MerchantCard from '../components/MerchantCard';
 import { useFavorites } from '../context/FavoritesContext';
+import { Business } from '../types';
 
 function SavedPage() {
   const { favorites } = useFavorites();
   const navigate = useNavigate();
+
+  const handleSelect = (business: Business) => {
+    navigate(`/business/${business.id}`, { state: { business } });
+  };
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
@@ -57,10 +62,10 @@ function SavedPage() {
               {favorites.length} guardado{favorites.length !== 1 ? 's' : ''}
             </p>
             {favorites.map((business) => (
-              <BusinessCard
+              <MerchantCard
                 key={business.id}
                 business={business}
-                onClick={(id) => navigate(`/business/${id}`, { state: { business } })}
+                onClick={handleSelect}
               />
             ))}
           </div>
