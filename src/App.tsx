@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
+import UpdatePrompt from './components/UpdatePrompt';
 import { useResponsive } from './hooks/useResponsive';
 import PhoneMirror from './components/PhoneMirror';
 
@@ -53,6 +54,7 @@ function AppContent() {
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
+      <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<RootRedirect />} />

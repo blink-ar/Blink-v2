@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   MapPin,
   Clock,
@@ -60,9 +61,12 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 
   // State for dropdown
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [showLocationPopup, setShowLocationPopup] = React.useState(false);
+  const [locationSearch, setLocationSearch] = React.useState('');
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const dropdownMenuRef = React.useRef<HTMLDivElement>(null);
   const [dropdownMaxHeight, setDropdownMaxHeight] = React.useState<number>(240);
+  const MAX_VISIBLE_LOCATIONS = 8;
 
   // Calculate dropdown max height based on available space below
   React.useEffect(() => {
@@ -300,6 +304,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
 
   // Physical store view (existing code)
   return (
+    <>
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900">
@@ -364,71 +369,69 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
                         ref={dropdownMenuRef}
                         className="absolute top-full z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto pb-2"
                         style={{ maxHeight: `${dropdownMaxHeight}px` }}
-                        onWheel={(e) => {
-                          // Prevent scroll from bubbling to parent
-                          e.stopPropagation();
-                        }}
-                        onTouchMove={(e) => {
-                          // Prevent scroll from bubbling on touch devices
-                          e.stopPropagation();
-                        }}
+                        onWheel={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
-                        {physicalLocations.map((location, index) => {
+                        {physicalLocations.slice(0, MAX_VISIBLE_LOCATIONS).map((location, index) => {
                           const isSelected = selectedLocation?.placeId
                             ? location.placeId === selectedLocation.placeId
                             : selectedLocation?.formattedAddress === location.formattedAddress;
 
-                          // Calculate distance if user position is available
                           const distance = userCoords
-                            ? calculateDistance(
-                                userCoords.latitude,
-                                userCoords.longitude,
-                                location.lat,
-                                location.lng
-                              )
+                            ? calculateDistance(userCoords.latitude, userCoords.longitude, location.lat, location.lng)
                             : null;
 
                           return (
                             <button
                               key={location.placeId || index}
-                              onClick={() => {
-                                onLocationSelect?.(location);
-                                setIsDropdownOpen(false);
-                              }}
+                              onClick={() => { onLocationSelect?.(location); setIsDropdownOpen(false); }}
                               className={`w-full text-left p-3 border-b border-gray-100 last:border-b-0 transition-colors ${
-                                isSelected
-                                  ? 'bg-blue-50'
-                                  : 'hover:bg-gray-50'
+                                isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
                                     {location.name && (
-                                      <p className={`text-sm font-medium mb-1 truncate ${
-                                        isSelected ? 'text-blue-900' : 'text-gray-900'
-                                      }`}>
+                                      <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
                                         {location.name}
                                       </p>
                                     )}
-                                    <p className={`text-xs truncate ${
-                                      isSelected ? 'text-blue-700' : 'text-gray-600'
-                                    }`}>
-                                      {location.formattedAddress}
-                                    </p>
+                                    {userCoords && index === 0 && (
+                                      <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        Más cercana
+                                      </span>
+                                    )}
                                   </div>
+                                  <p className={`text-xs truncate ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>
+                                    {location.formattedAddress}
+                                  </p>
+                                </div>
                                 {distance !== null && (
-                                  <span className={`text-xs font-semibold flex-shrink-0 ${
-                                    isSelected ? 'text-blue-600' : 'text-gray-500'
-                                  }`}>
-                                    {distance < 1
-                                      ? `${Math.round(distance * 1000)}m`
-                                      : `${distance.toFixed(1)}km`}
+                                  <span className={`text-xs font-semibold flex-shrink-0 ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
+                                    {distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`}
                                   </span>
                                 )}
                               </div>
                             </button>
                           );
                         })}
+
+                        {/* "Ver más" button — opens full popup with search */}
+                        {physicalLocations.length > MAX_VISIBLE_LOCATIONS && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsDropdownOpen(false);
+                              setLocationSearch('');
+                              setShowLocationPopup(true);
+                            }}
+                            className="w-full p-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors text-center flex items-center justify-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>expand_more</span>
+                            Ver más sucursales ({physicalLocations.length - MAX_VISIBLE_LOCATIONS} más)
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -451,6 +454,7 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
             </button>
           )}
         </div>
+
 
         {/* Opening Hours Section - Only show when location is selected */}
         {selectedLocation ? (
@@ -642,6 +646,156 @@ const StoreInformation: React.FC<StoreInformationProps> = ({
         )} */}
       </div>
     </div>
+
+    {/* ── Full locations popup — rendered via portal to escape any stacking context ── */}
+    {showLocationPopup && createPortal(
+      <div
+        className="fixed inset-0 z-[200] bg-black/50"
+        onClick={() => setShowLocationPopup(false)}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
+          style={{ borderRadius: '20px 20px 0 0', maxHeight: '85vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
+            <div>
+              <h3 className="font-semibold text-base text-gray-900">Todas las sucursales</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {physicalLocations.length} ubicaciones
+                {userCoords ? ' · ordenadas por cercanía' : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowLocationPopup(false)}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+            </button>
+          </div>
+
+          {/* Search bar */}
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
+            <div className="relative">
+              <span
+                className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400"
+                style={{ fontSize: 18 }}
+              >
+                search
+              </span>
+              <input
+                autoFocus
+                className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                placeholder="Buscar por dirección o nombre..."
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+              />
+              {locationSearch && (
+                <button
+                  onClick={() => setLocationSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Location list */}
+          <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+            {(() => {
+              const q = locationSearch.trim().toLowerCase();
+              const filtered = q
+                ? physicalLocations.filter((loc) =>
+                    (loc.name || '').toLowerCase().includes(q) ||
+                    (loc.formattedAddress || '').toLowerCase().includes(q)
+                  )
+                : physicalLocations;
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-gray-400 text-sm">
+                    Sin resultados para "{locationSearch}"
+                  </div>
+                );
+              }
+
+              return filtered.map((location, index) => {
+                const isSelected = selectedLocation?.placeId
+                  ? location.placeId === selectedLocation.placeId
+                  : selectedLocation?.formattedAddress === location.formattedAddress;
+
+                const distance = userCoords
+                  ? calculateDistance(userCoords.latitude, userCoords.longitude, location.lat, location.lng)
+                  : null;
+
+                const isNearest = !q && userCoords && index === 0;
+
+                return (
+                  <button
+                    key={location.placeId || index}
+                    onClick={() => {
+                      onLocationSelect?.(location);
+                      setShowLocationPopup(false);
+                    }}
+                    className={`w-full text-left px-5 py-3.5 transition-colors active:bg-gray-50 ${
+                      isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div
+                          className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ background: isSelected ? '#EFF6FF' : '#F3F4F6' }}
+                        >
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ fontSize: 14, color: isSelected ? '#2563EB' : '#6B7280' }}
+                          >
+                            location_on
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {location.name && (
+                              <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                                {location.name}
+                              </p>
+                            )}
+                            {isNearest && (
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                                Más cercana
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
+                            {location.formattedAddress}
+                          </p>
+                        </div>
+                      </div>
+                      {distance !== null && (
+                        <span className={`text-xs font-semibold flex-shrink-0 mt-0.5 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
+                          {distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              });
+            })()}
+            <div className="h-6" />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

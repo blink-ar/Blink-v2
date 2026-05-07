@@ -708,50 +708,49 @@ function SearchPage() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
-              activeFilterCount > 0
-                ? 'bg-primary text-white'
-                : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
-            }`}
-            aria-label="Abrir filtros"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>tune</span>
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Quick filter pills — active ones float to the front */}
         {(() => {
           const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+          const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          const todayKey = DAY_KEYS[new Date().getDay()];
           const pills = [
             {
               key: 'banks',
               active: selectedBanks.length > 0,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="banks"
-                  onClick={() => setShowBankSheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     selectedBanks.length > 0
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
-                  {selectedBanks.length > 0 ? (
-                    <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
-                  ) : (
-                    <span>Bancos</span>
+                  <button
+                    onClick={() => setShowBankSheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                    {selectedBanks.length > 0 ? (
+                      <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
+                    ) : (
+                      <span>Bancos</span>
+                    )}
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {selectedBanks.length > 0 && (
+                    <button
+                      onClick={() => setSelectedBanks([])}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar bancos"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
                   )}
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                </div>
               ),
             },
             {
@@ -759,24 +758,41 @@ function SearchPage() {
               active: !!activeCat,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="category"
-                  onClick={() => setShowCategorySheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     activeCat
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat ? activeCat.icon : 'category'}</span>
-                  <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                  <button
+                    onClick={() => setShowCategorySheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    {activeCat
+                      ? <span style={{ fontSize: 16, lineHeight: 1 }}>{activeCat.emoji}</span>
+                      : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                    }
+                    <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {activeCat && (
+                    <button
+                      onClick={() => setSelectedCategory('')}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar categoría"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
+                  )}
+                </div>
               ),
             },
             {
               key: 'proximity',
               active: sortByDistance,
+              pinned: true,
               node: (
                 <button
                   key="proximity"
@@ -787,8 +803,27 @@ function SearchPage() {
                       : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
-                  <span>Más cercanos</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
+                  <span>Cerca</span>
+                </button>
+              ),
+            },
+            {
+              key: 'today',
+              active: availableDay === todayKey,
+              pinned: true,
+              node: (
+                <button
+                  key="today"
+                  onClick={() => setAvailableDay(availableDay === todayKey ? undefined : todayKey)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    availableDay === todayKey
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span style={{ fontSize: 15, lineHeight: 1 }}>📅</span>
+                  <span>Hoy</span>
                 </button>
               ),
             },
@@ -846,11 +881,35 @@ function SearchPage() {
             },
           ];
 
-          const sorted = [...pills.filter((p) => p.active), ...pills.filter((p) => !p.active)];
+          // Pinned pills always stay first; remaining pills sort active-first
+          const pinnedPills = pills.filter((p) => (p as any).pinned);
+          const otherPills = pills.filter((p) => !(p as any).pinned);
+          const sorted = [
+            ...pinnedPills,
+            ...otherPills.filter((p) => p.active),
+            ...otherPills.filter((p) => !p.active),
+          ];
 
           return (
             <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
               <div className="flex gap-2 min-w-max items-center">
+                {/* Filter button pinned to the left of the pill row */}
+                <button
+                  onClick={() => setShowFilters(true)}
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0 transition-all duration-150 active:scale-95 ${
+                    activeFilterCount > 0
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
+                  }`}
+                  aria-label="Abrir filtros"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
                 {sorted.map((p) => p.node)}
               </div>
             </div>
