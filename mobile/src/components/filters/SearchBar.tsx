@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, Keyboard } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { colors, borderRadius } from '../../constants/theme';
 
@@ -33,6 +33,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          onSubmitEditing={Keyboard.dismiss}
         />
         {showFilter && (
           <TouchableOpacity
