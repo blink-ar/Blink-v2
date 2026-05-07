@@ -90,11 +90,11 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
               </>
             )}
           </h2>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-hidden">
             {visibleBadges.map((badge) => (
               <span
                 key={badge}
-                className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                 style={{ background: '#1E293B', color: '#E2E8F0' }}
               >
                 {badge}
@@ -102,16 +102,16 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
             ))}
             {remaining > 0 && (
               <span
-                className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                 style={{ background: '#F1F5F9', color: '#94A3B8' }}
               >
                 +{remaining}
               </span>
             )}
-            <span className="text-[10px] text-blink-muted ml-1.5">
-              {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-            </span>
           </div>
+          <span className="text-[10px] text-blink-muted mt-[3px]">
+            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+          </span>
         </div>
 
         {/* Discount / installments */}
