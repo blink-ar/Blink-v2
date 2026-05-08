@@ -13,6 +13,7 @@ import {
 import { useBenefitsData } from "../hooks/useBenefitsData";
 import { useEnrichedBusinesses } from "../hooks/useEnrichedBusinesses";
 import { CacheNotification } from "../components/CacheNotification";
+import { NotificationBanner } from "../components/NotificationBanner";
 import {
   SkeletonFeaturedBanner,
   SkeletonActiveOffers,
@@ -519,6 +520,7 @@ function Home() {
     <div className="min-h-screen bg-gray-50 pb-20 safe-area-inset">
       <SkipToContent targetId="main-content" />
       <Header />
+      <NotificationBanner />
       <LoadingAnnouncement
         isLoading={isLoading}
         message="Cargando ofertas y descuentos"
