@@ -29,10 +29,6 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
 const NOTIFICATIONS_SECRET = process.env.NOTIFICATIONS_SECRET;
 
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-}
-
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
   globalState.__blinkMongo = {
@@ -2105,6 +2101,12 @@ async function handleNotificationUnsubscribe(req, res) {
 async function handleNotificationSend(req, res) {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     return json(res, 503, { error: 'Push notifications not configured (missing VAPID keys)' });
+  }
+
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  } catch (err) {
+    return json(res, 503, { error: 'Invalid VAPID configuration', detail: err.message });
   }
 
   const body = await readJsonBody(req);
