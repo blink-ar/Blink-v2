@@ -48,6 +48,8 @@ export const getBankAccent = (name: string): BankAccent => {
   // ── Greens ───────────────────────────────────────────────────────────────
   // Banco Ciudad — green
   if (n.includes('ciudad'))                      return { bg: '#D1FAE5', text: '#065F46', border: '#A7F3D0' };
+  // Buepp — GCBA yellow (#FFCB04)
+  if (n.includes('buepp'))                       return { bg: '#FEF9C3', text: '#A16207', border: '#FDE047' };
   // Banco Credicoop — green
   if (n.includes('credicoop'))                   return { bg: '#D1FAE5', text: '#065F46', border: '#A7F3D0' };
   // Lemon — bright green

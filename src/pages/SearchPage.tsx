@@ -139,7 +139,7 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position } = useGeolocation();
+  const { position, permissionDenied, requestPermission } = useGeolocation();
 
   const {
     businesses,
@@ -708,50 +708,49 @@ function SearchPage() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
-              activeFilterCount > 0
-                ? 'bg-primary text-white'
-                : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
-            }`}
-            aria-label="Abrir filtros"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>tune</span>
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Quick filter pills — active ones float to the front */}
         {(() => {
           const activeCat = CATEGORY_OPTIONS.find((o) => o.token === selectedCategory);
+          const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          const todayKey = DAY_KEYS[new Date().getDay()];
           const pills = [
             {
               key: 'banks',
               active: selectedBanks.length > 0,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="banks"
-                  onClick={() => setShowBankSheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     selectedBanks.length > 0
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
-                  {selectedBanks.length > 0 ? (
-                    <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
-                  ) : (
-                    <span>Bancos</span>
+                  <button
+                    onClick={() => setShowBankSheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+                    {selectedBanks.length > 0 ? (
+                      <span className="font-semibold">{selectedBanks.length} banco{selectedBanks.length !== 1 ? 's' : ''}</span>
+                    ) : (
+                      <span>Bancos</span>
+                    )}
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {selectedBanks.length > 0 && (
+                    <button
+                      onClick={() => setSelectedBanks([])}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar bancos"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
                   )}
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                </div>
               ),
             },
             {
@@ -759,36 +758,79 @@ function SearchPage() {
               active: !!activeCat,
               isSheet: true,
               node: (
-                <button
+                <div
                   key="category"
-                  onClick={() => setShowCategorySheet(true)}
-                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center h-9 rounded-xl text-sm font-medium transition-all duration-150 ${
                     activeCat
                       ? 'bg-primary/10 border border-primary/30 text-primary'
-                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCat ? activeCat.icon : 'category'}</span>
-                  <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
-                  <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
-                </button>
+                  <button
+                    onClick={() => setShowCategorySheet(true)}
+                    className="flex items-center gap-1.5 pl-3 pr-2 h-full active:scale-95 transition-transform cursor-pointer"
+                  >
+                    {activeCat
+                      ? <span style={{ fontSize: 16, lineHeight: 1 }}>{activeCat.emoji}</span>
+                      : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>category</span>
+                    }
+                    <span className={activeCat ? 'font-semibold' : ''}>{activeCat ? activeCat.label : 'Categoría'}</span>
+                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>expand_more</span>
+                  </button>
+                  {activeCat && (
+                    <button
+                      onClick={() => setSelectedCategory('')}
+                      className="pr-2.5 h-full flex items-center opacity-60 hover:opacity-100 transition-opacity active:scale-95"
+                      aria-label="Limpiar categoría"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                    </button>
+                  )}
+                </div>
               ),
             },
             {
               key: 'proximity',
               active: sortByDistance,
+              pinned: true,
               node: (
                 <button
                   key="proximity"
-                  onClick={() => setSortByDistance(!sortByDistance)}
+                  onClick={() => {
+                    if (permissionDenied) {
+                      requestPermission();
+                      setSortByDistance(true);
+                    } else {
+                      setSortByDistance(!sortByDistance);
+                    }
+                  }}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                     sortByDistance
                       ? 'bg-primary text-white'
                       : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>near_me</span>
-                  <span>Más cercanos</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
+                  <span>Cerca</span>
+                </button>
+              ),
+            },
+            {
+              key: 'today',
+              active: availableDay === todayKey,
+              pinned: true,
+              node: (
+                <button
+                  key="today"
+                  onClick={() => setAvailableDay(availableDay === todayKey ? undefined : todayKey)}
+                  className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+                    availableDay === todayKey
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-ink hover:border-primary/30'
+                  }`}
+                >
+                  <span style={{ fontSize: 15, lineHeight: 1 }}>📅</span>
+                  <span>Hoy</span>
                 </button>
               ),
             },
@@ -846,11 +888,35 @@ function SearchPage() {
             },
           ];
 
-          const sorted = [...pills.filter((p) => p.active), ...pills.filter((p) => !p.active)];
+          // Pinned pills always stay first; remaining pills sort active-first
+          const pinnedPills = pills.filter((p) => (p as any).pinned);
+          const otherPills = pills.filter((p) => !(p as any).pinned);
+          const sorted = [
+            ...pinnedPills,
+            ...otherPills.filter((p) => p.active),
+            ...otherPills.filter((p) => !p.active),
+          ];
 
           return (
             <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
               <div className="flex gap-2 min-w-max items-center">
+                {/* Filter button pinned to the left of the pill row */}
+                <button
+                  onClick={() => setShowFilters(true)}
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0 transition-all duration-150 active:scale-95 ${
+                    activeFilterCount > 0
+                      ? 'bg-primary text-white'
+                      : 'bg-blink-bg border border-blink-border text-blink-muted hover:border-primary/30'
+                  }`}
+                  aria-label="Abrir filtros"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
                 {sorted.map((p) => p.node)}
               </div>
             </div>
@@ -948,15 +1014,15 @@ function SearchPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
                           {visibleBadges.map((badge) => (
-                            <span key={`ob-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                            <span key={`ob-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                           ))}
                           {remaining > 0 && (
-                            <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                            <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                           )}
-                          <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                         </div>
+                        <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                       </div>
                       {maxDiscount > 0 ? (
                         <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1039,15 +1105,15 @@ function SearchPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
                               {visibleBadges.map((badge) => (
-                                <span key={`rel-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                                <span key={`rel-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                               ))}
                               {remaining > 0 && (
-                                <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                                <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                               )}
-                              <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                             </div>
+                            <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                           </div>
                           {maxDiscount > 0 ? (
                             <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1146,11 +1212,11 @@ function SearchPage() {
                     </h2>
 
                     {/* Banks + count row */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-hidden">
                       {visibleBadges.map((badge) => (
                         <span
                           key={`${business.id}-${badge}`}
-                          className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#1E293B', color: '#E2E8F0' }}
                         >
                           {badge}
@@ -1158,16 +1224,16 @@ function SearchPage() {
                       ))}
                       {remaining > 0 && (
                         <span
-                          className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#F1F5F9', color: '#94A3B8' }}
                         >
                           +{remaining}
                         </span>
                       )}
-                      <span className="text-[10px] text-blink-muted ml-1.5">
-                        {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                      </span>
                     </div>
+                    <span className="text-[10px] text-blink-muted mt-[3px]">
+                      {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                    </span>
                   </div>
 
                   {/* Benefit — typographic right column, no box */}
@@ -1284,11 +1350,11 @@ function SearchPage() {
                             )}
                           </h2>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
                             {visibleBadges.map((badge) => (
                               <span
                                 key={`rel-${business.id}-${badge}`}
-                                className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#1E293B', color: '#E2E8F0' }}
                               >
                                 {badge}
@@ -1296,16 +1362,16 @@ function SearchPage() {
                             ))}
                             {remaining > 0 && (
                               <span
-                                className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#F1F5F9', color: '#94A3B8' }}
                               >
                                 +{remaining}
                               </span>
                             )}
-                            <span className="text-[10px] text-blink-muted ml-1.5">
-                              {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                            </span>
                           </div>
+                          <span className="text-[10px] text-blink-muted mt-[3px]">
+                            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                          </span>
                         </div>
 
                         {maxDiscount > 0 ? (

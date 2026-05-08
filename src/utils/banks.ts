@@ -15,11 +15,12 @@ export const KNOWN_BANKS: BankDescriptor[] = [
   { token: 'amex', code: 'AMEX', label: 'AMEX' },
   { token: 'naranja', code: 'NX', label: 'NARANJA X' },
   { token: 'nacion', code: 'BNA', label: 'NACION' },
-  { token: 'ciudad', code: 'CIU', label: 'CIUDAD' },
+  { token: 'ciudad', code: 'CIUD', label: 'CIUDAD' },
   { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
   { token: 'visa', code: 'VISA', label: 'VISA' },
   { token: 'mastercard', code: 'MC', label: 'MASTERCARD' },
   { token: 'lagaceta', code: 'LAGA', label: 'LA GACETA' },
+  { token: 'buepp', code: 'BUEPP', label: 'BUEPP' },
 ];
 
 const asBankText = (value: unknown): string => {
@@ -71,6 +72,7 @@ const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
   if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
   if (normalized.includes('visa')) return KNOWN_BANKS[12];
   if (normalized.includes('master')) return KNOWN_BANKS[13];
+  if (normalized.includes('buepp')) return KNOWN_BANKS[15];
   return null;
 };
 
