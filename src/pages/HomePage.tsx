@@ -18,8 +18,8 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function HomePage() {
   const navigate = useNavigate();
-  const { isSupported, permission, isSubscribed, isLoading: notifLoading, subscribe, unsubscribe } = usePushNotifications();
-  const showBell = isSupported && permission !== 'denied';
+  const { isSupported, isSubscribed } = usePushNotifications();
+  const showBell = isSupported;
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -129,10 +129,9 @@ function HomePage() {
           <div className="flex items-center gap-2">
             {showBell && (
               <button
-                onClick={() => isSubscribed ? unsubscribe() : subscribe()}
-                disabled={notifLoading}
-                aria-label={isSubscribed ? 'Desactivar notificaciones' : 'Activar notificaciones'}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors disabled:opacity-50"
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
                   notifications

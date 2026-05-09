@@ -16,6 +16,7 @@ const ALLOWED_COLLECTIONS = new Set([
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
 const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
+const NOTIFICATION_HISTORY_COLLECTION = 'notification_history';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 
@@ -2147,7 +2148,29 @@ async function handleNotificationSend(req, res) {
   }
 
   const sent = results.filter((r) => r.status === 'fulfilled').length;
+
+  await db.collection(NOTIFICATION_HISTORY_COLLECTION).insertOne({
+    title,
+    body: notifBody || '',
+    url: url || '/',
+    sentAt: new Date(),
+    sent,
+    total: subscriptions.length,
+  });
+
   return json(res, 200, { success: true, sent, total: subscriptions.length, expired: expiredEndpoints.length });
+}
+
+async function handleNotificationHistory(req, res) {
+  const db = await getWritableDb();
+  const notifications = await db
+    .collection(NOTIFICATION_HISTORY_COLLECTION)
+    .find({})
+    .sort({ sentAt: -1 })
+    .limit(100)
+    .toArray();
+
+  return json(res, 200, { notifications });
 }
 
 export default async function handler(req, res) {
@@ -2193,6 +2216,10 @@ export default async function handler(req, res) {
       return await handlePlaceDetails(req, res);
     }
 
+    if (req.method === 'GET' && path === '/api/notifications/history') {
+      return await handleNotificationHistory(req, res);
+    }
+
     if (req.method === 'POST' && path === '/api/notifications/subscribe') {
       return await handleNotificationSubscribe(req, res);
     }
@@ -2226,6 +2253,7 @@ export default async function handler(req, res) {
         'GET /api/networks',
         'GET /api/stats',
         'POST /api/places/details',
+        'GET /api/notifications/history',
         'POST /api/notifications/subscribe',
         'POST /api/notifications/unsubscribe',
         'POST /api/notifications/send'
