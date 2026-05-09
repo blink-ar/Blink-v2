@@ -1,57 +1,57 @@
-export const API_BASE_URL = 'http://192.168.100.54:3003';
+// Set EXPO_PUBLIC_API_BASE_URL in your .env file for the deployed backend URL
+// e.g. EXPO_PUBLIC_API_BASE_URL=https://blink-v2.vercel.app
+export const API_BASE_URL =
+  (typeof process !== 'undefined' && (process.env as any).EXPO_PUBLIC_API_BASE_URL) ||
+  'https://blink-v2.vercel.app';
 
 export const ITEMS_PER_PAGE = 20;
 
 export const CATEGORY_DATA = [
-  { id: 'gastronomia', name: 'Comida', icon: '🍽️', color: '#F59E0B' },
-  { id: 'moda', name: 'Ropa', icon: '👕', color: '#8B5CF6' },
-  { id: 'entretenimiento', name: 'Entretenimiento', icon: '🎭', color: '#EF4444' },
-  { id: 'deportes', name: 'Deportes', icon: '⚽', color: '#059669' },
-  { id: 'regalos', name: 'Regalos', icon: '🎁', color: '#DC2626' },
-  { id: 'viajes', name: 'Viajes', icon: '✈️', color: '#06B6D4' },
-  { id: 'automotores', name: 'Automotores', icon: '🚗', color: '#1F2937' },
-  { id: 'belleza', name: 'Belleza', icon: '💄', color: '#EC4899' },
-  { id: 'jugueterias', name: 'Jugueterías', icon: '🧸', color: '#F97316' },
-  { id: 'hogar', name: 'Hogar', icon: '🏠', color: '#7C3AED' },
-  { id: 'electro', name: 'Electro', icon: '📱', color: '#0891B2' },
-  { id: 'shopping', name: 'Super', icon: '🛒', color: '#10B981' },
-  { id: 'otros', name: 'Otros', icon: '📦', color: '#6B7280' },
+  { id: 'gastronomia', name: 'Gastronomía', emoji: '🍕', bg: '#EEF2FF', text: '#4338CA' },
+  { id: 'moda', name: 'Moda', emoji: '👗', bg: '#FCE7F3', text: '#9D174D' },
+  { id: 'entretenimiento', name: 'Entretenimiento', emoji: '🎮', bg: '#EDE9FE', text: '#4C1D95' },
+  { id: 'deportes', name: 'Deportes', emoji: '⚽', bg: '#D1FAE5', text: '#065F46' },
+  { id: 'regalos', name: 'Regalos', emoji: '🎁', bg: '#FEE2E2', text: '#991B1B' },
+  { id: 'viajes', name: 'Viajes', emoji: '✈️', bg: '#DBEAFE', text: '#1E40AF' },
+  { id: 'automotores', name: 'Automotores', emoji: '🚗', bg: '#F3F4F6', text: '#374151' },
+  { id: 'belleza', name: 'Belleza', emoji: '💄', bg: '#FDF2F8', text: '#831843' },
+  { id: 'jugueterias', name: 'Jugueterías', emoji: '🧸', bg: '#EEF2FF', text: '#78350F' },
+  { id: 'hogar', name: 'Hogar', emoji: '🏠', bg: '#ECFDF5', text: '#064E3B' },
+  { id: 'electro', name: 'Electro', emoji: '💻', bg: '#EEF2FF', text: '#312E81' },
+  { id: 'shopping', name: 'Supermercado', emoji: '🛒', bg: '#F0FDF4', text: '#14532D' },
+  { id: 'otros', name: 'Otros', emoji: '📦', bg: '#F8FAFC', text: '#475569' },
 ] as const;
 
-export const BANK_DATA = [
-  { id: 'santander', name: 'Santander', icon: '🏦', color: '#EC0000' },
-  { id: 'bbva', name: 'BBVA', icon: '🏦', color: '#004481' },
-  { id: 'banco-de-chile', name: 'Banco de Chile', icon: '🏦', color: '#003DA5' },
-  { id: 'bci', name: 'BCI', icon: '🏦', color: '#FF6B35' },
-  { id: 'banco-estado', name: 'Banco Estado', icon: '🏦', color: '#0066CC' },
-  { id: 'scotiabank', name: 'Scotiabank', icon: '🏦', color: '#DA020E' },
-  { id: 'itau', name: 'Itaú', icon: '🏦', color: '#FF6900' },
-  { id: 'falabella', name: 'Falabella', icon: '🏦', color: '#7B68EE' },
-  { id: 'ripley', name: 'Ripley', icon: '🏦', color: '#E31837' },
-  { id: 'cencosud', name: 'Cencosud', icon: '🏦', color: '#00A651' },
-] as const;
-
-export const CATEGORY_COLORS: Record<string, string> = {
-  gastronomia: '#F59E0B',
-  moda: '#8B5CF6',
-  entretenimiento: '#EF4444',
-  deportes: '#059669',
-  regalos: '#DC2626',
-  viajes: '#06B6D4',
-  automotores: '#1F2937',
-  belleza: '#EC4899',
-  jugueterias: '#F97316',
-  hogar: '#7C3AED',
-  electro: '#0891B2',
-  shopping: '#10B981',
-  otros: '#6B7280',
+export const CATEGORY_MAP: Record<string, { bg: string; text: string; emoji: string }> = {
+  gastronomia: { bg: '#EEF2FF', text: '#6366F1', emoji: '🍕' },
+  moda:        { bg: '#EDE9FE', text: '#7C3AED', emoji: '👗' },
+  viajes:      { bg: '#DBEAFE', text: '#1E40AF', emoji: '✈️' },
+  deportes:    { bg: '#D1FAE5', text: '#065F46', emoji: '⚽' },
+  belleza:     { bg: '#FDF2F8', text: '#831843', emoji: '💄' },
+  entretenimiento: { bg: '#EDE9FE', text: '#4C1D95', emoji: '🎮' },
+  hogar:       { bg: '#ECFDF5', text: '#064E3B', emoji: '🏠' },
+  electro:     { bg: '#EEF2FF', text: '#312E81', emoji: '💻' },
+  shopping:    { bg: '#F0FDF4', text: '#14532D', emoji: '🛒' },
+  automotores: { bg: '#F3F4F6', text: '#374151', emoji: '🚗' },
+  regalos:     { bg: '#FEE2E2', text: '#991B1B', emoji: '🎁' },
+  jugueterias: { bg: '#EEF2FF', text: '#78350F', emoji: '🧸' },
+  otros:       { bg: '#F8FAFC', text: '#475569', emoji: '📦' },
 };
 
-export const CATEGORY_ICONS: Record<string, string> = {
-  gastronomia: '🍽️',
-  moda: '🛍️',
-  viajes: '✈️',
-  deportes: '⚽',
-  entretenimiento: '🎭',
-  otros: '🛒',
-};
+export const DISCOUNT_OPTIONS = [
+  { value: 10, label: '10%+' },
+  { value: 20, label: '20%+' },
+  { value: 30, label: '30%+' },
+  { value: 50, label: '50%+' },
+];
+
+export const DAY_OPTIONS = [
+  { value: 'today', label: 'Hoy' },
+  { value: 'monday', label: 'Lun' },
+  { value: 'tuesday', label: 'Mar' },
+  { value: 'wednesday', label: 'Mié' },
+  { value: 'thursday', label: 'Jue' },
+  { value: 'friday', label: 'Vie' },
+  { value: 'saturday', label: 'Sáb' },
+  { value: 'sunday', label: 'Dom' },
+];

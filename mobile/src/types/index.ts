@@ -1,6 +1,7 @@
 export interface BankBenefit {
   bankName: string;
   cardName: string;
+  cardTypes?: string[];
   benefit: string;
   rewardRate: string;
   color: string;
@@ -17,6 +18,9 @@ export interface BankBenefit {
   originalAnalyzedText?: string;
   description?: string;
   installments?: number | null;
+  validUntil?: string | null;
+  id?: string;
+  subscription?: string | null;
 }
 
 export interface Business {

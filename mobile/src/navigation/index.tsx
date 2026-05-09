@@ -2,96 +2,118 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
-import type { RootStackParamList } from '../types/navigation';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Home, Search, Map, Bookmark, User } from 'lucide-react-native';
+import type {
+  RootTabParamList,
+  HomeStackParamList,
+  SearchStackParamList,
+  MapStackParamList,
+  SavedStackParamList,
+  ProfileStackParamList,
+} from '../types/navigation';
 import HomeScreen from '../screens/HomeScreen';
+import SearchScreen from '../screens/SearchScreen';
+import MapScreen from '../screens/MapScreen';
+import SavedScreen from '../screens/SavedScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import BusinessDetailScreen from '../screens/BusinessDetailScreen';
 import BenefitDetailScreen from '../screens/BenefitDetailScreen';
-import { colors } from '../constants/theme';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const HomeStack = createNativeStackNavigator<HomeStackParamList>();
+const SearchStack = createNativeStackNavigator<SearchStackParamList>();
+const MapStack = createNativeStackNavigator<MapStackParamList>();
+const SavedStack = createNativeStackNavigator<SavedStackParamList>();
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+const Tab = createBottomTabNavigator<RootTabParamList>();
 
-function HomeTabIcon({ focused }: { focused: boolean }) {
+const screenOptions = { headerShown: false, animation: 'slide_from_right' } as const;
+
+function HomeStackNav() {
   return (
-    <View style={styles.tabIcon}>
-      <Text style={[styles.tabEmoji, !focused && styles.tabEmojiInactive]}>🏠</Text>
-    </View>
+    <HomeStack.Navigator screenOptions={screenOptions}>
+      <HomeStack.Screen name="Home" component={HomeScreen} />
+      <HomeStack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
+      <HomeStack.Screen name="BenefitDetail" component={BenefitDetailScreen} />
+    </HomeStack.Navigator>
   );
 }
 
-function BeneficiosTabIcon({ focused }: { focused: boolean }) {
+function SearchStackNav() {
   return (
-    <View style={styles.tabIcon}>
-      <Text style={[styles.tabEmoji, !focused && styles.tabEmojiInactive]}>⭐</Text>
-    </View>
+    <SearchStack.Navigator screenOptions={screenOptions}>
+      <SearchStack.Screen name="Search" component={SearchScreen} />
+      <SearchStack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
+      <SearchStack.Screen name="BenefitDetail" component={BenefitDetailScreen} />
+    </SearchStack.Navigator>
   );
 }
 
-function HomeTabs() {
+function MapStackNav() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary[600],
-        tabBarInactiveTintColor: colors.gray[400],
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopWidth: 1,
-          borderTopColor: colors.gray[200],
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 4,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Inicio"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: HomeTabIcon,
-        }}
-      />
-      <Tab.Screen
-        name="Beneficios"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: BeneficiosTabIcon,
-        }}
-        initialParams={{ tab: 'beneficios' }}
-      />
-    </Tab.Navigator>
+    <MapStack.Navigator screenOptions={screenOptions}>
+      <MapStack.Screen name="Map" component={MapScreen} />
+      <MapStack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
+      <MapStack.Screen name="BenefitDetail" component={BenefitDetailScreen} />
+    </MapStack.Navigator>
+  );
+}
+
+function SavedStackNav() {
+  return (
+    <SavedStack.Navigator screenOptions={screenOptions}>
+      <SavedStack.Screen name="Saved" component={SavedScreen} />
+      <SavedStack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
+      <SavedStack.Screen name="BenefitDetail" component={BenefitDetailScreen} />
+    </SavedStack.Navigator>
+  );
+}
+
+function ProfileStackNav() {
+  return (
+    <ProfileStack.Navigator screenOptions={screenOptions}>
+      <ProfileStack.Screen name="Profile" component={ProfileScreen} />
+    </ProfileStack.Navigator>
   );
 }
 
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
           headerShown: false,
-          animation: 'slide_from_right',
-        }}
+          tabBarActiveTintColor: '#6366F1',
+          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarStyle: {
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderTopColor: '#E8E6E1',
+            height: Platform.OS === 'ios' ? 88 : 60,
+            paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: '600',
+          },
+          tabBarIcon: ({ focused, color, size }) => {
+            const iconProps = { size: 22, color, strokeWidth: focused ? 2.5 : 2 };
+            if (route.name === 'HomeTab') return <Home {...iconProps} />;
+            if (route.name === 'SearchTab') return <Search {...iconProps} />;
+            if (route.name === 'MapTab') return <Map {...iconProps} />;
+            if (route.name === 'SavedTab') return <Bookmark {...iconProps} />;
+            if (route.name === 'ProfileTab') return <User {...iconProps} />;
+            return null;
+          },
+        })}
       >
-        <Stack.Screen name="HomeTabs" component={HomeTabs} />
-        <Stack.Screen name="BenefitDetail" component={BenefitDetailScreen} />
-      </Stack.Navigator>
+        <Tab.Screen name="HomeTab" component={HomeStackNav} options={{ title: 'Inicio' }} />
+        <Tab.Screen name="SearchTab" component={SearchStackNav} options={{ title: 'Buscar' }} />
+        <Tab.Screen name="MapTab" component={MapStackNav} options={{ title: 'Mapa' }} />
+        <Tab.Screen name="SavedTab" component={SavedStackNav} options={{ title: 'Guardados' }} />
+        <Tab.Screen name="ProfileTab" component={ProfileStackNav} options={{ title: 'Perfil' }} />
+      </Tab.Navigator>
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  tabIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabEmoji: {
-    fontSize: 20,
-  },
-  tabEmojiInactive: {
-    opacity: 0.5,
-  },
-});

@@ -2,15 +2,31 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
-import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
-import { getRawBenefits } from '../services/rawBenefitsApi';
+import { fetchBusinessesPaginated, BusinessesApiResponse, getRawBenefits } from '../services/api';
 import { useGeolocation } from './useGeolocation';
+import { encodeGeohash } from '../utils/geohash';
 import { ITEMS_PER_PAGE } from '../constants';
 
 export const queryKeys = {
   businesses: ['businesses'] as const,
   featuredBenefits: ['featuredBenefits'] as const,
+  subscriptions: ['bankSubscriptions'] as const,
 };
+
+export interface BenefitsFilters {
+  search?: string;
+  category?: string;
+  bank?: string;
+  subscription?: string;
+  minDiscount?: number;
+  maxDistance?: number;
+  availableDay?: string;
+  network?: string;
+  cardMode?: 'credit' | 'debit';
+  hasInstallments?: boolean;
+  onlineOnly?: boolean;
+  sortByDistance?: boolean;
+}
 
 interface UseBenefitsDataReturn {
   businesses: Business[];
@@ -22,22 +38,20 @@ interface UseBenefitsDataReturn {
   loadMore: () => void;
   refreshData: () => Promise<void>;
   totalBusinesses: number;
-}
-
-export interface BenefitsFilters {
-  search?: string;
-  category?: string;
-  bank?: string;
-  minDiscount?: number;
-  maxDistance?: number;
-  availableDay?: string;
-  network?: string;
-  cardMode?: 'credit' | 'debit';
-  hasInstallments?: boolean;
+  proximityUnavailable: boolean;
 }
 
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
   const { position, loading: positionLoading } = useGeolocation();
+  const wantsSortByDistance = filters?.sortByDistance ?? false;
+  const sortByDistance = wantsSortByDistance && position !== null;
+  const geohash = !sortByDistance && position
+    ? encodeGeohash(position.latitude, position.longitude)
+    : undefined;
+
+  const filtersKey = Object.fromEntries(
+    Object.entries(filters || {}).filter(([, v]) => v !== undefined && v !== false && v !== '' && v !== 0),
+  );
 
   const {
     data,
@@ -48,18 +62,21 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
     hasNextPage,
     refetch: refetchBusinesses,
   } = useInfiniteQuery({
-    queryKey: [...queryKeys.businesses, filters],
+    queryKey: sortByDistance
+      ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
+      : [...queryKeys.businesses, geohash, filtersKey],
     queryFn: async ({ pageParam = 0 }) => {
       return fetchBusinessesPaginated({
         limit: ITEMS_PER_PAGE,
-        offset: pageParam,
-        ...(position && {
-          lat: position.latitude,
-          lng: position.longitude,
-        }),
+        offset: pageParam as number,
+        ...(sortByDistance && position
+          ? { lat: position.latitude, lng: position.longitude }
+          : geohash ? { geohash } : {}),
         ...(filters?.search && { search: filters.search }),
         ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
         ...(filters?.bank && { bank: filters.bank }),
+        ...(filters?.subscription && { subscription: filters.subscription }),
+        ...(filters?.onlineOnly && { online: true }),
       });
     },
     getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -84,11 +101,11 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
   });
 
   const businesses = useMemo(() => {
-    const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
-    const seenIds = new Set();
-    return allBusinesses.filter(business => {
-      if (seenIds.has(business.id)) return false;
-      seenIds.add(business.id);
+    const all = data?.pages.flatMap((page) => page.businesses) ?? [];
+    const seen = new Set<string>();
+    return all.filter((b) => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
       return true;
     });
   }, [data?.pages]);
@@ -103,9 +120,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
       : null;
 
   const loadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
 
   const refreshData = async () => {
@@ -122,11 +137,13 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
     loadMore,
     refreshData,
     totalBusinesses,
+    proximityUnavailable: wantsSortByDistance && !positionLoading && position === null,
   };
 }
 
 export function useBusinessesData() {
   const { position, loading: positionLoading } = useGeolocation();
+  const geohash = position ? encodeGeohash(position.latitude, position.longitude) : undefined;
 
   const {
     data,
@@ -136,15 +153,12 @@ export function useBusinessesData() {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.businesses,
+    queryKey: [...queryKeys.businesses, geohash],
     queryFn: async ({ pageParam = 0 }) => {
       return fetchBusinessesPaginated({
         limit: ITEMS_PER_PAGE,
-        offset: pageParam,
-        ...(position && {
-          lat: position.latitude,
-          lng: position.longitude,
-        }),
+        offset: pageParam as number,
+        ...(geohash ? { geohash } : {}),
       });
     },
     getNextPageParam: (lastPage: BusinessesApiResponse) => {
@@ -159,11 +173,11 @@ export function useBusinessesData() {
   });
 
   const businesses = useMemo(() => {
-    const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
-    const seenIds = new Set();
-    return allBusinesses.filter(business => {
-      if (seenIds.has(business.id)) return false;
-      seenIds.add(business.id);
+    const all = data?.pages.flatMap((page) => page.businesses) ?? [];
+    const seen = new Set<string>();
+    return all.filter((b) => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
       return true;
     });
   }, [data?.pages]);
