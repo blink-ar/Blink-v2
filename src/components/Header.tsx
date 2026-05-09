@@ -11,23 +11,16 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
     usePushNotifications();
 
-  const handleBellClick = () => {
-    if (isSubscribed) {
-      unsubscribe();
-    } else {
-      subscribe();
-    }
-  };
+  const showBell = isSupported && permission !== "denied";
 
-  const bellLabel = isSubscribed
-    ? "Desactivar notificaciones"
-    : "Activar notificaciones";
+  const handleBellClick = () => {
+    if (isSubscribed) unsubscribe();
+    else subscribe();
+  };
 
   return (
     <div className="modern-header header safe-area-top header-slide-down">
-      {/* Main Header Bar */}
       <div className="flex items-center justify-between px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-white border-b border-gray-200">
-        {/* Left: App Title */}
         <div className="flex items-center">
           <Link
             to="/"
@@ -42,9 +35,8 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
           </Link>
         </div>
 
-        {/* Right: Notification Bell */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {isSupported && permission !== "denied" && (
+          {showBell && (
             <button
               onClick={handleBellClick}
               disabled={isLoading}
@@ -54,8 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
                 minHeight: "var(--touch-target-min)",
                 borderRadius: "var(--radius-full)",
               }}
-              aria-label={bellLabel}
-              title={bellLabel}
+              aria-label={isSubscribed ? "Desactivar notificaciones" : "Activar notificaciones"}
             >
               {isSubscribed ? (
                 <Bell className="h-5 w-5 sm:h-6 sm:w-6 fill-current text-primary-600" />

@@ -9,6 +9,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
+// Browser supports the Push API — does NOT require VAPID key
+function browserSupportsPush(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window
+  );
+}
+
 export interface UsePushNotificationsReturn {
   isSupported: boolean;
   permission: NotificationPermission;
@@ -19,12 +29,7 @@ export interface UsePushNotificationsReturn {
 }
 
 export function usePushNotifications(): UsePushNotificationsReturn {
-  const isSupported =
-    typeof window !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window &&
-    !!VAPID_PUBLIC_KEY;
+  const isSupported = browserSupportsPush();
 
   const [permission, setPermission] = useState<NotificationPermission>(
     isSupported ? Notification.permission : 'denied'
@@ -35,9 +40,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   useEffect(() => {
     if (!isSupported) return;
-
     setPermission(Notification.permission);
-
     navigator.serviceWorker.ready.then((reg) => {
       reg.pushManager.getSubscription().then((sub) => {
         setIsSubscribed(!!sub);
@@ -48,6 +51,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   const subscribe = useCallback(async () => {
     if (!isSupported || isLoading) return;
+    if (!VAPID_PUBLIC_KEY) {
+      console.error('[Push] VITE_VAPID_PUBLIC_KEY is not set');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -58,12 +65,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         perm = await Notification.requestPermission();
         setPermission(perm);
       }
-
       if (perm !== 'granted') return;
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
       await fetch('/api/notifications/subscribe', {
@@ -91,7 +97,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endpoint: subscription.endpoint }),
       });
-
       await subscription.unsubscribe();
       setIsSubscribed(false);
       setSubscription(null);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Bell, X, Download } from "lucide-react";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 
-const DISMISSED_KEY = "blink_notif_banner_dismissed";
+const NOTIF_DISMISSED_KEY = "blink_notif_banner_dismissed";
 const INSTALL_DISMISSED_KEY = "blink_install_popup_dismissed";
 
 function isIOS() {
@@ -76,28 +76,30 @@ export const NotificationBanner: React.FC = () => {
   const { isSupported, permission, isSubscribed, isLoading, subscribe } =
     usePushNotifications();
 
-  const [dismissed, setDismissed] = useState(true);
+  const [ready, setReady] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
   const [iosNotStandalone, setIosNotStandalone] = useState(false);
 
   useEffect(() => {
-    const notifDismissed = localStorage.getItem(DISMISSED_KEY) === "true";
-    const installDismissed = localStorage.getItem(INSTALL_DISMISSED_KEY) === "1";
     const onIOS = isIOS();
     const standalone = isStandalone();
 
     if (onIOS && !standalone) {
       setIosNotStandalone(true);
-      setDismissed(installDismissed);
+      setDismissed(localStorage.getItem(INSTALL_DISMISSED_KEY) === "1");
     } else {
-      setDismissed(notifDismissed);
+      setDismissed(localStorage.getItem(NOTIF_DISMISSED_KEY) === "true");
     }
+    setReady(true);
   }, []);
 
   const handleDismiss = () => {
-    const key = iosNotStandalone ? INSTALL_DISMISSED_KEY : DISMISSED_KEY;
-    const value = iosNotStandalone ? "1" : "true";
-    localStorage.setItem(key, value);
+    if (iosNotStandalone) {
+      localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+    } else {
+      localStorage.setItem(NOTIF_DISMISSED_KEY, "true");
+    }
     setDismissed(true);
   };
 
@@ -108,12 +110,10 @@ export const NotificationBanner: React.FC = () => {
     }
   };
 
-  // Hide if dismissed or already handled
-  if (dismissed) return null;
-  if (!iosNotStandalone && (isSubscribed || permission === "denied")) return null;
-  if (!iosNotStandalone && !isSupported) return null;
+  // Don't render until we've read localStorage (avoids flash)
+  if (!ready || dismissed) return null;
 
-  // iOS in browser — prompt to install
+  // iOS in browser — can't use push without installing the PWA
   if (iosNotStandalone) {
     return (
       <>
@@ -131,15 +131,11 @@ export const NotificationBanner: React.FC = () => {
           </div>
           <button
             onClick={() => setShowSheet(true)}
-            className="flex-shrink-0 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors"
+            className="flex-shrink-0 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg"
           >
             Cómo
           </button>
-          <button
-            onClick={handleDismiss}
-            className="flex-shrink-0 p-1 text-blue-400 hover:text-blue-600 transition-colors"
-            aria-label="Cerrar"
-          >
+          <button onClick={handleDismiss} className="flex-shrink-0 p-1 text-blue-400" aria-label="Cerrar">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -148,7 +144,9 @@ export const NotificationBanner: React.FC = () => {
     );
   }
 
-  // Normal push notification prompt
+  // Other browsers — only show if push is supported and not already subscribed/denied
+  if (!isSupported || isSubscribed || permission === "denied") return null;
+
   return (
     <div className="mx-4 sm:mx-6 md:mx-8 mt-3 mb-1 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 flex items-center gap-3">
       <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
@@ -165,15 +163,11 @@ export const NotificationBanner: React.FC = () => {
       <button
         onClick={handleEnable}
         disabled={isLoading}
-        className="flex-shrink-0 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+        className="flex-shrink-0 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-3 py-1.5 rounded-lg disabled:opacity-60"
       >
         {isLoading ? "..." : "Activar"}
       </button>
-      <button
-        onClick={handleDismiss}
-        className="flex-shrink-0 p-1 text-blue-400 hover:text-blue-600 transition-colors"
-        aria-label="Cerrar"
-      >
+      <button onClick={handleDismiss} className="flex-shrink-0 p-1 text-blue-400" aria-label="Cerrar">
         <X className="w-4 h-4" />
       </button>
     </div>
