@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
@@ -8,6 +13,10 @@
     {
       "src": "/business/([^/]+)",
       "dest": "/api/[...path]?path=business/$1"
+    },
+    {
+      "src": "/comercios/([^/]+)",
+      "dest": "/api/[...path]?path=comercios/$1"
     },
     {
       "handle": "filesystem"

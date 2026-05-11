@@ -2,7 +2,13 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
-import { normalizeSearchText, slugify, tokenizeSearchText } from './search/normalize.js';
+import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import {
+  getMerchantSeoPathFromMerchant,
+  parseMerchantSeoSlugId,
+  readViteAppShell,
+  renderMerchantSeoHtml
+} from './merchant-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -16,6 +22,43 @@ const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+const MERCHANT_SEO_PROJECTION = {
+  _id: 0,
+  merchantId: 1,
+  merchantName: 1,
+  merchantKey: 1,
+  categories: 1,
+  banks: 1,
+  locations: 1,
+  hasOnlineBenefits: 1,
+  benefitCount: 1,
+  activeBenefitCount: 1,
+  maxDiscountPercentage: 1,
+  searchProfile: 1,
+  imageUrl: 1,
+  logoUrl: 1,
+  coverUrl: 1,
+  isActive: 1
+};
+const BENEFIT_SUMMARY_PROJECTION = {
+  _id: 1,
+  id: 1,
+  merchantId: 1,
+  bank: 1,
+  benefitTitle: 1,
+  availableDays: 1,
+  discountPercentage: 1,
+  caps: 1,
+  online: 1,
+  otherDiscounts: 1,
+  installments: 1,
+  description: 1,
+  termsAndConditions: 1,
+  link: 1,
+  validUntil: 1,
+  cardTypes: 1,
+  subscription: 1
+};
 
 const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
@@ -48,6 +91,12 @@ function redirect(res, statusCode, location) {
   res.send('');
 }
 
+function html(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(payload);
+}
+
 // Cache-Control directives
 const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
 const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
@@ -55,6 +104,11 @@ const CC_LOCATION = 'private, max-age=60';                                      
 
 function setCacheControl(res, directive) {
   res.setHeader('Cache-Control', directive);
+}
+
+function getCanonicalSiteUrl(url) {
+  const configuredSiteUrl = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').trim().replace(/\/$/, '');
+  return configuredSiteUrl || url.origin.replace(/\/$/, '');
 }
 
 /**
@@ -198,12 +252,6 @@ function pickBusinessImage(asset) {
   if (asset?.imageUrl) return asset.imageUrl;
   if (asset?.logoUrl) return asset.logoUrl;
   return DEFAULT_BUSINESS_IMAGE;
-}
-
-function getMerchantSeoPathFromMerchant(merchant) {
-  const merchantId = String(merchant?.merchantId || '').trim();
-  const slug = slugify(merchant?.merchantName || '') || 'comercio';
-  return `/comercios/${slug}--${encodeURIComponent(merchantId)}`;
 }
 
 function dedupeLocations(locations) {
@@ -1790,26 +1838,6 @@ async function handleGetBusinesses(req, res, url, db) {
     logoUrl: 1,
     coverUrl: 1
   };
-  const benefitSummaryProjection = {
-    _id: 1,
-    id: 1,
-    merchantId: 1,
-    bank: 1,
-    benefitTitle: 1,
-    availableDays: 1,
-    discountPercentage: 1,
-    caps: 1,
-    online: 1,
-    otherDiscounts: 1,
-    installments: 1,
-    description: 1,
-    termsAndConditions: 1,
-    link: 1,
-    validUntil: 1,
-    cardTypes: 1,
-    subscription: 1
-  };
-
   let pagedMerchants = [];
   if (hasLocation) {
     try {
@@ -1949,7 +1977,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const rawBenefits = merchantIds.length > 0
     ? await db.collection(collectionName)
-      .find(benefitQuery, { projection: benefitSummaryProjection })
+      .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
       .sort({ bank: 1, benefitTitle: 1 })
       .toArray()
     : [];
@@ -2007,6 +2035,67 @@ async function handleGetBusinesses(req, res, url, db) {
       ...(hasLocation && { lat: userLat, lng: userLng })
     }
   });
+}
+
+async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
+  const parsed = parseMerchantSeoSlugId(slugId);
+  if (!parsed) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: parsed.merchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: MERCHANT_SEO_PROJECTION
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: parsed.merchantId
+    });
+  }
+
+  const canonicalPath = getMerchantSeoPathFromMerchant(merchant);
+  if (`/comercios/${slugId}` !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const rawBenefits = await db.collection(DEFAULT_COLLECTION)
+    .find(
+      {
+        merchantId: parsed.merchantId
+      },
+      {
+        projection: BENEFIT_SUMMARY_PROJECTION
+      }
+    )
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderMerchantSeoHtml({
+    appShell,
+    merchant,
+    benefits,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    now: options.now || new Date()
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
 }
 
 async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
@@ -2076,6 +2165,7 @@ export {
   handleGetBenefits,
   handleGetBusinesses,
   handleLegacyBusinessRedirect,
+  handleMerchantSeoPage,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2100,6 +2190,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
+      if (merchantSeoMatch) {
+        return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
+      }
+
       const legacyBusinessMatch = path.match(/^\/api\/business\/([^/]+)$/);
       if (legacyBusinessMatch) {
         return await handleLegacyBusinessRedirect(req, res, url, db, decodeURIComponent(legacyBusinessMatch[1]));
@@ -2145,6 +2240,7 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/comercios/:slugId',
         'GET /api/business/:id',
         'GET /api/search',
         'GET /api/categories',
