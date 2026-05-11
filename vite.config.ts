@@ -23,8 +23,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
-          // Pull in push notification event handlers
           importScripts: ['sw-push.js'],
+          navigateFallbackDenylist: [/^\/api\//],
           // Smart caching for better mobile performance
           runtimeCaching: [
             {

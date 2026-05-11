@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
+import { useAuth } from '../contexts/AuthContext';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
@@ -20,6 +21,7 @@ function HomePage() {
   const navigate = useNavigate();
   const { isSupported, isSubscribed } = usePushNotifications();
   const showBell = isSupported;
+  const { user } = useAuth();
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -138,14 +140,17 @@ function HomePage() {
                 </span>
               </button>
             )}
-            <div
-              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
+            <Link
+              to="/profile"
+              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center transition-opacity active:opacity-70"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>
-                person
-              </span>
-            </div>
+              {user ? (
+                <span className="text-white text-sm font-bold uppercase">{user.name.charAt(0)}</span>
+              ) : (
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
+              )}
+            </Link>
           </div>
         </div>
         {/* Ticker */}

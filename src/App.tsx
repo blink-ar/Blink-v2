@@ -5,6 +5,7 @@ import RouteSEO from './components/seo/RouteSEO';
 import UpdatePrompt from './components/UpdatePrompt';
 import { useResponsive } from './hooks/useResponsive';
 import PhoneMirror from './components/PhoneMirror';
+import { AuthProvider } from './contexts/AuthContext';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -26,6 +27,9 @@ const MapPage = lazy(() => import('./pages/MapPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -71,6 +75,9 @@ function AppContent() {
           <Route path="/categorias/:category" element={<CategoryPage />} />
           <Route path="/categorias/:category/page/:page" element={<CategoryPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>
@@ -88,7 +95,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }
