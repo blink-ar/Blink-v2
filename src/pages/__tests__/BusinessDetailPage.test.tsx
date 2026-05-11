@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
 import { fetchBusinessById } from '../../services/api';
+import { useSEO } from '../../hooks/useSEO';
 
 const routerMocks = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
-  mockUseLocation: vi.fn()
+  mockUseLocation: vi.fn(),
+  mockUseParams: vi.fn()
 }));
 
 vi.mock('../../services/api', () => ({
@@ -27,7 +29,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
     ...actual,
-    useParams: () => ({ id: 'merchant_69a6f741b7ff0ecb9e33cf58' }),
+    useParams: () => routerMocks.mockUseParams(),
     useNavigate: () => routerMocks.mockNavigate,
     useLocation: routerMocks.mockUseLocation
   };
@@ -67,7 +69,11 @@ const mockBusiness: Business = {
 describe('BusinessDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    routerMocks.mockUseLocation.mockReturnValue({ state: null });
+    routerMocks.mockUseParams.mockReturnValue({ id: 'merchant_69a6f741b7ff0ecb9e33cf58' });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/business/merchant_69a6f741b7ff0ecb9e33cf58'
+    });
   });
 
   it('loads the business by exact merchant id when route state is missing', async () => {
@@ -76,10 +82,48 @@ describe('BusinessDetailPage', () => {
     render(<BusinessDetailPage />);
 
     await waitFor(() => {
-      expect(fetchBusinessById).toHaveBeenCalledWith('merchant_69a6f741b7ff0ecb9e33cf58');
+      expect(fetchBusinessById).toHaveBeenCalledWith(
+        'merchant_69a6f741b7ff0ecb9e33cf58',
+        { includeExpired: true },
+      );
     });
     expect(await screen.findByText('Mostaza')).toBeInTheDocument();
     expect(screen.getByText('gastronomia')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(routerMocks.mockNavigate).toHaveBeenCalledWith(
+        '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58',
+        { replace: true, state: { business: mockBusiness } },
+      );
+    });
+  });
+
+  it('loads canonical merchant URLs by parsed merchant id without redirecting', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(mockBusiness);
+    routerMocks.mockUseParams.mockReturnValue({
+      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+
+    render(<BusinessDetailPage />);
+
+    await waitFor(() => {
+      expect(fetchBusinessById).toHaveBeenCalledWith(
+        'merchant_69a6f741b7ff0ecb9e33cf58',
+        { includeExpired: true },
+      );
+    });
+    expect(await screen.findByText('Mostaza')).toBeInTheDocument();
+    expect(routerMocks.mockNavigate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+        }),
+      );
+    });
   });
 
   it('renders a not found state when the business id does not resolve', async () => {
@@ -88,5 +132,30 @@ describe('BusinessDetailPage', () => {
     render(<BusinessDetailPage />);
 
     expect(await screen.findByText('Comercio no encontrado')).toBeInTheDocument();
+  });
+
+  it('shows previous benefits when the merchant has no active benefits', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness,
+      benefits: [
+        {
+          ...mockBusiness.benefits[0],
+          validUntil: '2020-01-01',
+        },
+      ],
+    });
+    routerMocks.mockUseParams.mockReturnValue({
+      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+
+    render(<BusinessDetailPage />);
+
+    expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
+    expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
+    expect(screen.getByText('Venció: 2020-01-01')).toBeInTheDocument();
   });
 });

@@ -79,7 +79,7 @@ function RouteSEO() {
       description: 'Explora descuentos bancarios por banco, categoria y ciudad en Argentina.',
       path: location.pathname,
     };
-  } else if (location.pathname.startsWith('/business/')) {
+  } else if (location.pathname.startsWith('/business/') || location.pathname.startsWith('/comercios/')) {
     seoConfig = {
       title: `Beneficios por comercio | ${SITE_NAME}`,
       description: 'Consulta descuentos, topes y condiciones por comercio.',

@@ -4,6 +4,7 @@ import {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleLegacyBusinessRedirect,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
 
@@ -273,6 +274,70 @@ describe('merchant-first serverless helpers', () => {
     expect(merchantQueries[0]).not.toHaveProperty('$or');
     expect(merchantQueries[1]).not.toHaveProperty('$or');
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+  });
+
+  it('handleLegacyBusinessRedirect returns a 301 canonical merchant URL', async () => {
+    const merchantQueries: unknown[] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne(query: unknown) {
+              merchantQueries.push(query);
+              return {
+                merchantId: 'merchant_1',
+                merchantName: 'Óptica Visión'
+              };
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/business/merchant_1');
+
+    await handleLegacyBusinessRedirect(req as never, res as never, url, db as never, 'merchant_1');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/comercios/optica-vision--merchant_1');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: 'merchant_1',
+      benefitCount: { $gt: 0 }
+    });
+  });
+
+  it('handleLegacyBusinessRedirect returns 404 when the merchant cannot be indexed', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne() {
+              return null;
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/business/missing');
+
+    await handleLegacyBusinessRedirect(req as never, res as never, url, db as never, 'missing');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Merchant not found',
+      merchantId: 'missing'
+    });
   });
 
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {

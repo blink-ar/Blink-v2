@@ -5,6 +5,7 @@ import { fetchBusinessById } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
+import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -22,6 +23,28 @@ const formatCuando = (cuando?: string): string => {
     result = result.replace(new RegExp(full, 'gi'), abbr);
   });
   return result;
+};
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatLocalDateOnly = (date: Date): string => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-');
+
+const isBenefitActive = (benefit: BankBenefit, now = new Date()): boolean => {
+  const validUntil = benefit.validUntil?.trim();
+  if (!validUntil) return true;
+
+  if (DATE_ONLY_PATTERN.test(validUntil)) {
+    return validUntil >= formatLocalDateOnly(now);
+  }
+
+  const parsedTime = Date.parse(validUntil);
+  if (!Number.isFinite(parsedTime)) return false;
+
+  return parsedTime >= now.getTime();
 };
 
 
@@ -45,26 +68,70 @@ const bankAbbr = (name: string) => name.replace(/banco\s*/i, '').substring(0, 6)
 
 
 function BusinessDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id, slugId } = useParams<{ id?: string; slugId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const passedBusiness = (location.state as { business?: Business } | null)?.business;
-  const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
-  const [loading, setLoading] = useState(!passedBusiness);
+  const parsedSeoParam = parseMerchantSeoParam(slugId);
+  const routeMerchantId = parsedSeoParam?.merchantId || id || '';
+  const routePassedBusiness = passedBusiness && (!routeMerchantId || passedBusiness.id === routeMerchantId)
+    ? passedBusiness
+    : null;
+  const [business, setBusiness] = useState<Business | null>(routePassedBusiness || null);
+  const [loading, setLoading] = useState(!routePassedBusiness);
   const [error, setError] = useState<string | null>(null);
   const businessViewSignatureRef = useRef('');
+  const routePath = slugId && parsedSeoParam
+    ? `/comercios/${slugId}`
+    : routeMerchantId
+      ? `/business/${routeMerchantId}`
+      : '/business';
+  const canonicalBusinessPath = business ? getMerchantSeoPath({ id: business.id, name: business.name }) : routePath;
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
-  const businessBenefitCount = business?.benefits.length || 0;
-  const businessPath = id ? `/business/${id}` : '/business';
+
+  const sortedBenefits = useMemo(() => {
+    if (!business) return [];
+    return [...business.benefits].sort((a, b) => {
+      const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
+      const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
+      if (dB !== dA) return dB - dA;
+      return (b.installments || 0) - (a.installments || 0);
+    });
+  }, [business]);
+
+  const { activeBenefits, pastBenefits } = useMemo(() => {
+    const now = new Date();
+    return sortedBenefits.reduce(
+      (groups, benefit) => {
+        if (isBenefitActive(benefit, now)) {
+          groups.activeBenefits.push(benefit);
+        } else {
+          groups.pastBenefits.push(benefit);
+        }
+        return groups;
+      },
+      {
+        activeBenefits: [] as BankBenefit[],
+        pastBenefits: [] as BankBenefit[],
+      },
+    );
+  }, [sortedBenefits]);
+
+  const activeBenefitCount = activeBenefits.length;
+  const pastBenefitCount = pastBenefits.length;
+  const topBenefits = activeBenefits.slice(0, 2);
+  const otherBenefits = activeBenefits.slice(2);
 
   useSEO({
     title: business
       ? `${business.name}: descuentos y beneficios bancarios | Blink`
       : 'Beneficios por comercio | Blink',
     description: business
-      ? `${businessBenefitCount} beneficios activos en ${business.name} para ${businessCategory} en Argentina.`
+      ? activeBenefitCount > 0
+        ? `${activeBenefitCount} beneficios activos en ${business.name} para ${businessCategory} en Argentina.`
+        : `Consulta beneficios anteriores de ${business.name} para ${businessCategory} en Argentina.`
       : 'Consulta descuentos, topes y condiciones por comercio en Blink.',
-    path: business ? `/business/${business.id}` : businessPath,
+    path: canonicalBusinessPath,
     type: 'article',
     structuredData: business
       ? {
@@ -84,17 +151,16 @@ function BusinessDetailPage() {
   });
 
   useEffect(() => {
-    if (passedBusiness) {
-      setBusiness(passedBusiness);
+    if (routePassedBusiness) {
+      setBusiness(routePassedBusiness);
       setError(null);
       setLoading(false);
-      return;
     }
 
     let cancelled = false;
 
     const load = async () => {
-      if (!id) {
+      if (!routeMerchantId) {
         setBusiness(null);
         setError('Comercio no encontrado');
         setLoading(false);
@@ -102,22 +168,26 @@ function BusinessDetailPage() {
       }
 
       try {
-        setLoading(true);
+        setLoading(!routePassedBusiness);
         setError(null);
-        setBusiness(null);
+        if (!routePassedBusiness) {
+          setBusiness(null);
+        }
 
-        const resolvedBusiness = await fetchBusinessById(id);
+        const resolvedBusiness = await fetchBusinessById(routeMerchantId, { includeExpired: true });
         if (cancelled) return;
 
         if (resolvedBusiness) {
           setBusiness(resolvedBusiness);
-        } else {
+        } else if (!routePassedBusiness) {
           setError('Comercio no encontrado');
         }
       } catch {
         if (cancelled) return;
-        setBusiness(null);
-        setError('Error al cargar');
+        if (!routePassedBusiness) {
+          setBusiness(null);
+          setError('Error al cargar');
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -130,7 +200,16 @@ function BusinessDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, passedBusiness]);
+  }, [routeMerchantId, routePassedBusiness]);
+
+  useEffect(() => {
+    if (!business) return;
+
+    const canonicalPath = getMerchantSeoPath({ id: business.id, name: business.name });
+    if (location.pathname === canonicalPath) return;
+
+    navigate(canonicalPath, { replace: true, state: { business } });
+  }, [business, location.pathname, navigate]);
 
   useEffect(() => {
     if (!business) return;
@@ -139,19 +218,6 @@ function BusinessDetailPage() {
     businessViewSignatureRef.current = signature;
     trackSelectBusiness({ source: 'business_detail_page', businessId: business.id, category: business.category });
   }, [business]);
-
-  const sortedBenefits = useMemo(() => {
-    if (!business) return [];
-    return [...business.benefits].sort((a, b) => {
-      const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
-      const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
-      if (dB !== dA) return dB - dA;
-      return (b.installments || 0) - (a.installments || 0);
-    });
-  }, [business]);
-
-  const topBenefits = sortedBenefits.slice(0, 2);
-  const otherBenefits = sortedBenefits.slice(2);
 
   const handleBenefitSelect = (selectedBenefit: BankBenefit, position: number) => {
     if (!business) return;
@@ -235,10 +301,12 @@ function BusinessDetailPage() {
               </span>
               <span
                 className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.72)', color: '#065F46' }}
+                style={{ background: 'rgba(255,255,255,0.72)', color: activeBenefitCount > 0 ? '#065F46' : '#92400E' }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                Activo
+                <span
+                  className={`w-1.5 h-1.5 rounded-full inline-block ${activeBenefitCount > 0 ? 'bg-green-500' : 'bg-amber-500'}`}
+                />
+                {activeBenefitCount > 0 ? 'Activo' : 'Sin activos'}
               </span>
               {business.rating > 0 && (
                 <span
@@ -254,6 +322,18 @@ function BusinessDetailPage() {
         </div>
 
         <div className="px-4 pt-6 space-y-6">
+          {activeBenefitCount === 0 && pastBenefitCount > 0 && (
+            <section
+              className="bg-white rounded-2xl p-4"
+              style={{ border: '1px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+            >
+              <p className="text-sm font-semibold text-blink-ink">No hay descuentos activos ahora</p>
+              <p className="text-xs text-blink-muted mt-1">
+                Igual puedes revisar promociones anteriores de {business.name}.
+              </p>
+            </section>
+          )}
+
           {/* Top Benefits */}
           {topBenefits.length > 0 && (
             <section className="space-y-3">
@@ -411,6 +491,48 @@ function BusinessDetailPage() {
                         <p className="text-xs font-medium text-blink-muted">{formatCuando(benefit.cuando)}</p>
                         <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {pastBenefits.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-semibold text-base text-blink-ink">Beneficios anteriores</h2>
+              <div className="space-y-2">
+                {pastBenefits.map((benefit, idx) => {
+                  const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
+                  const bankAccent = getBankAccent(benefit.bankName);
+                  return (
+                    <div
+                      key={`past-${benefit.bankName}-${idx}`}
+                      onClick={() => handleBenefitSelect(benefit, activeBenefitCount + idx + 1)}
+                      className="bg-white rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer transition-all duration-150 active:scale-[0.98]"
+                      style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', opacity: 0.82 }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="text-xs font-semibold px-2 py-1 rounded-lg"
+                          style={{ background: bankAccent.bg, color: bankAccent.text }}
+                        >
+                          {bankAbbr(benefit.bankName)}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-sm text-blink-ink leading-none">
+                            {discount && parseInt(discount) > 0
+                              ? `${discount}% OFF`
+                              : benefit.installments && benefit.installments > 0
+                                ? `${benefit.installments} cuotas s/int.`
+                                : benefit.benefit}
+                          </p>
+                          <p className="text-[10px] text-blink-muted mt-0.5">
+                            {benefit.validUntil ? `Venció: ${benefit.validUntil}` : 'Promoción anterior'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
                     </div>
                   );
                 })}

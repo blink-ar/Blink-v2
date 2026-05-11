@@ -2,7 +2,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
-import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import { normalizeSearchText, slugify, tokenizeSearchText } from './search/normalize.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -39,6 +39,13 @@ function json(res, statusCode, payload) {
   res.status(statusCode);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.send(JSON.stringify(payload));
+}
+
+function redirect(res, statusCode, location) {
+  res.status(statusCode);
+  res.setHeader('Location', location);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send('');
 }
 
 // Cache-Control directives
@@ -191,6 +198,12 @@ function pickBusinessImage(asset) {
   if (asset?.imageUrl) return asset.imageUrl;
   if (asset?.logoUrl) return asset.logoUrl;
   return DEFAULT_BUSINESS_IMAGE;
+}
+
+function getMerchantSeoPathFromMerchant(merchant) {
+  const merchantId = String(merchant?.merchantId || '').trim();
+  const slug = slugify(merchant?.merchantName || '') || 'comercio';
+  return `/comercios/${slug}--${encodeURIComponent(merchantId)}`;
 }
 
 function dedupeLocations(locations) {
@@ -1996,6 +2009,42 @@ async function handleGetBusinesses(req, res, url, db) {
   });
 }
 
+async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
+  const normalizedMerchantId = String(merchantId || '').trim();
+  if (!normalizedMerchantId) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: normalizedMerchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: {
+        _id: 0,
+        merchantId: 1,
+        merchantName: 1
+      }
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: normalizedMerchantId
+    });
+  }
+
+  setCacheControl(res, CC_CONTENT);
+  return redirect(res, 301, getMerchantSeoPathFromMerchant(merchant));
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2026,6 +2075,7 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleLegacyBusinessRedirect,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2047,6 +2097,13 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/api/businesses') {
       return await handleGetBusinesses(req, res, url, db);
+    }
+
+    if (req.method === 'GET') {
+      const legacyBusinessMatch = path.match(/^\/api\/business\/([^/]+)$/);
+      if (legacyBusinessMatch) {
+        return await handleLegacyBusinessRedirect(req, res, url, db, decodeURIComponent(legacyBusinessMatch[1]));
+      }
     }
 
     if (req.method === 'GET' && path === '/api/search') {
@@ -2088,6 +2145,7 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/business/:id',
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',

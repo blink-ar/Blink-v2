@@ -17,6 +17,7 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { formatDistance } from '../utils/distance';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 interface BankDescriptor {
   token: string;
@@ -625,7 +626,7 @@ function SearchPage() {
       category: business.category,
       position,
     });
-    navigate(`/business/${business.id}`, { state: { business } });
+    navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
   };
 
   return (

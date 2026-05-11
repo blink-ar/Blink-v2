@@ -6,6 +6,10 @@
       "dest": "/api/[...path]?path=$1"
     },
     {
+      "src": "/business/([^/]+)",
+      "dest": "/api/[...path]?path=business/$1"
+    },
+    {
       "handle": "filesystem"
     },
     {

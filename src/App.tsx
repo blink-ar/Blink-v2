@@ -39,6 +39,7 @@ function App() {
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/comercios/:slugId" element={<BusinessDetailPage />} />
           <Route path="/business/:id" element={<BusinessDetailPage />} />
           <Route path="/benefit/:id/:benefitIndex?" element={<BenefitDetailPage />} />
           <Route path="/saved" element={<SavedPage />} />
