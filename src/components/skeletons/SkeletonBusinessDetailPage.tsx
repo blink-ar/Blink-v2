@@ -1,128 +1,101 @@
 import React from 'react';
 import Skeleton from '../ui/Skeleton';
 
-/**
- * Full-page skeleton for the BusinessDetailPage
- */
 const SkeletonBusinessDetailPage: React.FC = () => {
   return (
-    <div className="bg-blink-bg min-h-screen flex flex-col relative overflow-x-hidden" aria-hidden="true">
-      <main className="flex-1 pb-32">
-        {/* Hero — light indigo gradient */}
-        <div
-          className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)', minHeight: 260 }}
-        >
-          {/* Floating nav buttons */}
-          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.70)' }}
-            >
-              <Skeleton variant="circular" width={20} height={20} />
-            </div>
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.70)' }}
-            >
-              <Skeleton variant="circular" width={20} height={20} />
-            </div>
+    <div className="bg-blink-bg text-blink-ink font-body flex flex-col" style={{ height: '100dvh' }} aria-hidden="true">
+
+      {/* Header */}
+      <header className="bg-white flex-shrink-0" style={{ borderBottom: '1px solid #E8E6E1' }}>
+
+        {/* Top row */}
+        <div className="flex items-center gap-3 px-4 py-4">
+          {/* Back button */}
+          <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full">
+            <Skeleton variant="circular" width={22} height={22} />
           </div>
 
-          {/* Logo + name + badges */}
-          <div className="relative z-10 flex flex-col items-center pt-24 pb-8 px-6 text-center gap-3">
-            <Skeleton variant="rectangular" width={84} height={84} className="rounded-[22px]" />
-            <Skeleton variant="text" width={140} height={26} />
-            <div className="flex items-center gap-2">
-              <Skeleton variant="rectangular" width={80} height={28} className="rounded-full" />
-              <Skeleton variant="rectangular" width={65} height={28} className="rounded-full" />
-            </div>
+          {/* Business logo */}
+          <Skeleton
+            variant="rectangular"
+            width={64}
+            height={64}
+            className="rounded-2xl flex-shrink-0"
+          />
+
+          {/* Name / category / benefit count */}
+          <div className="flex-1 min-w-0 space-y-2">
+            <Skeleton variant="text" width={140} height={17} />
+            <Skeleton variant="text" width={80} height={12} />
+            <Skeleton variant="text" width={110} height={12} />
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="w-9 h-9 flex items-center justify-center">
+                <Skeleton variant="circular" width={22} height={22} />
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="px-4 pt-6 space-y-6">
-          {/* "Mis beneficios" heading */}
-          <div className="flex items-center gap-2 mb-1">
-            <Skeleton variant="text" width={120} height={18} />
-          </div>
+        {/* Filter pills */}
+        <div className="px-4 py-3 flex gap-2" style={{ borderTop: '1px solid #E8E6E1' }}>
+          <Skeleton variant="rectangular" width={72} height={36} className="rounded-xl flex-shrink-0" />
+          <Skeleton variant="rectangular" width={110} height={36} className="rounded-xl flex-shrink-0" />
+          <Skeleton variant="rectangular" width={90} height={36} className="rounded-xl flex-shrink-0" />
+        </div>
+      </header>
 
-          {/* Top benefit card — large, highlighted */}
-          <div
-            className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: '1.5px solid #C7D2FE', boxShadow: '0 4px 20px rgba(99,102,241,0.12)' }}
-          >
-            <div className="px-4 pt-4 pb-5" style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <Skeleton variant="rectangular" width={54} height={26} className="rounded-full" />
-                <Skeleton variant="rectangular" width={80} height={26} className="rounded-full" />
-              </div>
-              <Skeleton variant="text" width={100} height={52} className="mb-1" />
-              <Skeleton variant="text" width={80} height={14} />
-            </div>
-            <div className="px-4 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #E8E6E1' }}>
-              <div className="space-y-1">
-                <Skeleton variant="text" width={60} height={10} />
-                <Skeleton variant="text" width={100} height={16} />
-              </div>
-              <Skeleton variant="rectangular" width={90} height={32} className="rounded-xl" />
-            </div>
-          </div>
+      {/* Content */}
+      <main className="flex-1 overflow-y-auto pb-4">
+        <div className="space-y-3 pt-3 px-4">
 
-          {/* Second benefit card */}
-          <div
-            className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: '1px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
-          >
-            <div className="px-4 pt-4 pb-5" style={{ background: '#FAFAFA' }}>
-              <div className="flex items-center justify-between mb-3">
-                <Skeleton variant="rectangular" width={54} height={26} className="rounded-full" />
-                <Skeleton variant="text" width={60} height={14} />
-              </div>
-              <Skeleton variant="text" width={80} height={40} className="mb-1" />
-              <Skeleton variant="text" width={70} height={14} />
-            </div>
-            <div className="px-4 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #E8E6E1' }}>
-              <div className="space-y-1">
-                <Skeleton variant="text" width={60} height={10} />
-                <Skeleton variant="text" width={100} height={16} />
-              </div>
-              <Skeleton variant="rectangular" width={90} height={32} className="rounded-xl" />
-            </div>
-          </div>
-
-          {/* "Más beneficios" heading */}
-          <Skeleton variant="text" width={110} height={18} />
-
-          {/* Other benefit rows */}
-          {Array.from({ length: 3 }).map((_, i) => (
+          {/* Bank group cards */}
+          {[2, 3, 2].map((rowCount, gi) => (
             <div
-              key={i}
-              className="bg-white rounded-xl px-4 py-3 flex items-center justify-between"
-              style={{ border: '1px solid #E8E6E1' }}
+              key={gi}
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
             >
-              <div className="flex items-center gap-3">
-                <Skeleton variant="rectangular" width={44} height={26} className="rounded-lg" />
-                <div className="space-y-1">
-                  <Skeleton variant="text" width={90} height={14} />
-                  <Skeleton variant="text" width={60} height={10} />
+              {/* Bank header */}
+              <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#F3F4F6' }}>
+                <Skeleton variant="rectangular" width={28} height={28} className="rounded-md flex-shrink-0" />
+                <Skeleton variant="text" width={90} height={13} />
+              </div>
+
+              {/* Benefit rows */}
+              {Array.from({ length: rowCount }).map((_, ri) => (
+                <div
+                  key={ri}
+                  className="px-4 py-4"
+                  style={{ borderTop: '1px solid #E8E6E1' }}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <Skeleton variant="text" width="75%" height={15} />
+                      <Skeleton variant="text" width="50%" height={11} />
+                      <div className="flex gap-1.5">
+                        <Skeleton variant="rectangular" width={44} height={18} className="rounded-md" />
+                        <Skeleton variant="rectangular" width={100} height={18} className="rounded-md" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <div className="text-right space-y-1">
+                        <Skeleton variant="text" width={48} height={26} />
+                        <Skeleton variant="text" width={40} height={11} />
+                      </div>
+                      <Skeleton variant="circular" width={18} height={18} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <Skeleton variant="text" width={50} height={12} />
-                <Skeleton variant="circular" width={16} height={16} />
-              </div>
+              ))}
             </div>
           ))}
+
         </div>
       </main>
-
-      {/* Fixed CTA bar */}
-      <div
-        className="fixed bottom-0 left-0 w-full z-50 p-4"
-        style={{ background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #E8E6E1' }}
-      >
-        <Skeleton variant="rectangular" width="100%" height={56} className="rounded-2xl" />
-      </div>
     </div>
   );
 };

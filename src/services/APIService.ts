@@ -4,6 +4,7 @@ import { HTTPClient } from './HTTPClient';
 import { Business, BankBenefit, CanonicalLocation } from '../types';
 // Removed mockBusinesses import - using only real MongoDB data
 import { benefitsAPI } from './api';
+import { getCategoryDefaultImage } from '../utils/categoryImages';
 
 
 
@@ -311,7 +312,7 @@ export class APIService extends AbstractBaseService {
 
                     const image = getStringOrDefault(benefit.image, '') ||
                         getStringOrDefault(benefit.imagen, '') ||
-                        'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+                        getCategoryDefaultImage(category);
 
                     if (!businessMap.has(businessName)) {
                         const locations = extractLocations(benefit);

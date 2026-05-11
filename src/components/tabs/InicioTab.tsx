@@ -125,6 +125,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
           />
         </div>
       )}
+
     </div>
   );
 };

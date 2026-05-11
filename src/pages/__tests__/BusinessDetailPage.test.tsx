@@ -25,6 +25,13 @@ vi.mock('../../hooks/useSEO', () => ({
   useSEO: vi.fn()
 }));
 
+vi.mock('../../context/FavoritesContext', () => ({
+  useFavorites: () => ({
+    isFavorite: vi.fn(() => false),
+    toggleFavorite: vi.fn()
+  })
+}));
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {

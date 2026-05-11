@@ -7,3 +7,4 @@ export { default as SkeletonHomePage } from './SkeletonHomePage';
 export { default as SkeletonSearchPage } from './SkeletonSearchPage';
 export { default as SkeletonBusinessDetailPage } from './SkeletonBusinessDetailPage';
 export { default as SkeletonBenefitDetailPage } from './SkeletonBenefitDetailPage';
+export { default as SkeletonAvailableBanks } from './SkeletonAvailableBanks';

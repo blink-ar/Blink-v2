@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
-import { fetchBusinessesPaginated } from '../services/api';
+import { fetchBusinessById, fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
 import { SkeletonBenefitDetailPage } from '../components/skeletons';
 import { parseDayAvailability } from '../utils/dayAvailabilityParser';
@@ -14,6 +15,9 @@ import {
   trackUnsaveBenefit,
   trackViewBenefit,
 } from '../analytics/intentTracking';
+import { getBankAccent } from '../utils/bankColors';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { calculateDistance } from '../utils/distance';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -26,21 +30,80 @@ const BENEFIT_DAYS = [
 ];
 
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
+const LOCATIONS_PREVIEW_COUNT = 4;
 
-// Soft bank accent colors
-const getBankAccent = (name: string): { bg: string; text: string; border: string } => {
-  const lower = name.toLowerCase();
-  if (lower.includes('galicia')) return { bg: '#EEF2FF', text: '#4338CA', border: '#C7D2FE' };
-  if (lower.includes('santander')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
-  if (lower.includes('bbva')) return { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' };
-  if (lower.includes('macro')) return { bg: '#EEF2FF', text: '#78350F', border: '#C7D2FE' };
-  if (lower.includes('nacion')) return { bg: '#DBEAFE', text: '#1D4ED8', border: '#BFDBFE' };
-  if (lower.includes('hsbc')) return { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' };
-  if (lower.includes('icbc')) return { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' };
-  if (lower.includes('modo')) return { bg: '#EDE9FE', text: '#5B21B6', border: '#DDD6FE' };
-  if (lower.includes('naranja')) return { bg: '#FED7AA', text: '#9A3412', border: '#FDBA74' };
-  if (lower.includes('ciudad')) return { bg: '#D1FAE5', text: '#065F46', border: '#A7F3D0' };
-  return { bg: '#F3F4F6', text: '#374151', border: '#E5E7EB' };
+const parseBenefitIndex = (benefitIndex?: string): number => {
+  const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
+  return Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
+};
+
+const resolveBenefitSelection = (
+  business: Business,
+  benefitIndex?: string
+): { benefit: BankBenefit | null; position: number } => {
+  const safeIndex = parseBenefitIndex(benefitIndex);
+  const position = business.benefits[safeIndex] ? safeIndex : 0;
+
+  return {
+    benefit: business.benefits[position] || business.benefits[0] || null,
+    position
+  };
+};
+
+const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null> => {
+  try {
+    const exactBusiness = await fetchBusinessById(routeId);
+    if (exactBusiness) return exactBusiness;
+  } catch (error) {
+    console.error('[BenefitDetailPage] exact merchant lookup failed:', error);
+  }
+
+  const searchName = routeId.replace(/-/g, ' ');
+  const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
+
+  if (Array.isArray(response)) {
+    return response[0] || null;
+  }
+
+  return response.success && response.businesses.length > 0
+    ? response.businesses[0]
+    : null;
+};
+
+// Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
+const parseTopeAmount = (tope: unknown): number | null => {
+  if (tope == null) return null;
+  const s = String(tope).trim();
+  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
+  // Argentine format: "." = thousands separator, "," = decimal
+  const cleaned = s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+};
+
+const formatArgentinePeso = (amount: number): string =>
+  '$' + Math.round(amount).toLocaleString('es-AR');
+
+const getPaymentMethod = (benefit: BankBenefit): string | null => {
+  const tipo = (benefit.tipo || '').toLowerCase();
+  if (/cr[eé]d/i.test(tipo)) return 'Tarjeta de Crédito';
+  if (/d[eé]b/i.test(tipo)) return 'Tarjeta de Débito';
+  const allCards = [...(benefit.cardTypes || []), benefit.cardName || ''].join(' ');
+  if (/cr[eé]d/i.test(allCards)) return 'Tarjeta de Crédito';
+  if (/d[eé]b/i.test(allCards)) return 'Tarjeta de Débito';
+  return null;
+};
+
+const isPremiumCard = (cardName: string): boolean =>
+  /signature|black|infinite|platinum|select|gold/i.test(cardName);
+
+const detectCardNetwork = (cardName: string): string | null => {
+  if (/visa/i.test(cardName)) return 'VISA';
+  if (/master/i.test(cardName)) return 'MC';
+  if (/amex|american/i.test(cardName)) return 'AMEX';
+  if (/naranja/i.test(cardName)) return 'NX';
+  if (/cabal/i.test(cardName)) return 'CABAL';
+  return null;
 };
 
 function BenefitDetailPage() {
@@ -52,13 +115,15 @@ function BenefitDetailPage() {
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(!passedBusiness);
   const [error, setError] = useState<string | null>(null);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showLocations, setShowLocations] = useState(false);
-  const [showCards, setShowCards] = useState(false);
   const [benefitPosition, setBenefitPosition] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
+  const [showLocationPopup, setShowLocationPopup] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const { position: userPosition } = useGeolocation();
+  const [showTerms, setShowTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
-  const { getSubscriptionName } = useSubscriptions();
+  const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
   const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
   const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
 
@@ -88,46 +153,58 @@ function BenefitDetailPage() {
 
   useEffect(() => {
     if (passedBusiness) {
-      const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-      const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-      const resolvedIndex = passedBusiness.benefits[safeIndex] ? safeIndex : 0;
-      setBenefitPosition(resolvedIndex);
-      setBenefit(passedBusiness.benefits[resolvedIndex] || passedBusiness.benefits[0] || null);
+      const selection = resolveBenefitSelection(passedBusiness, benefitIndex);
+      setBusiness(passedBusiness);
+      setBenefitPosition(selection.position);
+      setBenefit(selection.benefit);
+      setError(null);
+      setLoading(false);
       return;
     }
 
+    let cancelled = false;
+
     const load = async () => {
-      if (!id) return;
+      if (!id) {
+        setBusiness(null);
+        setBenefit(null);
+        setError('Beneficio no encontrado');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const searchName = id.replace(/-/g, ' ');
-        const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
-        if (Array.isArray(response) && response.length > 0) {
-          const biz = response[0];
-          setBusiness(biz);
-          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
-          setBenefitPosition(resolvedIndex);
-          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
-        } else if (response.success && response.businesses.length > 0) {
-          const biz = response.businesses[0];
-          setBusiness(biz);
-          const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
-          const safeIndex = Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
-          const resolvedIndex = biz.benefits[safeIndex] ? safeIndex : 0;
-          setBenefitPosition(resolvedIndex);
-          setBenefit(biz.benefits[resolvedIndex] || biz.benefits[0] || null);
+        setError(null);
+
+        const resolvedBusiness = await fetchBusinessForRouteId(id);
+        if (cancelled) return;
+
+        if (resolvedBusiness) {
+          const selection = resolveBenefitSelection(resolvedBusiness, benefitIndex);
+          setBusiness(resolvedBusiness);
+          setBenefitPosition(selection.position);
+          setBenefit(selection.benefit);
         } else {
+          setBusiness(null);
+          setBenefit(null);
           setError('Beneficio no encontrado');
         }
       } catch {
+        if (cancelled) return;
+        setBusiness(null);
+        setBenefit(null);
         setError('Error al cargar');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
     load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, benefitIndex, passedBusiness]);
 
   useEffect(() => {
@@ -224,15 +301,22 @@ function BenefitDetailPage() {
   }
 
   const subscriptionName = getSubscriptionName(benefit.subscription);
+  const subscription = getSubscriptionById(benefit.subscription);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
-  const isOnline = business.hasOnline;
   const bankAccent = getBankAccent(benefit.bankName);
+
+  const topeStr = benefit.tope != null ? String(benefit.tope) : '';
+  const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
+  const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
+  const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
+  const paymentMethod = getPaymentMethod(benefit);
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     try {
       const d = new Date(dateStr);
-      return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+      if (isNaN(d.getTime())) return dateStr;
+      return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
     } catch {
       return dateStr;
     }
@@ -240,75 +324,111 @@ function BenefitDetailPage() {
 
   const validUntilFormatted = formatDate(benefit.validUntil);
   const dayAvailability = parseDayAvailability(benefit.cuando);
-  const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])].filter(Boolean).join('\n\n');
-  const locations = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+  const hasDayData = !!benefit.cuando;
+
+  const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const locations = (() => {
+    const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+    if (!userPosition) return valid;
+    return [...valid].sort((a, b) =>
+      calculateDistance(userPosition.latitude, userPosition.longitude, a.lat, a.lng) -
+      calculateDistance(userPosition.latitude, userPosition.longitude, b.lat, b.lng)
+    );
+  })();
+  const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
+
+  const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
+    ? benefit.cardTypes
+    : benefit.cardName ? [benefit.cardName] : []
+  ).filter((c): c is string => typeof c === 'string' && c.trim().length > 0);
 
   return (
+    <>
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       <main className="flex-1 overflow-y-auto pb-32">
 
-        {/* Hero - dark indigo (distinct from the light business page hero) */}
+        {/* Hero — bank accent color, sticky */}
         <div
-          className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)', minHeight: 240 }}
+          className="relative"
+          style={{
+            background: bankAccent.bg,
+            minHeight: 220,
+            position: 'sticky',
+            top: 0,
+            zIndex: 50,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+          }}
         >
-          {/* Floating nav buttons - glass on dark background */}
+          {/* Floating nav */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
             <button
               onClick={() => navigate(-1)}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}
+              style={{ background: 'rgba(0,0,0,0.07)', border: `1px solid ${bankAccent.border}` }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 20 }}>arrow_back</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: bankAccent.text }}>arrow_back</span>
             </button>
             <button
               onClick={handleToggleSave}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{
-                background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.25)',
+                background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(0,0,0,0.07)',
+                border: `1px solid ${isSaved ? 'transparent' : bankAccent.border}`,
               }}
             >
               <span
-                className="material-symbols-outlined text-white"
-                style={{ fontSize: 20, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
+                className="material-symbols-outlined"
+                style={{ fontSize: 20, color: isSaved ? 'white' : bankAccent.text, fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
               >
                 favorite
               </span>
             </button>
           </div>
 
-          {/* Hero content: logo + business name + bank badge */}
-          <div className="relative z-10 flex flex-col items-center pt-20 pb-8 px-6 text-center">
-            {/* Logo */}
-            <div
-              className="w-[72px] h-[72px] rounded-[20px] bg-white flex items-center justify-center overflow-hidden mb-3"
-              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.30)', border: '2px solid rgba(255,255,255,0.20)' }}
-            >
-              {business.image ? (
-                <img alt={business.name} className="w-full h-full object-contain p-1.5" src={business.image} />
-              ) : (
-                <span className="font-black text-2xl text-primary">{business.name?.charAt(0)}</span>
-              )}
+          {/* Hero content */}
+          <div className="relative z-10 flex flex-col items-center pt-20 pb-7 px-6 text-center">
+
+            {/* Business logo with bank badge overlaid */}
+            <div className="relative mb-3">
+              <div
+                className="w-[72px] h-[72px] rounded-[20px] bg-white flex items-center justify-center overflow-hidden"
+                style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.12)', border: `2px solid ${bankAccent.border}` }}
+              >
+                {business.image ? (
+                  <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
+                ) : (
+                  <span className="font-black text-2xl" style={{ color: bankAccent.text }}>{business.name?.charAt(0)}</span>
+                )}
+              </div>
+              {/* Bank badge */}
+              <div
+                className="absolute -bottom-2 -right-2 w-[26px] h-[26px] rounded-full flex items-center justify-center"
+                style={{ background: bankAccent.text, border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
+              >
+                <span className="font-black text-white" style={{ fontSize: 8, letterSpacing: '-0.02em' }}>
+                  {benefit.bankName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
+                </span>
+              </div>
             </div>
 
-            {/* Business name */}
-            <h1 className="font-black text-[20px] text-white leading-tight mb-2.5">{business.name}</h1>
+            <h1 className="font-black text-[20px] leading-tight mb-2.5" style={{ color: bankAccent.text }}>
+              {business.name}
+            </h1>
 
-            {/* Bank + card badge + subscription — glass style on dark bg */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
               <span
-                className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
-                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                className="px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ background: bankAccent.text, color: 'white' }}
               >
                 {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
               {subscriptionName && (
                 <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold text-white/90"
-                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                  className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: bankAccent.border, color: bankAccent.text }}
                 >
                   {subscriptionName}
                 </span>
@@ -319,241 +439,312 @@ function BenefitDetailPage() {
 
         <div className="p-4 space-y-3">
 
-        {/* Main Benefit Card */}
-        <div
-          className="bg-white rounded-2xl overflow-hidden"
-          style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
-        >
-          {/* Discount hero — white, clear contrast from the indigo hero above */}
-          <div className="flex flex-col items-center text-center px-6 pt-8 pb-7 bg-white">
-            {discount > 0 ? (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Descuento</p>
-                <div className="flex items-end gap-1 leading-none">
-                  <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{discount}</span>
-                  <div className="flex flex-col items-start mb-1">
-                    <span className="font-black leading-none" style={{ fontSize: 34, color: '#818CF8' }}>%</span>
-                    <span className="font-bold text-[11px] tracking-[0.14em] uppercase text-blink-muted">OFF</span>
-                  </div>
-                </div>
-                {benefit.installments != null && benefit.installments > 0 && (
-                  <p className="text-xs font-semibold mt-3" style={{ color: '#059669' }}>+ {benefit.installments} cuotas sin interés</p>
-                )}
-                <p className="text-xs font-medium mt-2 text-blink-muted">
-                  {!benefit.tope || String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
-                </p>
-              </>
-            ) : benefit.installments && benefit.installments > 0 ? (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Cuotas sin interés</p>
-                <div className="flex items-end gap-2 leading-none">
-                  <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{benefit.installments}</span>
-                  <span className="font-bold mb-1" style={{ fontSize: 28, color: '#818CF8' }}>x</span>
-                </div>
-                <p className="text-xs font-medium mt-3 text-blink-muted">sin interés</p>
-                {benefit.tope && (
-                  <p className="text-xs font-medium mt-2 text-blink-muted">
-                    {String(benefit.tope).toUpperCase().includes('SIN TOPE') ? 'Sin tope de reintegro' : `Tope: ${benefit.tope}`}
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-4 text-blink-muted">Beneficio</p>
-                <p className="font-bold text-blink-ink text-lg leading-snug">{benefit.benefit}</p>
-              </>
-            )}
+          {/* ── Discount hero card ── */}
+          <div
+            className="bg-white rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+          >
+            <div className="flex flex-col items-center text-center px-6 pt-7 pb-7">
+              {/* Benefit title */}
+              <p className="text-sm font-medium text-blink-muted mb-4">{benefit.benefit}</p>
 
-            {/* Bank + card badges */}
-            <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
-              <span
-                className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ background: bankAccent.bg, color: bankAccent.text, border: `1px solid ${bankAccent.border}` }}
-              >
-                {benefit.bankName}
-              </span>
-              {(benefit.cardTypes && benefit.cardTypes.length > 0
-                ? benefit.cardTypes
-                : benefit.cardName ? [benefit.cardName] : []
-              ).map((card, i) => (
-                <span
-                  key={i}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
-                  style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
-                >
-                  {card.replace(/ any$/i, '')}
-                </span>
-              ))}
-              {subscriptionName && (
-                <span
-                  className="px-3 py-1.5 rounded-full text-xs font-medium text-blink-muted"
-                  style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
-                >
-                  {subscriptionName}
-                </span>
+              {discount > 0 ? (
+                <>
+                  <div className="flex items-end gap-1 leading-none">
+                    <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{discount}</span>
+                    <div className="flex flex-col items-start mb-1">
+                      <span className="font-black leading-none" style={{ fontSize: 34, color: '#818CF8' }}>%</span>
+                      <span className="font-bold text-[11px] tracking-[0.14em] uppercase text-blink-muted">OFF</span>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium text-blink-muted mt-3">de ahorro</p>
+                  {benefit.installments != null && benefit.installments > 0 && (
+                    <p className="text-xs font-semibold mt-2" style={{ color: '#059669' }}>
+                      + {benefit.installments} cuotas sin interés
+                    </p>
+                  )}
+                </>
+              ) : benefit.installments && benefit.installments > 0 ? (
+                <>
+                  <div className="flex items-end gap-2 leading-none">
+                    <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{benefit.installments}</span>
+                    <span className="font-bold mb-1" style={{ fontSize: 28, color: '#818CF8' }}>x</span>
+                  </div>
+                  <p className="text-sm font-medium text-blink-muted mt-3">cuotas sin interés</p>
+                </>
+              ) : (
+                <p className="font-bold text-blink-ink text-lg leading-snug">{benefit.benefit}</p>
               )}
             </div>
           </div>
 
-{/* Days availability */}
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid #E8E6E1' }}>
-            <p className="text-[10px] font-semibold text-blink-muted uppercase tracking-wide mb-2.5">Días de vigencia</p>
-            <div className="flex gap-1.5">
-              {BENEFIT_DAYS.map((day) => {
-                const isActive = dayAvailability?.allDays || dayAvailability?.[day.key] || false;
-                return (
-                  <div
-                    key={day.key}
-                    className="flex-1 h-8 flex items-center justify-center rounded-xl font-semibold text-xs transition-all"
-                    style={
-                      isActive
-                        ? { background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', color: 'white' }
-                        : { background: '#F3F4F6', color: '#9CA3AF' }
-                    }
-                  >
-                    {day.abbr}
+          {/* ── Condiciones card ── */}
+          <div
+            className="bg-white rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+          >
+            <div className="px-5 pt-5 pb-4">
+              <p className="font-bold text-[15px] text-blink-ink mb-3">Condiciones</p>
+
+              <div className="divide-y divide-blink-border">
+
+                {/* Tope descuento */}
+                {!isNoLimit && benefit.tope && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Tope descuento</span>
+                    <span className="text-sm font-semibold text-blink-ink">{benefit.tope}</span>
                   </div>
-                );
-              })}
+                )}
+
+                {/* Max spend to maximize discount */}
+                {maxSpend && (
+                  <div className="flex items-start justify-between gap-4 py-3">
+                    <span className="text-sm text-blink-muted leading-snug flex-1">
+                      Aprovechá el descuento al máximo gastando hasta
+                    </span>
+                    <span className="text-sm font-semibold flex-shrink-0 flex items-center gap-1" style={{ color: '#6366F1' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>info</span>
+                      {formatArgentinePeso(maxSpend)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Vigencia */}
+                {validUntilFormatted && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Vigencia</span>
+                    <span className="text-sm font-semibold text-blink-ink">hasta {validUntilFormatted}</span>
+                  </div>
+                )}
+
+                {/* Pagando con */}
+                {paymentMethod && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Pagando con</span>
+                    <span className="text-sm font-semibold text-blink-ink">{paymentMethod}</span>
+                  </div>
+                )}
+
+                {/* Días disponible */}
+                {hasDayData && dayAvailability && (
+                  <div className="flex items-center justify-between py-3 gap-3">
+                    <span className="text-sm text-blink-muted flex-shrink-0">Días disponible</span>
+                    <div className="flex gap-1">
+                      {BENEFIT_DAYS.map((day) => {
+                        const isActive = dayAvailability.allDays || dayAvailability[day.key] || false;
+                        return (
+                          <div
+                            key={day.key}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg font-semibold text-[11px]"
+                            style={
+                              isActive
+                                ? { background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', color: 'white' }
+                                : { background: '#F3F4F6', color: '#9CA3AF' }
+                            }
+                          >
+                            {day.abbr}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Benefit description */}
+              {benefit.description ? (
+                <div className="mt-4 pt-4" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  <p className="text-sm text-blink-muted leading-relaxed">{benefit.description}</p>
+                </div>
+              ) : null}
+
+              <p className="text-xs text-blink-muted mt-4 leading-relaxed">
+                El beneficio puede tener condiciones o restricciones especiales no listadas aquí.
+              </p>
             </div>
           </div>
 
-          {/* Description */}
-          {benefit.description && (
-            <div className="px-5 py-4" style={{ borderBottom: '1px solid #E8E6E1' }}>
-              <p className="text-sm text-blink-ink leading-relaxed">{benefit.description}</p>
+          {/* ── Accede al beneficio ── */}
+          {(cards.length > 0 || subscription) && (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <div className="px-5 pt-5 pb-5">
+                <p className="font-bold text-[15px] text-blink-ink mb-1">Accede al beneficio</p>
+                <p className="text-xs text-blink-muted mb-4">Con tus tarjetas de {benefit.bankName}:</p>
+
+                <div className="space-y-2.5">
+                  {cards.map((card, i) => {
+                    const cardClean = String(card ?? '').replace(/ any$/i, '');
+                    const dark = isPremiumCard(cardClean);
+                    const network = detectCardNetwork(cardClean) || detectCardNetwork(benefit.bankName);
+
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+                        style={{
+                          background: dark ? '#1C1C1E' : '#F9FAFB',
+                          border: dark ? 'none' : '1px solid #E8E6E1',
+                        }}
+                      >
+                        {network && (
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0"
+                            style={{
+                              background: dark ? 'rgba(255,255,255,0.12)' : bankAccent.bg,
+                              color: dark ? 'rgba(255,255,255,0.85)' : bankAccent.text,
+                              letterSpacing: '0.04em',
+                            }}
+                          >
+                            {network}
+                          </span>
+                        )}
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: dark ? 'white' : '#1C1C1E' }}
+                        >
+                          {cardClean}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Subscription entry */}
+                  {subscription && (
+                    <>
+                      {cards.length > 0 && (
+                        <div className="pt-1 pb-0.5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted">
+                            Membresía requerida
+                          </p>
+                        </div>
+                      )}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+                        style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
+                      >
+                        {subscription.icon ? (
+                          <img
+                            src={subscription.icon}
+                            alt={subscription.name}
+                            className="w-6 h-6 rounded object-contain flex-shrink-0"
+                          />
+                        ) : (
+                          <span
+                            className="material-symbols-outlined flex-shrink-0"
+                            style={{ fontSize: 18, color: bankAccent.text }}
+                          >
+                            loyalty
+                          </span>
+                        )}
+                        <span className="text-sm font-medium text-blink-ink">{subscription.name}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="px-5 py-4 flex items-center justify-between">
-            <p className="text-[10px] text-blink-muted italic">* Por transacción. Consultá bases legales.</p>
-            {validUntilFormatted && (
-              <span className="text-[10px] font-medium text-blink-muted">Válido hasta {validUntilFormatted}</span>
-            )}
-          </div>
-        </div>
+          {/* ── Savings Simulator ── */}
+          {discount > 0 && (
+            <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
+          )}
 
-        {/* Savings Simulator */}
-        {discount > 0 && (
-          <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
-        )}
-
-        {/* Expandable sections */}
-        <div className="space-y-2">
-          {/* Terms */}
-          <div
-            className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: '1px solid #E8E6E1' }}
-          >
-            <button
-              onClick={() => setShowTerms(!showTerms)}
-              className="w-full px-4 py-3.5 flex justify-between items-center text-left"
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: '#EEF2FF' }}
-                >
-                  <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
-                </div>
-                <span className="font-semibold text-sm text-blink-ink">Términos y condiciones</span>
-              </div>
-              <span
-                className="material-symbols-outlined text-blink-muted transition-transform duration-200"
-                style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
-              >
-                expand_more
-              </span>
-            </button>
-            {showTerms && termsText && (
-              <div className="px-4 pb-4 pt-0" style={{ borderTop: '1px solid #E8E6E1' }}>
-                <p className="text-xs text-blink-muted leading-relaxed whitespace-pre-wrap pt-3">{termsText}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Locations */}
-          <div
-            className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: '1px solid #E8E6E1' }}
-          >
-            <button
-              onClick={() => setShowLocations(!showLocations)}
-              className="w-full px-4 py-3.5 flex justify-between items-center text-left"
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: '#F0FDF4' }}
-                >
-                  <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 16 }}>storefront</span>
-                </div>
-                <span className="font-semibold text-sm text-blink-ink">Sucursales adheridas</span>
-              </div>
-              <span
-                className="material-symbols-outlined text-blink-muted transition-transform duration-200"
-                style={{ fontSize: 20, transform: showLocations ? 'rotate(180deg)' : 'none' }}
-              >
-                expand_more
-              </span>
-            </button>
-            {showLocations && locations.length > 0 && (
-              <div className="px-4 pb-4 pt-0 space-y-2" style={{ borderTop: '1px solid #E8E6E1' }}>
-                {locations.map((loc, i) => (
-                  <div key={i} className="flex items-start gap-2 pt-3 border-b border-blink-border pb-2 last:border-0">
-                    <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 14, marginTop: 1 }}>location_on</span>
-                    <p className="text-xs text-blink-muted leading-snug">
-                      {loc.formattedAddress || 'Dirección no disponible'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Card types */}
-          {(benefit.cardTypes && benefit.cardTypes.length > 0) && (
+          {/* ── Disponible en ── */}
+          {locations.length > 0 && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
-              style={{ border: '1px solid #E8E6E1' }}
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <div className="px-5 pt-5 pb-3">
+                <p className="font-bold text-[15px] text-blink-ink mb-1">Disponible en:</p>
+
+                <div className="divide-y divide-blink-border">
+                  {displayLocations.map((loc, i) => {
+                    const streetLine = loc.addressComponents?.route
+                      ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ' ' + loc.addressComponents.streetNumber : ''}`
+                      : loc.name || (loc.formattedAddress?.split(',')[0] ?? 'Dirección no disponible');
+
+                    const cityLine = loc.addressComponents
+                      ? [
+                          loc.addressComponents.locality,
+                          loc.addressComponents.adminAreaLevel1,
+                          loc.addressComponents.country,
+                        ].filter(Boolean).join(', ')
+                      : loc.formattedAddress ?? '';
+
+                    return (
+                      <div key={i} className="flex items-start gap-3 py-3">
+                        <span
+                          className="material-symbols-outlined flex-shrink-0 mt-0.5"
+                          style={{ fontSize: 18, color: '#9CA3AF' }}
+                        >
+                          location_on
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-blink-ink leading-tight">{streetLine}</p>
+                          {cityLine && (
+                            <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {locations.length > LOCATIONS_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => { setLocationSearch(''); setShowLocationSearch(false); setShowLocationPopup(true); }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+                    style={{ background: '#EEF2FF', color: '#6366F1' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
+                    Ver las {locations.length} ubicaciones
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Términos y condiciones ── */}
+          {termsText ? (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
             >
               <button
-                onClick={() => setShowCards(!showCards)}
-                className="w-full px-4 py-3.5 flex justify-between items-center text-left"
+                onClick={() => setShowTerms(!showTerms)}
+                className="w-full px-5 py-4 flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ background: '#EEF2FF' }}
-                  >
-                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>credit_card</span>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
                   </div>
-                  <span className="font-semibold text-sm text-blink-ink">Tarjetas adheridas</span>
+                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
                 </div>
                 <span
-                  className="material-symbols-outlined text-blink-muted transition-transform duration-200"
-                  style={{ fontSize: 20, transform: showCards ? 'rotate(180deg)' : 'none' }}
+                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
+                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
                 >
                   expand_more
                 </span>
               </button>
-              {showCards && (
-                <div className="px-4 pb-4 pt-0 space-y-2" style={{ borderTop: '1px solid #E8E6E1' }}>
-                  {benefit.cardTypes.map((card, i) => (
-                    <div key={i} className="flex items-center gap-2 pt-3 border-b border-blink-border pb-2 last:border-0">
-                      <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 14 }}>credit_card</span>
-                      <p className="text-xs text-blink-muted leading-snug">{card.replace(/ any$/i, '')}</p>
-                    </div>
-                  ))}
+              {showTerms && (
+                <div className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>
                 </div>
               )}
             </div>
-          )}
+          ) : null}
+
         </div>
-        </div>{/* close p-4 space-y-3 */}
       </main>
 
-      {/* Fixed Bottom CTA */}
+      {/* Fixed bottom CTA */}
       <div
         className="fixed bottom-0 left-0 right-0 p-4 flex gap-3 z-20"
         style={{
@@ -578,6 +769,153 @@ function BenefitDetailPage() {
         </button>
       </div>
     </div>
+
+    {/* ── Locations popup — portal to escape any stacking context ── */}
+    {showLocationPopup && createPortal(
+      <div
+        className="fixed inset-0 z-[200] bg-black/50"
+        onClick={() => setShowLocationPopup(false)}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
+          style={{ borderRadius: '20px 20px 0 0', maxHeight: '65vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
+            <div>
+              <h3 className="font-semibold text-base text-blink-ink">Todas las ubicaciones</h3>
+              <p className="text-xs text-blink-muted mt-0.5">
+                {locations.length} sucursales
+                {userPosition ? ' · ordenadas por cercanía' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (showLocationSearch) { setLocationSearch(''); }
+                  setShowLocationSearch(!showLocationSearch);
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors text-base"
+              >
+                🔍
+              </button>
+              <button
+                onClick={() => setShowLocationPopup(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Collapsible search bar */}
+          {showLocationSearch && (
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
+              <div className="relative">
+                <span
+                  className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted"
+                  style={{ fontSize: 18 }}
+                >
+                  search
+                </span>
+                <input
+                  autoFocus
+                  className="w-full h-10 bg-blink-bg border border-blink-border rounded-xl pl-9 pr-9 text-sm text-blink-ink placeholder-blink-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="Buscar por dirección o nombre..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                />
+                {locationSearch && (
+                  <button
+                    onClick={() => setLocationSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blink-muted"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Location list */}
+          <div className="flex-1 overflow-y-auto divide-y divide-blink-border">
+            {(() => {
+              const q = locationSearch.trim().toLowerCase();
+              const filtered = q
+                ? locations.filter((loc) =>
+                    (loc.name || '').toLowerCase().includes(q) ||
+                    (loc.formattedAddress || '').toLowerCase().includes(q)
+                  )
+                : locations;
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-blink-muted text-sm">
+                    Sin resultados para "{locationSearch}"
+                  </div>
+                );
+              }
+
+              return filtered.map((loc, i) => {
+                const streetLine = loc.addressComponents?.route
+                  ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ' ' + loc.addressComponents.streetNumber : ''}`
+                  : loc.name || (loc.formattedAddress?.split(',')[0] ?? 'Dirección no disponible');
+
+                const cityLine = loc.addressComponents
+                  ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
+                  : loc.formattedAddress ?? '';
+
+                const dist = userPosition
+                  ? calculateDistance(userPosition.latitude, userPosition.longitude, loc.lat, loc.lng)
+                  : null;
+
+                const isNearest = !q && userPosition && i === 0;
+
+                return (
+                  <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                    <div
+                      className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: '#F3F4F6' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6B7280' }}>
+                        location_on
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-sm font-medium text-blink-ink leading-tight truncate">{streetLine}</p>
+                        {isNearest && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                            Más cercana
+                          </span>
+                        )}
+                      </div>
+                      {cityLine && (
+                        <p className="text-xs text-blink-muted">{cityLine}</p>
+                      )}
+                    </div>
+                    {dist !== null && (
+                      <span className="text-xs font-semibold flex-shrink-0 mt-0.5 text-blink-muted">
+                        {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
+                      </span>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+            <div className="h-6" />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }
 
