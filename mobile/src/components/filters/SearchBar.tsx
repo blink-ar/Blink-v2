@@ -35,13 +35,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           placeholderTextColor={colors.gray[400]}
           autoCapitalize="none"
           autoCorrect={false}
-          keyboardAppearance="light"
           returnKeyType="search"
-          blurOnSubmit={true}
-          onSubmitEditing={() => {
-            inputRef.current?.blur();
-            Keyboard.dismiss();
-          }}
+          submitBehavior="blurAndSubmit"
+          onSubmitEditing={() => inputRef.current?.blur()}
         />
         {showFilter && (
           <TouchableOpacity
