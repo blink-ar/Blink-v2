@@ -13,7 +13,6 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   loginWithGoogle: () => void;
-  loginWithApple: () => void;
   loginWithEmail: (email: string) => void;
   loginWithPasskey: () => void;
   logout: () => void;
@@ -27,8 +26,7 @@ const LOGOUT_URL = window.location.origin;
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user: auth0User, isLoading, isAuthenticated, loginWithRedirect, logout: auth0Logout } = useAuth0();
 
-  const user: AuthUser | null = auth0User
-    ? {
+  const user: AuthUser | null = auth0User ? {
         id: auth0User.sub ?? '',
         name: auth0User.name ?? auth0User.email ?? '',
         email: auth0User.email ?? '',
@@ -40,15 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loginWithRedirect({
       authorizationParams: {
         connection: 'google-oauth2',
-        redirect_uri: CALLBACK_URL,
-      },
-    });
-  }, [loginWithRedirect]);
-
-  const loginWithApple = useCallback(() => {
-    loginWithRedirect({
-      authorizationParams: {
-        connection: 'apple',
         redirect_uri: CALLBACK_URL,
       },
     });
@@ -78,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [auth0Logout]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, loginWithGoogle, loginWithApple, loginWithEmail, loginWithPasskey, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, loginWithGoogle, loginWithEmail, loginWithPasskey, logout }}>
       {children}
     </AuthContext.Provider>
   );
