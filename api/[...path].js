@@ -3,6 +3,18 @@ import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
 import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import {
+  getMerchantSeoPathFromMerchant,
+  parseMerchantSeoSlugId,
+  readViteAppShell,
+  renderMerchantSeoHtml
+} from './merchant-seo.js';
+import {
+  getCategorySeoPath as getCategoryPagePath,
+  loadCategorySeoData,
+  renderCategorySeoHtml,
+  resolveSeoCategory
+} from './category-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -16,6 +28,43 @@ const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+const MERCHANT_SEO_PROJECTION = {
+  _id: 0,
+  merchantId: 1,
+  merchantName: 1,
+  merchantKey: 1,
+  categories: 1,
+  banks: 1,
+  locations: 1,
+  hasOnlineBenefits: 1,
+  benefitCount: 1,
+  activeBenefitCount: 1,
+  maxDiscountPercentage: 1,
+  searchProfile: 1,
+  imageUrl: 1,
+  logoUrl: 1,
+  coverUrl: 1,
+  isActive: 1
+};
+const BENEFIT_SUMMARY_PROJECTION = {
+  _id: 1,
+  id: 1,
+  merchantId: 1,
+  bank: 1,
+  benefitTitle: 1,
+  availableDays: 1,
+  discountPercentage: 1,
+  caps: 1,
+  online: 1,
+  otherDiscounts: 1,
+  installments: 1,
+  description: 1,
+  termsAndConditions: 1,
+  link: 1,
+  validUntil: 1,
+  cardTypes: 1,
+  subscription: 1
+};
 
 const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
@@ -41,6 +90,19 @@ function json(res, statusCode, payload) {
   res.send(JSON.stringify(payload));
 }
 
+function redirect(res, statusCode, location) {
+  res.status(statusCode);
+  res.setHeader('Location', location);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send('');
+}
+
+function html(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(payload);
+}
+
 // Cache-Control directives
 const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
 const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
@@ -48,6 +110,15 @@ const CC_LOCATION = 'private, max-age=60';                                      
 
 function setCacheControl(res, directive) {
   res.setHeader('Cache-Control', directive);
+}
+
+function getCanonicalSiteUrl(url) {
+  const configuredSiteUrl = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').trim().replace(/\/$/, '');
+  return configuredSiteUrl || url.origin.replace(/\/$/, '');
+}
+
+function isReadMethod(req) {
+  return req.method === 'GET' || req.method === 'HEAD';
 }
 
 /**
@@ -80,11 +151,11 @@ function getParsedUrl(req) {
 }
 
 function resolveRequestPath(url) {
-  if (url.pathname !== '/api/[...path]') {
+  const rewrittenPath = url.searchParams.get('path');
+  if (!rewrittenPath && url.pathname !== '/api/[...path]') {
     return url.pathname;
   }
 
-  const rewrittenPath = url.searchParams.get('path');
   if (!rewrittenPath) {
     return '/api';
   }
@@ -1777,26 +1848,6 @@ async function handleGetBusinesses(req, res, url, db) {
     logoUrl: 1,
     coverUrl: 1
   };
-  const benefitSummaryProjection = {
-    _id: 1,
-    id: 1,
-    merchantId: 1,
-    bank: 1,
-    benefitTitle: 1,
-    availableDays: 1,
-    discountPercentage: 1,
-    caps: 1,
-    online: 1,
-    otherDiscounts: 1,
-    installments: 1,
-    description: 1,
-    termsAndConditions: 1,
-    link: 1,
-    validUntil: 1,
-    cardTypes: 1,
-    subscription: 1
-  };
-
   let pagedMerchants = [];
   if (hasLocation) {
     try {
@@ -1936,7 +1987,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const rawBenefits = merchantIds.length > 0
     ? await db.collection(collectionName)
-      .find(benefitQuery, { projection: benefitSummaryProjection })
+      .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
       .sort({ bank: 1, benefitTitle: 1 })
       .toArray()
     : [];
@@ -1996,6 +2047,156 @@ async function handleGetBusinesses(req, res, url, db) {
   });
 }
 
+async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
+  const parsed = parseMerchantSeoSlugId(slugId);
+  if (!parsed) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: parsed.merchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: MERCHANT_SEO_PROJECTION
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: parsed.merchantId
+    });
+  }
+
+  const canonicalPath = getMerchantSeoPathFromMerchant(merchant);
+  if (`/comercios/${slugId}` !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const rawBenefits = await db.collection(DEFAULT_COLLECTION)
+    .find(
+      {
+        merchantId: parsed.merchantId
+      },
+      {
+        projection: BENEFIT_SUMMARY_PROJECTION
+      }
+    )
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderMerchantSeoHtml({
+    appShell,
+    merchant,
+    benefits,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    now: options.now || new Date()
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
+async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
+  const normalizedMerchantId = String(merchantId || '').trim();
+  if (!normalizedMerchantId) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: normalizedMerchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: {
+        _id: 0,
+        merchantId: 1,
+        merchantName: 1
+      }
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: normalizedMerchantId
+    });
+  }
+
+  setCacheControl(res, CC_CONTENT);
+  return redirect(res, 301, getMerchantSeoPathFromMerchant(merchant));
+}
+
+async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam, options = {}) {
+  const category = resolveSeoCategory(categoryParam);
+  if (!category) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category not found',
+      category: categoryParam
+    });
+  }
+
+  const parsedPage = Number.parseInt(String(pageParam || '1'), 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const canonicalPath = getCategoryPagePath(category, page);
+  const requestedPath = pageParam
+    ? `/categorias/${categoryParam}/page/${pageParam}`
+    : `/categorias/${categoryParam}`;
+
+  if (requestedPath !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const data = await loadCategorySeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    category,
+    page
+  });
+
+  if (data.outOfRange) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category page not found',
+      category: category.slug,
+      page
+    });
+  }
+
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderCategorySeoHtml({
+    appShell,
+    category,
+    merchants: data.merchants,
+    total: data.total,
+    page: data.page,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2023,9 +2224,13 @@ async function handlePlaceDetails(req, res) {
 export {
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
+  resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleCategorySeoPage,
+  handleLegacyBusinessRedirect,
+  handleMerchantSeoPage,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2047,6 +2252,30 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/api/businesses') {
       return await handleGetBusinesses(req, res, url, db);
+    }
+
+    if (isReadMethod(req)) {
+      const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
+      if (categorySeoMatch) {
+        return await handleCategorySeoPage(
+          req,
+          res,
+          url,
+          db,
+          decodeURIComponent(categorySeoMatch[1]),
+          categorySeoMatch[2] ? decodeURIComponent(categorySeoMatch[2]) : undefined
+        );
+      }
+
+      const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
+      if (merchantSeoMatch) {
+        return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
+      }
+
+      const legacyBusinessMatch = path.match(/^\/api\/business\/([^/]+)$/);
+      if (legacyBusinessMatch) {
+        return await handleLegacyBusinessRedirect(req, res, url, db, decodeURIComponent(legacyBusinessMatch[1]));
+      }
     }
 
     if (req.method === 'GET' && path === '/api/search') {
@@ -2088,6 +2317,10 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/categorias/:category',
+        'GET /api/categorias/:category/page/:page',
+        'GET /api/comercios/:slugId',
+        'GET /api/business/:id',
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',

@@ -14,6 +14,7 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
@@ -878,7 +879,7 @@ function MapPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       trackSelectBusiness({ source: 'map_list_open_business', businessId: biz.id, category: biz.category, position: idx + 1 });
-                      navigate(`/business/${biz.id}`, { state: { business: biz } });
+                      navigate(getMerchantSeoPath({ id: biz.id, name: biz.name }), { state: { business: biz } });
                     }}
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95"
                     style={{ background: '#EEF2FF', color: '#4338CA' }}

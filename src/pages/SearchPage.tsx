@@ -21,6 +21,7 @@ import {
 import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -175,8 +176,8 @@ function SearchPage() {
   const strictMatches = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
     if (!term) return enrichedBusinesses;
-    return enrichedBusinesses.filter((b) => 
-      b.name.toLowerCase().includes(term) || 
+    return enrichedBusinesses.filter((b) =>
+      b.name.toLowerCase().includes(term) ||
       (b as any).aliases?.some((a: string) => a.toLowerCase().includes(term))
     );
   }, [enrichedBusinesses, debouncedSearch]);
@@ -363,7 +364,7 @@ function SearchPage() {
         offset: pageParam,
         category: matchedCategory,
         bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
-        ...(sortByDistance && position 
+        ...(sortByDistance && position
           ? { lat: position.latitude, lng: position.longitude }
           : position ? { geohash: encodeGeohash(position.latitude, position.longitude) } : {}),
       }),
@@ -664,7 +665,7 @@ function SearchPage() {
       category: business.category,
       position,
     });
-    navigate(`/business/${business.id}`, { state: { business } });
+    navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
   };
 
   return (
@@ -1277,7 +1278,7 @@ function SearchPage() {
             <h2 className="mb-4 font-bold text-lg text-blink-ink">
               {relatedCategoryLabel ? `Más en ${relatedCategoryLabel}` : 'Más opciones relacionadas'}
             </h2>
-            
+
             <div className="space-y-3">
               {isRelatedLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
@@ -1308,7 +1309,7 @@ function SearchPage() {
                           category: business.category,
                           position: index,
                         });
-                        navigate(`/business/${business.id}`, { state: { business } });
+                        navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
                       }}
                       className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
                       style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
@@ -1399,7 +1400,7 @@ function SearchPage() {
 
             {/* Infinite scroll sentinel for related category */}
             <div ref={relatedSentinelRef} className="h-px mt-4" aria-hidden="true" />
-            
+
             {/* Loading more indicator for related */}
             {isRelatedFetchingMore && (
               <div className="flex justify-center py-4">

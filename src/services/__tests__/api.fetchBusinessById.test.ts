@@ -13,7 +13,7 @@ describe('fetchBusinessById', () => {
     vi.unstubAllGlobals();
   });
 
-  it('requests the businesses endpoint with an exact merchantId instead of a search query', async () => {
+  it('requests the businesses endpoint with an exact merchantId and optional expired benefits', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -53,13 +53,14 @@ describe('fetchBusinessById', () => {
       })
     });
 
-    const business = await fetchBusinessById('merchant_1');
+    const business = await fetchBusinessById('merchant_1', { includeExpired: true });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     const requestUrl = new URL(String(mockFetch.mock.calls[0][0]), 'https://example.com');
     expect(requestUrl.pathname).toBe('/api/businesses');
     expect(requestUrl.searchParams.get('merchantId')).toBe('merchant_1');
+    expect(requestUrl.searchParams.get('includeExpired')).toBe('true');
     expect(requestUrl.searchParams.get('search')).toBeNull();
     expect(business?.id).toBe('merchant_1');
     expect(business?.location).toHaveLength(1);
