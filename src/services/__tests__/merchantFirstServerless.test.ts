@@ -6,6 +6,7 @@ import {
   handleGetBusinesses,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
+  resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
 
@@ -63,6 +64,11 @@ function createAggregateCursor<T>(data: T[]) {
 }
 
 describe('merchant-first serverless helpers', () => {
+  it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
+    expect(resolveRequestPath(new URL('https://example.com/comercios/coto--merchant_1?path=comercios/coto--merchant_1'))).toBe('/api/comercios/coto--merchant_1');
+    expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
+  });
+
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
     const benefit = {
       id: 'benefit-1',

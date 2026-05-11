@@ -141,11 +141,11 @@ function getParsedUrl(req) {
 }
 
 function resolveRequestPath(url) {
-  if (url.pathname !== '/api/[...path]') {
+  const rewrittenPath = url.searchParams.get('path');
+  if (!rewrittenPath && url.pathname !== '/api/[...path]') {
     return url.pathname;
   }
 
-  const rewrittenPath = url.searchParams.get('path');
   if (!rewrittenPath) {
     return '/api';
   }
@@ -2161,6 +2161,7 @@ async function handlePlaceDetails(req, res) {
 export {
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
+  resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
