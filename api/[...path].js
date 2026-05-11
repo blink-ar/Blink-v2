@@ -1455,12 +1455,6 @@ async function handleLogin(req, res) {
   });
 }
 
-function redirect(res, location) {
-  res.status(302);
-  res.setHeader('Location', location);
-  res.end();
-}
-
 async function handleGoogleAuth(req, res) {
   if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google OAuth no configurado' });
   const params = new URLSearchParams({
@@ -1472,7 +1466,7 @@ async function handleGoogleAuth(req, res) {
     access_type: 'online',
     prompt: 'select_account'
   });
-  return redirect(res, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  return redirect(res, 302, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 }
 
 async function handleGoogleCallback(req, res, url) {
@@ -1481,7 +1475,7 @@ async function handleGoogleCallback(req, res, url) {
   const errorParam = url.searchParams.get('error');
 
   if (errorParam || !code || !verifyOAuthState(state)) {
-    return redirect(res, `${APP_URL}/auth/callback?error=acceso_denegado`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
   }
 
   try {
@@ -1513,10 +1507,10 @@ async function handleGoogleCallback(req, res, url) {
     });
 
     const token = signJwt({ sub: user._id.toString(), email: user.email });
-    return redirect(res, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
   } catch (err) {
     console.error('[OAuth] Google callback error:', err);
-    return redirect(res, `${APP_URL}/auth/callback?error=error_de_servidor`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
   }
 }
 
@@ -1529,7 +1523,7 @@ async function handleFacebookAuth(req, res) {
     scope: 'email,public_profile',
     state: buildOAuthState()
   });
-  return redirect(res, `https://www.facebook.com/v19.0/dialog/oauth?${params}`);
+  return redirect(res, 302, `https://www.facebook.com/v19.0/dialog/oauth?${params}`);
 }
 
 async function handleFacebookCallback(req, res, url) {
@@ -1538,7 +1532,7 @@ async function handleFacebookCallback(req, res, url) {
   const errorParam = url.searchParams.get('error');
 
   if (errorParam || !code || !verifyOAuthState(state)) {
-    return redirect(res, `${APP_URL}/auth/callback?error=acceso_denegado`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
   }
 
   try {
@@ -1567,10 +1561,10 @@ async function handleFacebookCallback(req, res, url) {
     });
 
     const token = signJwt({ sub: user._id.toString(), email: user.email });
-    return redirect(res, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
   } catch (err) {
     console.error('[OAuth] Facebook callback error:', err);
-    return redirect(res, `${APP_URL}/auth/callback?error=error_de_servidor`);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
   }
 }
 
