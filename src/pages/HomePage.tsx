@@ -13,9 +13,13 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
+import { NotificationBanner } from '../components/NotificationBanner';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function HomePage() {
   const navigate = useNavigate();
+  const { isSupported, isSubscribed } = usePushNotifications();
+  const showBell = isSupported;
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -123,11 +127,17 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
-                notifications
-              </span>
-            </button>
+            {showBell && (
+              <button
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
+                  notifications
+                </span>
+              </button>
+            )}
             <div
               className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
@@ -141,6 +151,8 @@ function HomePage() {
         {/* Ticker */}
         <Ticker count={activeBenefitsCount} />
       </header>
+
+      <NotificationBanner />
 
       <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}
