@@ -24,6 +24,7 @@ const SavedPage = lazy(() => import('./pages/SavedPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+const CategoryPage = lazy(() => import('./pages/CategoryPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-blink-bg flex items-center justify-center">
@@ -66,6 +67,8 @@ function AppContent() {
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/categorias/:category" element={<CategoryPage />} />
+          <Route path="/categorias/:category/page/:page" element={<CategoryPage />} />
           <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
         </Routes>

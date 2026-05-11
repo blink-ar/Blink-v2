@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useSEO } from '../../hooks/useSEO';
 import { SEOConfig, SITE_NAME, toAbsoluteUrl } from '../../seo/seo';
+import { resolveSeoCategory } from '../../seo/categoryPages';
 
 function RouteSEO() {
   const location = useLocation();
@@ -77,6 +78,18 @@ function RouteSEO() {
     seoConfig = {
       title: `Descuentos bancarios por banco y categoria | ${SITE_NAME}`,
       description: 'Explora descuentos bancarios por banco, categoria y ciudad en Argentina.',
+      path: location.pathname,
+    };
+  } else if (location.pathname.startsWith('/categorias/')) {
+    const [, , categoryParam, pageSegment, pageParam] = location.pathname.split('/');
+    const category = resolveSeoCategory(categoryParam);
+    const page = pageSegment === 'page' ? Number.parseInt(pageParam || '1', 10) : 1;
+    const pageSuffix = Number.isFinite(page) && page > 1 ? ` - pagina ${page}` : '';
+    const label = category?.label || 'categoria';
+
+    seoConfig = {
+      title: `Comercios de ${label} con descuentos${pageSuffix} | ${SITE_NAME}`,
+      description: `Explora comercios de ${label.toLowerCase()} con descuentos y promociones bancarias en Argentina.`,
       path: location.pathname,
     };
   } else if (location.pathname.startsWith('/business/') || location.pathname.startsWith('/comercios/')) {

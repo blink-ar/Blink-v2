@@ -9,6 +9,12 @@ import {
   readViteAppShell,
   renderMerchantSeoHtml
 } from './merchant-seo.js';
+import {
+  getCategorySeoPath as getCategoryPagePath,
+  loadCategorySeoData,
+  renderCategorySeoHtml,
+  resolveSeoCategory
+} from './category-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -2138,6 +2144,59 @@ async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
   return redirect(res, 301, getMerchantSeoPathFromMerchant(merchant));
 }
 
+async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam, options = {}) {
+  const category = resolveSeoCategory(categoryParam);
+  if (!category) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category not found',
+      category: categoryParam
+    });
+  }
+
+  const parsedPage = Number.parseInt(String(pageParam || '1'), 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const canonicalPath = getCategoryPagePath(category, page);
+  const requestedPath = pageParam
+    ? `/categorias/${categoryParam}/page/${pageParam}`
+    : `/categorias/${categoryParam}`;
+
+  if (requestedPath !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const data = await loadCategorySeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    category,
+    page
+  });
+
+  if (data.outOfRange) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category page not found',
+      category: category.slug,
+      page
+    });
+  }
+
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderCategorySeoHtml({
+    appShell,
+    category,
+    merchants: data.merchants,
+    total: data.total,
+    page: data.page,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2169,6 +2228,7 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleCategorySeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
   handleSearch,
@@ -2195,6 +2255,18 @@ export default async function handler(req, res) {
     }
 
     if (isReadMethod(req)) {
+      const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
+      if (categorySeoMatch) {
+        return await handleCategorySeoPage(
+          req,
+          res,
+          url,
+          db,
+          decodeURIComponent(categorySeoMatch[1]),
+          categorySeoMatch[2] ? decodeURIComponent(categorySeoMatch[2]) : undefined
+        );
+      }
+
       const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
       if (merchantSeoMatch) {
         return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
@@ -2245,6 +2317,8 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/categorias/:category',
+        'GET /api/categorias/:category/page/:page',
         'GET /api/comercios/:slugId',
         'GET /api/business/:id',
         'GET /api/search',

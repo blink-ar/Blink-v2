@@ -15,6 +15,14 @@
       "dest": "/api/[...path]?path=business/$1"
     },
     {
+      "src": "/categorias/([^/]+)/page/([0-9]+)",
+      "dest": "/api/[...path]?path=categorias/$1/page/$2"
+    },
+    {
+      "src": "/categorias/([^/]+)",
+      "dest": "/api/[...path]?path=categorias/$1"
+    },
+    {
       "src": "/comercios/([^/]+)",
       "dest": "/api/[...path]?path=comercios/$1"
     },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getActiveBenefitsMatch,
+  handleCategorySeoPage,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
@@ -67,6 +68,8 @@ describe('merchant-first serverless helpers', () => {
   it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
     expect(resolveRequestPath(new URL('https://example.com/comercios/coto--merchant_1?path=comercios/coto--merchant_1'))).toBe('/api/comercios/coto--merchant_1');
     expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
+    expect(resolveRequestPath(new URL('https://example.com/categorias/moda?path=categorias/moda'))).toBe('/api/categorias/moda');
+    expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
   });
 
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
@@ -553,6 +556,120 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('Beneficios anteriores');
     expect(res.body).toContain('20% OFF');
     expect(res.body).toContain('https://schema.org/Discontinued');
+  });
+
+  it('handleCategorySeoPage returns crawlable HTML with merchant links', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/categorias/supermercado');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'supermercado', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Comercios de Supermercado con descuentos | Blink</title>');
+    expect(res.body).toContain('<h1>Comercios de Supermercado con descuentos</h1>');
+    expect(res.body).toContain('href="/comercios/coto--merchant_1"');
+    expect(res.body).toContain('Banco Galicia');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(res.body).toContain('https://schema.org');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
+      benefitCount: { $gt: 0 },
+      categories: { $in: ['shopping'] }
+    });
+  });
+
+  it('handleCategorySeoPage redirects category aliases to canonical paths', async () => {
+    const db = {
+      collection() {
+        throw new Error('Category alias redirects should not query MongoDB');
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/categorias/shopping');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'shopping');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/categorias/supermercado');
+  });
+
+  it('handleCategorySeoPage returns 404 for out-of-range category pages', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 101;
+            },
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/categorias/moda/page/3');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'moda', '3', {
+      appShell: merchantSeoAppShell
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Category page not found',
+      category: 'moda',
+      page: 3
+    });
   });
 
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {

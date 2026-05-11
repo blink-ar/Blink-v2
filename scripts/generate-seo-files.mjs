@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
+import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
 import { slugify } from '../api/search/normalize.js';
 
 const DEFAULT_SITE_URL = 'https://example.com';
@@ -68,6 +69,12 @@ const baseRoutes = [
   { path: '/search', changefreq: 'daily', priority: '0.9' },
   { path: '/map', changefreq: 'daily', priority: '0.8' },
 ];
+
+const categorySeoRoutes = SEO_CATEGORY_DEFINITIONS.map((category) => ({
+  path: `/categorias/${category.slug}`,
+  changefreq: 'weekly',
+  priority: '0.8',
+}));
 
 function escapeXml(value) {
   return String(value)
@@ -144,7 +151,7 @@ for (const bank of banks) {
 }
 
 const merchantRoutes = await loadMerchantRoutes();
-const routes = [...baseRoutes, ...landingRoutes, ...merchantRoutes];
+const routes = [...baseRoutes, ...categorySeoRoutes, ...landingRoutes, ...merchantRoutes];
 const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());
 
 function buildUrlset(routeChunk) {
@@ -225,5 +232,5 @@ fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
 if (siteUrl === DEFAULT_SITE_URL) {
   console.warn('[seo] VITE_SITE_URL/SITE_URL is not set. Using https://example.com in sitemap and robots.txt.');
 } else {
-  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${merchantRoutes.length} merchant URLs)`);
+  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${merchantRoutes.length} merchant URLs)`);
 }
