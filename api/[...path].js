@@ -111,6 +111,10 @@ function getCanonicalSiteUrl(url) {
   return configuredSiteUrl || url.origin.replace(/\/$/, '');
 }
 
+function isReadMethod(req) {
+  return req.method === 'GET' || req.method === 'HEAD';
+}
+
 /**
  * Decode a geohash string to its center lat/lng.
  * Returns null if the input is invalid.
@@ -2190,7 +2194,7 @@ export default async function handler(req, res) {
       return await handleGetBusinesses(req, res, url, db);
     }
 
-    if (req.method === 'GET') {
+    if (isReadMethod(req)) {
       const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
       if (merchantSeoMatch) {
         return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
