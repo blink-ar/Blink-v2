@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,7 +13,6 @@ function GoogleIcon() {
   );
 }
 
-
 function PasskeyIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -22,17 +21,139 @@ function PasskeyIcon() {
   );
 }
 
-function LoginPage() {
-  const { loginWithGoogle, loginWithEmail, loginWithPasskey } = useAuth();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleEmailSubmit(e: FormEvent) {
+  return (
+    <div className="relative cursor-text" onClick={() => inputRef.current?.focus()}>
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus
+        maxLength={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        className="absolute opacity-0 inset-0 w-full h-full"
+        style={{ caretColor: 'transparent' }}
+      />
+      <div className="flex gap-2 justify-center pointer-events-none">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="w-12 h-14 rounded-xl flex items-center justify-center text-2xl font-bold text-blink-ink transition-all"
+            style={{
+              background: '#F9F9F8',
+              border: `1.5px solid ${value.length === i ? '#6366F1' : value.length > i ? '#C7D2FE' : '#E8E6E1'}`,
+              boxShadow: value.length === i ? '0 0 0 3px rgba(99,102,241,0.12)' : 'none',
+            }}
+          >
+            {value[i] ?? ''}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Step = 'email' | 'otp';
+
+function LoginPage() {
+  const { loginWithGoogle, loginWithPasskey, initiateEmailOTP, verifyEmailOTP, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState<Step>('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (isAuthenticated) navigate('/profile', { replace: true });
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  function goBack() {
+    if (step === 'otp') {
+      setStep('email');
+      setOtp('');
+      setError('');
+    } else {
+      navigate(-1);
+    }
+  }
+
+  async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
     setIsLoading(true);
-    loginWithEmail(email.trim());
+    setError('');
+    try {
+      await initiateEmailOTP(email.trim());
+      setStep('otp');
+      setResendCooldown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar el código');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleOtpSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (otp.length < 6) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      await verifyEmailOTP(email, otp);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Código incorrecto');
+      setOtp('');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    setError('');
+    try {
+      await initiateEmailOTP(email);
+      setResendCooldown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al reenviar');
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setIsLoading(true);
+    setError('');
+    try {
+      await loginWithGoogle();
+    } catch {
+      // user closed popup
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handlePasskeyLogin() {
+    setIsLoading(true);
+    setError('');
+    try {
+      await loginWithPasskey();
+    } catch {
+      // user closed popup
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -49,101 +170,145 @@ function LoginPage() {
       >
         <div className="h-14 flex items-center px-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
-          <span className="flex-1 text-center font-semibold text-base text-blink-ink">Accedé a Blink</span>
+          <span className="flex-1 text-center font-semibold text-base text-blink-ink">
+            {step === 'email' ? 'Accedé a Blink' : 'Verificá tu email'}
+          </span>
           <div className="w-9" />
         </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center px-4 py-8 gap-6">
-        {/* Icon */}
-        <div
-          className="w-20 h-20 rounded-2xl flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-            boxShadow: '0 8px 24px rgba(99,102,241,0.30)',
-          }}
-        >
-          <span className="material-symbols-outlined text-white" style={{ fontSize: 36 }}>lock_open</span>
-        </div>
-
-        <div className="text-center">
-          <h1 className="font-bold text-2xl text-blink-ink tracking-tight">Bienvenido</h1>
-          <p className="text-sm text-blink-muted mt-1">Ingresá o creá tu cuenta para continuar</p>
-        </div>
-
-        <div
-          className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4"
-          style={{ background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}
-        >
-          {/* Email OTP */}
-          <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-blink-muted tracking-wide">CORREO ELECTRÓNICO</label>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-                className="w-full rounded-xl px-4 py-3 text-sm text-blink-ink bg-blink-bg focus:outline-none focus:ring-2 focus:ring-blink-accent/30 transition-shadow"
-                style={{ border: '1px solid #E8E6E1' }}
-              />
+        {step === 'email' ? (
+          <>
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.30)' }}
+            >
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 36 }}>lock_open</span>
             </div>
-            <button
-              type="submit"
-              disabled={isLoading || !email.trim()}
-              className="w-full rounded-2xl flex items-center justify-center font-semibold text-base text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-              style={{
-                height: 52,
-                background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-                boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
-              }}
+
+            <div className="text-center">
+              <h1 className="font-bold text-2xl text-blink-ink tracking-tight">Bienvenido</h1>
+              <p className="text-sm text-blink-muted mt-1">Ingresá o creá tu cuenta para continuar</p>
+            </div>
+
+            <div
+              className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4"
+              style={{ background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}
             >
-              {isLoading ? 'Redirigiendo...' : 'Continuar con email'}
-            </button>
-          </form>
+              <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-blink-muted tracking-wide">CORREO ELECTRÓNICO</label>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@email.com"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-blink-ink bg-blink-bg focus:outline-none focus:ring-2 focus:ring-blink-accent/30 transition-shadow"
+                    style={{ border: '1px solid #E8E6E1' }}
+                  />
+                </div>
+                {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={isLoading || !email.trim()}
+                  className="w-full rounded-2xl flex items-center justify-center font-semibold text-base text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
+                  style={{ height: 52, background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}
+                >
+                  {isLoading ? 'Enviando...' : 'Continuar con email'}
+                </button>
+              </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-blink-border" />
-            <span className="text-xs text-blink-muted font-medium">o continuá con</span>
-            <div className="flex-1 h-px bg-blink-border" />
-          </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-blink-border" />
+                <span className="text-xs text-blink-muted font-medium">o continuá con</span>
+                <div className="flex-1 h-px bg-blink-border" />
+              </div>
 
-          {/* Social + Passkey buttons */}
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={loginWithGoogle}
-              className="flex items-center justify-center gap-2.5 w-full rounded-xl font-semibold text-sm text-blink-ink transition-all duration-150 active:scale-[0.98]"
-              style={{ height: 48, background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="flex items-center justify-center gap-2.5 w-full rounded-xl font-semibold text-sm text-blink-ink transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
+                  style={{ height: 48, background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+                >
+                  <GoogleIcon />
+                  Continuar con Google
+                </button>
+
+                <button
+                  onClick={handlePasskeyLogin}
+                  disabled={isLoading}
+                  className="flex items-center justify-center gap-2.5 w-full rounded-xl font-semibold text-sm text-blink-ink transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
+                  style={{ height: 48, background: '#F3F4F6', border: '1px solid #E8E6E1' }}
+                >
+                  <PasskeyIcon />
+                  Usar Passkey
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-blink-muted text-center max-w-xs">
+              Al continuar aceptás nuestros{' '}
+              <span className="text-blink-accent font-semibold">Términos de uso</span>
+              {' '}y{' '}
+              <span className="text-blink-accent font-semibold">Política de privacidad</span>
+            </p>
+          </>
+        ) : (
+          <>
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.30)' }}
             >
-              <GoogleIcon />
-              Continuar con Google
-            </button>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 36 }}>mark_email_unread</span>
+            </div>
 
-            <button
-              onClick={loginWithPasskey}
-              className="flex items-center justify-center gap-2.5 w-full rounded-xl font-semibold text-sm text-blink-ink transition-all duration-150 active:scale-[0.98]"
-              style={{ height: 48, background: '#F3F4F6', border: '1px solid #E8E6E1' }}
+            <div className="text-center">
+              <h1 className="font-bold text-2xl text-blink-ink tracking-tight">Revisá tu email</h1>
+              <p className="text-sm text-blink-muted mt-2 max-w-xs">
+                Enviamos un código de 6 dígitos a{' '}
+                <span className="font-semibold text-blink-ink">{email}</span>
+              </p>
+            </div>
+
+            <div
+              className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-5"
+              style={{ background: '#FFFFFF', border: '1px solid #E8E6E1', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}
             >
-              <PasskeyIcon />
-              Usar Passkey
-            </button>
-          </div>
-        </div>
+              <form onSubmit={handleOtpSubmit} className="flex flex-col gap-4">
+                <OtpInput value={otp} onChange={(v) => { setOtp(v); setError(''); }} />
+                {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={isLoading || otp.length < 6}
+                  className="w-full rounded-2xl flex items-center justify-center font-semibold text-base text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
+                  style={{ height: 52, background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}
+                >
+                  {isLoading ? 'Verificando...' : 'Verificar código'}
+                </button>
+              </form>
 
-        <p className="text-xs text-blink-muted text-center max-w-xs">
-          Al continuar aceptás nuestros{' '}
-          <span className="text-blink-accent font-semibold">Términos de uso</span>
-          {' '}y{' '}
-          <span className="text-blink-accent font-semibold">Política de privacidad</span>
-        </p>
+              <div className="flex items-center justify-center">
+                <button
+                  onClick={handleResend}
+                  disabled={resendCooldown > 0}
+                  className="text-sm font-semibold transition-colors"
+                  style={{ color: resendCooldown > 0 ? '#A8A49E' : '#6366F1' }}
+                >
+                  {resendCooldown > 0 ? `Reenviar código en ${resendCooldown}s` : 'Reenviar código'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
