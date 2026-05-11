@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { MongoClient } from 'mongodb';
+import { slugify } from '../api/search/normalize.js';
 
 const DEFAULT_SITE_URL = 'https://example.com';
+const DEFAULT_DATABASE_NAME = 'benefitsV3';
+const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
+const MAX_URLS_PER_SITEMAP = 50000;
 
 function loadEnvFromFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -50,6 +55,8 @@ const resolvedSiteUrl = normalizeSiteUrl(
 );
 
 const siteUrl = resolvedSiteUrl || DEFAULT_SITE_URL;
+const mongoUri = process.env.MONGODB_URI_READ_ONLY || '';
+const databaseName = process.env.DATABASE_NAME || DEFAULT_DATABASE_NAME;
 
 const today = new Date().toISOString().split('T')[0];
 const banks = ['galicia', 'santander', 'bbva', 'macro', 'nacion', 'icbc'];
@@ -61,6 +68,61 @@ const baseRoutes = [
   { path: '/search', changefreq: 'daily', priority: '0.9' },
   { path: '/map', changefreq: 'daily', priority: '0.8' },
 ];
+
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function getMerchantSeoPath(merchant) {
+  const merchantId = String(merchant?.merchantId || '').trim();
+  const merchantSlug = slugify(merchant?.merchantName || '') || 'comercio';
+  return `/comercios/${merchantSlug}--${encodeURIComponent(merchantId)}`;
+}
+
+async function loadMerchantRoutes() {
+  if (!mongoUri) {
+    console.warn('[seo] MONGODB_URI_READ_ONLY is not set. Skipping merchant sitemap URLs.');
+    return [];
+  }
+
+  const client = new MongoClient(mongoUri);
+  try {
+    await client.connect();
+    const db = client.db(databaseName);
+    const merchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+      .find(
+        {
+          isActive: { $ne: false },
+          merchantId: { $exists: true, $type: 'string' },
+          benefitCount: { $gt: 0 },
+        },
+        {
+          projection: {
+            _id: 0,
+            merchantId: 1,
+            merchantName: 1,
+          },
+        },
+      )
+      .sort({ merchantName: 1 })
+      .toArray();
+
+    return merchants
+      .filter((merchant) => String(merchant.merchantId || '').trim())
+      .map((merchant) => ({
+        path: getMerchantSeoPath(merchant),
+        changefreq: 'weekly',
+        priority: '0.8',
+      }));
+  } finally {
+    await client.close();
+  }
+}
 
 const landingRoutes = [];
 for (const bank of banks) {
@@ -81,15 +143,17 @@ for (const bank of banks) {
   }
 }
 
-const routes = [...baseRoutes, ...landingRoutes];
+const merchantRoutes = await loadMerchantRoutes();
+const routes = [...baseRoutes, ...landingRoutes, ...merchantRoutes];
 const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());
 
-const xmlUrls = uniqueRoutes
+function buildUrlset(routeChunk) {
+  const xmlUrls = routeChunk
   .map((route) => {
     return [
       '  <url>',
-      `    <loc>${siteUrl}${route.path}</loc>`,
-      `    <lastmod>${today}</lastmod>`,
+      `    <loc>${escapeXml(`${siteUrl}${route.path}`)}</loc>`,
+      `    <lastmod>${route.lastmod || today}</lastmod>`,
       `    <changefreq>${route.changefreq}</changefreq>`,
       `    <priority>${route.priority}</priority>`,
       '  </url>',
@@ -97,11 +161,29 @@ const xmlUrls = uniqueRoutes
   })
   .join('\n');
 
-const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${xmlUrls}
 </urlset>
 `;
+}
+
+function buildSitemapIndex(sitemapPaths) {
+  const sitemapEntries = sitemapPaths
+    .map((sitemapPath) => [
+      '  <sitemap>',
+      `    <loc>${escapeXml(`${siteUrl}${sitemapPath}`)}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      '  </sitemap>',
+    ].join('\n'))
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${sitemapEntries}
+</sitemapindex>
+`;
+}
 
 const robotsContent = `User-agent: *
 Allow: /
@@ -116,11 +198,32 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapContent, 'utf8');
+for (const fileName of fs.readdirSync(publicDir)) {
+  if (/^sitemap-\d+\.xml$/.test(fileName)) {
+    fs.unlinkSync(path.join(publicDir, fileName));
+  }
+}
+
+const sitemapChunks = [];
+for (let index = 0; index < uniqueRoutes.length; index += MAX_URLS_PER_SITEMAP) {
+  sitemapChunks.push(uniqueRoutes.slice(index, index + MAX_URLS_PER_SITEMAP));
+}
+
+if (sitemapChunks.length <= 1) {
+  fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), buildUrlset(sitemapChunks[0] || []), 'utf8');
+} else {
+  const sitemapPaths = sitemapChunks.map((chunk, index) => {
+    const sitemapPath = `/sitemap-${index + 1}.xml`;
+    fs.writeFileSync(path.join(publicDir, `sitemap-${index + 1}.xml`), buildUrlset(chunk), 'utf8');
+    return sitemapPath;
+  });
+  fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), buildSitemapIndex(sitemapPaths), 'utf8');
+}
+
 fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
 
 if (siteUrl === DEFAULT_SITE_URL) {
   console.warn('[seo] VITE_SITE_URL/SITE_URL is not set. Using https://example.com in sitemap and robots.txt.');
 } else {
-  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl}`);
+  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${merchantRoutes.length} merchant URLs)`);
 }
