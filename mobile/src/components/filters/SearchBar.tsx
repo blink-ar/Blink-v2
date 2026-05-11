@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Keyboard } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { colors, borderRadius } from '../../constants/theme';
@@ -20,11 +20,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   showFilter = true,
   activeFilterCount = 0,
 }) => {
+  const inputRef = useRef<TextInput>(null);
+
   return (
     <View style={styles.container}>
       <View style={styles.inputContainer}>
         <Search size={18} color={colors.gray[400]} style={styles.searchIcon} />
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={value}
           onChangeText={onChange}
@@ -33,7 +36,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          onSubmitEditing={Keyboard.dismiss}
+          blurOnSubmit={true}
+          onSubmitEditing={() => {
+            inputRef.current?.blur();
+            Keyboard.dismiss();
+          }}
         />
         {showFilter && (
           <TouchableOpacity
