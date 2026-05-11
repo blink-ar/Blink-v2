@@ -63,8 +63,9 @@ function LoginPage() {
   const { loginWithGoogle, loginWithPasskey, initiateEmailOTP, verifyEmailOTP, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<Step>('email');
-  const [email, setEmail] = useState('');
+  const preview = new URLSearchParams(window.location.search).get('preview');
+  const [step, setStep] = useState<Step>(preview === 'otp' ? 'otp' : 'email');
+  const [email, setEmail] = useState(preview === 'otp' ? 'preview@ejemplo.com' : '');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
