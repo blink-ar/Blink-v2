@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
@@ -13,7 +13,6 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
-import { SEO_CATEGORY_LINKS, getCategorySeoPath } from '../seo/categoryPages';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -323,42 +322,6 @@ function HomePage() {
 
         {/* Category Marquee */}
         <CategoryMarquee />
-
-        {/* Crawlable category links */}
-        <section className="px-4 -mt-2">
-          <div className="flex items-end justify-between gap-3 mb-3">
-            <div>
-              <h2 className="font-semibold text-base text-blink-ink">Explorá por categoría</h2>
-              <p className="text-xs text-blink-muted mt-1">
-                Comercios con descuentos bancarios agrupados por rubro.
-              </p>
-            </div>
-            <Link
-              to="/search"
-              className="shrink-0 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
-            >
-              Ver buscador
-            </Link>
-          </div>
-
-          <nav aria-label="Categorías de comercios" className="grid grid-cols-2 gap-2">
-            {SEO_CATEGORY_LINKS.map((category) => (
-              <Link
-                key={category.slug}
-                to={getCategorySeoPath(category)}
-                className="min-h-[74px] rounded-2xl border border-blink-border bg-white px-3 py-3 flex items-start gap-2 shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <span className="text-lg shrink-0" aria-hidden="true">{category.emoji}</span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-blink-ink truncate">{category.label}</span>
-                  <span className="block text-[11px] leading-4 text-blink-muted line-clamp-2">
-                    {category.description}
-                  </span>
-                </span>
-              </Link>
-            ))}
-          </nav>
-        </section>
 
         {/* Coming Soon Banks */}
         <ComingSoonSection />
