@@ -938,6 +938,66 @@ function mapMerchantHitToResponse(hit, scoreMeta, filters) {
   };
 }
 
+async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants, searchParams) {
+  const merchantIds = Array.from(
+    new Set(
+      (merchants || [])
+        .map((merchant) => merchant?.merchantId)
+        .filter((merchantId) => typeof merchantId === 'string' && merchantId.trim())
+    )
+  );
+
+  if (merchantIds.length === 0) {
+    return merchants || [];
+  }
+
+  const benefitQuery = {
+    merchantId: { $in: merchantIds }
+  };
+  const bank = searchParams.get('bank');
+  const bankFilter = bank
+    ? bank
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    : [];
+
+  if (bankFilter.length > 0) {
+    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  applyActiveBenefitsFilter(benefitQuery, searchParams);
+
+  const rawBenefits = await db.collection(collectionName)
+    .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefitsByMerchant = new Map();
+
+  for (const benefit of rawBenefits) {
+    const key = benefit?.merchantId;
+    if (!key) continue;
+    if (!benefitsByMerchant.has(key)) {
+      benefitsByMerchant.set(key, []);
+    }
+    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
+  }
+
+  return merchants.map((merchant) => {
+    if (!merchant?.merchantId) {
+      return merchant;
+    }
+
+    return {
+      ...merchant,
+      business: {
+        ...(merchant.business || {}),
+        benefits: benefitsByMerchant.get(merchant.merchantId) || []
+      }
+    };
+  });
+}
+
 function mapIntentHit(hit) {
   return {
     entityId: hit.entityId,
@@ -1161,7 +1221,12 @@ async function handleSearch(req, res, url, db) {
       .sort((a, b) => b.score - a.score);
 
     const distanceAwareMerchants = applyLocalDistanceGuardrail(scoredMerchantHits, filters);
-    const merchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
+    const merchants = await hydrateSearchMerchantsWithBenefits(
+      db,
+      collectionName,
+      distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum),
+      searchParams
+    );
     const intents = (intentSearch.hits || []).map(mapIntentHit);
     const products = (productSearch.hits || []).map(mapProductHit);
     const totalMerchants = distanceAwareMerchants.length;
@@ -1214,6 +1279,12 @@ async function handleSearch(req, res, url, db) {
       filters,
       searchParams
     );
+    const merchants = await hydrateSearchMerchantsWithBenefits(
+      db,
+      collectionName,
+      fallback.merchants,
+      searchParams
+    );
 
     return json(res, 200, {
       success: true,
@@ -1230,13 +1301,13 @@ async function handleSearch(req, res, url, db) {
         }
       },
       intents: fallback.intents,
-      merchants: fallback.merchants,
+      merchants,
       products: fallback.products,
       pagination: {
         totalMerchants: fallback.totalMerchants,
         limit: limitNum,
         offset: offsetNum,
-        hasMore: offsetNum + fallback.merchants.length < fallback.totalMerchants
+        hasMore: offsetNum + merchants.length < fallback.totalMerchants
       },
       ...(debugMode && { debug })
     });
