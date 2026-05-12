@@ -28,7 +28,16 @@ vi.mock('../../hooks/useSEO', () => ({
 vi.mock('../../context/FavoritesContext', () => ({
   useFavorites: () => ({
     isFavorite: vi.fn(() => false),
-    toggleFavorite: vi.fn()
+    toggleFavorite: vi.fn(),
+    favorites: [],
+    requiresAuth: false
+  })
+}));
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    isAuthenticated: true,
+    user: { id: 'test-user', name: 'Test', email: 'test@example.com' }
   })
 }));
 

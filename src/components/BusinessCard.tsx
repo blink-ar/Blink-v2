@@ -1,8 +1,10 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
 import { Business } from "../types";
 import { BBVALogo, SantanderLogo, GaliciaLogo, NacionLogo } from "./BankLogos";
 import { useFavorites } from "../context/FavoritesContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface PaymentMethod {
   type: "bbva" | "santander" | "galicia" | "nacion";
@@ -24,6 +26,8 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   style,
 }) => {
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const getPaymentMethods = (business: Business): PaymentMethod[] => {
     const methods: PaymentMethod[] = [];
 
@@ -195,9 +199,19 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
         className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full transition-colors active:scale-90 z-10"
         onClick={(e) => {
           e.stopPropagation();
+          if (!isAuthenticated) {
+            navigate('/login');
+            return;
+          }
           toggleFavorite(business);
         }}
-        aria-label={isFavorite(business.id) ? 'Quitar de guardados' : 'Guardar'}
+        aria-label={
+          !isAuthenticated
+            ? 'Iniciá sesión para guardar'
+            : isFavorite(business.id)
+              ? 'Quitar de guardados'
+              : 'Guardar'
+        }
       >
         <span
           className="material-symbols-outlined"

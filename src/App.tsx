@@ -6,6 +6,7 @@ import UpdatePrompt from './components/UpdatePrompt';
 import { useResponsive } from './hooks/useResponsive';
 import PhoneMirror from './components/PhoneMirror';
 import { AuthProvider } from './contexts/AuthContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -96,7 +97,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <FavoritesProvider>
+          <AppContent />
+        </FavoritesProvider>
       </AuthProvider>
     </Router>
   );
