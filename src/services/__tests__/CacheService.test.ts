@@ -109,9 +109,10 @@ describe('CacheService', () => {
 
             cacheService.set('test-key', testData, 2000);
 
-            // Verify the entry was stored with correct TTL
-            const cacheKey = 'blink_cache_v1.0.0_test-key';
-            const stored = mockStorage.store[cacheKey];
+            // Verify the entry was stored with the active cache namespace and correct TTL
+            const cacheKey = Object.keys(mockStorage.store).find((key) => key.endsWith('_test-key'));
+            expect(cacheKey).toMatch(/^blink_cache_v\d+\.\d+\.\d+_test-key$/);
+            const stored = mockStorage.store[cacheKey!];
             expect(stored).toBeTruthy();
 
             const entry = JSON.parse(stored!) as CacheEntry;

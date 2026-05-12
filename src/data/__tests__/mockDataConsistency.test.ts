@@ -206,7 +206,15 @@ describe('Mock Data Consistency', () => {
             expect(fallbacks.name).toBe('Test Business');
             expect(fallbacks.description).toBe('Test description');
             expect(fallbacks.rating).toBe(4.0);
-            expect(fallbacks.location).toBe('Multiple locations');
+            expect(fallbacks.location).toEqual([
+                expect.objectContaining({
+                    formattedAddress: 'Multiple locations',
+                    raw: 'Multiple locations',
+                    lat: 0,
+                    lng: 0,
+                    provider: 'google'
+                })
+            ]);
             expect(fallbacks.benefit).toBe('Special offer available');
             expect(fallbacks.rewardRate).toBe('Contact for details');
         });
