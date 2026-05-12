@@ -32,6 +32,22 @@ const BENEFIT_DAYS = [
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatLocalDateOnly = (date: Date): string => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-');
+
+const isBenefitActive = (validUntil: string | null | undefined, now = new Date()): boolean => {
+  const v = validUntil?.trim();
+  if (!v) return true;
+  if (DATE_ONLY_PATTERN.test(v)) return v >= formatLocalDateOnly(now);
+  const t = Date.parse(v);
+  return Number.isFinite(t) && t >= now.getTime();
+};
+
 const parseBenefitIndex = (benefitIndex?: string): number => {
   const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
   return Number.isNaN(parsedIndex) ? 0 : Math.max(0, parsedIndex);
@@ -302,6 +318,7 @@ function BenefitDetailPage() {
 
   const subscriptionName = getSubscriptionName(benefit.subscription);
   const subscription = getSubscriptionById(benefit.subscription);
+  const isExpired = !isBenefitActive(benefit.validUntil);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const bankAccent = getBankAccent(benefit.bankName);
 
@@ -439,6 +456,26 @@ function BenefitDetailPage() {
 
         <div className="p-4 space-y-3">
 
+          {/* ── Expired notice ── */}
+          {isExpired && (
+            <div
+              className="rounded-2xl px-4 py-4 flex items-start gap-3"
+              style={{ background: '#FEF2F2', border: '1.5px solid #FECACA' }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: '#FEE2E2' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#DC2626' }}>cancel</span>
+              </div>
+              <div>
+                <p className="font-bold text-[15px]" style={{ color: '#991B1B' }}>Este beneficio ya venció</p>
+                <p className="text-sm mt-0.5" style={{ color: '#B91C1C' }}>
+                  {benefit.validUntil
+                    ? `Dejó de estar disponible el ${validUntilFormatted}.`
+                    : 'Este beneficio ya no está disponible.'}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ── Discount hero card ── */}
           <div
             className="bg-white rounded-2xl overflow-hidden"
@@ -513,7 +550,14 @@ function BenefitDetailPage() {
                 {validUntilFormatted && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Vigencia</span>
-                    <span className="text-sm font-semibold text-blink-ink">hasta {validUntilFormatted}</span>
+                    {isExpired ? (
+                      <span className="text-sm font-semibold flex items-center gap-1" style={{ color: '#DC2626' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_busy</span>
+                        Venció {validUntilFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-blink-ink">hasta {validUntilFormatted}</span>
+                    )}
                   </div>
                 )}
 
