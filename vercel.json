@@ -1,9 +1,30 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/[...path]?path=$1"
+    },
+    {
+      "src": "/business/([^/]+)",
+      "dest": "/api/[...path]?path=business/$1"
+    },
+    {
+      "src": "/categorias/([^/]+)/page/([0-9]+)",
+      "dest": "/api/[...path]?path=categorias/$1/page/$2"
+    },
+    {
+      "src": "/categorias/([^/]+)",
+      "dest": "/api/[...path]?path=categorias/$1"
+    },
+    {
+      "src": "/comercios/([^/]+)",
+      "dest": "/api/[...path]?path=comercios/$1"
     },
     {
       "handle": "filesystem"

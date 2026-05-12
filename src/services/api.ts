@@ -51,7 +51,10 @@ function mapSearchResponseToBusinessesResponse(
   }
 ): BusinessesApiResponse {
   const businesses = normalizeBusinesses(
-    (searchData.merchants || []).map((merchantHit) => merchantHit.business)
+    (searchData.merchants || []).map((merchantHit) => ({
+      ...merchantHit.business,
+      aliases: merchantHit.aliases || [],
+    }))
   );
 
   return {
@@ -165,6 +168,7 @@ export async function fetchBusinessesPaginated(options: {
   lat?: number;
   lng?: number;
   online?: boolean;
+  includeExpired?: boolean;
 } = {}): Promise<BusinessesApiResponse> {
   const {
     limit = 20,
@@ -177,7 +181,8 @@ export async function fetchBusinessesPaginated(options: {
     geohash,
     lat,
     lng,
-    online
+    online,
+    includeExpired
   } = options;
   const normalizedMerchantId = merchantId?.trim();
 
@@ -214,6 +219,7 @@ export async function fetchBusinessesPaginated(options: {
   if (search) params.append('search', search);
   if (subscription) params.append('subscription', subscription);
   if (online) params.append('online', 'true');
+  if (includeExpired) params.append('includeExpired', 'true');
   // Exact coords take priority — only send one or the other
   if (lat !== undefined && lng !== undefined) {
     params.append('lat', lat.toString());
@@ -248,7 +254,10 @@ export async function fetchBusinessesPaginated(options: {
   }
 }
 
-export async function fetchBusinessById(merchantId: string): Promise<Business | null> {
+export async function fetchBusinessById(
+  merchantId: string,
+  options: { includeExpired?: boolean } = {},
+): Promise<Business | null> {
   const normalizedMerchantId = merchantId.trim();
   if (!normalizedMerchantId) {
     return null;
@@ -257,7 +266,8 @@ export async function fetchBusinessById(merchantId: string): Promise<Business | 
   const response = await fetchBusinessesPaginated({
     merchantId: normalizedMerchantId,
     limit: 1,
-    offset: 0
+    offset: 0,
+    includeExpired: options.includeExpired
   });
 
   if (!response.success) {

@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
+import { useAuth } from '../contexts/AuthContext';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
@@ -13,9 +14,14 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
+import { NotificationBanner } from '../components/NotificationBanner';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function HomePage() {
   const navigate = useNavigate();
+  const { isSupported, isSubscribed } = usePushNotifications();
+  const showBell = isSupported;
+  const { user } = useAuth();
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -123,24 +129,35 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
-                notifications
-              </span>
-            </button>
-            <div
-              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
+            {showBell && (
+              <button
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
+                  notifications
+                </span>
+              </button>
+            )}
+            <Link
+              to="/profile"
+              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center transition-opacity active:opacity-70"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>
-                person
-              </span>
-            </div>
+              {user ? (
+                <span className="text-white text-sm font-bold uppercase">{user.name.charAt(0)}</span>
+              ) : (
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
+              )}
+            </Link>
           </div>
         </div>
         {/* Ticker */}
         <Ticker count={activeBenefitsCount} />
       </header>
+
+      <NotificationBanner />
 
       <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}

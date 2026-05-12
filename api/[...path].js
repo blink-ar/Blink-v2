@@ -1,8 +1,29 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import webpush from 'web-push';
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
-import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import {
+  buildSearchPhraseVariants,
+  getNormalizedSearchWords,
+  getSignificantSearchTokens,
+  normalizeSearchText,
+  singularizeSpanishToken,
+  tokenizeSearchText
+} from './search/normalize.js';
+import {
+  getMerchantSeoPathFromMerchant,
+  parseMerchantSeoSlugId,
+  readViteAppShell,
+  renderMerchantSeoHtml
+} from './merchant-seo.js';
+import {
+  getCategorySeoPath as getCategoryPagePath,
+  loadCategorySeoData,
+  renderCategorySeoHtml,
+  resolveSeoCategory
+} from './category-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -14,16 +35,73 @@ const ALLOWED_COLLECTIONS = new Set([
 
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
+const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
+const NOTIFICATION_HISTORY_COLLECTION = 'notification_history';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+const MERCHANT_SEO_PROJECTION = {
+  _id: 0,
+  merchantId: 1,
+  merchantName: 1,
+  merchantKey: 1,
+  categories: 1,
+  banks: 1,
+  locations: 1,
+  hasOnlineBenefits: 1,
+  benefitCount: 1,
+  activeBenefitCount: 1,
+  maxDiscountPercentage: 1,
+  searchProfile: 1,
+  imageUrl: 1,
+  logoUrl: 1,
+  coverUrl: 1,
+  isActive: 1
+};
+const BENEFIT_SUMMARY_PROJECTION = {
+  _id: 1,
+  id: 1,
+  merchantId: 1,
+  bank: 1,
+  benefitTitle: 1,
+  availableDays: 1,
+  discountPercentage: 1,
+  caps: 1,
+  online: 1,
+  otherDiscounts: 1,
+  installments: 1,
+  description: 1,
+  termsAndConditions: 1,
+  link: 1,
+  validUntil: 1,
+  cardTypes: 1,
+  subscription: 1
+};
 
 const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
+const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme-set-JWT_SECRET-in-env';
+const APP_URL = (process.env.APP_URL || process.env.VITE_SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || '';
+const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || '';
+
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
+const NOTIFICATIONS_SECRET = process.env.NOTIFICATIONS_SECRET;
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
   globalState.__blinkMongo = {
+    clientPromise: null,
+    dbPromise: null
+  };
+}
+if (!globalState.__blinkMongoWrite) {
+  globalState.__blinkMongoWrite = {
     clientPromise: null,
     dbPromise: null
   };
@@ -35,10 +113,111 @@ if (!globalState.__blinkBankCards) {
   };
 }
 
+// --- Auth utilities ---
+
+function base64url(value) {
+  return Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url');
+}
+
+function signJwt(payload) {
+  const header = base64url({ alg: 'HS256', typ: 'JWT' });
+  const now = Math.floor(Date.now() / 1000);
+  const body = base64url({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 });
+  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${sig}`;
+}
+
+function verifyJwt(token) {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) throw new Error('Invalid token');
+  const [header, body, sig] = parts;
+  const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  const sigBuf = Buffer.from(sig, 'base64url');
+  const expBuf = Buffer.from(expected, 'base64url');
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) throw new Error('Invalid signature');
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired');
+  return payload;
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, hash, salt) {
+  const derived = scryptSync(password, salt, 64);
+  const stored = Buffer.from(hash, 'hex');
+  return derived.length === stored.length && timingSafeEqual(derived, stored);
+}
+
+function getAuthToken(req) {
+  const auth = req.headers['authorization'] || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
+
+function buildOAuthState() {
+  const ts = Date.now().toString();
+  const sig = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
+  return `${Buffer.from(ts).toString('base64url')}.${sig}`;
+}
+
+function verifyOAuthState(state) {
+  const [tsPart, sig] = (state || '').split('.');
+  if (!tsPart || !sig) return false;
+  const ts = Buffer.from(tsPart, 'base64url').toString();
+  const expected = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
+  const sigBuf = Buffer.from(sig, 'hex');
+  const expBuf = Buffer.from(expected, 'hex');
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return false;
+  return Date.now() - Number(ts) < 10 * 60 * 1000; // 10 minutes
+}
+
+async function upsertSocialUser(db, { email, name, googleId, facebookId }) {
+  const users = db.collection('users');
+  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
+
+  const providerQuery = googleId ? { googleId } : { facebookId };
+  const existing = await users.findOne(providerQuery);
+  if (existing) {
+    return existing;
+  }
+
+  const byEmail = await users.findOne({ email });
+  if (byEmail) {
+    await users.updateOne({ _id: byEmail._id }, { $set: googleId ? { googleId } : { facebookId } });
+    return { ...byEmail, ...(googleId ? { googleId } : { facebookId }) };
+  }
+
+  const result = await users.insertOne({
+    name,
+    email,
+    ...(googleId ? { googleId } : { facebookId }),
+    createdAt: new Date(),
+    isActive: true
+  });
+  return { _id: result.insertedId, name, email };
+}
+
 function json(res, statusCode, payload) {
   res.status(statusCode);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.send(JSON.stringify(payload));
+}
+
+function redirect(res, statusCode, location) {
+  res.status(statusCode);
+  res.setHeader('Location', location);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send('');
+}
+
+function html(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(payload);
 }
 
 // Cache-Control directives
@@ -48,6 +227,15 @@ const CC_LOCATION = 'private, max-age=60';                                      
 
 function setCacheControl(res, directive) {
   res.setHeader('Cache-Control', directive);
+}
+
+function getCanonicalSiteUrl(url) {
+  const configuredSiteUrl = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').trim().replace(/\/$/, '');
+  return configuredSiteUrl || url.origin.replace(/\/$/, '');
+}
+
+function isReadMethod(req) {
+  return req.method === 'GET' || req.method === 'HEAD';
 }
 
 /**
@@ -80,11 +268,11 @@ function getParsedUrl(req) {
 }
 
 function resolveRequestPath(url) {
-  if (url.pathname !== '/api/[...path]') {
+  const rewrittenPath = url.searchParams.get('path');
+  if (!rewrittenPath && url.pathname !== '/api/[...path]') {
     return url.pathname;
   }
 
-  const rewrittenPath = url.searchParams.get('path');
   if (!rewrittenPath) {
     return '/api';
   }
@@ -499,8 +687,100 @@ function parseSearchFilters(searchParams) {
 
 function buildExpandedQueryTokens(query) {
   const normalized = normalizeSearchText(query);
+  const phraseVariants = buildSearchPhraseVariants(query);
   const tokens = tokenizeSearchText(query);
-  return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
+  return Array.from(new Set([normalized, ...phraseVariants, ...tokens].filter(Boolean)));
+}
+
+const MERCHANT_NAME_CONNECTOR_WORDS = [
+  'de',
+  'del',
+  'la',
+  'las',
+  'el',
+  'los',
+  'y',
+  'e'
+];
+const MERCHANT_NAME_SEPARATOR_PATTERN = '[^a-z0-9áéíóúüñ]+';
+const ACCENT_FOLDING_CHAR_CLASSES = {
+  a: '[aáàäâã]',
+  e: '[eéèëê]',
+  i: '[iíìïî]',
+  o: '[oóòöôõ]',
+  u: '[uúùüû]',
+  n: '[nñ]'
+};
+
+function buildAccentInsensitiveTokenPattern(token, options = {}) {
+  const { allowPlural = true, singularize = true } = options;
+  const normalized = normalizeSearchText(token).replace(/\s+/g, '');
+  const base = singularize ? singularizeSpanishToken(normalized) : normalized;
+  if (!base) return '';
+
+  const source = Array.from(base)
+    .map((char) => ACCENT_FOLDING_CHAR_CLASSES[char] || escapeRegex(char))
+    .join('');
+  const pluralSuffix = allowPlural && /^[a-z0-9]+$/.test(base) && base.length > 3 ? '(?:s|es)?' : '';
+  return `${source}${pluralSuffix}`;
+}
+
+function getConnectorPatternSource() {
+  return MERCHANT_NAME_CONNECTOR_WORDS
+    .map((word) => buildAccentInsensitiveTokenPattern(word, { allowPlural: false, singularize: false }))
+    .filter(Boolean)
+    .join('|');
+}
+
+function buildFlexibleNameRegexSource(words, options = {}) {
+  const { allowConnectorsBetween = false, prefix = false } = options;
+  const tokenPatterns = words
+    .map((word) => buildAccentInsensitiveTokenPattern(word))
+    .filter(Boolean);
+
+  if (tokenPatterns.length === 0) {
+    return null;
+  }
+
+  const connectorSource = getConnectorPatternSource();
+  const separator = MERCHANT_NAME_SEPARATOR_PATTERN;
+  const joiner = allowConnectorsBetween && connectorSource
+    ? `${separator}(?:(?:${connectorSource})${separator})*`
+    : separator;
+  const leadingConnectors = allowConnectorsBetween && connectorSource
+    ? `(?:(?:${connectorSource})${separator})*`
+    : '';
+  const trailingConnectors = allowConnectorsBetween && connectorSource && !prefix
+    ? `(?:${separator}(?:${connectorSource}))*`
+    : '';
+
+  return `^${leadingConnectors}${tokenPatterns.join(joiner)}${trailingConnectors}${prefix ? '' : '$'}`;
+}
+
+function buildMerchantNameRescuePatterns(normalizedQuery, options = {}) {
+  const { prefix = false } = options;
+  const sources = new Set();
+
+  for (const variant of buildSearchPhraseVariants(normalizedQuery)) {
+    const words = getNormalizedSearchWords(variant);
+    const fullSource = buildFlexibleNameRegexSource(words, { prefix });
+    if (fullSource) {
+      sources.add(fullSource);
+    }
+
+    const significantWords = getSignificantSearchTokens(variant);
+    if (significantWords.length >= 2) {
+      const significantSource = buildFlexibleNameRegexSource(significantWords, {
+        allowConnectorsBetween: true,
+        prefix
+      });
+      if (significantSource) {
+        sources.add(significantSource);
+      }
+    }
+  }
+
+  return Array.from(sources).map((source) => new RegExp(source, 'i'));
 }
 
 function buildActiveMerchantSearchQuery(filters, searchParams) {
@@ -530,13 +810,13 @@ function buildActiveMerchantSearchQuery(filters, searchParams) {
   return query;
 }
 
-function buildMerchantNameRescueClauses(pattern) {
-  return [
+function buildMerchantNameRescueClauses(patterns) {
+  return patterns.flatMap((pattern) => [
     { merchantName: { $regex: pattern } },
     { merchantKey: { $regex: pattern } },
     { aliases: { $elemMatch: { $regex: pattern } } },
     { 'searchProfile.aliases': { $elemMatch: { $regex: pattern } } }
-  ];
+  ]);
 }
 
 function mergeMerchantDocsById(merchantLists) {
@@ -558,13 +838,13 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
   const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
-  const exactPattern = new RegExp(`^${escapeRegex(normalizedQuery)}$`, 'i');
-  const prefixPattern = new RegExp(`^${escapeRegex(normalizedQuery)}`, 'i');
+  const exactPatterns = buildMerchantNameRescuePatterns(normalizedQuery);
+  const prefixPatterns = buildMerchantNameRescuePatterns(normalizedQuery, { prefix: true });
 
   const exactMatches = await merchantCollection
     .find(
       combineQueriesWithAnd(baseQuery, {
-        $or: buildMerchantNameRescueClauses(exactPattern)
+        $or: buildMerchantNameRescueClauses(exactPatterns)
       }),
       {
         projection: MERCHANT_SEARCH_RESCUE_PROJECTION
@@ -585,7 +865,7 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
         baseQuery,
         exactIds.length > 0 ? { merchantId: { $nin: exactIds } } : null,
         {
-          $or: buildMerchantNameRescueClauses(prefixPattern)
+          $or: buildMerchantNameRescueClauses(prefixPatterns)
         }
       ),
       {
@@ -776,6 +1056,13 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   let score = Number(hit?._rankingScore || 0) * 100;
 
   const merchantName = normalizeSearchText(hit.merchantName || '');
+  const merchantNameVariants = new Set(buildSearchPhraseVariants(hit.merchantName || ''));
+  const querySignificantTokens = getSignificantSearchTokens(normalizedQuery, { singularize: true });
+  const merchantSignificantTokens = getSignificantSearchTokens(hit.merchantName || '', { singularize: true });
+  const hasSignificantNameMatch =
+    querySignificantTokens.length >= 2 &&
+    merchantSignificantTokens.length >= 2 &&
+    querySignificantTokens.join(' ') === merchantSignificantTokens.join(' ');
   const aliases = (Array.isArray(hit.aliases) ? hit.aliases : []).map((value) => normalizeSearchText(value));
   const aliasSet = new Set(aliases);
   const manualAliasSet = new Set(
@@ -787,6 +1074,12 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   if (merchantName && merchantName === normalizedQuery) {
     score += 1000;
     reasons.push('merchant_exact');
+  } else if (merchantNameVariants.has(normalizedQuery)) {
+    score += 850;
+    reasons.push('merchant_name_variant');
+  } else if (hasSignificantNameMatch) {
+    score += 820;
+    reasons.push('merchant_name_tokens_exact');
   } else if (merchantName && merchantName.startsWith(normalizedQuery)) {
     score += 450;
     reasons.push('merchant_prefix');
@@ -1187,6 +1480,225 @@ async function getDb() {
   }
 
   return globalState.__blinkMongo.dbPromise;
+}
+
+async function getWritableDb() {
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is required for write operations');
+  }
+  return getWriteDb();
+}
+
+async function getWriteDb() {
+  if (!globalState.__blinkMongoWrite.clientPromise) {
+    const client = new MongoClient(MONGODB_URI);
+    globalState.__blinkMongoWrite.clientPromise = client.connect();
+  }
+
+  if (!globalState.__blinkMongoWrite.dbPromise) {
+    globalState.__blinkMongoWrite.dbPromise = globalState.__blinkMongoWrite.clientPromise.then((client) => client.db(DATABASE_NAME));
+  }
+
+  return globalState.__blinkMongoWrite.dbPromise;
+}
+
+async function handleSignup(req, res) {
+  const body = await readJsonBody(req);
+  const { name, email, password } = body || {};
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return json(res, 400, { error: 'El nombre es requerido' });
+  }
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json(res, 400, { error: 'Email inválido' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return json(res, 400, { error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
+  const db = await getWriteDb();
+  const users = db.collection('users');
+
+  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
+
+  const existing = await users.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    return json(res, 409, { error: 'Ya existe una cuenta con ese email' });
+  }
+
+  const { hash, salt } = hashPassword(password);
+  const result = await users.insertOne({
+    name: name.trim(),
+    email: email.toLowerCase(),
+    passwordHash: hash,
+    passwordSalt: salt,
+    createdAt: new Date(),
+    isActive: true
+  });
+
+  const token = signJwt({ sub: result.insertedId.toString(), email: email.toLowerCase() });
+  return json(res, 201, {
+    success: true,
+    token,
+    user: { id: result.insertedId.toString(), name: name.trim(), email: email.toLowerCase() }
+  });
+}
+
+async function handleLogin(req, res) {
+  const body = await readJsonBody(req);
+  const { email, password } = body || {};
+
+  if (!email || !password) {
+    return json(res, 400, { error: 'Email y contraseña son requeridos' });
+  }
+
+  const db = await getWriteDb();
+  const user = await db.collection('users').findOne({ email: email.toLowerCase() });
+
+  if (!user || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+    return json(res, 401, { error: 'Email o contraseña incorrectos' });
+  }
+
+  const token = signJwt({ sub: user._id.toString(), email: user.email });
+  return json(res, 200, {
+    success: true,
+    token,
+    user: { id: user._id.toString(), name: user.name, email: user.email }
+  });
+}
+
+async function handleGoogleAuth(req, res) {
+  if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google OAuth no configurado' });
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `${APP_URL}/api/auth/google/callback`,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: buildOAuthState(),
+    access_type: 'online',
+    prompt: 'select_account'
+  });
+  return redirect(res, 302, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}
+
+async function handleGoogleCallback(req, res, url) {
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const errorParam = url.searchParams.get('error');
+
+  if (errorParam || !code || !verifyOAuthState(state)) {
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
+  }
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${APP_URL}/api/auth/google/callback`,
+        grant_type: 'authorization_code'
+      })
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('No access token from Google');
+
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const profile = await profileRes.json();
+    if (!profile.email) throw new Error('No email returned from Google');
+
+    const db = await getWriteDb();
+    const user = await upsertSocialUser(db, {
+      email: profile.email.toLowerCase(),
+      name: profile.name || profile.email,
+      googleId: profile.id
+    });
+
+    const token = signJwt({ sub: user._id.toString(), email: user.email });
+    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('[OAuth] Google callback error:', err);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
+  }
+}
+
+async function handleFacebookAuth(req, res) {
+  if (!FACEBOOK_APP_ID) return json(res, 503, { error: 'Facebook OAuth no configurado' });
+  const params = new URLSearchParams({
+    client_id: FACEBOOK_APP_ID,
+    redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
+    response_type: 'code',
+    scope: 'email,public_profile',
+    state: buildOAuthState()
+  });
+  return redirect(res, 302, `https://www.facebook.com/v19.0/dialog/oauth?${params}`);
+}
+
+async function handleFacebookCallback(req, res, url) {
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const errorParam = url.searchParams.get('error');
+
+  if (errorParam || !code || !verifyOAuthState(state)) {
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
+  }
+
+  try {
+    const tokenRes = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?${new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        client_secret: FACEBOOK_APP_SECRET,
+        redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
+        code
+      })}`
+    );
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('No access token from Facebook');
+
+    const profileRes = await fetch(
+      `https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${tokenData.access_token}`
+    );
+    const profile = await profileRes.json();
+    if (!profile.email) throw new Error('No email returned from Facebook');
+
+    const db = await getWriteDb();
+    const user = await upsertSocialUser(db, {
+      email: profile.email.toLowerCase(),
+      name: profile.name || profile.email,
+      facebookId: profile.id
+    });
+
+    const token = signJwt({ sub: user._id.toString(), email: user.email });
+    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('[OAuth] Facebook callback error:', err);
+    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
+  }
+}
+
+async function handleGetMe(req, res) {
+  const token = getAuthToken(req);
+  if (!token) return json(res, 401, { error: 'No autenticado' });
+
+  let payload;
+  try {
+    payload = verifyJwt(token);
+  } catch {
+    return json(res, 401, { error: 'Token inválido o expirado' });
+  }
+
+  const db = await getWriteDb();
+  const user = await db.collection('users').findOne({ _id: new ObjectId(payload.sub) });
+  if (!user) return json(res, 404, { error: 'Usuario no encontrado' });
+
+  return json(res, 200, {
+    success: true,
+    user: { id: user._id.toString(), name: user.name, email: user.email }
+  });
 }
 
 async function readJsonBody(req) {
@@ -1740,6 +2252,10 @@ async function handleGetBusinesses(req, res, url, db) {
   }
   if (search && !merchantId) {
     const normalizedSearch = normalizeSearchText(search);
+    const merchantNamePatterns = [
+      ...buildMerchantNameRescuePatterns(normalizedSearch),
+      ...buildMerchantNameRescuePatterns(normalizedSearch, { prefix: true })
+    ];
     const searchTerms = Array.from(
       new Set([
         search,
@@ -1749,18 +2265,21 @@ async function handleGetBusinesses(req, res, url, db) {
       ].filter(Boolean))
     );
 
-    merchantQuery.$or = searchTerms.flatMap((term) => {
-      const pattern = new RegExp(escapeRegex(term), 'i');
-      return [
-        { merchantName: pattern },
-        { merchantKey: pattern },
-        { aliases: { $elemMatch: { $regex: pattern } } },
-        { categories: { $elemMatch: { $regex: pattern } } },
-        { banks: { $elemMatch: { $regex: pattern } } },
-        { 'searchProfile.searchText': pattern },
-        { 'searchProfile.description': pattern }
-      ];
-    });
+    merchantQuery.$or = [
+      ...buildMerchantNameRescueClauses(merchantNamePatterns),
+      ...searchTerms.flatMap((term) => {
+        const pattern = new RegExp(escapeRegex(term), 'i');
+        return [
+          { merchantName: pattern },
+          { merchantKey: pattern },
+          { aliases: { $elemMatch: { $regex: pattern } } },
+          { categories: { $elemMatch: { $regex: pattern } } },
+          { banks: { $elemMatch: { $regex: pattern } } },
+          { 'searchProfile.searchText': pattern },
+          { 'searchProfile.description': pattern }
+        ];
+      })
+    ];
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
@@ -1777,26 +2296,6 @@ async function handleGetBusinesses(req, res, url, db) {
     logoUrl: 1,
     coverUrl: 1
   };
-  const benefitSummaryProjection = {
-    _id: 1,
-    id: 1,
-    merchantId: 1,
-    bank: 1,
-    benefitTitle: 1,
-    availableDays: 1,
-    discountPercentage: 1,
-    caps: 1,
-    online: 1,
-    otherDiscounts: 1,
-    installments: 1,
-    description: 1,
-    termsAndConditions: 1,
-    link: 1,
-    validUntil: 1,
-    cardTypes: 1,
-    subscription: 1
-  };
-
   let pagedMerchants = [];
   if (hasLocation) {
     try {
@@ -1936,7 +2435,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const rawBenefits = merchantIds.length > 0
     ? await db.collection(collectionName)
-      .find(benefitQuery, { projection: benefitSummaryProjection })
+      .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
       .sort({ bank: 1, benefitTitle: 1 })
       .toArray()
     : [];
@@ -1996,6 +2495,156 @@ async function handleGetBusinesses(req, res, url, db) {
   });
 }
 
+async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
+  const parsed = parseMerchantSeoSlugId(slugId);
+  if (!parsed) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: parsed.merchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: MERCHANT_SEO_PROJECTION
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: parsed.merchantId
+    });
+  }
+
+  const canonicalPath = getMerchantSeoPathFromMerchant(merchant);
+  if (`/comercios/${slugId}` !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const rawBenefits = await db.collection(DEFAULT_COLLECTION)
+    .find(
+      {
+        merchantId: parsed.merchantId
+      },
+      {
+        projection: BENEFIT_SUMMARY_PROJECTION
+      }
+    )
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderMerchantSeoHtml({
+    appShell,
+    merchant,
+    benefits,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    now: options.now || new Date()
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
+async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
+  const normalizedMerchantId = String(merchantId || '').trim();
+  if (!normalizedMerchantId) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: normalizedMerchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: {
+        _id: 0,
+        merchantId: 1,
+        merchantName: 1
+      }
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: normalizedMerchantId
+    });
+  }
+
+  setCacheControl(res, CC_CONTENT);
+  return redirect(res, 301, getMerchantSeoPathFromMerchant(merchant));
+}
+
+async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam, options = {}) {
+  const category = resolveSeoCategory(categoryParam);
+  if (!category) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category not found',
+      category: categoryParam
+    });
+  }
+
+  const parsedPage = Number.parseInt(String(pageParam || '1'), 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const canonicalPath = getCategoryPagePath(category, page);
+  const requestedPath = pageParam
+    ? `/categorias/${categoryParam}/page/${pageParam}`
+    : `/categorias/${categoryParam}`;
+
+  if (requestedPath !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const data = await loadCategorySeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    category,
+    page
+  });
+
+  if (data.outOfRange) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category page not found',
+      category: category.slug,
+      page
+    });
+  }
+
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderCategorySeoHtml({
+    appShell,
+    category,
+    merchants: data.merchants,
+    total: data.total,
+    page: data.page,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2023,12 +2672,127 @@ async function handlePlaceDetails(req, res) {
 export {
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
+  resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleCategorySeoPage,
+  handleLegacyBusinessRedirect,
+  handleMerchantSeoPage,
   handleSearch,
   rehydrateBenefitDoc
 };
+
+async function handleNotificationSubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint, keys, expirationTime } = body;
+
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return json(res, 400, { error: 'Invalid subscription: endpoint, keys.p256dh and keys.auth are required' });
+  }
+
+  const db = await getWritableDb();
+  const collection = db.collection(PUSH_SUBSCRIPTIONS_COLLECTION);
+
+  await collection.updateOne(
+    { endpoint },
+    {
+      $set: { endpoint, keys, expirationTime: expirationTime || null, updatedAt: new Date() },
+      $setOnInsert: { createdAt: new Date() },
+    },
+    { upsert: true }
+  );
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationUnsubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint } = body;
+
+  if (!endpoint) {
+    return json(res, 400, { error: 'endpoint is required' });
+  }
+
+  const db = await getWritableDb();
+  await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteOne({ endpoint });
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationSend(req, res) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return json(res, 503, { error: 'Push notifications not configured (missing VAPID keys)' });
+  }
+
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  } catch (err) {
+    return json(res, 503, { error: 'Invalid VAPID configuration', detail: err.message });
+  }
+
+  const body = await readJsonBody(req);
+
+  if (NOTIFICATIONS_SECRET && body.secret !== NOTIFICATIONS_SECRET) {
+    return json(res, 401, { error: 'Unauthorized' });
+  }
+
+  const { title, body: notifBody, url, options } = body;
+
+  if (!title) {
+    return json(res, 400, { error: 'title is required' });
+  }
+
+  const db = await getWritableDb();
+  const subscriptions = await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).find({}).toArray();
+
+  if (subscriptions.length === 0) {
+    return json(res, 200, { success: true, sent: 0, total: 0 });
+  }
+
+  const payload = JSON.stringify({ title, body: notifBody || '', url: url || '/', ...options });
+
+  const results = await Promise.allSettled(
+    subscriptions.map((sub) =>
+      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
+    )
+  );
+
+  // Remove subscriptions that are gone (410) or not found (404)
+  const expiredEndpoints = results
+    .map((result, i) => ({ result, sub: subscriptions[i] }))
+    .filter(({ result }) => result.status === 'rejected' && [410, 404].includes(result.reason?.statusCode))
+    .map(({ sub }) => sub.endpoint);
+
+  if (expiredEndpoints.length > 0) {
+    await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteMany({ endpoint: { $in: expiredEndpoints } });
+  }
+
+  const sent = results.filter((r) => r.status === 'fulfilled').length;
+
+  await db.collection(NOTIFICATION_HISTORY_COLLECTION).insertOne({
+    title,
+    body: notifBody || '',
+    url: url || '/',
+    sentAt: new Date(),
+    sent,
+    total: subscriptions.length,
+  });
+
+  return json(res, 200, { success: true, sent, total: subscriptions.length, expired: expiredEndpoints.length });
+}
+
+async function handleNotificationHistory(req, res) {
+  const db = await getWritableDb();
+  const notifications = await db
+    .collection(NOTIFICATION_HISTORY_COLLECTION)
+    .find({})
+    .sort({ sentAt: -1 })
+    .limit(100)
+    .toArray();
+
+  return json(res, 200, { notifications });
+}
 
 export default async function handler(req, res) {
   const url = getParsedUrl(req);
@@ -2047,6 +2811,30 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/api/businesses') {
       return await handleGetBusinesses(req, res, url, db);
+    }
+
+    if (isReadMethod(req)) {
+      const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
+      if (categorySeoMatch) {
+        return await handleCategorySeoPage(
+          req,
+          res,
+          url,
+          db,
+          decodeURIComponent(categorySeoMatch[1]),
+          categorySeoMatch[2] ? decodeURIComponent(categorySeoMatch[2]) : undefined
+        );
+      }
+
+      const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
+      if (merchantSeoMatch) {
+        return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
+      }
+
+      const legacyBusinessMatch = path.match(/^\/api\/business\/([^/]+)$/);
+      if (legacyBusinessMatch) {
+        return await handleLegacyBusinessRedirect(req, res, url, db, decodeURIComponent(legacyBusinessMatch[1]));
+      }
     }
 
     if (req.method === 'GET' && path === '/api/search') {
@@ -2073,6 +2861,50 @@ export default async function handler(req, res) {
       return await handlePlaceDetails(req, res);
     }
 
+    if (req.method === 'GET' && path === '/api/notifications/history') {
+      return await handleNotificationHistory(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/subscribe') {
+      return await handleNotificationSubscribe(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/unsubscribe') {
+      return await handleNotificationUnsubscribe(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/send') {
+      return await handleNotificationSend(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/auth/signup') {
+      return await handleSignup(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/auth/login') {
+      return await handleLogin(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/me') {
+      return await handleGetMe(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/google') {
+      return await handleGoogleAuth(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/google/callback') {
+      return await handleGoogleCallback(req, res, url);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/facebook') {
+      return await handleFacebookAuth(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/facebook/callback') {
+      return await handleFacebookCallback(req, res, url);
+    }
+
     if (req.method === 'GET') {
       const benefitByIdMatch = path.match(/^\/api\/benefits\/([^/]+)$/);
       if (benefitByIdMatch) {
@@ -2088,12 +2920,27 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/categorias/:category',
+        'GET /api/categorias/:category/page/:page',
+        'GET /api/comercios/:slugId',
+        'GET /api/business/:id',
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
         'GET /api/networks',
         'GET /api/stats',
-        'POST /api/places/details'
+        'POST /api/places/details',
+        'GET /api/notifications/history',
+        'POST /api/notifications/subscribe',
+        'POST /api/notifications/unsubscribe',
+        'POST /api/notifications/send',
+        'POST /api/auth/signup',
+        'POST /api/auth/login',
+        'GET /api/auth/me',
+        'GET /api/auth/google',
+        'GET /api/auth/google/callback',
+        'GET /api/auth/facebook',
+        'GET /api/auth/facebook/callback'
       ]
     });
   } catch (error) {

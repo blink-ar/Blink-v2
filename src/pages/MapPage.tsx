@@ -14,6 +14,7 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
@@ -34,7 +35,7 @@ const MAP_STYLE = [
 ];
 
 const CATEGORY_CHIPS = [
-  { id: 'nearby', label: '📍 Cerca de mí' },
+  { id: 'nearby', label: '📍 Cerca tuyo' },
   { id: 'gastronomia', label: '🍕 Gastronomía' },
   { id: 'moda', label: '👗 Moda' },
   { id: 'hogar', label: '🏠 Hogar' },
@@ -418,9 +419,9 @@ function MapPage() {
     }
 
     mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
-      const isSelected = isSingleBusinessMode
-        ? selected?.id === biz.id && idx === 0
-        : selected?.id === biz.id;
+      // Use idx === 0 as initial selection only in single-business mode on first load;
+      // the updateSelection effect will immediately reconcile once selectedMarkerIdx is set.
+      const isSelected = selected?.id === biz.id && (isSingleBusinessMode ? idx === 0 : false);
       const pos = new google.maps.LatLng(lat, lng);
       const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
         trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
@@ -575,13 +576,15 @@ function MapPage() {
   useEffect(() => {
     overlaysRef.current.forEach((o: any) => {
       if (typeof o.updateSelection === 'function') {
-        const isSelected = isSingleBusinessMode
-          ? selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx
-          : selectedBusiness?.id === o.__businessId;
+        // Always match both business ID and exact marker index so only the
+        // clicked pin is highlighted, even when a business has multiple locations.
+        const isSelected =
+          selectedBusiness?.id === o.__businessId &&
+          selectedMarkerIdx === o.__markerIdx;
         o.updateSelection(isSelected);
       }
     });
-  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
+  }, [selectedBusiness, selectedMarkerIdx]);
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
@@ -785,7 +788,7 @@ function MapPage() {
           <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-3" />
           <div className="flex justify-between items-center mb-1">
             <h3 className="font-semibold text-base text-blink-ink">
-              {isSingleBusinessMode ? 'Sucursales' : 'Cerca de vos'}
+              {isSingleBusinessMode ? 'Sucursales' : 'Cerca tuyo'}
             </h3>
             <span
               className="text-xs font-semibold px-2.5 py-1 rounded-full"
@@ -895,7 +898,7 @@ function MapPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       trackSelectBusiness({ source: 'map_list_open_business', businessId: biz.id, category: biz.category, position: idx + 1 });
-                      navigate(`/business/${biz.id}`, { state: { business: biz } });
+                      navigate(getMerchantSeoPath({ id: biz.id, name: biz.name }), { state: { business: biz } });
                     }}
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95"
                     style={{ background: '#EEF2FF', color: '#4338CA' }}

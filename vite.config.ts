@@ -20,9 +20,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
+          importScripts: ['sw-push.js'],
+          navigateFallbackDenylist: [/^\/api\//],
           // Smart caching for better mobile performance
           runtimeCaching: [
             {

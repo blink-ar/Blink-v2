@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   getActiveBenefitsMatch,
+  handleCategorySeoPage,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleLegacyBusinessRedirect,
+  handleMerchantSeoPage,
+  resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
+
+const merchantSeoAppShell = [
+  '<!doctype html>',
+  '<html lang="es">',
+  '<head><title>Default</title><link rel="canonical" href="/home" /></head>',
+  '<body><div id="root"></div><script type="module" src="/assets/index-test.js"></script></body>',
+  '</html>',
+].join('\n');
 
 function createResponseCapture() {
   return {
@@ -53,6 +65,13 @@ function createAggregateCursor<T>(data: T[]) {
 }
 
 describe('merchant-first serverless helpers', () => {
+  it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
+    expect(resolveRequestPath(new URL('https://example.com/comercios/coto--merchant_1?path=comercios/coto--merchant_1'))).toBe('/api/comercios/coto--merchant_1');
+    expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
+    expect(resolveRequestPath(new URL('https://example.com/categorias/moda?path=categorias/moda'))).toBe('/api/categorias/moda');
+    expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
+  });
+
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
     const benefit = {
       id: 'benefit-1',
@@ -273,6 +292,384 @@ describe('merchant-first serverless helpers', () => {
     expect(merchantQueries[0]).not.toHaveProperty('$or');
     expect(merchantQueries[1]).not.toHaveProperty('$or');
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+  });
+
+  it('handleLegacyBusinessRedirect returns a 301 canonical merchant URL', async () => {
+    const merchantQueries: unknown[] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne(query: unknown) {
+              merchantQueries.push(query);
+              return {
+                merchantId: 'merchant_1',
+                merchantName: 'Óptica Visión'
+              };
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/business/merchant_1');
+
+    await handleLegacyBusinessRedirect(req as never, res as never, url, db as never, 'merchant_1');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/comercios/optica-vision--merchant_1');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: 'merchant_1',
+      benefitCount: { $gt: 0 }
+    });
+  });
+
+  it('handleLegacyBusinessRedirect returns 404 when the merchant cannot be indexed', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne() {
+              return null;
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/business/missing');
+
+    await handleLegacyBusinessRedirect(req as never, res as never, url, db as never, 'missing');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Merchant not found',
+      merchantId: 'missing'
+    });
+  });
+
+  it('handleMerchantSeoPage returns HTML for a canonical merchant URL', async () => {
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne(query: unknown) {
+              merchantQueries.push(query);
+              return {
+                merchantId: 'merchant_1',
+                merchantName: 'Coto',
+                categories: ['supermercados'],
+                banks: ['Banco Galicia'],
+                activeBenefitCount: 1,
+                benefitCount: 1,
+                maxDiscountPercentage: 25,
+                locations: [
+                  {
+                    formattedAddress: 'Store 1',
+                    addressComponents: {
+                      locality: 'Buenos Aires',
+                      countryCode: 'AR'
+                    }
+                  }
+                ]
+              };
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor([
+                {
+                  id: 'benefit-1',
+                  merchantId: 'merchant_1',
+                  bank: 'Banco Galicia',
+                  benefitTitle: '25% OFF',
+                  discountPercentage: 25,
+                  availableDays: ['lunes'],
+                  validUntil: '2099-12-31'
+                }
+              ]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/comercios/coto--merchant_1');
+
+    await handleMerchantSeoPage(req as never, res as never, url, db as never, 'coto--merchant_1', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      now: new Date('2026-05-11T12:00:00.000Z')
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Coto descuentos y promociones | Blink</title>');
+    expect(res.body).toContain('<h1>Coto descuentos y promociones</h1>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/comercios/coto--merchant_1"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: 'merchant_1',
+      benefitCount: { $gt: 0 }
+    });
+    expect((benefitQueries[0] as { merchantId: string }).merchantId).toBe('merchant_1');
+  });
+
+  it('handleMerchantSeoPage redirects non-canonical merchant slugs', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne() {
+              return {
+                merchantId: 'merchant_1',
+                merchantName: 'Óptica Visión'
+              };
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/comercios/wrong--merchant_1');
+
+    await handleMerchantSeoPage(req as never, res as never, url, db as never, 'wrong--merchant_1', {
+      appShell: merchantSeoAppShell
+    });
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/comercios/optica-vision--merchant_1');
+  });
+
+  it('handleMerchantSeoPage returns 404 for missing or non-indexable merchants', async () => {
+    const merchantQueries: unknown[] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne(query: unknown) {
+              merchantQueries.push(query);
+              return null;
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/comercios/coto--merchant_1');
+
+    await handleMerchantSeoPage(req as never, res as never, url, db as never, 'coto--merchant_1');
+
+    expect(res.statusCode).toBe(404);
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: 'merchant_1',
+      benefitCount: { $gt: 0 }
+    });
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Merchant not found',
+      merchantId: 'merchant_1'
+    });
+  });
+
+  it('handleMerchantSeoPage renders past benefits when there are no active benefits', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async findOne() {
+              return {
+                merchantId: 'merchant_1',
+                merchantName: 'Coto',
+                categories: ['supermercados'],
+                banks: ['BBVA'],
+                activeBenefitCount: 0,
+                benefitCount: 1
+              };
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor([
+                {
+                  id: 'benefit-1',
+                  merchantId: 'merchant_1',
+                  bank: 'BBVA',
+                  benefitTitle: '20% OFF',
+                  discountPercentage: 20,
+                  validUntil: '2020-01-01'
+                }
+              ]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/comercios/coto--merchant_1');
+
+    await handleMerchantSeoPage(req as never, res as never, url, db as never, 'coto--merchant_1', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      now: new Date('2026-05-11T12:00:00.000Z')
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('No hay descuentos activos ahora');
+    expect(res.body).toContain('Beneficios anteriores');
+    expect(res.body).toContain('20% OFF');
+    expect(res.body).toContain('https://schema.org/Discontinued');
+  });
+
+  it('handleCategorySeoPage returns crawlable HTML with merchant links', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/categorias/supermercado');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'supermercado', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Comercios de Supermercado con descuentos | Blink</title>');
+    expect(res.body).toContain('<h1>Comercios de Supermercado con descuentos</h1>');
+    expect(res.body).toContain('href="/comercios/coto--merchant_1"');
+    expect(res.body).toContain('Banco Galicia');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(res.body).toContain('https://schema.org');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
+      benefitCount: { $gt: 0 },
+      categories: { $in: ['shopping'] }
+    });
+  });
+
+  it('handleCategorySeoPage redirects category aliases to canonical paths', async () => {
+    const db = {
+      collection() {
+        throw new Error('Category alias redirects should not query MongoDB');
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/categorias/shopping');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'shopping');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/categorias/supermercado');
+  });
+
+  it('handleCategorySeoPage returns 404 for out-of-range category pages', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 101;
+            },
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/categorias/moda/page/3');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'moda', '3', {
+      appShell: merchantSeoAppShell
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Category page not found',
+      category: 'moda',
+      page: 3
+    });
   });
 
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {
