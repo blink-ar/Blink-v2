@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
@@ -22,6 +23,9 @@ function HomePage() {
   const { isSupported, isSubscribed } = usePushNotifications();
   const showBell = isSupported;
   const { user } = useAuth();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [homeSearchTerm, setHomeSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -43,6 +47,62 @@ function HomePage() {
     });
     navigate(`/search?bank=${entity.token}`);
   };
+
+  const closeSearchOverlay = useCallback(() => {
+    setIsSearchOpen(false);
+    searchInputRef.current?.blur();
+  }, []);
+
+  const openSearchOverlay = () => {
+    flushSync(() => {
+      setHomeSearchTerm('');
+      setIsSearchOpen(true);
+    });
+    searchInputRef.current?.focus({ preventScroll: true });
+  };
+
+  const confirmHomeSearch = () => {
+    const confirmedSearch = (searchInputRef.current?.value ?? homeSearchTerm).trim();
+    closeSearchOverlay();
+
+    if (!confirmedSearch) {
+      navigate('/search');
+      return;
+    }
+
+    const params = new URLSearchParams({ q: confirmedSearch });
+    navigate(`/search?${params.toString()}`);
+  };
+
+  const handleHomeSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    confirmHomeSearch();
+  };
+
+  useEffect(() => {
+    if (!isSearchOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus({ preventScroll: true });
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeSearchOverlay();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeSearchOverlay, isSearchOpen]);
 
   const handleTopBenefitClick = (
     businessId: string,
@@ -129,6 +189,15 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openSearchOverlay}
+              aria-label="Buscar beneficios"
+              aria-expanded={isSearchOpen}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors active:scale-95"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>search</span>
+            </button>
             {showBell && (
               <button
                 onClick={() => navigate('/notifications')}
@@ -156,6 +225,56 @@ function HomePage() {
         {/* Ticker */}
         <Ticker count={activeBenefitsCount} />
       </header>
+
+      <div
+        className={`fixed inset-0 z-[80] flex items-center justify-center px-4 pb-20 transition-opacity duration-200 ${
+          isSearchOpen ? 'visible pointer-events-auto opacity-100' : 'invisible pointer-events-none opacity-0'
+        }`}
+        aria-hidden={!isSearchOpen}
+      >
+        <button
+          type="button"
+          aria-label="Cerrar búsqueda"
+          tabIndex={isSearchOpen ? 0 : -1}
+          onClick={closeSearchOverlay}
+          className="absolute inset-0 h-full w-full bg-white/35 backdrop-blur-[2px]"
+        />
+        <form
+          role="search"
+          onSubmit={handleHomeSearchSubmit}
+          className={`relative z-10 flex h-14 w-full max-w-[22rem] items-center gap-3 rounded-2xl px-4 transition-all duration-300 ease-out ${
+            isSearchOpen
+              ? 'translate-x-0 translate-y-0 scale-100 opacity-100'
+              : 'translate-x-[34vw] -translate-y-[36vh] scale-[0.18] opacity-0'
+          }`}
+          style={{
+            background: 'rgba(255,255,255,0.96)',
+            border: '1px solid rgba(232,230,225,0.95)',
+            boxShadow: '0 18px 46px rgba(28,28,30,0.16)',
+            transformOrigin: 'calc(100% - 18px) -40px',
+          }}
+        >
+          <span className="material-symbols-outlined shrink-0 text-blink-muted" style={{ fontSize: 22 }}>search</span>
+          <input
+            ref={searchInputRef}
+            value={homeSearchTerm}
+            onChange={(event) => setHomeSearchTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmHomeSearch();
+              }
+            }}
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            tabIndex={isSearchOpen ? 0 : -1}
+            className="min-w-0 flex-1 appearance-none bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
+            placeholder="Buscar beneficios..."
+          />
+        </form>
+      </div>
 
       <NotificationBanner />
 
