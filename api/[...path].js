@@ -245,7 +245,7 @@ async function getUserIdFromRequest(req) {
 }
 
 async function getUserDataCollection() {
-  const db = await getWriteDb();
+  const db = await getWritableDb();
   const col = db.collection(USER_DATA_COLLECTION);
   await col.createIndex({ userId: 1 }, { unique: true }).catch(() => {});
   return col;
@@ -1722,10 +1722,7 @@ async function getWritableDb() {
   if (!MONGODB_URI) {
     throw new Error('MONGODB_URI environment variable is required for write operations');
   }
-  return getWriteDb();
-}
 
-async function getWriteDb() {
   if (!globalState.__blinkMongoWrite.clientPromise) {
     const client = new MongoClient(MONGODB_URI);
     globalState.__blinkMongoWrite.clientPromise = client.connect();
@@ -1752,7 +1749,7 @@ async function handleSignup(req, res) {
     return json(res, 400, { error: 'La contraseña debe tener al menos 6 caracteres' });
   }
 
-  const db = await getWriteDb();
+  const db = await getWritableDb();
   const users = db.collection('users');
 
   await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
@@ -1788,7 +1785,7 @@ async function handleLogin(req, res) {
     return json(res, 400, { error: 'Email y contraseña son requeridos' });
   }
 
-  const db = await getWriteDb();
+  const db = await getWritableDb();
   const user = await db.collection('users').findOne({ email: email.toLowerCase() });
 
   if (!user || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
@@ -1847,7 +1844,7 @@ async function handleGoogleCallback(req, res, url) {
     const profile = await profileRes.json();
     if (!profile.email) throw new Error('No email returned from Google');
 
-    const db = await getWriteDb();
+    const db = await getWritableDb();
     const user = await upsertSocialUser(db, {
       email: profile.email.toLowerCase(),
       name: profile.name || profile.email,
@@ -1901,7 +1898,7 @@ async function handleFacebookCallback(req, res, url) {
     const profile = await profileRes.json();
     if (!profile.email) throw new Error('No email returned from Facebook');
 
-    const db = await getWriteDb();
+    const db = await getWritableDb();
     const user = await upsertSocialUser(db, {
       email: profile.email.toLowerCase(),
       name: profile.name || profile.email,
@@ -1927,7 +1924,7 @@ async function handleGetMe(req, res) {
     return json(res, 401, { error: 'Token inválido o expirado' });
   }
 
-  const db = await getWriteDb();
+  const db = await getWritableDb();
   const user = await db.collection('users').findOne({ _id: new ObjectId(payload.sub) });
   if (!user) return json(res, 404, { error: 'Usuario no encontrado' });
 
