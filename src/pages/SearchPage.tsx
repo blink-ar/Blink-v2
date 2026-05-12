@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
@@ -300,6 +300,7 @@ function SearchPage() {
   const hasInitializedFiltersRef = useRef(false);
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Infinite scroll sentinel — primary results
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -644,6 +645,15 @@ function SearchPage() {
     setDebouncedSearch('');
   };
 
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const confirmedSearch = searchInputRef.current?.value.trim() ?? searchTerm.trim();
+    setSearchTerm(confirmedSearch);
+    setDebouncedSearch(confirmedSearch);
+    searchInputRef.current?.blur();
+  };
+
   const handleFiltersApply = (values: UnifiedFilterValues) => {
     setSelectedBanks(values.selectedBanks);
     setSelectedCategory(values.selectedCategory);
@@ -686,28 +696,33 @@ function SearchPage() {
           >
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
-          <div
+          <form
+            role="search"
+            onSubmit={submitSearch}
             className="flex-1 h-11 flex items-center px-3 gap-2 rounded-xl"
             style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
           >
             <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
             <input
-              className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+              ref={searchInputRef}
+              className="flex-1 appearance-none bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
               placeholder="Buscar tiendas y beneficios..."
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               autoFocus={false}
             />
             {searchTerm && (
               <button
+                type="button"
                 onClick={clearSearch}
                 className="text-blink-muted hover:text-blink-ink transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
             )}
-          </div>
+          </form>
           <button
             onClick={() => setShowFilters(true)}
             className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 active:scale-95 ${
