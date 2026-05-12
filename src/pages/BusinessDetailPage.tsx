@@ -7,6 +7,7 @@ import { getBankAccent } from '../utils/bankColors';
 import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
 import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
@@ -104,6 +105,7 @@ function BusinessDetailPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isAuthenticated } = useAuth();
 
   const sortedBenefits = useMemo(() => {
     if (!business) return [];
@@ -346,8 +348,20 @@ function BusinessDetailPage() {
 
           <button
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
-            onClick={() => toggleFavorite(business)}
-            aria-label={isFavorite(business.id) ? 'Quitar de guardados' : 'Guardar'}
+            onClick={() => {
+              if (!isAuthenticated) {
+                navigate('/login');
+                return;
+              }
+              toggleFavorite(business);
+            }}
+            aria-label={
+              !isAuthenticated
+                ? 'Iniciá sesión para guardar'
+                : isFavorite(business.id)
+                  ? 'Quitar de guardados'
+                  : 'Guardar'
+            }
           >
             <span
               className="material-symbols-outlined"

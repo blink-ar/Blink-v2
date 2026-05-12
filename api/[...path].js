@@ -1,6 +1,6 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import webpush from 'web-push';
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, scryptSync, timingSafeEqual, createPublicKey, createVerify } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
@@ -87,6 +87,9 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || '';
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || '';
+const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || '').replace(/\/$/, '');
+
+const USER_DATA_COLLECTION = 'user_data';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -156,6 +159,141 @@ function getAuthToken(req) {
   const auth = req.headers['authorization'] || '';
   if (auth.startsWith('Bearer ')) return auth.slice(7);
   return null;
+}
+
+const jwksCache = { keys: null, fetchedAt: 0 };
+const JWKS_TTL_MS = 60 * 60 * 1000;
+
+async function getAuth0Jwks() {
+  if (!AUTH0_DOMAIN) throw new Error('Auth0 domain not configured');
+  const now = Date.now();
+  if (jwksCache.keys && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
+  const res = await fetch(`https://${AUTH0_DOMAIN}/.well-known/jwks.json`);
+  if (!res.ok) throw new Error('Failed to fetch JWKS');
+  const data = await res.json();
+  jwksCache.keys = data.keys || [];
+  jwksCache.fetchedAt = now;
+  return jwksCache.keys;
+}
+
+async function verifyAuth0Jwt(token) {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) throw new Error('Invalid token');
+  const [headerB64, payloadB64, sigB64] = parts;
+  const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+  const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+
+  if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Token expired');
+  if (!payload.iss || !AUTH0_DOMAIN || !payload.iss.includes(AUTH0_DOMAIN)) throw new Error('Invalid issuer');
+  if (header.alg !== 'RS256') throw new Error('Unsupported algorithm');
+
+  const keys = await getAuth0Jwks();
+  const jwk = keys.find((k) => k.kid === header.kid && (k.use === 'sig' || !k.use));
+  if (!jwk) throw new Error('Signing key not found');
+
+  const pubKey = createPublicKey({ key: jwk, format: 'jwk' });
+  const verifier = createVerify('SHA256');
+  verifier.update(`${headerB64}.${payloadB64}`);
+  const ok = verifier.verify(pubKey, Buffer.from(sigB64, 'base64url'));
+  if (!ok) throw new Error('Invalid signature');
+  return payload;
+}
+
+async function getUserIdFromRequest(req) {
+  const token = getAuthToken(req);
+  if (!token) return null;
+  try {
+    const payload = verifyJwt(token);
+    if (payload && payload.sub) return String(payload.sub);
+  } catch {
+    // not a local JWT
+  }
+  try {
+    const payload = await verifyAuth0Jwt(token);
+    if (payload && payload.sub) return String(payload.sub);
+  } catch {
+    // not a valid Auth0 JWT
+  }
+  return null;
+}
+
+async function getUserDataCollection() {
+  const db = await getWriteDb();
+  const col = db.collection(USER_DATA_COLLECTION);
+  await col.createIndex({ userId: 1 }, { unique: true }).catch(() => {});
+  return col;
+}
+
+async function handleGetUserFavorites(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const col = await getUserDataCollection();
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleAddUserFavorite(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const body = await readJsonBody(req);
+  const merchantId = body?.merchantId;
+  if (!merchantId || typeof merchantId !== 'string') {
+    return json(res, 400, { error: 'merchantId requerido' });
+  }
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    {
+      $addToSet: { favoriteMerchantIds: merchantId },
+      $setOnInsert: { userId, createdAt: new Date() },
+      $set: { updatedAt: new Date() }
+    },
+    { upsert: true }
+  );
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleRemoveUserFavorite(req, res, merchantId) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  if (!merchantId) return json(res, 400, { error: 'merchantId requerido' });
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    { $pull: { favoriteMerchantIds: merchantId }, $set: { updatedAt: new Date() } }
+  );
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleGetUserBanks(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const col = await getUserDataCollection();
+  const doc = await col.findOne({ userId }, { projection: { savedBankCodes: 1 } });
+  return json(res, 200, { success: true, savedBankCodes: doc?.savedBankCodes ?? [] });
+}
+
+async function handleUpdateUserBanks(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const body = await readJsonBody(req);
+  const banks = body?.banks;
+  if (!Array.isArray(banks) || banks.some((b) => typeof b !== 'string')) {
+    return json(res, 400, { error: 'banks debe ser un array de strings' });
+  }
+  const unique = Array.from(new Set(banks.map((b) => b.trim()).filter(Boolean)));
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    {
+      $set: { savedBankCodes: unique, updatedAt: new Date() },
+      $setOnInsert: { userId, createdAt: new Date() }
+    },
+    { upsert: true }
+  );
+  return json(res, 200, { success: true, savedBankCodes: unique });
 }
 
 function buildOAuthState() {
@@ -2903,6 +3041,29 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/api/auth/facebook/callback') {
       return await handleFacebookCallback(req, res, url);
+    }
+
+    if (req.method === 'GET' && path === '/api/user/favorites') {
+      return await handleGetUserFavorites(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/user/favorites') {
+      return await handleAddUserFavorite(req, res);
+    }
+
+    if (req.method === 'DELETE') {
+      const favoriteMatch = path.match(/^\/api\/user\/favorites\/([^/]+)$/);
+      if (favoriteMatch) {
+        return await handleRemoveUserFavorite(req, res, decodeURIComponent(favoriteMatch[1]));
+      }
+    }
+
+    if (req.method === 'GET' && path === '/api/user/banks') {
+      return await handleGetUserBanks(req, res);
+    }
+
+    if (req.method === 'PUT' && path === '/api/user/banks') {
+      return await handleUpdateUserBanks(req, res);
     }
 
     if (req.method === 'GET') {
