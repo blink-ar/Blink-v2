@@ -617,33 +617,31 @@ function BusinessDetailPage() {
 
         {viewMode !== 'sucursal' && pastBenefits.length > 0 && (
           <section className="space-y-2 pt-3 px-4">
-            <h2 className="font-semibold text-base text-blink-ink">Beneficios anteriores</h2>
+            <h2 className="font-semibold text-base text-gray-400">Beneficios anteriores</h2>
             {pastBenefits.map((benefit, idx) => {
               const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
-              const accent = getBankAccent(benefit.bankName);
               const benefitIdx = business.benefits.indexOf(benefit);
 
               return (
                 <div
                   key={`past-${benefit.bankName}-${idx}`}
                   onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, activeBenefitCount + idx + 1); }}
-                  className="bg-white rounded-xl px-4 py-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all opacity-80"
-                  style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                  className="bg-gray-50 rounded-xl px-4 py-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+                  style={{ border: '1px solid #E8E6E1', filter: 'grayscale(0.6)', opacity: 0.7 }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0"
-                      style={{ background: accent.bg, color: accent.text }}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0 bg-gray-200 text-gray-500"
                     >
                       {bankShortName(benefit.bankName)}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm text-blink-ink leading-tight truncate">
+                      <p className="font-semibold text-sm text-gray-500 leading-tight truncate">
                         {benefit.benefit || benefit.cardName}
                       </p>
-                      <p className="text-[10px] text-blink-muted mt-0.5">
+                      <p className="text-[10px] text-gray-400 mt-0.5">
                         {benefit.validUntil ? `Venció: ${benefit.validUntil}` : 'Promoción anterior'}
                       </p>
                     </div>
@@ -651,14 +649,14 @@ function BusinessDetailPage() {
                   <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
                     <div className="text-right">
                       {hasDiscount ? (
-                        <p className="font-bold text-base text-blink-ink">{discount}%</p>
+                        <p className="font-bold text-base text-gray-400">{discount}%</p>
                       ) : hasInstallments ? (
-                        <p className="font-bold text-sm text-primary">{benefit.installments} cuotas</p>
+                        <p className="font-bold text-sm text-gray-400">{benefit.installments} cuotas</p>
                       ) : (
-                        <p className="text-xs text-blink-muted">{benefit.rewardRate}</p>
+                        <p className="text-xs text-gray-400">{benefit.rewardRate}</p>
                       )}
                     </div>
-                    <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 16 }}>chevron_right</span>
+                    <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 16 }}>chevron_right</span>
                   </div>
                 </div>
               );
