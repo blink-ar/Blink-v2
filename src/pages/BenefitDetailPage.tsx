@@ -347,8 +347,8 @@ function BenefitDetailPage() {
 
   return (
     <>
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
-      <main className="flex-1 overflow-y-auto pb-32">
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-32">
 
         {/* Hero — bank accent color, sticky */}
         <div
