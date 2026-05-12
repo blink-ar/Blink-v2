@@ -1,5 +1,4 @@
 import { MongoClient, ObjectId } from 'mongodb';
-import webpush from 'web-push';
 import { createPublicKey, createVerify } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
@@ -78,8 +77,6 @@ const BENEFIT_SUMMARY_PROJECTION = {
 };
 
 const REQUIRED_PRODUCTION_ENV_VARS = [
-  'NOTIFICATIONS_SECRET',
-  'VAPID_PRIVATE_KEY',
   'MONGODB_URI'
 ];
 
@@ -110,11 +107,6 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_
 const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || '').replace(/\/$/, '');
 
 const USER_DATA_COLLECTION = 'user_data';
-
-const VAPID_PUBLIC_KEY = readEnv('VAPID_PUBLIC_KEY');
-const VAPID_PRIVATE_KEY = readEnv('VAPID_PRIVATE_KEY');
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
-const NOTIFICATIONS_SECRET = readEnv('NOTIFICATIONS_SECRET');
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
@@ -2638,68 +2630,6 @@ async function handleNotificationUnsubscribe(req, res) {
   return json(res, 200, { success: true });
 }
 
-async function handleNotificationSend(req, res) {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    return json(res, 503, { error: 'Push notifications not configured (missing VAPID keys)' });
-  }
-
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  } catch (err) {
-    return json(res, 503, { error: 'Invalid VAPID configuration', detail: err.message });
-  }
-
-  const body = await readJsonBody(req);
-
-  if (NOTIFICATIONS_SECRET && body.secret !== NOTIFICATIONS_SECRET) {
-    return json(res, 401, { error: 'Unauthorized' });
-  }
-
-  const { title, body: notifBody, url, options } = body;
-
-  if (!title) {
-    return json(res, 400, { error: 'title is required' });
-  }
-
-  const db = await getWritableDb();
-  const subscriptions = await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).find({}).toArray();
-
-  if (subscriptions.length === 0) {
-    return json(res, 200, { success: true, sent: 0, total: 0 });
-  }
-
-  const payload = JSON.stringify({ title, body: notifBody || '', url: url || '/', ...options });
-
-  const results = await Promise.allSettled(
-    subscriptions.map((sub) =>
-      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
-    )
-  );
-
-  // Remove subscriptions that are gone (410) or not found (404)
-  const expiredEndpoints = results
-    .map((result, i) => ({ result, sub: subscriptions[i] }))
-    .filter(({ result }) => result.status === 'rejected' && [410, 404].includes(result.reason?.statusCode))
-    .map(({ sub }) => sub.endpoint);
-
-  if (expiredEndpoints.length > 0) {
-    await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteMany({ endpoint: { $in: expiredEndpoints } });
-  }
-
-  const sent = results.filter((r) => r.status === 'fulfilled').length;
-
-  await db.collection(NOTIFICATION_HISTORY_COLLECTION).insertOne({
-    title,
-    body: notifBody || '',
-    url: url || '/',
-    sentAt: new Date(),
-    sent,
-    total: subscriptions.length,
-  });
-
-  return json(res, 200, { success: true, sent, total: subscriptions.length, expired: expiredEndpoints.length });
-}
-
 async function handleNotificationHistory(req, res) {
   const db = await getWritableDb();
   const notifications = await db
@@ -2787,10 +2717,6 @@ export default async function handler(req, res) {
       return await handleNotificationUnsubscribe(req, res);
     }
 
-    if (req.method === 'POST' && path === '/api/notifications/send') {
-      return await handleNotificationSend(req, res);
-    }
-
     if (req.method === 'GET' && path === '/api/user/favorites') {
       return await handleGetUserFavorites(req, res);
     }
@@ -2840,8 +2766,7 @@ export default async function handler(req, res) {
         'POST /api/places/details',
         'GET /api/notifications/history',
         'POST /api/notifications/subscribe',
-        'POST /api/notifications/unsubscribe',
-        'POST /api/notifications/send'
+        'POST /api/notifications/unsubscribe'
       ]
     });
   } catch (error) {

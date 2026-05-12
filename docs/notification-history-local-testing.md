@@ -14,9 +14,8 @@ DATABASE_NAME=benefitsV3
 ```
 
 `MONGODB_URI_READ_ONLY` is not enough for subscription writes or notification
-history writes. Push sending also needs `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
-and optionally `NOTIFICATIONS_SECRET`, but history rendering can be tested by
-seeding `notification_history` directly.
+history writes. History rendering can be tested by seeding
+`notification_history` directly.
 
 ## Recreate Locally
 
@@ -67,23 +66,8 @@ curl http://localhost:3000/api/notifications/history
 5. Open `/notifications` in the local app. The seeded item should appear under
 the current day and navigate to `/search` when selected.
 
-## Send Endpoint Example
-
-Use this only against local or preview environments with test subscriptions:
-
-```sh
-curl -X POST http://localhost:3000/api/notifications/send \
-  -H "content-type: application/json" \
-  -d '{"secret":"<NOTIFICATIONS_SECRET>","title":"PR smoke notification","body":"Sent from local API","url":"/search"}'
-```
-
-If `push_subscriptions` is empty, the send endpoint returns success with
-`sent: 0` and does not create history. For UI testing, seed
-`notification_history` directly as shown above.
-
 ## Current PR Caveat
 
 The production live proxy returns `404` for this route until this PR is deployed,
 because production does not have the new notification history endpoint yet.
-Do not test push subscription or send flows against production while validating
-this PR.
+Do not test push subscription flows against production while validating this PR.
