@@ -22,6 +22,7 @@ import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { matchesSearchPhrase } from '../utils/searchNormalization';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -174,11 +175,11 @@ function SearchPage() {
   });
 
   const strictMatches = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
+    const term = debouncedSearch.trim();
     if (!term) return enrichedBusinesses;
     return enrichedBusinesses.filter((b) =>
-      b.name.toLowerCase().includes(term) ||
-      (b as any).aliases?.some((a: string) => a.toLowerCase().includes(term))
+      matchesSearchPhrase(b.name, term) ||
+      b.aliases?.some((alias) => matchesSearchPhrase(alias, term))
     );
   }, [enrichedBusinesses, debouncedSearch]);
 
