@@ -1929,29 +1929,6 @@ async function handleGetBanks(req, res, url, db) {
   });
 }
 
-async function handleGetNetworks(req, res, url, db) {
-  const searchParams = url.searchParams;
-  const collectionName = getCollectionName(searchParams);
-  const activeMatch = getActiveBenefitsMatch(searchParams);
-
-  const networks = await db.collection(collectionName)
-    .aggregate([
-      ...(activeMatch ? [{ $match: activeMatch }] : []),
-      { $group: { _id: '$network', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ])
-    .toArray();
-
-  setCacheControl(res, CC_METADATA);
-  return json(res, 200, {
-    success: true,
-    networks: networks.map((network) => ({
-      name: network._id,
-      count: network.count
-    }))
-  });
-}
-
 async function handleGetStats(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -2790,10 +2767,6 @@ export default async function handler(req, res) {
       return await handleGetBanks(req, res, url, db);
     }
 
-    if (req.method === 'GET' && path === '/api/networks') {
-      return await handleGetNetworks(req, res, url, db);
-    }
-
     if (req.method === 'GET' && path === '/api/stats') {
       return await handleGetStats(req, res, url, db);
     }
@@ -2863,7 +2836,6 @@ export default async function handler(req, res) {
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
-        'GET /api/networks',
         'GET /api/stats',
         'POST /api/places/details',
         'GET /api/notifications/history',
