@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchBusinessesPaginated } from '../services/api';
 import { useSEO } from '../hooks/useSEO';
 import { toAbsoluteUrl } from '../seo/seo';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 import {
   LANDING_BANKS,
   LANDING_CATEGORIES,
@@ -169,7 +170,7 @@ function LandingPage() {
               '@type': 'ListItem',
               position: index + 1,
               name: business.name,
-              url: toAbsoluteUrl(`/business/${business.id}`),
+              url: toAbsoluteUrl(getMerchantSeoPath({ id: business.id, name: business.name })),
             })),
           },
         ]
@@ -234,7 +235,7 @@ function LandingPage() {
             {filteredBusinesses.slice(0, 24).map((business) => (
               <Link
                 key={business.id}
-                to={`/business/${business.id}`}
+                to={getMerchantSeoPath({ id: business.id, name: business.name })}
                 className="border-2 border-blink-ink bg-white shadow-hard-sm p-4 hover:bg-blink-surface transition-colors"
               >
                 <p className="font-display text-lg uppercase leading-tight">{business.name}</p>

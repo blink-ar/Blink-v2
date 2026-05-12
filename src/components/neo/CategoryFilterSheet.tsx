@@ -4,22 +4,25 @@ export interface CategoryOption {
   token: string;
   label: string;
   icon: string;
+  emoji: string;
+  bg: string;
+  color: string;
 }
 
 export const CATEGORY_OPTIONS: CategoryOption[] = [
-  { token: 'gastronomia',     label: 'Gastronomía',     icon: 'restaurant' },
-  { token: 'moda',            label: 'Moda',             icon: 'checkroom' },
-  { token: 'viajes',          label: 'Viajes',           icon: 'flight' },
-  { token: 'entretenimiento', label: 'Entretenimiento',  icon: 'movie' },
-  { token: 'deportes',        label: 'Deportes',         icon: 'sports_soccer' },
-  { token: 'belleza',         label: 'Belleza',          icon: 'face_retouching_natural' },
-  { token: 'hogar',           label: 'Hogar',            icon: 'home' },
-  { token: 'electro',         label: 'Electro',          icon: 'electrical_services' },
-  { token: 'shopping',        label: 'Shopping',         icon: 'shopping_bag' },
-  { token: 'automotores',     label: 'Automotores',      icon: 'directions_car' },
-  { token: 'regalos',         label: 'Regalos',          icon: 'card_giftcard' },
-  { token: 'jugueterias',     label: 'Jugueterías',      icon: 'toys' },
-  { token: 'otros',           label: 'Otros',            icon: 'more_horiz' },
+  { token: 'gastronomia',     label: 'Gastronomía',     icon: 'restaurant',             emoji: '🍕', bg: '#EEF2FF', color: '#4338CA' },
+  { token: 'moda',            label: 'Moda',             icon: 'checkroom',              emoji: '👗', bg: '#FCE7F3', color: '#9D174D' },
+  { token: 'viajes',          label: 'Viajes',           icon: 'flight',                 emoji: '✈️', bg: '#DBEAFE', color: '#1E40AF' },
+  { token: 'entretenimiento', label: 'Entretenimiento',  icon: 'movie',                  emoji: '🎮', bg: '#EDE9FE', color: '#4C1D95' },
+  { token: 'deportes',        label: 'Deportes',         icon: 'sports_soccer',          emoji: '⚽', bg: '#D1FAE5', color: '#065F46' },
+  { token: 'belleza',         label: 'Belleza',          icon: 'face_retouching_natural', emoji: '💄', bg: '#FDF2F8', color: '#831843' },
+  { token: 'hogar',           label: 'Hogar',            icon: 'home',                   emoji: '🏠', bg: '#ECFDF5', color: '#064E3B' },
+  { token: 'electro',         label: 'Electro',          icon: 'electrical_services',    emoji: '💻', bg: '#EEF2FF', color: '#312E81' },
+  { token: 'shopping',        label: 'Supermercado',     icon: 'shopping_bag',           emoji: '🛒', bg: '#F0FDF4', color: '#14532D' },
+  { token: 'automotores',     label: 'Automotores',      icon: 'directions_car',         emoji: '🚗', bg: '#F3F4F6', color: '#374151' },
+  { token: 'regalos',         label: 'Regalos',          icon: 'card_giftcard',          emoji: '🎁', bg: '#FEE2E2', color: '#991B1B' },
+  { token: 'jugueterias',     label: 'Jugueterías',      icon: 'toys',                   emoji: '🧸', bg: '#FEF3C7', color: '#92400E' },
+  { token: 'otros',           label: 'Otros',            icon: 'more_horiz',             emoji: '📦', bg: '#F8FAFC', color: '#475569' },
 ];
 
 interface CategoryFilterSheetProps {
@@ -94,25 +97,31 @@ const CategoryFilterSheet = ({
                 <button
                   key={option.token}
                   onClick={() => toggle(option.token)}
-                  className={`aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 gap-1.5 transition-all duration-150 active:scale-95 ${
-                    isSelected
-                      ? 'bg-primary/10 ring-2 ring-primary/40'
-                      : 'bg-blink-bg border border-blink-border hover:border-primary/30'
-                  }`}
+                  className="aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 gap-1.5 transition-all duration-150 active:scale-95"
+                  style={isSelected ? {
+                    backgroundColor: option.bg,
+                    outline: `2px solid ${option.color}60`,
+                    outlineOffset: '0px',
+                  } : {
+                    backgroundColor: option.bg,
+                    border: `1px solid ${option.color}20`,
+                  }}
                 >
+                  {/* Emoji icon */}
+                  <span style={{ fontSize: 28, lineHeight: 1 }}>{option.emoji}</span>
+
                   <span
-                    className={`material-symbols-outlined ${isSelected ? 'text-primary' : 'text-blink-muted'}`}
-                    style={{ fontSize: 26 }}
-                  >
-                    {option.icon}
-                  </span>
-                  <span
-                    className={`text-[10px] font-semibold text-center leading-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}
+                    className="text-[10px] font-semibold text-center leading-tight"
+                    style={{ color: option.color }}
                   >
                     {option.label}
                   </span>
+
                   {isSelected && (
-                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <div
+                      className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: option.color }}
+                    >
                       <span className="material-symbols-outlined text-white" style={{ fontSize: 12 }}>check</span>
                     </div>
                   )}

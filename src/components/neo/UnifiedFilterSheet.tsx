@@ -260,23 +260,27 @@ const UnifiedFilterSheet = ({
                           selectedCategory: d.selectedCategory === option.token ? '' : option.token,
                         }))
                       }
-                      className={`py-3 relative rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
-                        isSelected
-                          ? 'bg-primary/10 ring-2 ring-primary/40'
-                          : 'bg-blink-bg border border-blink-border hover:border-primary/30'
-                      }`}
+                      className="py-3 relative rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95"
+                      style={isSelected ? {
+                        backgroundColor: option.bg,
+                        outline: `2px solid ${option.color}60`,
+                      } : {
+                        backgroundColor: option.bg,
+                        border: `1px solid ${option.color}20`,
+                      }}
                     >
+                      <span style={{ fontSize: 22, lineHeight: 1 }}>{option.emoji}</span>
                       <span
-                        className={`material-symbols-outlined ${isSelected ? 'text-primary' : 'text-blink-muted'}`}
-                        style={{ fontSize: 22 }}
+                        className="text-[9px] font-semibold text-center leading-tight"
+                        style={{ color: option.color }}
                       >
-                        {option.icon}
-                      </span>
-                      <span className={`text-[9px] font-semibold text-center leading-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}>
                         {option.label}
                       </span>
                       {isSelected && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                        <div
+                          className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                          style={{ background: option.color }}
+                        >
                           <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>
                         </div>
                       )}
