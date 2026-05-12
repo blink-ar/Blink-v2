@@ -15,13 +15,24 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
-import { NotificationBanner } from '../components/NotificationBanner';
+import { NotificationBanner, InstallSheet } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+
+function isIOSBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!/iphone|ipad|ipod/i.test(navigator.userAgent)) return false;
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true;
+  return !standalone;
+}
 
 function HomePage() {
   const navigate = useNavigate();
   const { isSupported, isSubscribed } = usePushNotifications();
-  const showBell = isSupported;
+  const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
+  const [showInstallSheet, setShowInstallSheet] = useState(false);
+  const showBell = iosNotInstalled || isSupported;
   const { user } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [homeSearchTerm, setHomeSearchTerm] = useState('');
@@ -209,13 +220,18 @@ function HomePage() {
             </button>
             {showBell && (
               <button
-                onClick={() => navigate('/notifications')}
-                aria-label="Ver notificaciones"
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+                onClick={() => iosNotInstalled ? setShowInstallSheet(true) : navigate('/notifications')}
+                aria-label={iosNotInstalled ? 'Instalá la app para activar notificaciones' : 'Ver notificaciones'}
+                className="relative w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
                   notifications
                 </span>
+                {iosNotInstalled && (
+                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                    1
+                  </span>
+                )}
               </button>
             )}
             <Link
@@ -474,6 +490,7 @@ function HomePage() {
       </main>
 
       <BottomNav />
+      {showInstallSheet && <InstallSheet onClose={() => setShowInstallSheet(false)} />}
     </div>
   );
 }
