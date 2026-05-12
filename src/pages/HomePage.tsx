@@ -15,7 +15,7 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
-import { NotificationBanner, InstallSheet } from '../components/NotificationBanner';
+import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function isIOSBrowser(): boolean {
@@ -31,7 +31,6 @@ function HomePage() {
   const navigate = useNavigate();
   const { isSupported, isSubscribed } = usePushNotifications();
   const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
-  const [showInstallSheet, setShowInstallSheet] = useState(false);
   const showBell = iosNotInstalled || isSupported;
   const { user } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -220,8 +219,8 @@ function HomePage() {
             </button>
             {showBell && (
               <button
-                onClick={() => iosNotInstalled ? setShowInstallSheet(true) : navigate('/notifications')}
-                aria-label={iosNotInstalled ? 'Instalá la app para activar notificaciones' : 'Ver notificaciones'}
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
                 className="relative w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
@@ -490,7 +489,6 @@ function HomePage() {
       </main>
 
       <BottomNav />
-      {showInstallSheet && <InstallSheet onClose={() => setShowInstallSheet(false)} />}
     </div>
   );
 }
