@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import MerchantCard from '../components/MerchantCard';
 import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Business } from '../types';
 import { fetchBusinessById } from '../services/api';
 import { businessWithActiveBenefits } from '../utils/benefits';
 
 function SavedPage() {
   const { favorites } = useFavorites();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const hasSavedSnapshots = favorites.length > 0;
   const favoriteQueries = useQueries({
@@ -51,7 +53,36 @@ function SavedPage() {
       </header>
 
       <main className="flex-1 flex flex-col pb-28">
-        {visibleFavorites.length === 0 ? (
+        {!isAuthenticated ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 py-16">
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%)' }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 40, color: '#6366F1', fontVariationSettings: "'FILL' 0" }}
+              >
+                lock_open
+              </span>
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-base text-blink-ink mb-1">
+                Creá tu cuenta para guardar comercios
+              </p>
+              <p className="text-sm text-blink-muted max-w-xs">
+                Iniciá sesión para guardar tus comercios favoritos y sincronizarlos en todos tus dispositivos.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="mt-2 h-11 px-6 rounded-xl font-semibold text-sm text-white transition-all duration-150 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
+            >
+              Iniciar sesión
+            </button>
+          </div>
+        ) : visibleFavorites.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 py-16">
             <div
               className="w-20 h-20 rounded-2xl flex items-center justify-center"

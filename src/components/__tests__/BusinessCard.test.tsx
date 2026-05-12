@@ -1,9 +1,21 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import BusinessCard from "../BusinessCard";
+import { AuthProvider } from "../../contexts/AuthContext";
 import { FavoritesProvider } from "../../context/FavoritesContext";
 import { Business } from "../../types";
+
+vi.mock("@auth0/auth0-react", () => ({
+  useAuth0: () => ({
+    user: null,
+    isLoading: false,
+    isAuthenticated: false,
+    loginWithPopup: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
 
 // Mock the BankLogos module
 vi.mock("../BankLogos", () => ({
@@ -87,13 +99,17 @@ describe("BusinessCard", () => {
 
   const renderBusinessCard = (props: Partial<React.ComponentProps<typeof BusinessCard>> = {}) =>
     render(
-      <FavoritesProvider>
-        <BusinessCard
-          business={mockBusiness}
-          onClick={mockOnClick}
-          {...props}
-        />
-      </FavoritesProvider>
+      <MemoryRouter>
+        <AuthProvider>
+          <FavoritesProvider>
+            <BusinessCard
+              business={mockBusiness}
+              onClick={mockOnClick}
+              {...props}
+            />
+          </FavoritesProvider>
+        </AuthProvider>
+      </MemoryRouter>
     );
 
   beforeEach(() => {

@@ -1,7 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Business } from '../types';
 import { toBankDescriptor } from '../utils/banks';
 import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDistance } from '../utils/distance';
 import { filterActiveBenefits } from '../utils/benefits';
 
@@ -50,6 +52,8 @@ const getBankBadges = (benefits: Business['benefits']): string[] => {
 
 const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClick }) => {
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const favorited = isFavorite(business.id);
   const activeBenefits = filterActiveBenefits(business.benefits || []);
 
@@ -143,9 +147,19 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
           className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-colors active:scale-90"
           onClick={(e) => {
             e.stopPropagation();
+            if (!isAuthenticated) {
+              navigate('/login');
+              return;
+            }
             toggleFavorite(business);
           }}
-          aria-label={favorited ? 'Quitar de guardados' : 'Guardar'}
+          aria-label={
+            !isAuthenticated
+              ? 'Iniciá sesión para guardar'
+              : favorited
+                ? 'Quitar de guardados'
+                : 'Guardar'
+          }
         >
           <span
             className="material-symbols-outlined"
