@@ -40,7 +40,6 @@ const BankFilterSheet = ({
   isOpen,
   options,
   selectedTokens,
-  onClose,
   onApply,
 }: BankFilterSheetProps) => {
   const [searchTerm, setSearchTerm] = useState('');

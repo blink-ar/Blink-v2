@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CacheService, CacheEntry } from '../CacheService';
-import { CacheError, StorageError } from '../base';
+import { StorageError } from '../base';
 
 // Simple localStorage mock
 const mockStorage = {

@@ -35,7 +35,6 @@ interface CategoryFilterSheetProps {
 const CategoryFilterSheet = ({
   isOpen,
   selected,
-  onClose,
   onApply,
 }: CategoryFilterSheetProps) => {
   const [draft, setDraft] = useState(selected);
@@ -59,8 +58,6 @@ const CategoryFilterSheet = ({
   const toggle = (token: string) => {
     setDraft((current) => (current === token ? '' : token));
   };
-
-  const activeOption = CATEGORY_OPTIONS.find((o) => o.token === draft);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm">

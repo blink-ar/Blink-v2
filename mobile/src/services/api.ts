@@ -8,7 +8,6 @@ import {
   MongoStatsResponse,
   transformRawBenefitToBenefit,
 } from '../types/mongodb';
-import type { CanonicalLocation } from '../types';
 import { API_BASE_URL } from '../constants';
 
 const COLLECTION = 'confirmed_benefits';

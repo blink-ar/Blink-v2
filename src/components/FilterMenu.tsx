@@ -78,7 +78,6 @@ export function FilterMenu({
   onNetworkChange,
   hasInstallments,
   onHasInstallmentsChange,
-  onClose,
 }: FilterMenuProps) {
   // Helper to calculate active filter count
   const getActiveFilterCount = () => {

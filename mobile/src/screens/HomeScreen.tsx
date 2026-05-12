@@ -21,7 +21,6 @@ import ActiveOffers from '../components/ActiveOffers';
 import { SkeletonCard } from '../components/ui/Skeleton';
 import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
-import { Business, Category } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { CATEGORY_DATA, BANK_DATA } from '../constants';
 import { colors } from '../constants/theme';

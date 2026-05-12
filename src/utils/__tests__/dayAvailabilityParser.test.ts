@@ -329,8 +329,7 @@ import {
     hasAnyDayAvailable,
     getAvailableDayNames,
     getPatternConfidence,
-    type DayAvailability,
-    type PatternMatch
+    type DayAvailability
 } from '../dayAvailabilityParser';
 
 describe('dayAvailabilityParser', () => {

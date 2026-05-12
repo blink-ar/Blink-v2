@@ -6,14 +6,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import { Business, BankBenefit, CanonicalLocation } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
-import { getRawBenefitById, getRawBenefits } from '../services/rawBenefitsApi';
+import { getRawBenefitById } from '../services/rawBenefitsApi';
 import { useBusinessesData } from '../hooks/useBenefitsData';
 import StoreHeader from '../components/StoreHeader';
 import StoreInformation from '../components/StoreInformation';
 import { BankBenefitGroup } from '../components/BankBenefitGroup';
 import BenefitDetailModal from '../components/BenefitDetailModal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { colors, borderRadius } from '../constants/theme';
+import { colors } from '../constants/theme';
 
 type RouteProps = RouteProp<RootStackParamList, 'BenefitDetail'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;

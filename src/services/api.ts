@@ -9,8 +9,7 @@ import {
   MongoBanksResponse,
   MongoStatsResponse,
   transformRawBenefitToBenefit,
-  BankSubscription,
-  RawBankSubscription
+  BankSubscription
 } from '../types/mongodb';
 
 declare global {

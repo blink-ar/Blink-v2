@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mockBusinesses } from '../mockData';
 import { MockDataGenerator, generateConsistentMockData } from '../mockDataGenerator';
 import { DataTransformationService } from '../../services/DataTransformationService';
-import { Business, BankBenefit, Category } from '../../types';
+import { Category } from '../../types';
 
 describe('Mock Data Consistency', () => {
     let transformationService: DataTransformationService;

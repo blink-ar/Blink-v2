@@ -1,5 +1,5 @@
 import { Business, BankBenefit, Category } from '../types';
-import { AbstractBaseService, Logger, ValidationError } from './base';
+import { AbstractBaseService, Logger } from './base';
 import { getCategoryDefaultImage } from '../utils/categoryImages';
 
 /**
