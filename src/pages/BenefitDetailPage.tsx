@@ -347,7 +347,7 @@ function BenefitDetailPage() {
 
   return (
     <>
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative">
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
       <main className="flex-1 overflow-y-auto overflow-x-hidden pb-32">
 
         {/* Hero — bank accent color, sticky */}
@@ -744,30 +744,32 @@ function BenefitDetailPage() {
         </div>
       </main>
 
-      {/* Fixed bottom CTA */}
-      <div
-        className="fixed bottom-0 left-0 right-0 p-4 flex gap-3 z-20"
-        style={{
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(12px)',
-          borderTop: '1px solid #E8E6E1',
-        }}
+    </div>
+
+    {/* Bottom CTA — lives outside the scroll container so no ancestor overflow can shift it */}
+    <div
+      className="fixed bottom-0 left-0 right-0 px-4 pt-4 flex gap-3 z-[60]"
+      style={{
+        background: 'rgba(255,255,255,0.95)',
+        backdropFilter: 'blur(12px)',
+        borderTop: '1px solid #E8E6E1',
+        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+      }}
+    >
+      <button
+        onClick={handleOpenMap}
+        className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+        style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
       >
-        <button
-          onClick={handleOpenMap}
-          className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
-          Ver ubicación
-        </button>
-        <button
-          onClick={() => void handleShare()}
-          className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>share</span>
-        </button>
-      </div>
+        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
+        Ver ubicación
+      </button>
+      <button
+        onClick={() => void handleShare()}
+        className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>share</span>
+      </button>
     </div>
 
     {/* ── Locations popup — portal to escape any stacking context ── */}
