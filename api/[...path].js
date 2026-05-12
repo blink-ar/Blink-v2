@@ -1,6 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
-import webpush from 'web-push';
-import { createHmac, randomBytes, scryptSync, timingSafeEqual, createPublicKey, createVerify } from 'crypto';
+import { createPublicKey, createVerify } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
@@ -77,24 +76,37 @@ const BENEFIT_SUMMARY_PROJECTION = {
   subscription: 1
 };
 
-const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
-const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
+const REQUIRED_PRODUCTION_ENV_VARS = [
+  'MONGODB_URI'
+];
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+}
+
+function readEnv(name) {
+  const value = process.env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function validateProductionEnv() {
+  if (!isProductionRuntime()) return;
+
+  const missing = REQUIRED_PRODUCTION_ENV_VARS.filter((name) => !readEnv(name));
+  if (missing.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+}
+
+validateProductionEnv();
+
+const MONGODB_URI_READ_ONLY = readEnv('MONGODB_URI_READ_ONLY');
+const MONGODB_URI = readEnv('MONGODB_URI');
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme-set-JWT_SECRET-in-env';
-const APP_URL = (process.env.APP_URL || process.env.VITE_SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || '';
-const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || '';
 const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || '').replace(/\/$/, '');
 
 const USER_DATA_COLLECTION = 'user_data';
-
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
-const NOTIFICATIONS_SECRET = process.env.NOTIFICATIONS_SECRET;
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
@@ -117,43 +129,6 @@ if (!globalState.__blinkBankCards) {
 }
 
 // --- Auth utilities ---
-
-function base64url(value) {
-  return Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url');
-}
-
-function signJwt(payload) {
-  const header = base64url({ alg: 'HS256', typ: 'JWT' });
-  const now = Math.floor(Date.now() / 1000);
-  const body = base64url({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 });
-  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
-  return `${header}.${body}.${sig}`;
-}
-
-function verifyJwt(token) {
-  const parts = (token || '').split('.');
-  if (parts.length !== 3) throw new Error('Invalid token');
-  const [header, body, sig] = parts;
-  const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
-  const sigBuf = Buffer.from(sig, 'base64url');
-  const expBuf = Buffer.from(expected, 'base64url');
-  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) throw new Error('Invalid signature');
-  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
-  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired');
-  return payload;
-}
-
-function hashPassword(password) {
-  const salt = randomBytes(16).toString('hex');
-  const hash = scryptSync(password, salt, 64).toString('hex');
-  return { hash, salt };
-}
-
-function verifyPassword(password, hash, salt) {
-  const derived = scryptSync(password, salt, 64);
-  const stored = Buffer.from(hash, 'hex');
-  return derived.length === stored.length && timingSafeEqual(derived, stored);
-}
 
 function getAuthToken(req) {
   const auth = req.headers['authorization'] || '';
@@ -203,12 +178,6 @@ async function getUserIdFromRequest(req) {
   const token = getAuthToken(req);
   if (!token) return null;
   try {
-    const payload = verifyJwt(token);
-    if (payload && payload.sub) return String(payload.sub);
-  } catch {
-    // not a local JWT
-  }
-  try {
     const payload = await verifyAuth0Jwt(token);
     if (payload && payload.sub) return String(payload.sub);
   } catch {
@@ -218,7 +187,7 @@ async function getUserIdFromRequest(req) {
 }
 
 async function getUserDataCollection() {
-  const db = await getWriteDb();
+  const db = await getWritableDb();
   const col = db.collection(USER_DATA_COLLECTION);
   await col.createIndex({ userId: 1 }, { unique: true }).catch(() => {});
   return col;
@@ -294,49 +263,6 @@ async function handleUpdateUserBanks(req, res) {
     { upsert: true }
   );
   return json(res, 200, { success: true, savedBankCodes: unique });
-}
-
-function buildOAuthState() {
-  const ts = Date.now().toString();
-  const sig = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
-  return `${Buffer.from(ts).toString('base64url')}.${sig}`;
-}
-
-function verifyOAuthState(state) {
-  const [tsPart, sig] = (state || '').split('.');
-  if (!tsPart || !sig) return false;
-  const ts = Buffer.from(tsPart, 'base64url').toString();
-  const expected = createHmac('sha256', JWT_SECRET).update(ts).digest('hex');
-  const sigBuf = Buffer.from(sig, 'hex');
-  const expBuf = Buffer.from(expected, 'hex');
-  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return false;
-  return Date.now() - Number(ts) < 10 * 60 * 1000; // 10 minutes
-}
-
-async function upsertSocialUser(db, { email, name, googleId, facebookId }) {
-  const users = db.collection('users');
-  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
-
-  const providerQuery = googleId ? { googleId } : { facebookId };
-  const existing = await users.findOne(providerQuery);
-  if (existing) {
-    return existing;
-  }
-
-  const byEmail = await users.findOne({ email });
-  if (byEmail) {
-    await users.updateOne({ _id: byEmail._id }, { $set: googleId ? { googleId } : { facebookId } });
-    return { ...byEmail, ...(googleId ? { googleId } : { facebookId }) };
-  }
-
-  const result = await users.insertOne({
-    name,
-    email,
-    ...(googleId ? { googleId } : { facebookId }),
-    createdAt: new Date(),
-    isActive: true
-  });
-  return { _id: result.insertedId, name, email };
 }
 
 function json(res, statusCode, payload) {
@@ -1695,10 +1621,7 @@ async function getWritableDb() {
   if (!MONGODB_URI) {
     throw new Error('MONGODB_URI environment variable is required for write operations');
   }
-  return getWriteDb();
-}
 
-async function getWriteDb() {
   if (!globalState.__blinkMongoWrite.clientPromise) {
     const client = new MongoClient(MONGODB_URI);
     globalState.__blinkMongoWrite.clientPromise = client.connect();
@@ -1709,205 +1632,6 @@ async function getWriteDb() {
   }
 
   return globalState.__blinkMongoWrite.dbPromise;
-}
-
-async function handleSignup(req, res) {
-  const body = await readJsonBody(req);
-  const { name, email, password } = body || {};
-
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return json(res, 400, { error: 'El nombre es requerido' });
-  }
-  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return json(res, 400, { error: 'Email inválido' });
-  }
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    return json(res, 400, { error: 'La contraseña debe tener al menos 6 caracteres' });
-  }
-
-  const db = await getWriteDb();
-  const users = db.collection('users');
-
-  await users.createIndex({ email: 1 }, { unique: true }).catch(() => {});
-
-  const existing = await users.findOne({ email: email.toLowerCase() });
-  if (existing) {
-    return json(res, 409, { error: 'Ya existe una cuenta con ese email' });
-  }
-
-  const { hash, salt } = hashPassword(password);
-  const result = await users.insertOne({
-    name: name.trim(),
-    email: email.toLowerCase(),
-    passwordHash: hash,
-    passwordSalt: salt,
-    createdAt: new Date(),
-    isActive: true
-  });
-
-  const token = signJwt({ sub: result.insertedId.toString(), email: email.toLowerCase() });
-  return json(res, 201, {
-    success: true,
-    token,
-    user: { id: result.insertedId.toString(), name: name.trim(), email: email.toLowerCase() }
-  });
-}
-
-async function handleLogin(req, res) {
-  const body = await readJsonBody(req);
-  const { email, password } = body || {};
-
-  if (!email || !password) {
-    return json(res, 400, { error: 'Email y contraseña son requeridos' });
-  }
-
-  const db = await getWriteDb();
-  const user = await db.collection('users').findOne({ email: email.toLowerCase() });
-
-  if (!user || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
-    return json(res, 401, { error: 'Email o contraseña incorrectos' });
-  }
-
-  const token = signJwt({ sub: user._id.toString(), email: user.email });
-  return json(res, 200, {
-    success: true,
-    token,
-    user: { id: user._id.toString(), name: user.name, email: user.email }
-  });
-}
-
-async function handleGoogleAuth(req, res) {
-  if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google OAuth no configurado' });
-  const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: `${APP_URL}/api/auth/google/callback`,
-    response_type: 'code',
-    scope: 'openid email profile',
-    state: buildOAuthState(),
-    access_type: 'online',
-    prompt: 'select_account'
-  });
-  return redirect(res, 302, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
-}
-
-async function handleGoogleCallback(req, res, url) {
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
-  const errorParam = url.searchParams.get('error');
-
-  if (errorParam || !code || !verifyOAuthState(state)) {
-    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
-  }
-
-  try {
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${APP_URL}/api/auth/google/callback`,
-        grant_type: 'authorization_code'
-      })
-    });
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) throw new Error('No access token from Google');
-
-    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` }
-    });
-    const profile = await profileRes.json();
-    if (!profile.email) throw new Error('No email returned from Google');
-
-    const db = await getWriteDb();
-    const user = await upsertSocialUser(db, {
-      email: profile.email.toLowerCase(),
-      name: profile.name || profile.email,
-      googleId: profile.id
-    });
-
-    const token = signJwt({ sub: user._id.toString(), email: user.email });
-    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
-  } catch (err) {
-    console.error('[OAuth] Google callback error:', err);
-    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
-  }
-}
-
-async function handleFacebookAuth(req, res) {
-  if (!FACEBOOK_APP_ID) return json(res, 503, { error: 'Facebook OAuth no configurado' });
-  const params = new URLSearchParams({
-    client_id: FACEBOOK_APP_ID,
-    redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
-    response_type: 'code',
-    scope: 'email,public_profile',
-    state: buildOAuthState()
-  });
-  return redirect(res, 302, `https://www.facebook.com/v19.0/dialog/oauth?${params}`);
-}
-
-async function handleFacebookCallback(req, res, url) {
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
-  const errorParam = url.searchParams.get('error');
-
-  if (errorParam || !code || !verifyOAuthState(state)) {
-    return redirect(res, 302, `${APP_URL}/auth/callback?error=acceso_denegado`);
-  }
-
-  try {
-    const tokenRes = await fetch(
-      `https://graph.facebook.com/v19.0/oauth/access_token?${new URLSearchParams({
-        client_id: FACEBOOK_APP_ID,
-        client_secret: FACEBOOK_APP_SECRET,
-        redirect_uri: `${APP_URL}/api/auth/facebook/callback`,
-        code
-      })}`
-    );
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) throw new Error('No access token from Facebook');
-
-    const profileRes = await fetch(
-      `https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${tokenData.access_token}`
-    );
-    const profile = await profileRes.json();
-    if (!profile.email) throw new Error('No email returned from Facebook');
-
-    const db = await getWriteDb();
-    const user = await upsertSocialUser(db, {
-      email: profile.email.toLowerCase(),
-      name: profile.name || profile.email,
-      facebookId: profile.id
-    });
-
-    const token = signJwt({ sub: user._id.toString(), email: user.email });
-    return redirect(res, 302, `${APP_URL}/auth/callback?token=${encodeURIComponent(token)}`);
-  } catch (err) {
-    console.error('[OAuth] Facebook callback error:', err);
-    return redirect(res, 302, `${APP_URL}/auth/callback?error=error_de_servidor`);
-  }
-}
-
-async function handleGetMe(req, res) {
-  const token = getAuthToken(req);
-  if (!token) return json(res, 401, { error: 'No autenticado' });
-
-  let payload;
-  try {
-    payload = verifyJwt(token);
-  } catch {
-    return json(res, 401, { error: 'Token inválido o expirado' });
-  }
-
-  const db = await getWriteDb();
-  const user = await db.collection('users').findOne({ _id: new ObjectId(payload.sub) });
-  if (!user) return json(res, 404, { error: 'Usuario no encontrado' });
-
-  return json(res, 200, {
-    success: true,
-    user: { id: user._id.toString(), name: user.name, email: user.email }
-  });
 }
 
 async function readJsonBody(req) {
@@ -2193,29 +1917,6 @@ async function handleGetBanks(req, res, url, db) {
     banks: banks.map((bank) => ({
       name: bank._id,
       count: bank.count
-    }))
-  });
-}
-
-async function handleGetNetworks(req, res, url, db) {
-  const searchParams = url.searchParams;
-  const collectionName = getCollectionName(searchParams);
-  const activeMatch = getActiveBenefitsMatch(searchParams);
-
-  const networks = await db.collection(collectionName)
-    .aggregate([
-      ...(activeMatch ? [{ $match: activeMatch }] : []),
-      { $group: { _id: '$network', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ])
-    .toArray();
-
-  setCacheControl(res, CC_METADATA);
-  return json(res, 200, {
-    success: true,
-    networks: networks.map((network) => ({
-      name: network._id,
-      count: network.count
     }))
   });
 }
@@ -2929,68 +2630,6 @@ async function handleNotificationUnsubscribe(req, res) {
   return json(res, 200, { success: true });
 }
 
-async function handleNotificationSend(req, res) {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    return json(res, 503, { error: 'Push notifications not configured (missing VAPID keys)' });
-  }
-
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  } catch (err) {
-    return json(res, 503, { error: 'Invalid VAPID configuration', detail: err.message });
-  }
-
-  const body = await readJsonBody(req);
-
-  if (NOTIFICATIONS_SECRET && body.secret !== NOTIFICATIONS_SECRET) {
-    return json(res, 401, { error: 'Unauthorized' });
-  }
-
-  const { title, body: notifBody, url, options } = body;
-
-  if (!title) {
-    return json(res, 400, { error: 'title is required' });
-  }
-
-  const db = await getWritableDb();
-  const subscriptions = await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).find({}).toArray();
-
-  if (subscriptions.length === 0) {
-    return json(res, 200, { success: true, sent: 0, total: 0 });
-  }
-
-  const payload = JSON.stringify({ title, body: notifBody || '', url: url || '/', ...options });
-
-  const results = await Promise.allSettled(
-    subscriptions.map((sub) =>
-      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
-    )
-  );
-
-  // Remove subscriptions that are gone (410) or not found (404)
-  const expiredEndpoints = results
-    .map((result, i) => ({ result, sub: subscriptions[i] }))
-    .filter(({ result }) => result.status === 'rejected' && [410, 404].includes(result.reason?.statusCode))
-    .map(({ sub }) => sub.endpoint);
-
-  if (expiredEndpoints.length > 0) {
-    await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteMany({ endpoint: { $in: expiredEndpoints } });
-  }
-
-  const sent = results.filter((r) => r.status === 'fulfilled').length;
-
-  await db.collection(NOTIFICATION_HISTORY_COLLECTION).insertOne({
-    title,
-    body: notifBody || '',
-    url: url || '/',
-    sentAt: new Date(),
-    sent,
-    total: subscriptions.length,
-  });
-
-  return json(res, 200, { success: true, sent, total: subscriptions.length, expired: expiredEndpoints.length });
-}
-
 async function handleNotificationHistory(req, res) {
   const db = await getWritableDb();
   const notifications = await db
@@ -3058,10 +2697,6 @@ export default async function handler(req, res) {
       return await handleGetBanks(req, res, url, db);
     }
 
-    if (req.method === 'GET' && path === '/api/networks') {
-      return await handleGetNetworks(req, res, url, db);
-    }
-
     if (req.method === 'GET' && path === '/api/stats') {
       return await handleGetStats(req, res, url, db);
     }
@@ -3080,38 +2715,6 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST' && path === '/api/notifications/unsubscribe') {
       return await handleNotificationUnsubscribe(req, res);
-    }
-
-    if (req.method === 'POST' && path === '/api/notifications/send') {
-      return await handleNotificationSend(req, res);
-    }
-
-    if (req.method === 'POST' && path === '/api/auth/signup') {
-      return await handleSignup(req, res);
-    }
-
-    if (req.method === 'POST' && path === '/api/auth/login') {
-      return await handleLogin(req, res);
-    }
-
-    if (req.method === 'GET' && path === '/api/auth/me') {
-      return await handleGetMe(req, res);
-    }
-
-    if (req.method === 'GET' && path === '/api/auth/google') {
-      return await handleGoogleAuth(req, res);
-    }
-
-    if (req.method === 'GET' && path === '/api/auth/google/callback') {
-      return await handleGoogleCallback(req, res, url);
-    }
-
-    if (req.method === 'GET' && path === '/api/auth/facebook') {
-      return await handleFacebookAuth(req, res);
-    }
-
-    if (req.method === 'GET' && path === '/api/auth/facebook/callback') {
-      return await handleFacebookCallback(req, res, url);
     }
 
     if (req.method === 'GET' && path === '/api/user/favorites') {
@@ -3159,20 +2762,11 @@ export default async function handler(req, res) {
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
-        'GET /api/networks',
         'GET /api/stats',
         'POST /api/places/details',
         'GET /api/notifications/history',
         'POST /api/notifications/subscribe',
-        'POST /api/notifications/unsubscribe',
-        'POST /api/notifications/send',
-        'POST /api/auth/signup',
-        'POST /api/auth/login',
-        'GET /api/auth/me',
-        'GET /api/auth/google',
-        'GET /api/auth/google/callback',
-        'GET /api/auth/facebook',
-        'GET /api/auth/facebook/callback'
+        'POST /api/notifications/unsubscribe'
       ]
     });
   } catch (error) {
