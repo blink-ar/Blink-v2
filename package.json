@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prepare": "husky",
     "dev:all": "pnpm run dev & pnpm run dev:api",
     "dev:api": "node scripts/dev-functions-server.mjs",
     "dev:vercel:functions": "npx vercel dev --local-config vercel.functions-dev.json --listen 3000",
@@ -46,6 +47,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
+    "husky": "^9.1.7",
     "jsdom": "^27.0.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",

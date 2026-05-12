@@ -184,6 +184,42 @@ export class CacheService extends AbstractBaseService {
     }
 
     /**
+     * Get metadata for a valid cache entry without returning the cached data.
+     */
+    getEntryMetadata(key: string): Pick<CacheEntry, 'timestamp' | 'ttl' | 'version' | 'size'> | null {
+        this.ensureInitialized();
+        this.ensureNotDestroyed();
+
+        try {
+            const serialized = localStorage.getItem(this.getCacheKey(key));
+            if (!serialized) {
+                return null;
+            }
+
+            const entry = safeJsonParse<CacheEntry>(serialized);
+            if (!entry) {
+                this.remove(key);
+                return null;
+            }
+
+            if (!this.isEntryValid(entry)) {
+                this.remove(key);
+                return null;
+            }
+
+            return {
+                timestamp: entry.timestamp,
+                ttl: entry.ttl,
+                version: entry.version,
+                size: entry.size
+            };
+        } catch (error) {
+            this.logger.error('Failed to get cache entry metadata', { key, error: error.message });
+            return null;
+        }
+    }
+
+    /**
      * Check if a cache entry is valid (not expired)
      */
     isValid(key: string): boolean {

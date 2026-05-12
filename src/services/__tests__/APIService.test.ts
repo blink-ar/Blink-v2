@@ -66,6 +66,7 @@ describe('APIService', () => {
         initialize: ReturnType<typeof vi.fn>;
         destroy: ReturnType<typeof vi.fn>;
         get: ReturnType<typeof vi.fn>;
+        getEntryMetadata: ReturnType<typeof vi.fn>;
         set: ReturnType<typeof vi.fn>;
         clear: ReturnType<typeof vi.fn>;
         getStats: ReturnType<typeof vi.fn>;
@@ -84,6 +85,7 @@ describe('APIService', () => {
             initialize: vi.fn().mockResolvedValue(undefined),
             destroy: vi.fn().mockResolvedValue(undefined),
             get: vi.fn(),
+            getEntryMetadata: vi.fn().mockReturnValue(null),
             set: vi.fn(),
             clear: vi.fn(),
             getStats: vi.fn().mockReturnValue({
@@ -146,12 +148,49 @@ describe('APIService', () => {
                 }
             ];
             mockCacheService.get.mockReturnValue(cachedBusinesses);
+            mockCacheService.getEntryMetadata.mockReturnValue({
+                timestamp: Date.now(),
+                ttl: 1000,
+                version: '1.0.0',
+                size: 1
+            });
 
             const result = await apiService.fetchBusinesses();
 
             expect(mockCacheService.get).toHaveBeenCalledWith('businesses');
+            expect(mockCacheService.getEntryMetadata).toHaveBeenCalledWith('businesses');
             expect(benefitsAPI.getBenefits).not.toHaveBeenCalled();
             expect(result).toEqual(cachedBusinesses);
+        });
+
+        it('refreshes stale cached businesses in the background', async () => {
+            const cachedBusinesses: Business[] = [
+                {
+                    id: 'cached-business',
+                    name: 'Cached Business',
+                    category: 'gastronomia',
+                    description: 'Cached description',
+                    rating: 5,
+                    location: [testLocation],
+                    image: 'https://example.com/cached.jpg',
+                    benefits: []
+                }
+            ];
+            mockCacheService.get.mockReturnValue(cachedBusinesses);
+            mockCacheService.getEntryMetadata.mockReturnValue({
+                timestamp: Date.now() - 600,
+                ttl: 1000,
+                version: '1.0.0',
+                size: 1
+            });
+            apiMocks.getBenefits.mockResolvedValue([makeBenefit()]);
+
+            const result = await apiService.fetchBusinesses();
+            await Promise.resolve();
+
+            expect(result).toEqual(cachedBusinesses);
+            expect(benefitsAPI.getBenefits).toHaveBeenCalledWith();
+            expect(mockCacheService.set).toHaveBeenCalledWith('businesses', expect.any(Array));
         });
 
         it('fetches current benefits, groups them by merchant, and caches businesses', async () => {

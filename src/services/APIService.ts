@@ -117,7 +117,16 @@ export class APIService extends AbstractBaseService {
                 // Check if we should refresh in background
                 if (this.shouldRefreshInBackground(cacheKey)) {
                     this.logger.debug('Starting background refresh');
-                    this.backgroundRefreshPromise = this.fetchFromAPIAndCache();
+                    this.backgroundRefreshPromise = this.fetchFromAPIAndCache()
+                        .catch((error) => {
+                            this.logger.warn('Background refresh failed', {
+                                error: error instanceof Error ? error.message : String(error)
+                            });
+                            return cachedData;
+                        })
+                        .finally(() => {
+                            this.backgroundRefreshPromise = undefined;
+                        });
                 }
 
                 return cachedData;
@@ -491,16 +500,12 @@ export class APIService extends AbstractBaseService {
     }
 
     private shouldRefreshInBackground(cacheKey: string): boolean {
-        // Check if cache entry exists and is older than background refresh threshold
-        const entry = this.cacheService.get(cacheKey);
-        if (!entry) return false;
-
-        // For now, we'll use a simple heuristic - if we have a background refresh promise running, don't start another
         if (this.backgroundRefreshPromise) return false;
 
-        // In a real implementation, we'd check the cache entry timestamp
-        // For now, we'll refresh every other request to demonstrate the functionality
-        return Math.random() > 0.7; // 30% chance to refresh in background
+        const metadata = this.cacheService.getEntryMetadata(cacheKey);
+        if (!metadata) return false;
+
+        return Date.now() - metadata.timestamp >= this.config.backgroundRefreshThreshold;
     }
 
     private getFallbackData(): Business[] {
