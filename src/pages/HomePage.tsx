@@ -53,12 +53,21 @@ function HomePage() {
     searchInputRef.current?.blur();
   }, []);
 
+  const focusSearchInput = useCallback(() => {
+    const input = searchInputRef.current;
+    if (!input) return;
+    input.focus();
+    const valueLength = input.value.length;
+    input.setSelectionRange(valueLength, valueLength);
+  }, []);
+
   const openSearchOverlay = () => {
+    focusSearchInput();
     flushSync(() => {
       setHomeSearchTerm('');
       setIsSearchOpen(true);
     });
-    searchInputRef.current?.focus({ preventScroll: true });
+    focusSearchInput();
   };
 
   const confirmHomeSearch = () => {
@@ -86,7 +95,7 @@ function HomePage() {
     document.body.style.overflow = 'hidden';
 
     const frame = window.requestAnimationFrame(() => {
-      searchInputRef.current?.focus({ preventScroll: true });
+      focusSearchInput();
     });
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -102,7 +111,7 @@ function HomePage() {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [closeSearchOverlay, isSearchOpen]);
+  }, [closeSearchOverlay, focusSearchInput, isSearchOpen]);
 
   const handleTopBenefitClick = (
     businessId: string,
@@ -228,7 +237,7 @@ function HomePage() {
 
       <div
         className={`fixed inset-0 z-[80] flex items-center justify-center px-4 pb-20 transition-opacity duration-200 ${
-          isSearchOpen ? 'visible pointer-events-auto opacity-100' : 'invisible pointer-events-none opacity-0'
+          isSearchOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         }`}
         aria-hidden={!isSearchOpen}
       >
