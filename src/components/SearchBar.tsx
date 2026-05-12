@@ -32,6 +32,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           icon={<Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />}
           className="modern-search-input w-full pl-10 sm:pl-12 pr-12 sm:pr-14 py-3 sm:py-4 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white focus-ring"
           inputMode="search"
+          enterKeyHint="search"
           touchOptimized={true}
           aria-label="Buscar descuentos y tiendas"
           style={{
