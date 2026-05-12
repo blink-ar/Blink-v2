@@ -51,7 +51,10 @@ function mapSearchResponseToBusinessesResponse(
   }
 ): BusinessesApiResponse {
   const businesses = normalizeBusinesses(
-    (searchData.merchants || []).map((merchantHit) => merchantHit.business)
+    (searchData.merchants || []).map((merchantHit) => ({
+      ...merchantHit.business,
+      aliases: merchantHit.aliases || [],
+    }))
   );
 
   return {

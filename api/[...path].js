@@ -2,7 +2,14 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
-import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import {
+  buildSearchPhraseVariants,
+  getNormalizedSearchWords,
+  getSignificantSearchTokens,
+  normalizeSearchText,
+  singularizeSpanishToken,
+  tokenizeSearchText
+} from './search/normalize.js';
 import {
   getMerchantSeoPathFromMerchant,
   parseMerchantSeoSlugId,
@@ -570,8 +577,100 @@ function parseSearchFilters(searchParams) {
 
 function buildExpandedQueryTokens(query) {
   const normalized = normalizeSearchText(query);
+  const phraseVariants = buildSearchPhraseVariants(query);
   const tokens = tokenizeSearchText(query);
-  return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
+  return Array.from(new Set([normalized, ...phraseVariants, ...tokens].filter(Boolean)));
+}
+
+const MERCHANT_NAME_CONNECTOR_WORDS = [
+  'de',
+  'del',
+  'la',
+  'las',
+  'el',
+  'los',
+  'y',
+  'e'
+];
+const MERCHANT_NAME_SEPARATOR_PATTERN = '[^a-z0-9áéíóúüñ]+';
+const ACCENT_FOLDING_CHAR_CLASSES = {
+  a: '[aáàäâã]',
+  e: '[eéèëê]',
+  i: '[iíìïî]',
+  o: '[oóòöôõ]',
+  u: '[uúùüû]',
+  n: '[nñ]'
+};
+
+function buildAccentInsensitiveTokenPattern(token, options = {}) {
+  const { allowPlural = true, singularize = true } = options;
+  const normalized = normalizeSearchText(token).replace(/\s+/g, '');
+  const base = singularize ? singularizeSpanishToken(normalized) : normalized;
+  if (!base) return '';
+
+  const source = Array.from(base)
+    .map((char) => ACCENT_FOLDING_CHAR_CLASSES[char] || escapeRegex(char))
+    .join('');
+  const pluralSuffix = allowPlural && /^[a-z0-9]+$/.test(base) && base.length > 3 ? '(?:s|es)?' : '';
+  return `${source}${pluralSuffix}`;
+}
+
+function getConnectorPatternSource() {
+  return MERCHANT_NAME_CONNECTOR_WORDS
+    .map((word) => buildAccentInsensitiveTokenPattern(word, { allowPlural: false, singularize: false }))
+    .filter(Boolean)
+    .join('|');
+}
+
+function buildFlexibleNameRegexSource(words, options = {}) {
+  const { allowConnectorsBetween = false, prefix = false } = options;
+  const tokenPatterns = words
+    .map((word) => buildAccentInsensitiveTokenPattern(word))
+    .filter(Boolean);
+
+  if (tokenPatterns.length === 0) {
+    return null;
+  }
+
+  const connectorSource = getConnectorPatternSource();
+  const separator = MERCHANT_NAME_SEPARATOR_PATTERN;
+  const joiner = allowConnectorsBetween && connectorSource
+    ? `${separator}(?:(?:${connectorSource})${separator})*`
+    : separator;
+  const leadingConnectors = allowConnectorsBetween && connectorSource
+    ? `(?:(?:${connectorSource})${separator})*`
+    : '';
+  const trailingConnectors = allowConnectorsBetween && connectorSource && !prefix
+    ? `(?:${separator}(?:${connectorSource}))*`
+    : '';
+
+  return `^${leadingConnectors}${tokenPatterns.join(joiner)}${trailingConnectors}${prefix ? '' : '$'}`;
+}
+
+function buildMerchantNameRescuePatterns(normalizedQuery, options = {}) {
+  const { prefix = false } = options;
+  const sources = new Set();
+
+  for (const variant of buildSearchPhraseVariants(normalizedQuery)) {
+    const words = getNormalizedSearchWords(variant);
+    const fullSource = buildFlexibleNameRegexSource(words, { prefix });
+    if (fullSource) {
+      sources.add(fullSource);
+    }
+
+    const significantWords = getSignificantSearchTokens(variant);
+    if (significantWords.length >= 2) {
+      const significantSource = buildFlexibleNameRegexSource(significantWords, {
+        allowConnectorsBetween: true,
+        prefix
+      });
+      if (significantSource) {
+        sources.add(significantSource);
+      }
+    }
+  }
+
+  return Array.from(sources).map((source) => new RegExp(source, 'i'));
 }
 
 function buildActiveMerchantSearchQuery(filters, searchParams) {
@@ -601,13 +700,13 @@ function buildActiveMerchantSearchQuery(filters, searchParams) {
   return query;
 }
 
-function buildMerchantNameRescueClauses(pattern) {
-  return [
+function buildMerchantNameRescueClauses(patterns) {
+  return patterns.flatMap((pattern) => [
     { merchantName: { $regex: pattern } },
     { merchantKey: { $regex: pattern } },
     { aliases: { $elemMatch: { $regex: pattern } } },
     { 'searchProfile.aliases': { $elemMatch: { $regex: pattern } } }
-  ];
+  ]);
 }
 
 function mergeMerchantDocsById(merchantLists) {
@@ -629,13 +728,13 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
   const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
-  const exactPattern = new RegExp(`^${escapeRegex(normalizedQuery)}$`, 'i');
-  const prefixPattern = new RegExp(`^${escapeRegex(normalizedQuery)}`, 'i');
+  const exactPatterns = buildMerchantNameRescuePatterns(normalizedQuery);
+  const prefixPatterns = buildMerchantNameRescuePatterns(normalizedQuery, { prefix: true });
 
   const exactMatches = await merchantCollection
     .find(
       combineQueriesWithAnd(baseQuery, {
-        $or: buildMerchantNameRescueClauses(exactPattern)
+        $or: buildMerchantNameRescueClauses(exactPatterns)
       }),
       {
         projection: MERCHANT_SEARCH_RESCUE_PROJECTION
@@ -656,7 +755,7 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
         baseQuery,
         exactIds.length > 0 ? { merchantId: { $nin: exactIds } } : null,
         {
-          $or: buildMerchantNameRescueClauses(prefixPattern)
+          $or: buildMerchantNameRescueClauses(prefixPatterns)
         }
       ),
       {
@@ -847,6 +946,13 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   let score = Number(hit?._rankingScore || 0) * 100;
 
   const merchantName = normalizeSearchText(hit.merchantName || '');
+  const merchantNameVariants = new Set(buildSearchPhraseVariants(hit.merchantName || ''));
+  const querySignificantTokens = getSignificantSearchTokens(normalizedQuery, { singularize: true });
+  const merchantSignificantTokens = getSignificantSearchTokens(hit.merchantName || '', { singularize: true });
+  const hasSignificantNameMatch =
+    querySignificantTokens.length >= 2 &&
+    merchantSignificantTokens.length >= 2 &&
+    querySignificantTokens.join(' ') === merchantSignificantTokens.join(' ');
   const aliases = (Array.isArray(hit.aliases) ? hit.aliases : []).map((value) => normalizeSearchText(value));
   const aliasSet = new Set(aliases);
   const manualAliasSet = new Set(
@@ -858,6 +964,12 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   if (merchantName && merchantName === normalizedQuery) {
     score += 1000;
     reasons.push('merchant_exact');
+  } else if (merchantNameVariants.has(normalizedQuery)) {
+    score += 850;
+    reasons.push('merchant_name_variant');
+  } else if (hasSignificantNameMatch) {
+    score += 820;
+    reasons.push('merchant_name_tokens_exact');
   } else if (merchantName && merchantName.startsWith(normalizedQuery)) {
     score += 450;
     reasons.push('merchant_prefix');
@@ -1811,6 +1923,10 @@ async function handleGetBusinesses(req, res, url, db) {
   }
   if (search && !merchantId) {
     const normalizedSearch = normalizeSearchText(search);
+    const merchantNamePatterns = [
+      ...buildMerchantNameRescuePatterns(normalizedSearch),
+      ...buildMerchantNameRescuePatterns(normalizedSearch, { prefix: true })
+    ];
     const searchTerms = Array.from(
       new Set([
         search,
@@ -1820,18 +1936,21 @@ async function handleGetBusinesses(req, res, url, db) {
       ].filter(Boolean))
     );
 
-    merchantQuery.$or = searchTerms.flatMap((term) => {
-      const pattern = new RegExp(escapeRegex(term), 'i');
-      return [
-        { merchantName: pattern },
-        { merchantKey: pattern },
-        { aliases: { $elemMatch: { $regex: pattern } } },
-        { categories: { $elemMatch: { $regex: pattern } } },
-        { banks: { $elemMatch: { $regex: pattern } } },
-        { 'searchProfile.searchText': pattern },
-        { 'searchProfile.description': pattern }
-      ];
-    });
+    merchantQuery.$or = [
+      ...buildMerchantNameRescueClauses(merchantNamePatterns),
+      ...searchTerms.flatMap((term) => {
+        const pattern = new RegExp(escapeRegex(term), 'i');
+        return [
+          { merchantName: pattern },
+          { merchantKey: pattern },
+          { aliases: { $elemMatch: { $regex: pattern } } },
+          { categories: { $elemMatch: { $regex: pattern } } },
+          { banks: { $elemMatch: { $regex: pattern } } },
+          { 'searchProfile.searchText': pattern },
+          { 'searchProfile.description': pattern }
+        ];
+      })
+    ];
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);

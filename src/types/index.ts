@@ -35,6 +35,7 @@ export interface Business {
   location: CanonicalLocation[];
   image: string;
   benefits: BankBenefit[];
+  aliases?: string[];
   // Enhanced fields for new functionality
   lastUpdated?: number;
   imageLoaded?: boolean;
