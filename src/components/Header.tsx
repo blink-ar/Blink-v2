@@ -1,21 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Bell, BellOff } from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { InstallSheet } from "./NotificationBanner";
 
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
-function isStandalone() {
-  return (
+function isIOSBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (!/iphone|ipad|ipod/i.test(ua)) return false;
+  const standalone =
     window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as any).standalone === true
-  );
+    (window.navigator as any).standalone === true;
+  return !standalone;
 }
-
-const IOS_HEADER_DISMISSED_KEY = "blink_ios_header_notif_dismissed";
 
 interface HeaderProps {
   title?: string;
@@ -25,20 +22,11 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
     usePushNotifications();
 
-  const [iosNotInstalled, setIosNotInstalled] = useState(false);
-  const [iosDismissed, setIosDismissed] = useState(false);
+  // Evaluated synchronously so the bell is visible on the very first render.
+  const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
   const [showInstallSheet, setShowInstallSheet] = useState(false);
 
-  useEffect(() => {
-    if (isIOS() && !isStandalone()) {
-      setIosNotInstalled(true);
-      setIosDismissed(localStorage.getItem(IOS_HEADER_DISMISSED_KEY) === "1");
-    }
-  }, []);
-
-  const showBell = iosNotInstalled
-    ? !iosDismissed
-    : isSupported && permission !== "denied";
+  const showBell = iosNotInstalled || (isSupported && permission !== "denied");
 
   const handleBellClick = () => {
     if (iosNotInstalled) {
@@ -48,12 +36,6 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
     } else {
       subscribe();
     }
-  };
-
-  const handleInstallSheetClose = () => {
-    setShowInstallSheet(false);
-    localStorage.setItem(IOS_HEADER_DISMISSED_KEY, "1");
-    setIosDismissed(true);
   };
 
   return (
@@ -110,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ title = "Blink" }) => {
           </div>
         </div>
       </div>
-      {showInstallSheet && <InstallSheet onClose={handleInstallSheetClose} />}
+      {showInstallSheet && <InstallSheet onClose={() => setShowInstallSheet(false)} />}
     </>
   );
 };
