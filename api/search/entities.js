@@ -4,7 +4,13 @@ import {
   SPANISH_STOP_WORDS,
   resolveIntentTagsFromTokens
 } from './dictionaries.js';
-import { normalizeSearchText, slugify, tokenizeSearchText, uniqueStrings } from './normalize.js';
+import {
+  buildSearchPhraseVariants,
+  normalizeSearchText,
+  slugify,
+  tokenizeSearchText,
+  uniqueStrings
+} from './normalize.js';
 
 const MAX_PRODUCT_TAGS_PER_MERCHANT = 40;
 const MAX_MERCHANT_REFS_PER_ENTITY = 150;
@@ -42,18 +48,28 @@ function buildProductTags(benefit) {
 
 function resolveMerchantAliases(merchantName, merchantKey) {
   const aliases = new Set();
+  const addAlias = (value) => {
+    const normalized = normalizeSearchText(value);
+    if (normalized) {
+      aliases.add(normalized);
+    }
+  };
+
   const nameTokens = tokenizeSearchText(merchantName);
-  nameTokens.forEach((token) => aliases.add(token));
-  aliases.add(merchantKey);
+  nameTokens.forEach(addAlias);
+  buildSearchPhraseVariants(merchantName).forEach(addAlias);
+  buildSearchPhraseVariants(merchantKey).forEach(addAlias);
 
   if (merchantName && merchantName.length >= 4) {
     const compact = normalizeSearchText(merchantName).replace(/\s+/g, '');
-    aliases.add(compact);
-    aliases.add(compact.slice(0, 4));
+    addAlias(compact);
+    addAlias(compact.slice(0, 4));
   }
 
   const manualAliases = MERCHANT_ALIASES[merchantKey] || [];
-  manualAliases.forEach((alias) => aliases.add(normalizeSearchText(alias)));
+  manualAliases.forEach((alias) => {
+    buildSearchPhraseVariants(alias).forEach(addAlias);
+  });
 
   const aliasCandidates = Array.from(aliases);
   for (const alias of aliasCandidates) {
@@ -179,7 +195,7 @@ function buildMerchantDocument(accumulator) {
 
   const intentTags = uniqueStrings(Array.from(accumulator.intentTags));
   const manualAliases = uniqueStrings(
-    (MERCHANT_ALIASES[accumulator.merchantKey] || []).map((alias) => normalizeSearchText(alias))
+    (MERCHANT_ALIASES[accumulator.merchantKey] || []).flatMap((alias) => buildSearchPhraseVariants(alias))
   );
   const aliases = resolveMerchantAliases(
     accumulator.merchantName,
@@ -239,7 +255,7 @@ function buildMerchantDocumentFromStoredMerchant(merchant) {
   const locations = Array.isArray(merchant?.locations) ? merchant.locations.slice(0, 15) : [];
   const aliases = uniqueStrings([
     ...resolveMerchantAliases(merchantName, merchantKey),
-    ...(Array.isArray(searchProfile.aliases) ? searchProfile.aliases.map((alias) => normalizeSearchText(alias)) : [])
+    ...(Array.isArray(searchProfile.aliases) ? searchProfile.aliases.flatMap((alias) => buildSearchPhraseVariants(alias)) : [])
   ]);
   const productTags = uniqueStrings(Array.isArray(searchProfile.productTags) ? searchProfile.productTags.map((tag) => normalizeSearchText(tag)) : []);
   const intentTags = uniqueStrings(Array.isArray(searchProfile.intentTags) ? searchProfile.intentTags : []);
@@ -261,7 +277,7 @@ function buildMerchantDocumentFromStoredMerchant(merchant) {
     merchantName,
     aliases,
     manualAliases: uniqueStrings(
-      (MERCHANT_ALIASES[merchantKey] || []).map((alias) => normalizeSearchText(alias))
+      (MERCHANT_ALIASES[merchantKey] || []).flatMap((alias) => buildSearchPhraseVariants(alias))
     ),
     intentTags,
     productTags,

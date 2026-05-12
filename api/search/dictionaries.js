@@ -1,4 +1,4 @@
-import { normalizeSearchText } from './normalize.js';
+import { normalizeSearchText, SPANISH_STOP_WORDS as NORMALIZED_SPANISH_STOP_WORDS } from './normalize.js';
 
 export const DEFAULT_SEARCH_INDEX_NAME = 'search_entities_v1';
 
@@ -50,37 +50,7 @@ export const INTENT_TAXONOMY = {
 // Do not include intent/category/product terms here.
 export const MERCHANT_ALIASES = {};
 
-export const SPANISH_STOP_WORDS = new Set([
-  'de',
-  'la',
-  'las',
-  'el',
-  'los',
-  'en',
-  'con',
-  'sin',
-  'para',
-  'por',
-  'del',
-  'y',
-  'o',
-  'a',
-  'un',
-  'una',
-  'al',
-  'tu',
-  'mi',
-  'su',
-  'se',
-  'es',
-  'off',
-  'app',
-  'pay',
-  'visa',
-  'mastercard',
-  'banco',
-  'tarjeta'
-]);
+export const SPANISH_STOP_WORDS = NORMALIZED_SPANISH_STOP_WORDS;
 
 // Intentionally empty by default:
 // query expansion should come from indexed corpus relations, not hand-maintained maps.
