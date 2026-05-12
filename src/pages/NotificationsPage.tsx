@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { InstallSheet } from '../components/NotificationBanner';
 import BottomNav from '../components/neo/BottomNav';
+
+function isIOSBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!/iphone|ipad|ipod/i.test(navigator.userAgent)) return false;
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true;
+  return !standalone;
+}
 
 interface StoredNotification {
   _id: string;
@@ -46,6 +56,9 @@ export default function NotificationsPage() {
   const navigate = useNavigate();
   const { isSupported, permission, isSubscribed, isLoading, subscribe } = usePushNotifications();
   const showBanner = isSupported && !isSubscribed && permission !== 'denied';
+
+  const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
+  const [showInstallSheet, setShowInstallSheet] = useState(false);
 
   const [notifications, setNotifications] = useState<StoredNotification[]>([]);
   const [fetching, setFetching] = useState(true);
@@ -109,6 +122,34 @@ export default function NotificationsPage() {
           </div>
         )}
 
+        {/* iOS install notification */}
+        {iosNotInstalled && (
+          <div className="px-4 mt-4">
+            <p className="text-xs font-semibold text-blink-muted uppercase tracking-wide mb-2 px-1">Hoy</p>
+            <button
+              onClick={() => setShowInstallSheet(true)}
+              className="w-full text-left rounded-2xl bg-white border border-gray-100 px-4 py-3 flex items-start gap-3 active:scale-[0.98] transition-transform"
+              style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}
+            >
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
+              >
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>install_mobile</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-blink-ink">Instalá la app de Blink</p>
+                  <span className="text-[11px] text-blink-muted flex-shrink-0">Ahora</span>
+                </div>
+                <p className="text-xs text-blink-muted mt-0.5 line-clamp-2">
+                  Para recibir notificaciones en tu teléfono, instalá Blink en tu pantalla de inicio. Tocá para ver cómo.
+                </p>
+              </div>
+            </button>
+          </div>
+        )}
+
         {/* Content */}
         {fetching ? (
           <div className="flex-1 flex flex-col gap-3 px-4 mt-6">
@@ -164,6 +205,7 @@ export default function NotificationsPage() {
       </main>
 
       <BottomNav />
+      {showInstallSheet && <InstallSheet onClose={() => setShowInstallSheet(false)} />}
     </div>
   );
 }
