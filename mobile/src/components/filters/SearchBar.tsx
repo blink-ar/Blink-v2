@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { Keyboard, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { colors, borderRadius } from '../../constants/theme';
 
@@ -10,6 +10,7 @@ interface SearchBarProps {
   onFilterClick?: () => void;
   showFilter?: boolean;
   activeFilterCount?: number;
+  onSubmit?: (value: string) => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -19,6 +20,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onFilterClick,
   showFilter = true,
   activeFilterCount = 0,
+  onSubmit,
 }) => {
   return (
     <View style={styles.container}>
@@ -33,6 +35,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          blurOnSubmit
+          onSubmitEditing={(event) => {
+            onSubmit?.(event.nativeEvent.text);
+            Keyboard.dismiss();
+          }}
         />
         {showFilter && (
           <TouchableOpacity

@@ -78,6 +78,12 @@ export default function HomeScreen() {
     }
   }, [searchTerm, activeTab]);
 
+  const confirmSearch = useCallback((value: string) => {
+    const confirmedSearch = value.trim();
+    setSearchTerm(confirmedSearch);
+    setDebouncedSearchTerm(confirmedSearch);
+  }, []);
+
   const filters: BenefitsFilters = {
     search: debouncedSearchTerm.trim() || undefined,
     category: selectedCategory !== 'all' ? selectedCategory : undefined,
@@ -289,6 +295,7 @@ export default function HomeScreen() {
         <SearchBar
           value={searchTerm}
           onChange={setSearchTerm}
+          onSubmit={confirmSearch}
           showFilter={activeTab !== 'inicio'}
           activeFilterCount={activeFilterCount}
           onFilterClick={() => setShowFilterMenu(true)}
@@ -306,6 +313,7 @@ export default function HomeScreen() {
       <SearchBar
         value={searchTerm}
         onChange={setSearchTerm}
+        onSubmit={confirmSearch}
         showFilter={activeTab !== 'inicio'}
         activeFilterCount={activeFilterCount}
         onFilterClick={() => setShowFilterMenu(true)}
