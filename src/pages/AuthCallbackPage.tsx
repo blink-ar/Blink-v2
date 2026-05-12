@@ -1,21 +1,25 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 
 function AuthCallbackPage() {
   const { isLoading, isAuthenticated, error } = useAuth0();
   const navigate = useNavigate();
+  const location = useLocation();
+  const callbackParams = new URLSearchParams(location.search);
+  const callbackError = callbackParams.get('error');
+  const callbackErrorDescription = callbackParams.get('error_description');
+  const errorMessage = callbackErrorDescription || callbackError || error?.message;
 
   useEffect(() => {
+    if (errorMessage) return;
     if (isLoading) return;
     if (isAuthenticated) {
       navigate('/profile', { replace: true });
-    } else if (error) {
-      navigate('/login', { replace: true });
     }
-  }, [isLoading, isAuthenticated, error, navigate]);
+  }, [isLoading, isAuthenticated, errorMessage, navigate]);
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col items-center justify-center gap-6 px-6">
         <div
@@ -26,10 +30,10 @@ function AuthCallbackPage() {
         </div>
         <div className="text-center">
           <h2 className="font-bold text-lg text-blink-ink mb-1">Algo salió mal</h2>
-          <p className="text-sm text-blink-muted">{error.message}</p>
+          <p className="text-sm text-blink-muted">{errorMessage}</p>
         </div>
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate('/login', { replace: true })}
           className="rounded-2xl flex items-center justify-center font-semibold text-base text-white px-8 transition-all duration-150 active:scale-[0.98]"
           style={{
             height: 52,
