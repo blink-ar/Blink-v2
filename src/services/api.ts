@@ -11,6 +11,7 @@ import {
   transformRawBenefitToBenefit,
   BankSubscription
 } from '../types/mongodb';
+import { filterActiveBenefits } from '../utils/benefits';
 
 declare global {
   // Extend the globalThis type to include allCategories
@@ -54,7 +55,7 @@ function mapSearchResponseToBusinessesResponse(
       ...merchantHit.business,
       aliases: merchantHit.aliases || [],
     }))
-  );
+  ).filter((business) => business.benefits.length > 0);
 
   return {
     success: searchData.success,
@@ -103,7 +104,10 @@ export async function fetchSearch(options: {
   return response.json();
 }
 
-export function normalizeBusinesses(businesses: any[]): Business[] {
+export function normalizeBusinesses(
+  businesses: any[],
+  options: { includeExpired?: boolean } = {},
+): Business[] {
   return businesses.map((raw) => {
     const rawLocations = raw.location || raw.locations || [];
 
@@ -126,7 +130,10 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
           ...b,
           cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : b.cardTypes
         }))
-      : raw.benefits;
+      : [];
+    const visibleBenefits = options.includeExpired
+      ? benefits
+      : filterActiveBenefits(benefits);
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
@@ -138,7 +145,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
     const business: any = {
       ...raw,
       category,
-      benefits,
+      benefits: visibleBenefits,
       location: uniqueLocations,
       image
     };
@@ -148,7 +155,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
     }
 
     return business as Business;
-  });
+  }).filter((business) => options.includeExpired || business.benefits.length > 0);
 }
 
 /**
@@ -238,7 +245,7 @@ export async function fetchBusinessesPaginated(options: {
 
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {
-      data.businesses = normalizeBusinesses(data.businesses);
+      data.businesses = normalizeBusinesses(data.businesses, { includeExpired });
     }
 
     return data;

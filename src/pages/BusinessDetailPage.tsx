@@ -8,6 +8,7 @@ import { useSEO } from '../hooks/useSEO';
 import { SkeletonBusinessDetailPage } from '../components/skeletons';
 import { useFavorites } from '../context/FavoritesContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
+import { isBenefitActive } from '../utils/benefits';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -49,26 +50,6 @@ const TODAY_ABBR = (() => {
 
 const isBenefitAvailableToday = (b: BankBenefit): boolean =>
   isAllDays(b.cuando) || getActiveDays(b.cuando).has(TODAY_ABBR);
-
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const formatLocalDateOnly = (date: Date): string => [
-  date.getFullYear(),
-  String(date.getMonth() + 1).padStart(2, '0'),
-  String(date.getDate()).padStart(2, '0'),
-].join('-');
-
-const isBenefitActive = (benefit: BankBenefit, now = new Date()): boolean => {
-  const validUntil = benefit.validUntil?.trim();
-  if (!validUntil) return true;
-
-  if (DATE_ONLY_PATTERN.test(validUntil)) {
-    return validUntil >= formatLocalDateOnly(now);
-  }
-
-  const parsedTime = Date.parse(validUntil);
-  return Number.isFinite(parsedTime) && parsedTime >= now.getTime();
-};
 
 const INITIAL_SHOW = 2;
 
