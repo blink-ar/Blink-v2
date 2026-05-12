@@ -23,6 +23,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   return (
     <div className="w-full search-bar">
+      <form role="search" onSubmit={(e) => { e.preventDefault(); (e.currentTarget.querySelector("input") as HTMLInputElement)?.blur(); }}>
       <div className="relative">
         <TouchInput
           type="text"
@@ -69,6 +70,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </button>
         )}
       </div>
+      </form>
     </div>
   );
 };
