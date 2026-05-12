@@ -16,14 +16,14 @@ function isStandalone() {
   );
 }
 
-const ShareIcon = () => (
+export const ShareIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline mx-0.5">
     <path d="M7 1v8M4 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M2 8v4a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
   </svg>
 );
 
-const Step: React.FC<{ num: number; children: React.ReactNode }> = ({ num, children }) => (
+export const Step: React.FC<{ num: number; children: React.ReactNode }> = ({ num, children }) => (
   <div className="flex items-start gap-3">
     <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold text-white bg-blue-500">
       {num}
@@ -32,7 +32,7 @@ const Step: React.FC<{ num: number; children: React.ReactNode }> = ({ num, child
   </div>
 );
 
-const InstallSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+export const InstallSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div
     className="fixed inset-0 z-[100] flex items-end"
     style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
