@@ -77,11 +77,38 @@ const BENEFIT_SUMMARY_PROJECTION = {
   subscription: 1
 };
 
-const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
-const MONGODB_URI = process.env.MONGODB_URI || MONGODB_URI_READ_ONLY;
+const REQUIRED_PRODUCTION_ENV_VARS = [
+  'JWT_SECRET',
+  'NOTIFICATIONS_SECRET',
+  'VAPID_PRIVATE_KEY',
+  'MONGODB_URI'
+];
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+}
+
+function readEnv(name) {
+  const value = process.env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function validateProductionEnv() {
+  if (!isProductionRuntime()) return;
+
+  const missing = REQUIRED_PRODUCTION_ENV_VARS.filter((name) => !readEnv(name));
+  if (missing.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+}
+
+validateProductionEnv();
+
+const MONGODB_URI_READ_ONLY = readEnv('MONGODB_URI_READ_ONLY');
+const MONGODB_URI = readEnv('MONGODB_URI');
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme-set-JWT_SECRET-in-env';
+const JWT_SECRET = readEnv('JWT_SECRET') || 'changeme-set-JWT_SECRET-in-env';
 const APP_URL = (process.env.APP_URL || process.env.VITE_SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -91,10 +118,10 @@ const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN 
 
 const USER_DATA_COLLECTION = 'user_data';
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_PUBLIC_KEY = readEnv('VAPID_PUBLIC_KEY');
+const VAPID_PRIVATE_KEY = readEnv('VAPID_PRIVATE_KEY');
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@blink.com';
-const NOTIFICATIONS_SECRET = process.env.NOTIFICATIONS_SECRET;
+const NOTIFICATIONS_SECRET = readEnv('NOTIFICATIONS_SECRET');
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
