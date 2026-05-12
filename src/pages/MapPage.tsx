@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { type FormEvent, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getGoogleMaps } from '../services/googleMapsLoader';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -14,6 +14,7 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
@@ -110,6 +111,7 @@ function MapPage() {
   });
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<any>(null);
   const overlaysRef = useRef<any[]>([]);
   const userOverlayRef = useRef<any>(null);
@@ -126,6 +128,20 @@ function MapPage() {
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
   const mapInteractionTimestampsRef = useRef<Record<string, number>>({});
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const confirmedSearch = searchInputRef.current?.value.trim() ?? searchTerm.trim();
+    setSearchTerm(confirmedSearch);
+    setDebouncedSearch(confirmedSearch);
+    searchInputRef.current?.blur();
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+  };
 
   const isSingleBusinessMode = !!focusBusinessId;
 
@@ -616,24 +632,28 @@ function MapPage() {
           ) : (
             <>
               {/* Search */}
-              <div
+              <form
+                role="search"
+                onSubmit={submitSearch}
                 className="flex-1 h-11 rounded-2xl flex items-center px-3.5 gap-2 relative"
                 style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid rgba(232,230,225,0.8)' }}
               >
                 <span className="material-symbols-outlined text-blink-muted flex-shrink-0" style={{ fontSize: 18 }}>search</span>
                 <input
-                  className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+                  ref={searchInputRef}
+                  className="flex-1 appearance-none bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
                   placeholder="Buscar tiendas..."
-                  type="text"
+                  type="search"
+                  enterKeyHint="search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 {searchTerm && (
-                  <button onClick={() => setSearchTerm('')} className="text-blink-muted">
+                  <button type="button" onClick={clearSearch} className="text-blink-muted">
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
                   </button>
                 )}
-              </div>
+              </form>
 
               {/* Filter toggle */}
               <button
@@ -878,7 +898,7 @@ function MapPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       trackSelectBusiness({ source: 'map_list_open_business', businessId: biz.id, category: biz.category, position: idx + 1 });
-                      navigate(`/business/${biz.id}`, { state: { business: biz } });
+                      navigate(getMerchantSeoPath({ id: biz.id, name: biz.name }), { state: { business: biz } });
                     }}
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95"
                     style={{ background: '#EEF2FF', color: '#4338CA' }}

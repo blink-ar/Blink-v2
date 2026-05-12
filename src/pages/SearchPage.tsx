@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
@@ -21,6 +21,8 @@ import {
 import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { matchesSearchPhrase } from '../utils/searchNormalization';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -139,7 +141,7 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position } = useGeolocation();
+  const { position, permissionDenied, requestPermission } = useGeolocation();
 
   const {
     businesses,
@@ -173,11 +175,11 @@ function SearchPage() {
   });
 
   const strictMatches = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
+    const term = debouncedSearch.trim();
     if (!term) return enrichedBusinesses;
-    return enrichedBusinesses.filter((b) => 
-      b.name.toLowerCase().includes(term) || 
-      (b as any).aliases?.some((a: string) => a.toLowerCase().includes(term))
+    return enrichedBusinesses.filter((b) =>
+      matchesSearchPhrase(b.name, term) ||
+      b.aliases?.some((alias) => matchesSearchPhrase(alias, term))
     );
   }, [enrichedBusinesses, debouncedSearch]);
 
@@ -300,6 +302,7 @@ function SearchPage() {
   const hasInitializedFiltersRef = useRef(false);
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Infinite scroll sentinel — primary results
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -363,7 +366,7 @@ function SearchPage() {
         offset: pageParam,
         category: matchedCategory,
         bank: selectedBanks.length > 0 ? selectedBanks.join(',') : undefined,
-        ...(sortByDistance && position 
+        ...(sortByDistance && position
           ? { lat: position.latitude, lng: position.longitude }
           : position ? { geohash: encodeGeohash(position.latitude, position.longitude) } : {}),
       }),
@@ -631,9 +634,12 @@ function SearchPage() {
     const seen = new Set<string>();
     const badges: string[] = [];
     source.benefits.forEach((benefit) => {
-      if (benefit.bankName && !seen.has(benefit.bankName)) {
-        seen.add(benefit.bankName);
-        badges.push(toBankDescriptor(benefit.bankName).code);
+      if (!benefit.bankName) return;
+
+      const descriptor = toBankDescriptor(benefit.bankName);
+      if (!seen.has(descriptor.token)) {
+        seen.add(descriptor.token);
+        badges.push(descriptor.code);
       }
     });
     return badges;
@@ -642,6 +648,15 @@ function SearchPage() {
   const clearSearch = () => {
     setSearchTerm('');
     setDebouncedSearch('');
+  };
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const confirmedSearch = searchInputRef.current?.value.trim() ?? searchTerm.trim();
+    setSearchTerm(confirmedSearch);
+    setDebouncedSearch(confirmedSearch);
+    searchInputRef.current?.blur();
   };
 
   const handleFiltersApply = (values: UnifiedFilterValues) => {
@@ -664,7 +679,7 @@ function SearchPage() {
       category: business.category,
       position,
     });
-    navigate(`/business/${business.id}`, { state: { business } });
+    navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
   };
 
   return (
@@ -686,28 +701,33 @@ function SearchPage() {
           >
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
-          <div
+          <form
+            role="search"
+            onSubmit={submitSearch}
             className="flex-1 h-11 flex items-center px-3 gap-2 rounded-xl"
             style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
           >
             <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
             <input
-              className="flex-1 bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+              ref={searchInputRef}
+              className="flex-1 appearance-none bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
               placeholder="Buscar tiendas y beneficios..."
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               autoFocus={false}
             />
             {searchTerm && (
               <button
+                type="button"
                 onClick={clearSearch}
                 className="text-blink-muted hover:text-blink-ink transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
             )}
-          </div>
+          </form>
         </div>
 
         {/* Quick filter pills — active ones float to the front */}
@@ -796,7 +816,14 @@ function SearchPage() {
               node: (
                 <button
                   key="proximity"
-                  onClick={() => setSortByDistance(!sortByDistance)}
+                  onClick={() => {
+                    if (permissionDenied) {
+                      requestPermission();
+                      setSortByDistance(true);
+                    } else {
+                      setSortByDistance(!sortByDistance);
+                    }
+                  }}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                     sortByDistance
                       ? 'bg-primary text-white'
@@ -1007,15 +1034,15 @@ function SearchPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
                           {visibleBadges.map((badge) => (
-                            <span key={`ob-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                            <span key={`ob-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                           ))}
                           {remaining > 0 && (
-                            <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                            <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                           )}
-                          <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                         </div>
+                        <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                       </div>
                       {maxDiscount > 0 ? (
                         <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1098,15 +1125,15 @@ function SearchPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
                               {visibleBadges.map((badge) => (
-                                <span key={`rel-${business.id}-${badge}`} className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
+                                <span key={`rel-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
                               ))}
                               {remaining > 0 && (
-                                <span className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
+                                <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
                               )}
-                              <span className="text-[10px] text-blink-muted ml-1.5">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                             </div>
+                            <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
                           </div>
                           {maxDiscount > 0 ? (
                             <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
@@ -1205,11 +1232,11 @@ function SearchPage() {
                     </h2>
 
                     {/* Banks + count row */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-hidden">
                       {visibleBadges.map((badge) => (
                         <span
                           key={`${business.id}-${badge}`}
-                          className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#1E293B', color: '#E2E8F0' }}
                         >
                           {badge}
@@ -1217,16 +1244,16 @@ function SearchPage() {
                       ))}
                       {remaining > 0 && (
                         <span
-                          className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                          className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                           style={{ background: '#F1F5F9', color: '#94A3B8' }}
                         >
                           +{remaining}
                         </span>
                       )}
-                      <span className="text-[10px] text-blink-muted ml-1.5">
-                        {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                      </span>
                     </div>
+                    <span className="text-[10px] text-blink-muted mt-[3px]">
+                      {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                    </span>
                   </div>
 
                   {/* Benefit — typographic right column, no box */}
@@ -1270,7 +1297,7 @@ function SearchPage() {
             <h2 className="mb-4 font-bold text-lg text-blink-ink">
               {relatedCategoryLabel ? `Más en ${relatedCategoryLabel}` : 'Más opciones relacionadas'}
             </h2>
-            
+
             <div className="space-y-3">
               {isRelatedLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
@@ -1301,7 +1328,7 @@ function SearchPage() {
                           category: business.category,
                           position: index,
                         });
-                        navigate(`/business/${business.id}`, { state: { business } });
+                        navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
                       }}
                       className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
                       style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
@@ -1343,11 +1370,11 @@ function SearchPage() {
                             )}
                           </h2>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
                             {visibleBadges.map((badge) => (
                               <span
                                 key={`rel-${business.id}-${badge}`}
-                                className="text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#1E293B', color: '#E2E8F0' }}
                               >
                                 {badge}
@@ -1355,16 +1382,16 @@ function SearchPage() {
                             ))}
                             {remaining > 0 && (
                               <span
-                                className="text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
+                                className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
                                 style={{ background: '#F1F5F9', color: '#94A3B8' }}
                               >
                                 +{remaining}
                               </span>
                             )}
-                            <span className="text-[10px] text-blink-muted ml-1.5">
-                              {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                            </span>
                           </div>
+                          <span className="text-[10px] text-blink-muted mt-[3px]">
+                            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+                          </span>
                         </div>
 
                         {maxDiscount > 0 ? (
@@ -1392,7 +1419,7 @@ function SearchPage() {
 
             {/* Infinite scroll sentinel for related category */}
             <div ref={relatedSentinelRef} className="h-px mt-4" aria-hidden="true" />
-            
+
             {/* Loading more indicator for related */}
             {isRelatedFetchingMore && (
               <div className="flex justify-center py-4">

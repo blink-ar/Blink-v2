@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
+import { useAuth } from '../contexts/AuthContext';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
 import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
@@ -13,9 +15,27 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
+import { NotificationBanner } from '../components/NotificationBanner';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
+function isIOSBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!/iphone|ipad|ipod/i.test(navigator.userAgent)) return false;
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true;
+  return !standalone;
+}
 
 function HomePage() {
   const navigate = useNavigate();
+  const { isSupported, isSubscribed } = usePushNotifications();
+  const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
+  const showBell = iosNotInstalled || isSupported;
+  const { user } = useAuth();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [homeSearchTerm, setHomeSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -37,6 +57,71 @@ function HomePage() {
     });
     navigate(`/search?bank=${entity.token}`);
   };
+
+  const closeSearchOverlay = useCallback(() => {
+    setIsSearchOpen(false);
+    searchInputRef.current?.blur();
+  }, []);
+
+  const focusSearchInput = useCallback(() => {
+    const input = searchInputRef.current;
+    if (!input) return;
+    input.focus();
+    const valueLength = input.value.length;
+    input.setSelectionRange(valueLength, valueLength);
+  }, []);
+
+  const openSearchOverlay = () => {
+    focusSearchInput();
+    flushSync(() => {
+      setHomeSearchTerm('');
+      setIsSearchOpen(true);
+    });
+    focusSearchInput();
+  };
+
+  const confirmHomeSearch = () => {
+    const confirmedSearch = (searchInputRef.current?.value ?? homeSearchTerm).trim();
+    closeSearchOverlay();
+
+    if (!confirmedSearch) {
+      navigate('/search');
+      return;
+    }
+
+    const params = new URLSearchParams({ q: confirmedSearch });
+    navigate(`/search?${params.toString()}`);
+  };
+
+  const handleHomeSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    confirmHomeSearch();
+  };
+
+  useEffect(() => {
+    if (!isSearchOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const frame = window.requestAnimationFrame(() => {
+      focusSearchInput();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeSearchOverlay();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeSearchOverlay, focusSearchInput, isSearchOpen]);
 
   const handleTopBenefitClick = (
     businessId: string,
@@ -123,24 +208,99 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
-                notifications
-              </span>
+            <button
+              type="button"
+              onClick={openSearchOverlay}
+              aria-label="Buscar beneficios"
+              aria-expanded={isSearchOpen}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors active:scale-95"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>search</span>
             </button>
-            <div
-              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
+            {showBell && (
+              <button
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
+                className="relative w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
+                  notifications
+                </span>
+                {iosNotInstalled && (
+                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                    1
+                  </span>
+                )}
+              </button>
+            )}
+            <Link
+              to="/profile"
+              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center transition-opacity active:opacity-70"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>
-                person
-              </span>
-            </div>
+              {user ? (
+                <span className="text-white text-sm font-bold uppercase">{user.name.charAt(0)}</span>
+              ) : (
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
+              )}
+            </Link>
           </div>
         </div>
         {/* Ticker */}
         <Ticker count={activeBenefitsCount} />
       </header>
+
+      <div
+        className={`fixed inset-0 z-[80] flex items-center justify-center px-4 pb-20 transition-opacity duration-200 ${
+          isSearchOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        aria-hidden={!isSearchOpen}
+      >
+        <button
+          type="button"
+          aria-label="Cerrar búsqueda"
+          tabIndex={isSearchOpen ? 0 : -1}
+          onClick={closeSearchOverlay}
+          className="absolute inset-0 h-full w-full bg-white/35 backdrop-blur-[2px]"
+        />
+        <form
+          role="search"
+          onSubmit={handleHomeSearchSubmit}
+          className={`relative z-10 flex h-14 w-full max-w-[22rem] items-center gap-3 rounded-2xl px-4 transition-all duration-300 ease-out ${
+            isSearchOpen
+              ? 'translate-x-0 translate-y-0 scale-100 opacity-100'
+              : 'translate-x-[34vw] -translate-y-[36vh] scale-[0.18] opacity-0'
+          }`}
+          style={{
+            background: 'rgba(255,255,255,0.96)',
+            border: '1px solid rgba(232,230,225,0.95)',
+            boxShadow: '0 18px 46px rgba(28,28,30,0.16)',
+            transformOrigin: 'calc(100% - 18px) -40px',
+          }}
+        >
+          <span className="material-symbols-outlined shrink-0 text-blink-muted" style={{ fontSize: 22 }}>search</span>
+          <input
+            ref={searchInputRef}
+            value={homeSearchTerm}
+            onChange={(event) => setHomeSearchTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmHomeSearch();
+              }
+            }}
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            tabIndex={isSearchOpen ? 0 : -1}
+            className="min-w-0 flex-1 appearance-none bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
+            placeholder="Buscar beneficios..."
+          />
+        </form>
+      </div>
+
+      <NotificationBanner />
 
       <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}

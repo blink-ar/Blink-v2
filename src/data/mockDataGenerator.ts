@@ -139,7 +139,7 @@ export class MockDataGenerator {
             }
         ];
 
-        return mockBusinessData.map((data, index) => {
+        return mockBusinessData.map((data) => {
             // Generate consistent business ID
             const businessId = this.generateBusinessId(data.name);
 

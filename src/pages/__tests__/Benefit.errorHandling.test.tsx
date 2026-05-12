@@ -1,219 +1,178 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
-import Benefit from "../Benefit";
-import * as api from "../../services/api";
-import { Business, BankBenefit } from "../../types";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import BenefitDetailPage from "../BenefitDetailPage";
+import { Business } from "../../types";
+import { fetchBusinessById, fetchBusinessesPaginated } from "../../services/api";
 
-// Mock the API
-vi.mock("../../services/api");
-const mockFetchBusinesses = vi.mocked(api.fetchBusinesses);
-
-// Mock the Logger
-vi.mock("../../services/base/Logger", () => ({
-  Logger: {
-    getInstance: () => ({
-      createServiceLogger: () => ({
-        error: vi.fn(),
-        warn: vi.fn(),
-        info: vi.fn(),
-        debug: vi.fn(),
-      }),
-    }),
-  },
+const routerMocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  useLocation: vi.fn(),
+  useParams: vi.fn(),
 }));
 
-// Mock react-router-dom params
+vi.mock("../../services/api", () => ({
+  fetchBusinessById: vi.fn(),
+  fetchBusinessesPaginated: vi.fn(),
+}));
+
+vi.mock("../../analytics/intentTracking", () => ({
+  trackSaveBenefit: vi.fn(),
+  trackShareBenefit: vi.fn(),
+  trackStartNavigation: vi.fn(),
+  trackUnsaveBenefit: vi.fn(),
+  trackViewBenefit: vi.fn(),
+}));
+
+vi.mock("../../hooks/useSEO", () => ({
+  useSEO: vi.fn(),
+}));
+
+vi.mock("../../hooks/useGeolocation", () => ({
+  useGeolocation: () => ({ position: null, error: null, isLoading: false }),
+}));
+
+vi.mock("../../hooks/useSubscriptions", () => ({
+  useSubscriptions: () => ({
+    subscriptions: [],
+    isLoading: false,
+    error: null,
+    getSubscriptionById: vi.fn(() => null),
+    getSubscriptionName: vi.fn(() => null),
+    getSubscriptionsByBank: vi.fn(() => []),
+  }),
+}));
+
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual("react-router-dom");
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    useParams: () => ({ id: "test-business", benefitIndex: "0" }),
-    useNavigate: () => vi.fn(),
+    useParams: routerMocks.useParams,
+    useNavigate: () => routerMocks.navigate,
+    useLocation: routerMocks.useLocation,
   };
 });
 
-describe("Benefit Error Handling", () => {
+const makeBusiness = (overrides: Partial<Business> = {}): Business => ({
+  id: "test-business",
+  name: "Test Business",
+  description: "Test Description",
+  image: "https://example.com/test.jpg",
+  category: "gastronomia",
+  rating: 5,
+  location: [
+    {
+      lat: -34.6,
+      lng: -58.38,
+      formattedAddress: "Test Street 123, CABA",
+      source: "address",
+      provider: "google",
+      confidence: 1,
+      raw: "Test Street 123, CABA",
+      updatedAt: "2026-05-01T00:00:00.000Z",
+    },
+  ],
+  benefits: [
+    {
+      bankName: "Banco Test",
+      cardName: "Visa",
+      benefit: "10% OFF",
+      rewardRate: "10%",
+      color: "#000000",
+      icon: "credit_card",
+    },
+  ],
+  ...overrides,
+});
+
+describe("Benefit detail page error handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMocks.useLocation.mockReturnValue({ state: null });
+    routerMocks.useParams.mockReturnValue({ id: "test-business", benefitIndex: "0" });
   });
 
-  it("should handle malformed benefit data gracefully", async () => {
-    // Create a business with malformed benefit data
-    const malformedBenefit: BankBenefit = {
-      bankName: "Test Bank",
-      cardName: "Test Card",
-      benefit: "Test Benefit",
-      rewardRate: "5%",
-      color: "#000000",
-      icon: "test-icon",
-      // Add malformed data that could cause errors
-      requisitos: [
-        "Valid requirement",
-        null as any,
-        undefined as any,
-        123 as any,
-        {} as any,
-        "Another valid requirement",
-      ],
-      usos: ["Valid usage", null as any, "Another valid usage"],
-      cuando: "Valid date range",
-      valor: "10%",
-      tope: "$1000",
-      condicion: "Valid condition",
-      textoAplicacion: "Valid application text",
-      tipo: "Valid type",
-      claseDeBeneficio: "Valid class",
-    };
+  it("falls back to search lookup when exact merchant lookup misses", async () => {
+    const legacyBusiness = makeBusiness({ id: "legacy-business", name: "Legacy Business" });
+    vi.mocked(fetchBusinessById).mockResolvedValue(null);
+    vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
+      success: true,
+      businesses: [legacyBusiness],
+      pagination: { total: 1, limit: 1, offset: 0, hasMore: false },
+      filters: { search: "test business" },
+    });
 
-    const mockBusiness: Business = {
-      id: "test-business",
-      name: "Test Business",
-      description: "Test Description",
-      image: "test-image.jpg",
-      category: "test-category",
-      benefits: [malformedBenefit],
-    };
+    render(<BenefitDetailPage />);
 
-    mockFetchBusinesses.mockResolvedValue([mockBusiness]);
-
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
-
-    // Wait for the component to load
-    await screen.findByText("Test Bank Test Card");
-
-    // Verify that the component renders without crashing
-    expect(screen.getByText("Test Bank Test Card")).toBeInTheDocument();
-    expect(screen.getByText("Test Benefit")).toBeInTheDocument();
-
-    // Verify that valid requirements are displayed
-    expect(screen.getByText("Valid requirement")).toBeInTheDocument();
-    expect(screen.getByText("Another valid requirement")).toBeInTheDocument();
-
-    // Verify that valid usage types are displayed
-    expect(screen.getByText("Valid Usage")).toBeInTheDocument();
-    expect(screen.getByText("Another Valid Usage")).toBeInTheDocument();
-
-    // Verify that other sections are displayed
-    expect(screen.getByText("Valid date range")).toBeInTheDocument();
-    expect(screen.getByText("10%")).toBeInTheDocument();
-    expect(screen.getByText("$1,000")).toBeInTheDocument();
-    expect(screen.getByText("Valid condition")).toBeInTheDocument();
-    expect(screen.getByText("Valid application text")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchBusinessesPaginated).toHaveBeenCalledWith({
+        search: "test business",
+        limit: 1,
+      });
+    });
+    expect(await screen.findByText("Legacy Business")).toBeInTheDocument();
   });
 
-  it("should handle completely malformed benefit object gracefully", async () => {
-    // Create a business with a completely malformed benefit
-    const malformedBenefit = {
-      // Missing required fields
-      bankName: null,
-      cardName: undefined,
-      benefit: 123,
-      rewardRate: {},
-      color: [],
-      icon: null,
-      // Malformed optional fields
-      requisitos: "not an array",
-      usos: null,
-      cuando: 123,
-      valor: {},
-      tope: [],
-      condicion: null,
-      textoAplicacion: undefined,
-      tipo: 123,
-      claseDeBeneficio: {},
-    } as any;
+  it("shows an error when both direct and fallback lookups fail", async () => {
+    vi.mocked(fetchBusinessById).mockRejectedValue(new Error("direct failed"));
+    vi.mocked(fetchBusinessesPaginated).mockRejectedValue(new Error("search failed"));
 
-    const mockBusiness: Business = {
-      id: "test-business",
-      name: "Test Business",
-      description: "Test Description",
-      image: "test-image.jpg",
-      category: "test-category",
-      benefits: [malformedBenefit],
-    };
+    render(<BenefitDetailPage />);
 
-    mockFetchBusinesses.mockResolvedValue([mockBusiness]);
-
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
-
-    // Wait for the component to load
-    await screen.findByText("Unknown Bank Unknown Card");
-
-    // Verify that the component renders without crashing
-    expect(screen.getByText("Unknown Bank Unknown Card")).toBeInTheDocument();
-    expect(
-      screen.getByText("Benefit description not available")
-    ).toBeInTheDocument();
-
-    // Verify that fallback content is displayed
-    expect(screen.getByText("Rate not available")).toBeInTheDocument();
+    expect(await screen.findByText("Error al cargar")).toBeInTheDocument();
   });
 
-  it("should handle API errors gracefully", async () => {
-    // Mock API to throw an error
-    mockFetchBusinesses.mockRejectedValue(new Error("API Error"));
+  it("shows not found when no business matches the route", async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(null);
+    vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
+      success: true,
+      businesses: [],
+      pagination: { total: 0, limit: 1, offset: 0, hasMore: false },
+      filters: { search: "test business" },
+    });
 
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
+    render(<BenefitDetailPage />);
 
-    // Wait for error message to appear
-    await screen.findByText("Failed to load business");
-
-    // Verify that error message is displayed
-    expect(screen.getByText("Failed to load business")).toBeInTheDocument();
+    expect(await screen.findByText("Beneficio no encontrado")).toBeInTheDocument();
   });
 
-  it("should handle missing business gracefully", async () => {
-    // Mock API to return empty array
-    mockFetchBusinesses.mockResolvedValue([]);
+  it("shows not found when a business has no benefits", async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({ benefits: [] }));
+    vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
+      success: false,
+      businesses: [],
+      pagination: { total: 0, limit: 1, offset: 0, hasMore: false },
+      filters: {},
+    });
 
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
+    render(<BenefitDetailPage />);
 
-    // Wait for error message to appear
-    await screen.findByText("Benefit not found");
-
-    // Verify that error message is displayed
-    expect(screen.getByText("Benefit not found")).toBeInTheDocument();
+    expect(await screen.findByText("Beneficio no encontrado")).toBeInTheDocument();
   });
 
-  it("should handle missing benefit index gracefully", async () => {
-    const mockBusiness: Business = {
-      id: "test-business",
-      name: "Test Business",
-      description: "Test Description",
-      image: "test-image.jpg",
-      category: "test-category",
-      benefits: [], // Empty benefits array
-    };
+  it("falls back to the first benefit when the route index is outside the available range", async () => {
+    routerMocks.useParams.mockReturnValue({ id: "test-business", benefitIndex: "99" });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness());
+    vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
+      success: false,
+      businesses: [],
+      pagination: { total: 0, limit: 1, offset: 0, hasMore: false },
+      filters: {},
+    });
 
-    mockFetchBusinesses.mockResolvedValue([mockBusiness]);
+    render(<BenefitDetailPage />);
 
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
+    expect(await screen.findByText("Test Business")).toBeInTheDocument();
+    expect(screen.getByText("Banco Test · Visa")).toBeInTheDocument();
+    expect(screen.getByText("10% OFF")).toBeInTheDocument();
+  });
 
-    // Wait for error message to appear
-    await screen.findByText("Benefit not found");
+  it("shows not found when the route is missing an id", async () => {
+    routerMocks.useParams.mockReturnValue({ id: undefined, benefitIndex: undefined });
 
-    // Verify that error message is displayed
-    expect(screen.getByText("Benefit not found")).toBeInTheDocument();
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText("Beneficio no encontrado")).toBeInTheDocument();
+    expect(fetchBusinessById).not.toHaveBeenCalled();
+    expect(fetchBusinessesPaginated).not.toHaveBeenCalled();
   });
 });

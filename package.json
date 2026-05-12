@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prepare": "husky",
     "dev:all": "pnpm run dev & pnpm run dev:api",
     "dev:api": "node scripts/dev-functions-server.mjs",
     "dev:vercel:functions": "npx vercel dev --local-config vercel.functions-dev.json --listen 3000",
@@ -21,6 +22,7 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.16.2",
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.12.2",
     "lucide-react": "^0.344.0",
@@ -43,6 +45,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
+    "husky": "^9.1.7",
     "jsdom": "^27.0.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
@@ -50,6 +53,7 @@
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2",
     "vite-plugin-pwa": "^0.17.4",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "workbox-window": "7.4.0"
   }
 }

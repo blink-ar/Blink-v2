@@ -9,9 +9,9 @@ import {
   MongoBanksResponse,
   MongoStatsResponse,
   transformRawBenefitToBenefit,
-  BankSubscription,
-  RawBankSubscription
+  BankSubscription
 } from '../types/mongodb';
+import { filterActiveBenefits } from '../utils/benefits';
 
 declare global {
   // Extend the globalThis type to include allCategories
@@ -51,8 +51,11 @@ function mapSearchResponseToBusinessesResponse(
   }
 ): BusinessesApiResponse {
   const businesses = normalizeBusinesses(
-    (searchData.merchants || []).map((merchantHit) => merchantHit.business)
-  );
+    (searchData.merchants || []).map((merchantHit) => ({
+      ...merchantHit.business,
+      aliases: merchantHit.aliases || [],
+    }))
+  ).filter((business) => business.benefits.length > 0);
 
   return {
     success: searchData.success,
@@ -101,7 +104,10 @@ export async function fetchSearch(options: {
   return response.json();
 }
 
-export function normalizeBusinesses(businesses: any[]): Business[] {
+export function normalizeBusinesses(
+  businesses: any[],
+  options: { includeExpired?: boolean } = {},
+): Business[] {
   return businesses.map((raw) => {
     const rawLocations = raw.location || raw.locations || [];
 
@@ -124,7 +130,10 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
           ...b,
           cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : b.cardTypes
         }))
-      : raw.benefits;
+      : [];
+    const visibleBenefits = options.includeExpired
+      ? benefits
+      : filterActiveBenefits(benefits);
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
@@ -136,7 +145,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
     const business: any = {
       ...raw,
       category,
-      benefits,
+      benefits: visibleBenefits,
       location: uniqueLocations,
       image
     };
@@ -146,7 +155,7 @@ export function normalizeBusinesses(businesses: any[]): Business[] {
     }
 
     return business as Business;
-  });
+  }).filter((business) => options.includeExpired || business.benefits.length > 0);
 }
 
 /**
@@ -165,6 +174,7 @@ export async function fetchBusinessesPaginated(options: {
   lat?: number;
   lng?: number;
   online?: boolean;
+  includeExpired?: boolean;
 } = {}): Promise<BusinessesApiResponse> {
   const {
     limit = 20,
@@ -177,7 +187,8 @@ export async function fetchBusinessesPaginated(options: {
     geohash,
     lat,
     lng,
-    online
+    online,
+    includeExpired
   } = options;
   const normalizedMerchantId = merchantId?.trim();
 
@@ -214,6 +225,7 @@ export async function fetchBusinessesPaginated(options: {
   if (search) params.append('search', search);
   if (subscription) params.append('subscription', subscription);
   if (online) params.append('online', 'true');
+  if (includeExpired) params.append('includeExpired', 'true');
   // Exact coords take priority — only send one or the other
   if (lat !== undefined && lng !== undefined) {
     params.append('lat', lat.toString());
@@ -233,7 +245,7 @@ export async function fetchBusinessesPaginated(options: {
 
     // Transform API data to match Business interface (mapping locations -> location)
     if (data.success && Array.isArray(data.businesses)) {
-      data.businesses = normalizeBusinesses(data.businesses);
+      data.businesses = normalizeBusinesses(data.businesses, { includeExpired });
     }
 
     return data;
@@ -248,7 +260,10 @@ export async function fetchBusinessesPaginated(options: {
   }
 }
 
-export async function fetchBusinessById(merchantId: string): Promise<Business | null> {
+export async function fetchBusinessById(
+  merchantId: string,
+  options: { includeExpired?: boolean } = {},
+): Promise<Business | null> {
   const normalizedMerchantId = merchantId.trim();
   if (!normalizedMerchantId) {
     return null;
@@ -257,7 +272,8 @@ export async function fetchBusinessById(merchantId: string): Promise<Business | 
   const response = await fetchBusinessesPaginated({
     merchantId: normalizedMerchantId,
     limit: 1,
-    offset: 0
+    offset: 0,
+    includeExpired: options.includeExpired
   });
 
   if (!response.success) {

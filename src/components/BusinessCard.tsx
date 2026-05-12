@@ -1,7 +1,10 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
 import { Business } from "../types";
 import { BBVALogo, SantanderLogo, GaliciaLogo, NacionLogo } from "./BankLogos";
+import { useFavorites } from "../context/FavoritesContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface PaymentMethod {
   type: "bbva" | "santander" | "galicia" | "nacion";
@@ -22,6 +25,9 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   className = "",
   style,
 }) => {
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const getPaymentMethods = (business: Business): PaymentMethod[] => {
     const methods: PaymentMethod[] = [];
 
@@ -176,7 +182,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
 
   return (
     <div
-      className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
+      className={`relative bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer ${className}`}
       onClick={() => onClick(business.id)}
       role="button"
       tabIndex={0}
@@ -189,6 +195,35 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
       }}
       aria-label={`Ver ofertas de ${business.name || 'Negocio'}`}
     >
+      <button
+        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full transition-colors active:scale-90 z-10"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isAuthenticated) {
+            navigate('/login');
+            return;
+          }
+          toggleFavorite(business);
+        }}
+        aria-label={
+          !isAuthenticated
+            ? 'Iniciá sesión para guardar'
+            : isFavorite(business.id)
+              ? 'Quitar de guardados'
+              : 'Guardar'
+        }
+      >
+        <span
+          className="material-symbols-outlined"
+          style={{
+            fontSize: 20,
+            color: isFavorite(business.id) ? '#ef4444' : '#9ca3af',
+            fontVariationSettings: isFavorite(business.id) ? "'FILL' 1" : "'FILL' 0",
+          }}
+        >
+          favorite
+        </span>
+      </button>
       <div className="flex items-start gap-3">
         {/* Business Icon */}
         <div className="relative flex-shrink-0">

@@ -6,7 +6,21 @@ import { Business, BankBenefit, CanonicalLocation } from '../types';
 import { benefitsAPI } from './api';
 import { getCategoryDefaultImage } from '../utils/categoryImages';
 
-
+const VALID_CATEGORIES = new Set([
+    'gastronomia',
+    'moda',
+    'entretenimiento',
+    'otros',
+    'deportes',
+    'regalos',
+    'viajes',
+    'automotores',
+    'belleza',
+    'jugueterias',
+    'hogar',
+    'electro',
+    'shopping',
+]);
 
 /**
  * API service configuration
@@ -103,7 +117,16 @@ export class APIService extends AbstractBaseService {
                 // Check if we should refresh in background
                 if (this.shouldRefreshInBackground(cacheKey)) {
                     this.logger.debug('Starting background refresh');
-                    this.backgroundRefreshPromise = this.fetchFromAPIAndCache();
+                    this.backgroundRefreshPromise = this.fetchFromAPIAndCache()
+                        .catch((error) => {
+                            this.logger.warn('Background refresh failed', {
+                                error: error instanceof Error ? error.message : String(error)
+                            });
+                            return cachedData;
+                        })
+                        .finally(() => {
+                            this.backgroundRefreshPromise = undefined;
+                        });
                 }
 
                 return cachedData;
@@ -233,11 +256,55 @@ export class APIService extends AbstractBaseService {
 
             const getStringArray = (value: unknown): string[] | undefined => {
                 if (!Array.isArray(value)) return undefined;
-                for (const item of value) {
-                    if (typeof item !== 'string') return undefined;
-                }
-                return value;
+                const strings = value
+                    .filter((item): item is string => typeof item === 'string')
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+                return strings.length > 0 ? strings : undefined;
             };
+
+            const normalizeCategory = (value: unknown): string => {
+                const category = getString(value).toLowerCase().trim();
+                return VALID_CATEGORIES.has(category) ? category : 'otros';
+            };
+
+            const getRewardRate = (benefit: Record<string, unknown>): string => {
+                const discountPercentage = benefit.discountPercentage;
+                if (typeof discountPercentage === 'number' && discountPercentage > 0) {
+                    return `${discountPercentage}%`;
+                }
+                if (typeof discountPercentage === 'string' && discountPercentage.trim()) {
+                    return discountPercentage.trim();
+                }
+
+                const installments = benefit.installments;
+                if (typeof installments === 'number' && installments > 0) {
+                    return `${installments} cuotas s/int`;
+                }
+
+                return getStringOrDefault(benefit.reward_rate, '') ||
+                    getStringOrDefault(benefit.tasa_recompensa, '') ||
+                    getStringOrDefault(benefit.valor, '') ||
+                    'N/A';
+            };
+
+            const getOptionalString = (...values: unknown[]): string | undefined => {
+                for (const value of values) {
+                    if (typeof value === 'number') return String(value);
+                    if (typeof value === 'string' && value.trim()) return value.trim();
+                }
+                return undefined;
+            };
+
+            const generateBusinessId = (name: string): string =>
+                name
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .trim()
+                    .replace(/\s+/g, '-')
+                    .substring(0, 80) || 'unknown-business';
 
             // Helper function to extract locations from MongoDB benefit data
             const extractLocations = (benefit: Record<string, unknown>): CanonicalLocation[] => {
@@ -302,7 +369,7 @@ export class APIService extends AbstractBaseService {
                         'Unknown Business';
 
                     const categories = Array.isArray(benefit.categories) ? benefit.categories : [];
-                    const category = categories.length > 0 ? getString(categories[0]) : 'otros';
+                    const category = normalizeCategory(categories.length > 0 ? categories[0] : 'otros');
 
                     const description = getStringOrDefault(benefit.description, '') ||
                         getStringOrDefault(benefit.descripcion, '') ||
@@ -316,9 +383,16 @@ export class APIService extends AbstractBaseService {
 
                     if (!businessMap.has(businessName)) {
                         const locations = extractLocations(benefit);
+                        const merchant = benefit.merchant && typeof benefit.merchant === 'object'
+                            ? benefit.merchant as Record<string, unknown>
+                            : {};
 
                         businessMap.set(businessName, {
-                            id: getString(benefit._id) || getString(benefit.id) || businessName,
+                            id: getString(merchant.id) ||
+                                getString(merchant._id) ||
+                                getString(benefit.merchantId) ||
+                                getString(benefit.businessId) ||
+                                generateBusinessId(businessName),
                             name: businessName,
                             category: category,
                             description: description,
@@ -347,17 +421,18 @@ export class APIService extends AbstractBaseService {
                             getStringOrDefault(benefit.benefit, '') ||
                             getStringOrDefault(benefit.beneficio, '') ||
                             description,
-                        rewardRate: getStringOrDefault(benefit.discountPercentage, '') ||
-                            getStringOrDefault(benefit.reward_rate, '') ||
-                            getStringOrDefault(benefit.tasa_recompensa, '') ||
-                            getStringOrDefault(benefit.valor, '') ||
-                            'N/A',
+                        cardTypes: getStringArray(cardTypes.map((cardType) =>
+                            typeof cardType === 'object' && cardType !== null
+                                ? (cardType as Record<string, unknown>).name
+                                : cardType
+                        )),
+                        rewardRate: getRewardRate(benefit),
                         color: getStringOrDefault(benefit.color, 'bg-blue-500'),
                         icon: getStringOrDefault(benefit.icon, 'CreditCard'),
                         // Map additional fields from raw benefit data
                         tipo: getString(benefit.tipo) || undefined,
                         cuando: getString(benefit.cuando) || undefined,
-                        valor: getString(benefit.valor) || getString(benefit.discountPercentage) || undefined,
+                        valor: getOptionalString(benefit.valor, benefit.discountPercentage),
                         tope: getString(benefit.tope) || undefined,
                         claseDeBeneficio: getString(benefit.claseDeBeneficio) ||
                             getString(benefit.clase_beneficio) ||
@@ -367,7 +442,11 @@ export class APIService extends AbstractBaseService {
                         usos: getStringArray(benefit.usos),
                         textoAplicacion: getString(benefit.textoAplicacion) ||
                             getString(benefit.texto_aplicacion) ||
+                            getString(benefit.link) ||
                             undefined,
+                        installments: typeof benefit.installments === 'number' ? benefit.installments : undefined,
+                        validUntil: getString(benefit.validUntil) || undefined,
+                        subscription: getString(benefit.subscription) || undefined,
                     };
 
                     business.benefits.push(bankBenefit);
@@ -421,16 +500,12 @@ export class APIService extends AbstractBaseService {
     }
 
     private shouldRefreshInBackground(cacheKey: string): boolean {
-        // Check if cache entry exists and is older than background refresh threshold
-        const entry = this.cacheService.get(cacheKey);
-        if (!entry) return false;
-
-        // For now, we'll use a simple heuristic - if we have a background refresh promise running, don't start another
         if (this.backgroundRefreshPromise) return false;
 
-        // In a real implementation, we'd check the cache entry timestamp
-        // For now, we'll refresh every other request to demonstrate the functionality
-        return Math.random() > 0.7; // 30% chance to refresh in background
+        const metadata = this.cacheService.getEntryMetadata(cacheKey);
+        if (!metadata) return false;
+
+        return Date.now() - metadata.timestamp >= this.config.backgroundRefreshThreshold;
     }
 
     private getFallbackData(): Business[] {

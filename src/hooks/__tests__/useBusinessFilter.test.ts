@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useBusinessFilter } from '../useBusinessFilter';
-import { Business, Category, CanonicalLocation } from '../../types';
+import { Business, CanonicalLocation } from '../../types';
 
 // Helper function to create a location object for tests
 const createTestLocation = (address: string): CanonicalLocation[] => [{

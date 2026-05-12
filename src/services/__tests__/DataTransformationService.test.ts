@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { DataTransformationService, BenefitResponse, AllBenefits } from '../DataTransformationService';
 import { Business, BankBenefit } from '../../types';
+import { getCategoryDefaultImage } from '../../utils/categoryImages';
 
 describe('DataTransformationService', () => {
     let service: DataTransformationService;
@@ -244,7 +245,7 @@ describe('DataTransformationService', () => {
             const result = service.transformBenefit('BANCO_TEST', benefitWithInvalidImage);
 
             expect(result.isValid).toBe(true);
-            expect(result.data!.business.image).toBe('https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400');
+            expect(result.data!.business.image).toBe(getCategoryDefaultImage('moda'));
         });
     });
 
@@ -368,7 +369,15 @@ describe('DataTransformationService', () => {
             expect(fallbacks.name).toBe('Test Business');
             expect(fallbacks.description).toBe('Test description');
             expect(fallbacks.rating).toBe(4.0);
-            expect(fallbacks.location).toBe('Multiple locations');
+            expect(fallbacks.location).toEqual([
+                expect.objectContaining({
+                    formattedAddress: 'Multiple locations',
+                    raw: 'Multiple locations',
+                    lat: 0,
+                    lng: 0,
+                    provider: 'google'
+                })
+            ]);
             expect(fallbacks.benefit).toBe('Special offer available');
             expect(fallbacks.rewardRate).toBe('Contact for details');
         });

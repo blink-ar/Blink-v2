@@ -58,4 +58,35 @@ describe('buildSearchDatasetFromMerchantDocs', () => {
     expect(dataset.productDocuments.some((doc) => doc.productTerm === 'helado')).toBe(true);
     expect(dataset.intentDocuments.some((doc) => doc.intentKey === 'dessert_icecream')).toBe(true);
   });
+
+  it('indexes accentless, connector-free, and singular merchant name variants', () => {
+    const dataset = buildSearchDatasetFromMerchantDocs([
+      {
+        merchantId: 'merchant_69a5e9d4b7ff0ecb9e339ea6',
+        merchantName: 'Almacén de Pizzas',
+        merchantKey: 'almacen-de-pizzas',
+        categories: ['gastronomia'],
+        banks: [],
+        locations: [],
+        activeBenefitCount: 3,
+        benefitCount: 3,
+        searchProfile: {
+          aliases: [],
+          description: '',
+          productTags: [],
+          intentTags: [],
+          benefits: []
+        }
+      }
+    ]);
+
+    expect(dataset.merchantDocuments[0].aliases).toEqual(
+      expect.arrayContaining([
+        'almacen de pizzas',
+        'almacen pizzas',
+        'almacen pizza'
+      ])
+    );
+    expect(dataset.merchantDocuments[0].searchText).toContain('almacen pizza');
+  });
 });

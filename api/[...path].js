@@ -1,8 +1,28 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { createPublicKey, createVerify } from 'crypto';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
-import { normalizeSearchText, tokenizeSearchText } from './search/normalize.js';
+import {
+  buildSearchPhraseVariants,
+  getNormalizedSearchWords,
+  getSignificantSearchTokens,
+  normalizeSearchText,
+  singularizeSpanishToken,
+  tokenizeSearchText
+} from './search/normalize.js';
+import {
+  getMerchantSeoPathFromMerchant,
+  parseMerchantSeoSlugId,
+  readViteAppShell,
+  renderMerchantSeoHtml
+} from './merchant-seo.js';
+import {
+  getCategorySeoPath as getCategoryPagePath,
+  loadCategorySeoData,
+  renderCategorySeoHtml,
+  resolveSeoCategory
+} from './category-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -14,16 +34,89 @@ const ALLOWED_COLLECTIONS = new Set([
 
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
+const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
+const NOTIFICATION_HISTORY_COLLECTION = 'notification_history';
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
+const MERCHANT_SEO_PROJECTION = {
+  _id: 0,
+  merchantId: 1,
+  merchantName: 1,
+  merchantKey: 1,
+  categories: 1,
+  banks: 1,
+  locations: 1,
+  hasOnlineBenefits: 1,
+  benefitCount: 1,
+  activeBenefitCount: 1,
+  maxDiscountPercentage: 1,
+  searchProfile: 1,
+  imageUrl: 1,
+  logoUrl: 1,
+  coverUrl: 1,
+  isActive: 1
+};
+const BENEFIT_SUMMARY_PROJECTION = {
+  _id: 1,
+  id: 1,
+  merchantId: 1,
+  bank: 1,
+  benefitTitle: 1,
+  availableDays: 1,
+  discountPercentage: 1,
+  caps: 1,
+  online: 1,
+  otherDiscounts: 1,
+  installments: 1,
+  description: 1,
+  termsAndConditions: 1,
+  link: 1,
+  validUntil: 1,
+  cardTypes: 1,
+  subscription: 1
+};
 
-const MONGODB_URI_READ_ONLY = process.env.MONGODB_URI_READ_ONLY;
+const REQUIRED_PRODUCTION_ENV_VARS = [
+  'MONGODB_URI'
+];
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+}
+
+function readEnv(name) {
+  const value = process.env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function validateProductionEnv() {
+  if (!isProductionRuntime()) return;
+
+  const missing = REQUIRED_PRODUCTION_ENV_VARS.filter((name) => !readEnv(name));
+  if (missing.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+}
+
+validateProductionEnv();
+
+const MONGODB_URI_READ_ONLY = readEnv('MONGODB_URI_READ_ONLY');
+const MONGODB_URI = readEnv('MONGODB_URI');
 const DATABASE_NAME = process.env.DATABASE_NAME || 'benefitsV3';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || '').replace(/\/$/, '');
+
+const USER_DATA_COLLECTION = 'user_data';
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
   globalState.__blinkMongo = {
+    clientPromise: null,
+    dbPromise: null
+  };
+}
+if (!globalState.__blinkMongoWrite) {
+  globalState.__blinkMongoWrite = {
     clientPromise: null,
     dbPromise: null
   };
@@ -35,10 +128,160 @@ if (!globalState.__blinkBankCards) {
   };
 }
 
+// --- Auth utilities ---
+
+function getAuthToken(req) {
+  const auth = req.headers['authorization'] || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
+
+const jwksCache = { keys: null, fetchedAt: 0 };
+const JWKS_TTL_MS = 60 * 60 * 1000;
+
+async function getAuth0Jwks() {
+  if (!AUTH0_DOMAIN) throw new Error('Auth0 domain not configured');
+  const now = Date.now();
+  if (jwksCache.keys && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
+  const res = await fetch(`https://${AUTH0_DOMAIN}/.well-known/jwks.json`);
+  if (!res.ok) throw new Error('Failed to fetch JWKS');
+  const data = await res.json();
+  jwksCache.keys = data.keys || [];
+  jwksCache.fetchedAt = now;
+  return jwksCache.keys;
+}
+
+async function verifyAuth0Jwt(token) {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) throw new Error('Invalid token');
+  const [headerB64, payloadB64, sigB64] = parts;
+  const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+  const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+
+  if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Token expired');
+  if (!payload.iss || !AUTH0_DOMAIN || !payload.iss.includes(AUTH0_DOMAIN)) throw new Error('Invalid issuer');
+  if (header.alg !== 'RS256') throw new Error('Unsupported algorithm');
+
+  const keys = await getAuth0Jwks();
+  const jwk = keys.find((k) => k.kid === header.kid && (k.use === 'sig' || !k.use));
+  if (!jwk) throw new Error('Signing key not found');
+
+  const pubKey = createPublicKey({ key: jwk, format: 'jwk' });
+  const verifier = createVerify('SHA256');
+  verifier.update(`${headerB64}.${payloadB64}`);
+  const ok = verifier.verify(pubKey, Buffer.from(sigB64, 'base64url'));
+  if (!ok) throw new Error('Invalid signature');
+  return payload;
+}
+
+async function getUserIdFromRequest(req) {
+  const token = getAuthToken(req);
+  if (!token) return null;
+  try {
+    const payload = await verifyAuth0Jwt(token);
+    if (payload && payload.sub) return String(payload.sub);
+  } catch {
+    // not a valid Auth0 JWT
+  }
+  return null;
+}
+
+async function getUserDataCollection() {
+  const db = await getWritableDb();
+  const col = db.collection(USER_DATA_COLLECTION);
+  await col.createIndex({ userId: 1 }, { unique: true }).catch(() => {});
+  return col;
+}
+
+async function handleGetUserFavorites(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const col = await getUserDataCollection();
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleAddUserFavorite(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const body = await readJsonBody(req);
+  const merchantId = body?.merchantId;
+  if (!merchantId || typeof merchantId !== 'string') {
+    return json(res, 400, { error: 'merchantId requerido' });
+  }
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    {
+      $addToSet: { favoriteMerchantIds: merchantId },
+      $setOnInsert: { userId, createdAt: new Date() },
+      $set: { updatedAt: new Date() }
+    },
+    { upsert: true }
+  );
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleRemoveUserFavorite(req, res, merchantId) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  if (!merchantId) return json(res, 400, { error: 'merchantId requerido' });
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    { $pull: { favoriteMerchantIds: merchantId }, $set: { updatedAt: new Date() } }
+  );
+  const doc = await col.findOne({ userId }, { projection: { favoriteMerchantIds: 1 } });
+  return json(res, 200, { success: true, favoriteMerchantIds: doc?.favoriteMerchantIds ?? [] });
+}
+
+async function handleGetUserBanks(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const col = await getUserDataCollection();
+  const doc = await col.findOne({ userId }, { projection: { savedBankCodes: 1 } });
+  return json(res, 200, { success: true, savedBankCodes: doc?.savedBankCodes ?? [] });
+}
+
+async function handleUpdateUserBanks(req, res) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return json(res, 401, { error: 'No autenticado' });
+  const body = await readJsonBody(req);
+  const banks = body?.banks;
+  if (!Array.isArray(banks) || banks.some((b) => typeof b !== 'string')) {
+    return json(res, 400, { error: 'banks debe ser un array de strings' });
+  }
+  const unique = Array.from(new Set(banks.map((b) => b.trim()).filter(Boolean)));
+  const col = await getUserDataCollection();
+  await col.updateOne(
+    { userId },
+    {
+      $set: { savedBankCodes: unique, updatedAt: new Date() },
+      $setOnInsert: { userId, createdAt: new Date() }
+    },
+    { upsert: true }
+  );
+  return json(res, 200, { success: true, savedBankCodes: unique });
+}
+
 function json(res, statusCode, payload) {
   res.status(statusCode);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.send(JSON.stringify(payload));
+}
+
+function redirect(res, statusCode, location) {
+  res.status(statusCode);
+  res.setHeader('Location', location);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send('');
+}
+
+function html(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(payload);
 }
 
 // Cache-Control directives
@@ -48,6 +291,15 @@ const CC_LOCATION = 'private, max-age=60';                                      
 
 function setCacheControl(res, directive) {
   res.setHeader('Cache-Control', directive);
+}
+
+function getCanonicalSiteUrl(url) {
+  const configuredSiteUrl = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').trim().replace(/\/$/, '');
+  return configuredSiteUrl || url.origin.replace(/\/$/, '');
+}
+
+function isReadMethod(req) {
+  return req.method === 'GET' || req.method === 'HEAD';
 }
 
 /**
@@ -80,11 +332,11 @@ function getParsedUrl(req) {
 }
 
 function resolveRequestPath(url) {
-  if (url.pathname !== '/api/[...path]') {
+  const rewrittenPath = url.searchParams.get('path');
+  if (!rewrittenPath && url.pathname !== '/api/[...path]') {
     return url.pathname;
   }
 
-  const rewrittenPath = url.searchParams.get('path');
   if (!rewrittenPath) {
     return '/api';
   }
@@ -499,8 +751,100 @@ function parseSearchFilters(searchParams) {
 
 function buildExpandedQueryTokens(query) {
   const normalized = normalizeSearchText(query);
+  const phraseVariants = buildSearchPhraseVariants(query);
   const tokens = tokenizeSearchText(query);
-  return Array.from(new Set([normalized, ...tokens].filter(Boolean)));
+  return Array.from(new Set([normalized, ...phraseVariants, ...tokens].filter(Boolean)));
+}
+
+const MERCHANT_NAME_CONNECTOR_WORDS = [
+  'de',
+  'del',
+  'la',
+  'las',
+  'el',
+  'los',
+  'y',
+  'e'
+];
+const MERCHANT_NAME_SEPARATOR_PATTERN = '[^a-z0-9áéíóúüñ]+';
+const ACCENT_FOLDING_CHAR_CLASSES = {
+  a: '[aáàäâã]',
+  e: '[eéèëê]',
+  i: '[iíìïî]',
+  o: '[oóòöôõ]',
+  u: '[uúùüû]',
+  n: '[nñ]'
+};
+
+function buildAccentInsensitiveTokenPattern(token, options = {}) {
+  const { allowPlural = true, singularize = true } = options;
+  const normalized = normalizeSearchText(token).replace(/\s+/g, '');
+  const base = singularize ? singularizeSpanishToken(normalized) : normalized;
+  if (!base) return '';
+
+  const source = Array.from(base)
+    .map((char) => ACCENT_FOLDING_CHAR_CLASSES[char] || escapeRegex(char))
+    .join('');
+  const pluralSuffix = allowPlural && /^[a-z0-9]+$/.test(base) && base.length > 3 ? '(?:s|es)?' : '';
+  return `${source}${pluralSuffix}`;
+}
+
+function getConnectorPatternSource() {
+  return MERCHANT_NAME_CONNECTOR_WORDS
+    .map((word) => buildAccentInsensitiveTokenPattern(word, { allowPlural: false, singularize: false }))
+    .filter(Boolean)
+    .join('|');
+}
+
+function buildFlexibleNameRegexSource(words, options = {}) {
+  const { allowConnectorsBetween = false, prefix = false } = options;
+  const tokenPatterns = words
+    .map((word) => buildAccentInsensitiveTokenPattern(word))
+    .filter(Boolean);
+
+  if (tokenPatterns.length === 0) {
+    return null;
+  }
+
+  const connectorSource = getConnectorPatternSource();
+  const separator = MERCHANT_NAME_SEPARATOR_PATTERN;
+  const joiner = allowConnectorsBetween && connectorSource
+    ? `${separator}(?:(?:${connectorSource})${separator})*`
+    : separator;
+  const leadingConnectors = allowConnectorsBetween && connectorSource
+    ? `(?:(?:${connectorSource})${separator})*`
+    : '';
+  const trailingConnectors = allowConnectorsBetween && connectorSource && !prefix
+    ? `(?:${separator}(?:${connectorSource}))*`
+    : '';
+
+  return `^${leadingConnectors}${tokenPatterns.join(joiner)}${trailingConnectors}${prefix ? '' : '$'}`;
+}
+
+function buildMerchantNameRescuePatterns(normalizedQuery, options = {}) {
+  const { prefix = false } = options;
+  const sources = new Set();
+
+  for (const variant of buildSearchPhraseVariants(normalizedQuery)) {
+    const words = getNormalizedSearchWords(variant);
+    const fullSource = buildFlexibleNameRegexSource(words, { prefix });
+    if (fullSource) {
+      sources.add(fullSource);
+    }
+
+    const significantWords = getSignificantSearchTokens(variant);
+    if (significantWords.length >= 2) {
+      const significantSource = buildFlexibleNameRegexSource(significantWords, {
+        allowConnectorsBetween: true,
+        prefix
+      });
+      if (significantSource) {
+        sources.add(significantSource);
+      }
+    }
+  }
+
+  return Array.from(sources).map((source) => new RegExp(source, 'i'));
 }
 
 function buildActiveMerchantSearchQuery(filters, searchParams) {
@@ -530,13 +874,13 @@ function buildActiveMerchantSearchQuery(filters, searchParams) {
   return query;
 }
 
-function buildMerchantNameRescueClauses(pattern) {
-  return [
+function buildMerchantNameRescueClauses(patterns) {
+  return patterns.flatMap((pattern) => [
     { merchantName: { $regex: pattern } },
     { merchantKey: { $regex: pattern } },
     { aliases: { $elemMatch: { $regex: pattern } } },
     { 'searchProfile.aliases': { $elemMatch: { $regex: pattern } } }
-  ];
+  ]);
 }
 
 function mergeMerchantDocsById(merchantLists) {
@@ -558,13 +902,13 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
   const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
-  const exactPattern = new RegExp(`^${escapeRegex(normalizedQuery)}$`, 'i');
-  const prefixPattern = new RegExp(`^${escapeRegex(normalizedQuery)}`, 'i');
+  const exactPatterns = buildMerchantNameRescuePatterns(normalizedQuery);
+  const prefixPatterns = buildMerchantNameRescuePatterns(normalizedQuery, { prefix: true });
 
   const exactMatches = await merchantCollection
     .find(
       combineQueriesWithAnd(baseQuery, {
-        $or: buildMerchantNameRescueClauses(exactPattern)
+        $or: buildMerchantNameRescueClauses(exactPatterns)
       }),
       {
         projection: MERCHANT_SEARCH_RESCUE_PROJECTION
@@ -585,7 +929,7 @@ async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchPa
         baseQuery,
         exactIds.length > 0 ? { merchantId: { $nin: exactIds } } : null,
         {
-          $or: buildMerchantNameRescueClauses(prefixPattern)
+          $or: buildMerchantNameRescueClauses(prefixPatterns)
         }
       ),
       {
@@ -776,6 +1120,13 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   let score = Number(hit?._rankingScore || 0) * 100;
 
   const merchantName = normalizeSearchText(hit.merchantName || '');
+  const merchantNameVariants = new Set(buildSearchPhraseVariants(hit.merchantName || ''));
+  const querySignificantTokens = getSignificantSearchTokens(normalizedQuery, { singularize: true });
+  const merchantSignificantTokens = getSignificantSearchTokens(hit.merchantName || '', { singularize: true });
+  const hasSignificantNameMatch =
+    querySignificantTokens.length >= 2 &&
+    merchantSignificantTokens.length >= 2 &&
+    querySignificantTokens.join(' ') === merchantSignificantTokens.join(' ');
   const aliases = (Array.isArray(hit.aliases) ? hit.aliases : []).map((value) => normalizeSearchText(value));
   const aliasSet = new Set(aliases);
   const manualAliasSet = new Set(
@@ -787,6 +1138,12 @@ function scoreMerchantHit(hit, normalizedQuery, expandedTokens, intentTags) {
   if (merchantName && merchantName === normalizedQuery) {
     score += 1000;
     reasons.push('merchant_exact');
+  } else if (merchantNameVariants.has(normalizedQuery)) {
+    score += 850;
+    reasons.push('merchant_name_variant');
+  } else if (hasSignificantNameMatch) {
+    score += 820;
+    reasons.push('merchant_name_tokens_exact');
   } else if (merchantName && merchantName.startsWith(normalizedQuery)) {
     score += 450;
     reasons.push('merchant_prefix');
@@ -865,6 +1222,66 @@ function mapMerchantHitToResponse(hit, scoreMeta, filters) {
     reasons: scoreMeta.reasons,
     business: withDistance
   };
+}
+
+async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants, searchParams) {
+  const merchantIds = Array.from(
+    new Set(
+      (merchants || [])
+        .map((merchant) => merchant?.merchantId)
+        .filter((merchantId) => typeof merchantId === 'string' && merchantId.trim())
+    )
+  );
+
+  if (merchantIds.length === 0) {
+    return merchants || [];
+  }
+
+  const benefitQuery = {
+    merchantId: { $in: merchantIds }
+  };
+  const bank = searchParams.get('bank');
+  const bankFilter = bank
+    ? bank
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    : [];
+
+  if (bankFilter.length > 0) {
+    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  }
+  applyActiveBenefitsFilter(benefitQuery, searchParams);
+
+  const rawBenefits = await db.collection(collectionName)
+    .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefitsByMerchant = new Map();
+
+  for (const benefit of rawBenefits) {
+    const key = benefit?.merchantId;
+    if (!key) continue;
+    if (!benefitsByMerchant.has(key)) {
+      benefitsByMerchant.set(key, []);
+    }
+    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
+  }
+
+  return merchants.map((merchant) => {
+    if (!merchant?.merchantId) {
+      return merchant;
+    }
+
+    return {
+      ...merchant,
+      business: {
+        ...(merchant.business || {}),
+        benefits: benefitsByMerchant.get(merchant.merchantId) || []
+      }
+    };
+  });
 }
 
 function mapIntentHit(hit) {
@@ -1090,7 +1507,12 @@ async function handleSearch(req, res, url, db) {
       .sort((a, b) => b.score - a.score);
 
     const distanceAwareMerchants = applyLocalDistanceGuardrail(scoredMerchantHits, filters);
-    const merchants = distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum);
+    const merchants = await hydrateSearchMerchantsWithBenefits(
+      db,
+      collectionName,
+      distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum),
+      searchParams
+    );
     const intents = (intentSearch.hits || []).map(mapIntentHit);
     const products = (productSearch.hits || []).map(mapProductHit);
     const totalMerchants = distanceAwareMerchants.length;
@@ -1143,6 +1565,12 @@ async function handleSearch(req, res, url, db) {
       filters,
       searchParams
     );
+    const merchants = await hydrateSearchMerchantsWithBenefits(
+      db,
+      collectionName,
+      fallback.merchants,
+      searchParams
+    );
 
     return json(res, 200, {
       success: true,
@@ -1159,13 +1587,13 @@ async function handleSearch(req, res, url, db) {
         }
       },
       intents: fallback.intents,
-      merchants: fallback.merchants,
+      merchants,
       products: fallback.products,
       pagination: {
         totalMerchants: fallback.totalMerchants,
         limit: limitNum,
         offset: offsetNum,
-        hasMore: offsetNum + fallback.merchants.length < fallback.totalMerchants
+        hasMore: offsetNum + merchants.length < fallback.totalMerchants
       },
       ...(debugMode && { debug })
     });
@@ -1187,6 +1615,23 @@ async function getDb() {
   }
 
   return globalState.__blinkMongo.dbPromise;
+}
+
+async function getWritableDb() {
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is required for write operations');
+  }
+
+  if (!globalState.__blinkMongoWrite.clientPromise) {
+    const client = new MongoClient(MONGODB_URI);
+    globalState.__blinkMongoWrite.clientPromise = client.connect();
+  }
+
+  if (!globalState.__blinkMongoWrite.dbPromise) {
+    globalState.__blinkMongoWrite.dbPromise = globalState.__blinkMongoWrite.clientPromise.then((client) => client.db(DATABASE_NAME));
+  }
+
+  return globalState.__blinkMongoWrite.dbPromise;
 }
 
 async function readJsonBody(req) {
@@ -1476,29 +1921,6 @@ async function handleGetBanks(req, res, url, db) {
   });
 }
 
-async function handleGetNetworks(req, res, url, db) {
-  const searchParams = url.searchParams;
-  const collectionName = getCollectionName(searchParams);
-  const activeMatch = getActiveBenefitsMatch(searchParams);
-
-  const networks = await db.collection(collectionName)
-    .aggregate([
-      ...(activeMatch ? [{ $match: activeMatch }] : []),
-      { $group: { _id: '$network', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ])
-    .toArray();
-
-  setCacheControl(res, CC_METADATA);
-  return json(res, 200, {
-    success: true,
-    networks: networks.map((network) => ({
-      name: network._id,
-      count: network.count
-    }))
-  });
-}
-
 async function handleGetStats(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -1740,6 +2162,10 @@ async function handleGetBusinesses(req, res, url, db) {
   }
   if (search && !merchantId) {
     const normalizedSearch = normalizeSearchText(search);
+    const merchantNamePatterns = [
+      ...buildMerchantNameRescuePatterns(normalizedSearch),
+      ...buildMerchantNameRescuePatterns(normalizedSearch, { prefix: true })
+    ];
     const searchTerms = Array.from(
       new Set([
         search,
@@ -1749,18 +2175,21 @@ async function handleGetBusinesses(req, res, url, db) {
       ].filter(Boolean))
     );
 
-    merchantQuery.$or = searchTerms.flatMap((term) => {
-      const pattern = new RegExp(escapeRegex(term), 'i');
-      return [
-        { merchantName: pattern },
-        { merchantKey: pattern },
-        { aliases: { $elemMatch: { $regex: pattern } } },
-        { categories: { $elemMatch: { $regex: pattern } } },
-        { banks: { $elemMatch: { $regex: pattern } } },
-        { 'searchProfile.searchText': pattern },
-        { 'searchProfile.description': pattern }
-      ];
-    });
+    merchantQuery.$or = [
+      ...buildMerchantNameRescueClauses(merchantNamePatterns),
+      ...searchTerms.flatMap((term) => {
+        const pattern = new RegExp(escapeRegex(term), 'i');
+        return [
+          { merchantName: pattern },
+          { merchantKey: pattern },
+          { aliases: { $elemMatch: { $regex: pattern } } },
+          { categories: { $elemMatch: { $regex: pattern } } },
+          { banks: { $elemMatch: { $regex: pattern } } },
+          { 'searchProfile.searchText': pattern },
+          { 'searchProfile.description': pattern }
+        ];
+      })
+    ];
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
@@ -1777,26 +2206,6 @@ async function handleGetBusinesses(req, res, url, db) {
     logoUrl: 1,
     coverUrl: 1
   };
-  const benefitSummaryProjection = {
-    _id: 1,
-    id: 1,
-    merchantId: 1,
-    bank: 1,
-    benefitTitle: 1,
-    availableDays: 1,
-    discountPercentage: 1,
-    caps: 1,
-    online: 1,
-    otherDiscounts: 1,
-    installments: 1,
-    description: 1,
-    termsAndConditions: 1,
-    link: 1,
-    validUntil: 1,
-    cardTypes: 1,
-    subscription: 1
-  };
-
   let pagedMerchants = [];
   if (hasLocation) {
     try {
@@ -1936,7 +2345,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const rawBenefits = merchantIds.length > 0
     ? await db.collection(collectionName)
-      .find(benefitQuery, { projection: benefitSummaryProjection })
+      .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
       .sort({ bank: 1, benefitTitle: 1 })
       .toArray()
     : [];
@@ -1996,6 +2405,156 @@ async function handleGetBusinesses(req, res, url, db) {
   });
 }
 
+async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
+  const parsed = parseMerchantSeoSlugId(slugId);
+  if (!parsed) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: parsed.merchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: MERCHANT_SEO_PROJECTION
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: parsed.merchantId
+    });
+  }
+
+  const canonicalPath = getMerchantSeoPathFromMerchant(merchant);
+  if (`/comercios/${slugId}` !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const rawBenefits = await db.collection(DEFAULT_COLLECTION)
+    .find(
+      {
+        merchantId: parsed.merchantId
+      },
+      {
+        projection: BENEFIT_SUMMARY_PROJECTION
+      }
+    )
+    .sort({ bank: 1, benefitTitle: 1 })
+    .toArray();
+  const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
+  const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderMerchantSeoHtml({
+    appShell,
+    merchant,
+    benefits,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    now: options.now || new Date()
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
+async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
+  const normalizedMerchantId = String(merchantId || '').trim();
+  if (!normalizedMerchantId) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found'
+    });
+  }
+
+  const merchant = await db.collection(MERCHANT_ASSETS_COLLECTION).findOne(
+    {
+      isActive: { $ne: false },
+      merchantId: normalizedMerchantId,
+      benefitCount: { $gt: 0 }
+    },
+    {
+      projection: {
+        _id: 0,
+        merchantId: 1,
+        merchantName: 1
+      }
+    }
+  );
+
+  if (!merchant) {
+    return json(res, 404, {
+      success: false,
+      error: 'Merchant not found',
+      merchantId: normalizedMerchantId
+    });
+  }
+
+  setCacheControl(res, CC_CONTENT);
+  return redirect(res, 301, getMerchantSeoPathFromMerchant(merchant));
+}
+
+async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam, options = {}) {
+  const category = resolveSeoCategory(categoryParam);
+  if (!category) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category not found',
+      category: categoryParam
+    });
+  }
+
+  const parsedPage = Number.parseInt(String(pageParam || '1'), 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const canonicalPath = getCategoryPagePath(category, page);
+  const requestedPath = pageParam
+    ? `/categorias/${categoryParam}/page/${pageParam}`
+    : `/categorias/${categoryParam}`;
+
+  if (requestedPath !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const data = await loadCategorySeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    category,
+    page
+  });
+
+  if (data.outOfRange) {
+    return json(res, 404, {
+      success: false,
+      error: 'Category page not found',
+      category: category.slug,
+      page
+    });
+  }
+
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderCategorySeoHtml({
+    appShell,
+    category,
+    merchants: data.merchants,
+    total: data.total,
+    page: data.page,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2023,12 +2582,65 @@ async function handlePlaceDetails(req, res) {
 export {
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
+  resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleCategorySeoPage,
+  handleLegacyBusinessRedirect,
+  handleMerchantSeoPage,
   handleSearch,
   rehydrateBenefitDoc
 };
+
+async function handleNotificationSubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint, keys, expirationTime } = body;
+
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return json(res, 400, { error: 'Invalid subscription: endpoint, keys.p256dh and keys.auth are required' });
+  }
+
+  const db = await getWritableDb();
+  const collection = db.collection(PUSH_SUBSCRIPTIONS_COLLECTION);
+
+  await collection.updateOne(
+    { endpoint },
+    {
+      $set: { endpoint, keys, expirationTime: expirationTime || null, updatedAt: new Date() },
+      $setOnInsert: { createdAt: new Date() },
+    },
+    { upsert: true }
+  );
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationUnsubscribe(req, res) {
+  const body = await readJsonBody(req);
+  const { endpoint } = body;
+
+  if (!endpoint) {
+    return json(res, 400, { error: 'endpoint is required' });
+  }
+
+  const db = await getWritableDb();
+  await db.collection(PUSH_SUBSCRIPTIONS_COLLECTION).deleteOne({ endpoint });
+
+  return json(res, 200, { success: true });
+}
+
+async function handleNotificationHistory(req, res) {
+  const db = await getWritableDb();
+  const notifications = await db
+    .collection(NOTIFICATION_HISTORY_COLLECTION)
+    .find({})
+    .sort({ sentAt: -1 })
+    .limit(100)
+    .toArray();
+
+  return json(res, 200, { notifications });
+}
 
 export default async function handler(req, res) {
   const url = getParsedUrl(req);
@@ -2049,6 +2661,30 @@ export default async function handler(req, res) {
       return await handleGetBusinesses(req, res, url, db);
     }
 
+    if (isReadMethod(req)) {
+      const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
+      if (categorySeoMatch) {
+        return await handleCategorySeoPage(
+          req,
+          res,
+          url,
+          db,
+          decodeURIComponent(categorySeoMatch[1]),
+          categorySeoMatch[2] ? decodeURIComponent(categorySeoMatch[2]) : undefined
+        );
+      }
+
+      const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
+      if (merchantSeoMatch) {
+        return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
+      }
+
+      const legacyBusinessMatch = path.match(/^\/api\/business\/([^/]+)$/);
+      if (legacyBusinessMatch) {
+        return await handleLegacyBusinessRedirect(req, res, url, db, decodeURIComponent(legacyBusinessMatch[1]));
+      }
+    }
+
     if (req.method === 'GET' && path === '/api/search') {
       return await handleSearch(req, res, url, db);
     }
@@ -2061,16 +2697,47 @@ export default async function handler(req, res) {
       return await handleGetBanks(req, res, url, db);
     }
 
-    if (req.method === 'GET' && path === '/api/networks') {
-      return await handleGetNetworks(req, res, url, db);
-    }
-
     if (req.method === 'GET' && path === '/api/stats') {
       return await handleGetStats(req, res, url, db);
     }
 
     if (req.method === 'POST' && path === '/api/places/details') {
       return await handlePlaceDetails(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/notifications/history') {
+      return await handleNotificationHistory(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/subscribe') {
+      return await handleNotificationSubscribe(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/notifications/unsubscribe') {
+      return await handleNotificationUnsubscribe(req, res);
+    }
+
+    if (req.method === 'GET' && path === '/api/user/favorites') {
+      return await handleGetUserFavorites(req, res);
+    }
+
+    if (req.method === 'POST' && path === '/api/user/favorites') {
+      return await handleAddUserFavorite(req, res);
+    }
+
+    if (req.method === 'DELETE') {
+      const favoriteMatch = path.match(/^\/api\/user\/favorites\/([^/]+)$/);
+      if (favoriteMatch) {
+        return await handleRemoveUserFavorite(req, res, decodeURIComponent(favoriteMatch[1]));
+      }
+    }
+
+    if (req.method === 'GET' && path === '/api/user/banks') {
+      return await handleGetUserBanks(req, res);
+    }
+
+    if (req.method === 'PUT' && path === '/api/user/banks') {
+      return await handleUpdateUserBanks(req, res);
     }
 
     if (req.method === 'GET') {
@@ -2088,12 +2755,18 @@ export default async function handler(req, res) {
         'GET /api/benefits/:id',
         'GET /api/benefits/nearby',
         'GET /api/businesses',
+        'GET /api/categorias/:category',
+        'GET /api/categorias/:category/page/:page',
+        'GET /api/comercios/:slugId',
+        'GET /api/business/:id',
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
-        'GET /api/networks',
         'GET /api/stats',
-        'POST /api/places/details'
+        'POST /api/places/details',
+        'GET /api/notifications/history',
+        'POST /api/notifications/subscribe',
+        'POST /api/notifications/unsubscribe'
       ]
     });
   } catch (error) {
