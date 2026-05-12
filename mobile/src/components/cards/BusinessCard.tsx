@@ -15,7 +15,6 @@ interface BusinessCardProps {
 const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   business,
   onClick,
-  compact = false,
   horizontal = false,
 }) => {
   const getDiscountPercentage = (): string => {

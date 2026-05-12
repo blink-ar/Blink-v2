@@ -1,196 +1,187 @@
-import { render, screen } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
-import { vi } from "vitest";
-import Benefit from "../Benefit";
-import { fetchBusinesses } from "../../services/api";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import BenefitDetailPage from "../BenefitDetailPage";
+import { Business } from "../../types";
+import { fetchBusinessById, fetchBusinessesPaginated } from "../../services/api";
 
-// Mock the API
-vi.mock("../../services/api");
-const mockFetchBusinesses = vi.mocked(fetchBusinesses);
+const routerMocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  useLocation: vi.fn(),
+  useParams: vi.fn(),
+}));
 
-// Mock useParams to return test values
+vi.mock("../../services/api", () => ({
+  fetchBusinessById: vi.fn(),
+  fetchBusinessesPaginated: vi.fn(),
+}));
+
+vi.mock("../../analytics/intentTracking", () => ({
+  trackSaveBenefit: vi.fn(),
+  trackShareBenefit: vi.fn(),
+  trackStartNavigation: vi.fn(),
+  trackUnsaveBenefit: vi.fn(),
+  trackViewBenefit: vi.fn(),
+}));
+
+vi.mock("../../hooks/useSEO", () => ({
+  useSEO: vi.fn(),
+}));
+
+vi.mock("../../hooks/useGeolocation", () => ({
+  useGeolocation: () => ({ position: null, error: null, isLoading: false }),
+}));
+
+vi.mock("../../hooks/useSubscriptions", () => ({
+  useSubscriptions: () => ({
+    subscriptions: [],
+    isLoading: false,
+    error: null,
+    getSubscriptionById: vi.fn(() => null),
+    getSubscriptionName: vi.fn(() => null),
+    getSubscriptionsByBank: vi.fn(() => []),
+  }),
+}));
+
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual("react-router-dom");
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    useParams: () => ({ id: "test-business", benefitIndex: "0" }),
-    useNavigate: () => vi.fn(),
+    useParams: routerMocks.useParams,
+    useNavigate: () => routerMocks.navigate,
+    useLocation: routerMocks.useLocation,
   };
 });
 
-const mockBusinessWithBenefitDetails = {
+const makeBusiness = (overrides: Partial<Business> = {}): Business => ({
   id: "test-business",
   name: "Test Business",
   category: "gastronomia",
   description: "Test business description",
   rating: 4.5,
-  location: "Test Location",
-  image: "test-image.jpg",
-  benefits: [
+  image: "https://example.com/test-business.jpg",
+  location: [
     {
-      bankName: "Test Bank",
-      cardName: "Test Card",
-      benefit: "Test Benefit Description",
-      rewardRate: "5%",
-      color: "#000000",
-      icon: "test-icon",
-      // Extended benefit details
-      tipo: "cashback",
-      cuando: "01/01/2024 - 31/12/2024",
-      valor: "50000 pesos",
-      tope: "$100,000",
-      claseDeBeneficio: "premium rewards",
-      condicion: "Minimum purchase of $50,000\nValid only on weekends",
-      requisitos: [
-        "Valid ID required",
-        "  Minimum age 18  ",
-        "", // Empty requirement should be filtered out
-        "Active account for 6 months",
-      ],
-      usos: ["online_shopping", "in-store", "mobile_payments"],
-      textoAplicacion:
-        "Apply through mobile app\n\nProcessing time: 24-48 hours",
+      lat: -34.6,
+      lng: -58.38,
+      formattedAddress: "Test Street 123, CABA",
+      addressComponents: {
+        route: "Test Street",
+        streetNumber: "123",
+        locality: "CABA",
+        country: "Argentina",
+      },
+      source: "address",
+      provider: "google",
+      confidence: 1,
+      raw: "Test Street 123, CABA",
+      updatedAt: "2026-05-01T00:00:00.000Z",
     },
   ],
-};
+  benefits: [
+    {
+      bankName: "Banco Test",
+      cardName: "Visa Gold",
+      cardTypes: ["Visa Gold", "Mastercard Black"],
+      benefit: "25% reintegro",
+      rewardRate: "25%",
+      color: "#000000",
+      icon: "credit_card",
+      description: "Descuento especial en el comercio",
+      tipo: "crédito",
+      cuando: "lunes, martes",
+      tope: "$100.000",
+      condicion: "Compra mínima de $50.000",
+      requisitos: ["DNI vigente", "Cuenta activa"],
+      usos: ["online", "presencial"],
+      textoAplicacion: "Se acredita automáticamente en el resumen",
+      validUntil: "2026-12-31",
+    },
+  ],
+  ...overrides,
+});
 
-describe("Benefit Details Processing", () => {
+describe("Benefit detail page content", () => {
   beforeEach(() => {
-    mockFetchBusinesses.mockResolvedValue([mockBusinessWithBenefitDetails]);
-  });
-
-  afterEach(() => {
     vi.clearAllMocks();
+    routerMocks.useLocation.mockReturnValue({ state: null });
+    routerMocks.useParams.mockReturnValue({ id: "test-business", benefitIndex: "0" });
+    vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
+      success: false,
+      businesses: [],
+      pagination: { total: 0, limit: 1, offset: 0, hasMore: false },
+      filters: {},
+    });
   });
 
-  it("should display formatted benefit details correctly", async () => {
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
+  it("renders the current benefit details from a direct merchant lookup", async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness());
 
-    // Wait for the component to load
-    await screen.findByText("Test Business - Test Card");
+    render(<BenefitDetailPage />);
 
-    // Check that benefit details section is rendered
-    expect(screen.getByText("Detailed Information")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchBusinessById).toHaveBeenCalledWith("test-business");
+    });
 
-    // Check formatted benefit type and class (now displayed in main section)
-    expect(screen.getByText("Cashback")).toBeInTheDocument();
-    expect(screen.getByText("Premium Rewards")).toBeInTheDocument();
+    expect(await screen.findByText("Test Business")).toBeInTheDocument();
+    expect(screen.getByText("Banco Test · Visa Gold")).toBeInTheDocument();
+    expect(screen.getByText("25% reintegro")).toBeInTheDocument();
+    expect(screen.getByText("OFF")).toBeInTheDocument();
+    expect(screen.getByText("de ahorro")).toBeInTheDocument();
+    expect(screen.getByText("Condiciones")).toBeInTheDocument();
+    expect(screen.getByText("Tope descuento")).toBeInTheDocument();
+    expect(screen.getByText("$100.000")).toBeInTheDocument();
+    expect(screen.getByText("Vigencia")).toBeInTheDocument();
+    expect(screen.getByText("hasta 31/12/2026")).toBeInTheDocument();
+    expect(screen.getByText("Pagando con")).toBeInTheDocument();
+    expect(screen.getByText("Tarjeta de Crédito")).toBeInTheDocument();
+    expect(screen.getByText("Accede al beneficio")).toBeInTheDocument();
+    expect(screen.getByText("Con tus tarjetas de Banco Test:")).toBeInTheDocument();
+    expect(screen.getByText("Visa Gold")).toBeInTheDocument();
+    expect(screen.getByText("Mastercard Black")).toBeInTheDocument();
+    expect(screen.getByText("Disponible en:")).toBeInTheDocument();
+    expect(screen.getByText("Test Street 123")).toBeInTheDocument();
 
-    // Check formatted validity period
-    expect(screen.getByText("Validity Period")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /términos y condiciones/i }));
 
-    // Check formatted value and limits
-    expect(screen.getByText("Value & Limits")).toBeInTheDocument();
-    expect(screen.getByText("$50,000")).toBeInTheDocument(); // Formatted value
-    expect(screen.getByText("$100,000")).toBeInTheDocument(); // Formatted limit
-
-    // Check conditions with preserved line breaks
-    expect(screen.getByText("Important Conditions")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Minimum purchase of \$50,000/)
-    ).toBeInTheDocument();
-
-    // Check processed usage types
-    expect(screen.getByText("Where You Can Use This")).toBeInTheDocument();
-    expect(screen.getByText("Online Shopping")).toBeInTheDocument();
-    expect(screen.getByText("In Store")).toBeInTheDocument();
-    expect(screen.getByText("Mobile Payments")).toBeInTheDocument();
-
-    // Check processed requirements (empty ones should be filtered out)
-    expect(screen.getByText("Requirements")).toBeInTheDocument();
-    expect(screen.getByText("Valid ID required")).toBeInTheDocument();
-    expect(screen.getByText("Minimum age 18")).toBeInTheDocument(); // Trimmed
-    expect(screen.getByText("Active account for 6 months")).toBeInTheDocument();
-
-    // Check application text with preserved formatting
-    expect(screen.getByText("How to Apply")).toBeInTheDocument();
-    expect(screen.getByText(/Apply through mobile app/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Processing time: 24-48 hours/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Compra mínima de \$50\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/DNI vigente/)).toBeInTheDocument();
+    expect(screen.getByText(/Cuenta activa/)).toBeInTheDocument();
+    expect(screen.getByText(/Se acredita automáticamente/)).toBeInTheDocument();
   });
 
-  it("should not display sections when benefit details are empty", async () => {
-    const businessWithEmptyDetails = {
-      ...mockBusinessWithBenefitDetails,
-      benefits: [
-        {
-          bankName: "Test Bank",
-          cardName: "Test Card",
-          benefit: "Test Benefit Description",
-          rewardRate: "5%",
-          color: "#000000",
-          icon: "test-icon",
-          // All optional fields are empty or undefined
-          tipo: "",
-          cuando: undefined,
-          valor: "   ", // Whitespace only
-          tope: null,
-          claseDeBeneficio: "",
-          condicion: "",
-          requisitos: [],
-          usos: ["", "   "], // Empty and whitespace only
-          textoAplicacion: "",
-        },
-      ],
-    };
-
-    mockFetchBusinesses.mockResolvedValue([businessWithEmptyDetails]);
-
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
+  it("omits optional detail sections when the benefit has no optional terms or valid locations", async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(
+      makeBusiness({
+        location: [
+          {
+            lat: 0,
+            lng: 0,
+            formattedAddress: "Multiple locations",
+            source: "address",
+            provider: "google",
+            confidence: 0.5,
+            raw: "Multiple locations",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        benefits: [
+          {
+            bankName: "Banco Test",
+            cardName: "Visa",
+            benefit: "Beneficio exclusivo",
+            rewardRate: "N/A",
+            color: "#000000",
+            icon: "credit_card",
+          },
+        ],
+      })
     );
 
-    // Wait for the component to load
-    await screen.findByText("Test Business - Test Card");
+    render(<BenefitDetailPage />);
 
-    // Benefit Details section should not be rendered when all details are empty
-    expect(screen.queryByText("Detailed Information")).not.toBeInTheDocument();
-  });
-
-  it("should handle malformed benefit data gracefully", async () => {
-    const businessWithMalformedData = {
-      ...mockBusinessWithBenefitDetails,
-      benefits: [
-        {
-          bankName: "Test Bank",
-          cardName: "Test Card",
-          benefit: "Test Benefit Description",
-          rewardRate: "5%",
-          color: "#000000",
-          icon: "test-icon",
-          // Malformed data
-          tipo: 123 as any, // Non-string type
-          cuando: ["not", "a", "string"] as any, // Array instead of string
-          valor: { invalid: "object" } as any, // Object instead of string
-          requisitos: ["Valid requirement", null, undefined, 123] as any, // Mixed types
-          usos: "not an array" as any, // String instead of array
-        },
-      ],
-    };
-
-    mockFetchBusinesses.mockResolvedValue([businessWithMalformedData]);
-
-    render(
-      <BrowserRouter>
-        <Benefit />
-      </BrowserRouter>
-    );
-
-    // Wait for the component to load
-    await screen.findByText("Test Business - Test Card");
-
-    // Component should still render without crashing
-    expect(screen.getByText("Test Business - Test Card")).toBeInTheDocument();
-
-    // Only valid requirements should be displayed
-    expect(screen.getByText("Requirements")).toBeInTheDocument();
-    expect(screen.getByText("Valid requirement")).toBeInTheDocument();
+    expect(await screen.findAllByText("Beneficio exclusivo")).toHaveLength(2);
+    expect(screen.queryByText("Tope descuento")).not.toBeInTheDocument();
+    expect(screen.queryByText("Disponible en:")).not.toBeInTheDocument();
+    expect(screen.queryByText("Términos y condiciones")).not.toBeInTheDocument();
   });
 });

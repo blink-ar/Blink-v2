@@ -41,7 +41,6 @@ interface UnifiedFilterSheetProps {
 
 const UnifiedFilterSheet = ({
   isOpen,
-  onClose,
   bankOptions,
   values,
   onApply,

@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     parseDayAvailabilityEnhanced,
-    getPatternConfidence,
-    type DayAvailability,
-    type PatternMatch
+    getPatternConfidence
 } from '../dayAvailabilityParser';
 
 describe('Enhanced Day Availability Parser', () => {

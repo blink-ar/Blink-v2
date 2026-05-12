@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     parseMultiFieldDayAvailability,
     parseDayAvailabilityFromBenefit,
-    type BenefitDayInfo,
-    type DayAvailability
+    type BenefitDayInfo
 } from '../dayAvailabilityParser';
 
 describe('Multi-Field Day Availability Parser', () => {

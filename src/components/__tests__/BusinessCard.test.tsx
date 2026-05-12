@@ -1,8 +1,21 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import BusinessCard from "../BusinessCard";
+import { AuthProvider } from "../../contexts/AuthContext";
+import { FavoritesProvider } from "../../context/FavoritesContext";
 import { Business } from "../../types";
+
+vi.mock("@auth0/auth0-react", () => ({
+  useAuth0: () => ({
+    user: null,
+    isLoading: false,
+    isAuthenticated: false,
+    loginWithPopup: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
 
 // Mock the BankLogos module
 vi.mock("../BankLogos", () => ({
@@ -84,12 +97,27 @@ const mockBusiness: Business = {
 describe("BusinessCard", () => {
   const mockOnClick = vi.fn();
 
+  const renderBusinessCard = (props: Partial<React.ComponentProps<typeof BusinessCard>> = {}) =>
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <FavoritesProvider>
+            <BusinessCard
+              business={mockBusiness}
+              onClick={mockOnClick}
+              {...props}
+            />
+          </FavoritesProvider>
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
   beforeEach(() => {
     mockOnClick.mockClear();
   });
 
   it("renders business information correctly", () => {
-    render(<BusinessCard business={mockBusiness} onClick={mockOnClick} />);
+    renderBusinessCard();
 
     expect(screen.getByText("Test Restaurant")).toBeInTheDocument();
     expect(screen.getByText("123 Test Street")).toBeInTheDocument();
@@ -98,7 +126,7 @@ describe("BusinessCard", () => {
   });
 
   it("calls onClick when clicked", () => {
-    render(<BusinessCard business={mockBusiness} onClick={mockOnClick} />);
+    renderBusinessCard();
 
     const card = screen.getByLabelText("Ver ofertas de Test Restaurant");
     fireEvent.click(card);
@@ -107,25 +135,19 @@ describe("BusinessCard", () => {
   });
 
   it("displays correct category icon", () => {
-    render(<BusinessCard business={mockBusiness} onClick={mockOnClick} />);
+    renderBusinessCard();
 
     expect(screen.getByText("🍽️")).toBeInTheDocument();
   });
 
   it("shows payment method logos", () => {
-    render(<BusinessCard business={mockBusiness} onClick={mockOnClick} />);
+    renderBusinessCard();
 
     expect(screen.getByTestId("bbva-logo")).toBeInTheDocument();
   });
 
   it("applies custom className", () => {
-    render(
-      <BusinessCard
-        business={mockBusiness}
-        onClick={mockOnClick}
-        className="custom-class"
-      />
-    );
+    renderBusinessCard({ className: "custom-class" });
 
     const card = screen.getByLabelText("Ver ofertas de Test Restaurant");
     expect(card).toHaveClass("custom-class");

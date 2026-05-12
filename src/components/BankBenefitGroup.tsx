@@ -15,7 +15,6 @@ interface BankBenefitGroupProps {
 export const BankBenefitGroup: React.FC<BankBenefitGroupProps> = ({
   bankName,
   benefits,
-  businessId,
   defaultExpanded = true,
   onBenefitSelect,
 }) => {

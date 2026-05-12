@@ -1,14 +1,36 @@
+import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/neo/BottomNav';
 import MerchantCard from '../components/MerchantCard';
 import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Business } from '../types';
+import { fetchBusinessById } from '../services/api';
+import { businessWithActiveBenefits } from '../utils/benefits';
 
 function SavedPage() {
   const { favorites } = useFavorites();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const hasSavedSnapshots = favorites.length > 0;
+  const favoriteQueries = useQueries({
+    queries: favorites.map((business) => ({
+      queryKey: ['saved-business', business.id],
+      queryFn: () => fetchBusinessById(business.id),
+      enabled: Boolean(business.id),
+      staleTime: 1000 * 60 * 5,
+    })),
+  });
+
+  const visibleFavorites = favorites
+    .map((snapshot, index) => {
+      const query = favoriteQueries[index];
+      if (query?.status === 'success') {
+        return query.data;
+      }
+      return businessWithActiveBenefits(snapshot);
+    })
+    .filter((business): business is Business => Boolean(business));
 
   const handleSelect = (business: Business) => {
     navigate(`/business/${business.id}`, { state: { business } });
@@ -60,7 +82,7 @@ function SavedPage() {
               Iniciar sesión
             </button>
           </div>
-        ) : favorites.length === 0 ? (
+        ) : visibleFavorites.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 py-16">
             <div
               className="w-20 h-20 rounded-2xl flex items-center justify-center"
@@ -74,9 +96,13 @@ function SavedPage() {
               </span>
             </div>
             <div className="text-center">
-              <p className="font-semibold text-base text-blink-ink mb-1">Todavía no guardaste nada</p>
+              <p className="font-semibold text-base text-blink-ink mb-1">
+                {hasSavedSnapshots ? 'Sin beneficios activos guardados' : 'Todavía no guardaste nada'}
+              </p>
               <p className="text-sm text-blink-muted">
-                Tocá el corazón en cualquier comercio para guardarlo acá.
+                {hasSavedSnapshots
+                  ? 'Tus comercios guardados no tienen beneficios activos ahora.'
+                  : 'Tocá el corazón en cualquier comercio para guardarlo acá.'}
               </p>
             </div>
             <button
@@ -90,9 +116,9 @@ function SavedPage() {
         ) : (
           <div className="px-4 pt-4 flex flex-col gap-3">
             <p className="text-xs font-medium text-blink-muted px-1">
-              {favorites.length} guardado{favorites.length !== 1 ? 's' : ''}
+              {visibleFavorites.length} guardado{visibleFavorites.length !== 1 ? 's' : ''}
             </p>
-            {favorites.map((business) => (
+            {visibleFavorites.map((business) => (
               <MerchantCard
                 key={business.id}
                 business={business}

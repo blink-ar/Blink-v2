@@ -157,7 +157,7 @@ function BenefitDetailPage() {
       setBusiness(passedBusiness);
       setBenefitPosition(selection.position);
       setBenefit(selection.benefit);
-      setError(null);
+      setError(selection.benefit ? null : 'Beneficio no encontrado');
       setLoading(false);
       return;
     }
@@ -185,6 +185,7 @@ function BenefitDetailPage() {
           setBusiness(resolvedBusiness);
           setBenefitPosition(selection.position);
           setBenefit(selection.benefit);
+          setError(selection.benefit ? null : 'Beneficio no encontrado');
         } else {
           setBusiness(null);
           setBenefit(null);
@@ -313,6 +314,11 @@ function BenefitDetailPage() {
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
+    const dateOnlyMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnlyMatch) {
+      const [, year, month, day] = dateOnlyMatch;
+      return `${day}/${month}/${year}`;
+    }
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;

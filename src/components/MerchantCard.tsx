@@ -5,6 +5,7 @@ import { toBankDescriptor } from '../utils/banks';
 import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDistance } from '../utils/distance';
+import { filterActiveBenefits } from '../utils/benefits';
 
 interface MerchantCardProps {
   business: Business;
@@ -17,30 +18,33 @@ const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
   viajes:      { bg: '#E0F2FE', color: '#0284C7' },
 };
 
-const getMaxDiscount = (business: Business) => {
+const getMaxDiscount = (benefits: Business['benefits']) => {
   let max = 0;
-  business.benefits.forEach((b) => {
+  benefits.forEach((b) => {
     const match = b.rewardRate.match(/(\d+)%/);
     if (match) max = Math.max(max, parseInt(match[1], 10));
   });
   return max;
 };
 
-const getMaxInstallments = (business: Business) => {
+const getMaxInstallments = (benefits: Business['benefits']) => {
   let max = 0;
-  business.benefits.forEach((b) => {
+  benefits.forEach((b) => {
     if (b.installments && b.installments > max) max = b.installments;
   });
   return max;
 };
 
-const getBankBadges = (business: Business): string[] => {
+const getBankBadges = (benefits: Business['benefits']): string[] => {
   const seen = new Set<string>();
   const badges: string[] = [];
-  business.benefits.forEach((b) => {
-    if (b.bankName && !seen.has(b.bankName)) {
-      seen.add(b.bankName);
-      badges.push(toBankDescriptor(b.bankName).code);
+  benefits.forEach((b) => {
+    if (!b.bankName) return;
+
+    const descriptor = toBankDescriptor(b.bankName);
+    if (!seen.has(descriptor.token)) {
+      seen.add(descriptor.token);
+      badges.push(descriptor.code);
     }
   });
   return badges;
@@ -51,12 +55,13 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const favorited = isFavorite(business.id);
+  const activeBenefits = filterActiveBenefits(business.benefits || []);
 
-  const bankBadges = getBankBadges(business);
+  const bankBadges = getBankBadges(activeBenefits);
   const visibleBadges = bankBadges.slice(0, 3);
   const remaining = bankBadges.length - 3;
-  const maxDiscount = getMaxDiscount(business);
-  const maxInstallments = getMaxInstallments(business);
+  const maxDiscount = getMaxDiscount(activeBenefits);
+  const maxInstallments = getMaxInstallments(activeBenefits);
   const categoryStyle = CATEGORY_STYLE[business.category] ?? { bg: '#DCFCE7', color: '#16A34A' };
 
   return (
@@ -114,7 +119,9 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
             )}
           </div>
           <span className="text-[10px] text-blink-muted mt-[3px]">
-            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+            {activeBenefits.length > 0
+              ? `${activeBenefits.length} ${activeBenefits.length !== 1 ? 'beneficios' : 'beneficio'}`
+              : 'Sin beneficios activos'}
           </span>
         </div>
 

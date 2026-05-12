@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { RawMongoBenefit } from '../types/mongodb';
 import { colors, shadows, borderRadius } from '../constants/theme';
 

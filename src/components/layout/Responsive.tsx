@@ -14,7 +14,7 @@ export const Responsive: React.FC<ResponsiveProps> = ({
   hide,
   className = "",
 }) => {
-  const { currentBreakpoint, isBreakpoint } = useResponsive();
+  const { isBreakpoint } = useResponsive();
 
   // If show prop is provided, only show on those breakpoints
   if (show && show.length > 0) {

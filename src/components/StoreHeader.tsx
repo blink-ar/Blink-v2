@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, MapPin, Star } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { Business } from "../types";
 
 interface StoreHeaderProps {
