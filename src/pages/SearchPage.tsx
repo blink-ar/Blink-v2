@@ -634,9 +634,12 @@ function SearchPage() {
     const seen = new Set<string>();
     const badges: string[] = [];
     source.benefits.forEach((benefit) => {
-      if (benefit.bankName && !seen.has(benefit.bankName)) {
-        seen.add(benefit.bankName);
-        badges.push(toBankDescriptor(benefit.bankName).code);
+      if (!benefit.bankName) return;
+
+      const descriptor = toBankDescriptor(benefit.bankName);
+      if (!seen.has(descriptor.token)) {
+        seen.add(descriptor.token);
+        badges.push(descriptor.code);
       }
     });
     return badges;
