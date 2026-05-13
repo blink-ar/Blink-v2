@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { SEARCH_PARAMS_KEY } from '../../pages/SearchPage';
+import { SEARCH_PARAMS_KEY } from '../../constants/search';
 
 export type NavTab = 'home' | 'search' | 'map' | 'saved';
 
@@ -24,7 +24,7 @@ const BottomNav: React.FC = () => {
 
   const getActiveTab = (): NavTab => {
     const path = location.pathname;
-    if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/search') || path.startsWith('/descuentos')) return 'search';
     if (path.startsWith('/map')) return 'map';
     if (path.startsWith('/saved')) return 'saved';
     return 'home';
