@@ -57,13 +57,10 @@ interface MarkerCluster {
   lng: number;
 }
 
-interface SpiderfiedCluster {
-  centerLat: number;
-  centerLng: number;
-  spokes: Array<{ marker: MapMarker; spokeLat: number; spokeLng: number }>;
-}
 
 function clusterMapMarkers(markers: MapMarker[], zoom: number): MarkerCluster[] {
+  // At street level, always show individual markers so co-located businesses are never stuck
+  if (zoom >= 17) return markers.map((m) => ({ markers: [m], lat: m.lat, lng: m.lng }));
   // Cell size in degrees shrinks as zoom increases — keeps ~60px cluster radius at each level
   const cellSize = 140 / Math.pow(2, zoom);
   const cells = new Map<string, MapMarker[]>();
@@ -146,7 +143,6 @@ function MapPage() {
   const googleRef = useRef<any>(null);
   const selectedBusinessRef = useRef<Business | null>(null);
   const buildOverlaysRef = useRef<((google: any, map: any, selected: Business | null) => void) | null>(null);
-  const spiderfiedClusterRef = useRef<SpiderfiedCluster | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
@@ -351,9 +347,7 @@ function MapPage() {
   const buildOverlays = useCallback((google: any, map: any, selected: Business | null) => {
     clearOverlays();
     const zoom = map.getZoom() ?? 15;
-    const spiderfied = spiderfiedClusterRef.current;
 
-    // ── BusinessOverlay ──────────────────────────────────────────
     class BusinessOverlay extends google.maps.OverlayView {
       private pos: any;
       private div: HTMLDivElement | null = null;
@@ -452,52 +446,6 @@ function MapPage() {
       }
     }
 
-    // ── SpiderLineOverlay ────────────────────────────────────────
-    // Renders dashed SVG lines from cluster center to each spoke marker.
-    class SpiderLineOverlay extends google.maps.OverlayView {
-      private lines: Array<{ from: any; to: any }>;
-      private svg: SVGSVGElement | null = null;
-
-      constructor(lines: Array<{ from: any; to: any }>) {
-        super();
-        this.lines = lines;
-      }
-
-      onAdd() {
-        this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement;
-        Object.assign(this.svg.style, { position: 'absolute', left: '0', top: '0', overflow: 'visible', pointerEvents: 'none', zIndex: '8' });
-        this.getPanes().overlayLayer.appendChild(this.svg);
-      }
-
-      draw() {
-        if (!this.svg) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
-        this.lines.forEach(({ from, to }) => {
-          const a = proj.fromLatLngToDivPixel(from);
-          const b = proj.fromLatLngToDivPixel(to);
-          if (!a || !b) return;
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', String(a.x));
-          line.setAttribute('y1', String(a.y));
-          line.setAttribute('x2', String(b.x));
-          line.setAttribute('y2', String(b.y));
-          line.setAttribute('stroke', 'rgba(99,102,241,0.45)');
-          line.setAttribute('stroke-width', '1.5');
-          line.setAttribute('stroke-dasharray', '4,3');
-          this.svg.appendChild(line);
-        });
-      }
-
-      onRemove() {
-        if (this.svg && this.svg.parentNode) {
-          this.svg.parentNode.removeChild(this.svg);
-          this.svg = null;
-        }
-      }
-    }
-
     // ── ClusterOverlay ───────────────────────────────────────────
     class ClusterOverlay extends google.maps.OverlayView {
       private pos: any;
@@ -588,13 +536,7 @@ function MapPage() {
     let globalIdx = 0;
 
     clusters.forEach((cluster) => {
-      // Check if this cluster is the one currently spiderfied
-      const isSpiderfied = spiderfied !== null &&
-        Math.abs(cluster.lat - spiderfied.centerLat) < 0.00002 &&
-        Math.abs(cluster.lng - spiderfied.centerLng) < 0.00002;
-
       if (cluster.markers.length === 1) {
-        // ── Individual marker ──────────────────────────────────
         const { business: biz, lat, lng } = cluster.markers[0];
         const idx = globalIdx++;
         const isSelected = selected?.id === biz.id;
@@ -610,65 +552,22 @@ function MapPage() {
         (overlay as any).__businessId = biz.id;
         (overlay as any).__markerIdx = idx;
         overlaysRef.current.push(overlay);
-
-      } else if (isSpiderfied && spiderfied) {
-        // ── Spiderfied cluster: draw lines + spoke markers ─────
-        const centerLatLng = new google.maps.LatLng(spiderfied.centerLat, spiderfied.centerLng);
-        const lines = spiderfied.spokes.map(({ spokeLat, spokeLng }) => ({
-          from: centerLatLng,
-          to: new google.maps.LatLng(spokeLat, spokeLng),
-        }));
-        const lineOverlay = new SpiderLineOverlay(lines);
-        lineOverlay.setMap(map);
-        overlaysRef.current.push(lineOverlay);
-
-        spiderfied.spokes.forEach(({ marker: { business: biz, lat, lng }, spokeLat, spokeLng }) => {
-          const idx = globalIdx++;
-          const isSelected = selected?.id === biz.id;
-          const spokePos = new google.maps.LatLng(spokeLat, spokeLng);
-          const realPos = new google.maps.LatLng(lat, lng);
-          const overlay = new BusinessOverlay(spokePos, biz, isSelected, biz.image || '', () => {
-            trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
-            trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
-            setSelectedBusiness(biz);
-            setSelectedMarkerIdx(idx);
-            map.panTo(realPos);
-          });
-          overlay.setMap(map);
-          (overlay as any).__businessId = biz.id;
-          (overlay as any).__markerIdx = idx;
-          overlaysRef.current.push(overlay);
-        });
-
       } else {
-        // ── Cluster bubble — tap to spiderfy ──────────────────
         globalIdx += cluster.markers.length;
         const pos = new google.maps.LatLng(cluster.lat, cluster.lng);
         const clusterOverlay = new ClusterOverlay(pos, cluster.markers.length, () => {
           trackMapInteractionThrottled('cluster_tap', { zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
-
-          // Compute spoke positions in world-coordinate space at current zoom,
-          // then convert back to lat/lng so spokes are fixed geographic points.
-          const projection = map.getProjection();
-          if (!projection) return;
-          const currentZoom = map.getZoom() ?? 15;
-          const scale = Math.pow(2, currentZoom);
-          const N = cluster.markers.length;
-          const radius = Math.max(65, N * 10);
-          const centerPt = projection.fromLatLngToPoint(new google.maps.LatLng(cluster.lat, cluster.lng));
-
-          const spokes = cluster.markers.map((m, i) => {
-            const angle = (2 * Math.PI * i / N) - Math.PI / 2;
-            const spokePt = new google.maps.Point(
-              centerPt.x + (radius * Math.cos(angle)) / scale,
-              centerPt.y + (radius * Math.sin(angle)) / scale,
-            );
-            const spokeLatLng = projection.fromPointToLatLng(spokePt);
-            return { marker: m, spokeLat: spokeLatLng.lat(), spokeLng: spokeLatLng.lng() };
-          });
-
-          spiderfiedClusterRef.current = { centerLat: cluster.lat, centerLng: cluster.lng, spokes };
-          buildOverlaysRef.current?.(google, map, selectedBusinessRef.current);
+          const bounds = new google.maps.LatLngBounds();
+          cluster.markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          const sameSpot = Math.abs(ne.lat() - sw.lat()) < 0.0001 && Math.abs(ne.lng() - sw.lng()) < 0.0001;
+          if (sameSpot) {
+            map.setCenter({ lat: cluster.lat, lng: cluster.lng });
+            map.setZoom(17);
+          } else {
+            map.fitBounds(bounds, 80);
+          }
         });
         clusterOverlay.setMap(map);
         overlaysRef.current.push(clusterOverlay);
@@ -756,10 +655,6 @@ function MapPage() {
         });
 
         mapRef.current.addListener('click', () => {
-          if (spiderfiedClusterRef.current) {
-            spiderfiedClusterRef.current = null;
-            buildOverlaysRef.current?.(googleRef.current, mapRef.current, null);
-          }
           setSelectedBusiness(null);
           trackMapInteractionThrottled('map_click', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
         });
@@ -772,7 +667,6 @@ function MapPage() {
         mapRef.current.addListener('zoom_changed', () => {
           const zoomLevel = mapRef.current?.getZoom() || undefined;
           trackMapInteractionThrottled('zoom', { zoomLevel, minIntervalMs: 800 });
-          spiderfiedClusterRef.current = null; // spider collapses when zoom changes
           if (googleRef.current && mapRef.current) {
             buildOverlaysRef.current?.(googleRef.current, mapRef.current, selectedBusinessRef.current);
           }
@@ -784,7 +678,6 @@ function MapPage() {
         createUserLocationOverlay(google, mapRef.current, position.latitude, position.longitude);
       }
 
-      spiderfiedClusterRef.current = null;
       buildOverlays(google, mapRef.current, selectedBusiness);
 
       if (isSingleBusinessMode) {
