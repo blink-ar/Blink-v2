@@ -58,6 +58,10 @@ interface MarkerCluster {
 }
 
 function clusterMapMarkers(markers: MapMarker[], zoom: number): MarkerCluster[] {
+  // At street level zoom, always show individual markers so co-located businesses are never stuck in a cluster
+  if (zoom >= 17) {
+    return markers.map((m) => ({ markers: [m], lat: m.lat, lng: m.lng }));
+  }
   // Cell size in degrees shrinks as zoom increases — keeps ~60px cluster radius at each level
   const cellSize = 140 / Math.pow(2, zoom);
   const cells = new Map<string, MapMarker[]>();
@@ -559,7 +563,17 @@ function MapPage() {
           trackMapInteractionThrottled('cluster_tap', { zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           const bounds = new google.maps.LatLngBounds();
           cluster.markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
-          map.fitBounds(bounds, 80);
+          // If all markers share effectively the same location, zoom to street level directly
+          // so they always expand (zoom >=17 disables clustering) instead of flying past it
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          const sameSpot = Math.abs(ne.lat() - sw.lat()) < 0.0001 && Math.abs(ne.lng() - sw.lng()) < 0.0001;
+          if (sameSpot) {
+            map.setCenter({ lat: cluster.lat, lng: cluster.lng });
+            map.setZoom(17);
+          } else {
+            map.fitBounds(bounds, 80);
+          }
         });
         clusterOverlay.setMap(map);
         overlaysRef.current.push(clusterOverlay);
