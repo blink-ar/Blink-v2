@@ -56,7 +56,7 @@ function CategoryPageContent({ category, page }: { category: SeoCategoryLink; pa
     <div className="min-h-screen bg-blink-bg text-blink-ink font-body pb-28">
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-blink-border">
         <div className="h-14 px-4 flex items-center justify-between">
-          <Link to="/home" className="font-bold text-lg tracking-tight">Blink</Link>
+          <Link to="/" className="font-bold text-lg tracking-tight">Blink</Link>
           <Link
             to={searchPath}
             className="h-9 px-3 rounded-full bg-blink-ink text-white text-sm font-semibold flex items-center justify-center"
