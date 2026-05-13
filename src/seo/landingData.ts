@@ -42,7 +42,7 @@ export const LANDING_CATEGORIES: LandingCategory[] = [
 
 export const LANDING_CITIES: LandingCity[] = [
   { slug: 'buenos-aires', name: 'Buenos Aires', aliases: ['buenos aires', 'provincia de buenos aires'] },
-  { slug: 'caba', name: 'CABA', aliases: ['caba', 'ciudad autonoma de buenos aires', 'capital federal'] },
+  { slug: 'caba', name: 'CABA', aliases: ['caba', 'ciudad autonoma de buenos aires', 'cdad autonoma de buenos aires', 'capital federal'] },
   { slug: 'cordoba', name: 'Cordoba', aliases: ['cordoba', 'cordoba capital'] },
   { slug: 'rosario', name: 'Rosario', aliases: ['rosario', 'santa fe'] },
   { slug: 'mendoza', name: 'Mendoza', aliases: ['mendoza'] },
@@ -56,6 +56,8 @@ function normalize(value: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -97,6 +99,8 @@ function collectLocationText(business: Business): string[] {
     if (location.addressComponents?.locality) parts.push(location.addressComponents.locality);
     if (location.addressComponents?.adminAreaLevel1) parts.push(location.addressComponents.adminAreaLevel1);
     if (location.addressComponents?.adminAreaLevel2) parts.push(location.addressComponents.adminAreaLevel2);
+    if (typeof location.raw === 'string') parts.push(location.raw);
+    if (location.raw && typeof location.raw === 'object') parts.push(JSON.stringify(location.raw));
   }
 
   return parts.map((part) => normalize(part));
