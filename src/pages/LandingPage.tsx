@@ -1,10 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import BusinessResultCard from '../components/BusinessResultCard';
+import BottomNav from '../components/neo/BottomNav';
+import { SkeletonCard } from '../components/skeletons';
 import { fetchBusinessesPaginated } from '../services/api';
 import { useSEO } from '../hooks/useSEO';
 import { toAbsoluteUrl } from '../seo/seo';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { SEARCH_PARAMS_KEY } from '../constants/search';
 import {
   LANDING_BANKS,
   LANDING_CATEGORIES,
@@ -21,6 +25,15 @@ import { Business } from '../types';
 
 const MAX_PAGES = 5;
 const PAGE_SIZE = 100;
+
+function getSearchPath(bankSlug: string, categorySlug: string): string {
+  const params = new URLSearchParams({
+    bank: bankSlug,
+    category: categorySlug,
+  });
+
+  return `/search?${params.toString()}`;
+}
 
 async function fetchLandingBusinesses(bank: string, category: string): Promise<Business[]> {
   const businesses: Business[] = [];
@@ -92,6 +105,7 @@ function LandingPage() {
     : 'Explora descuentos bancarios por banco, categoria y ciudad en Argentina.';
 
   const currentPath = location.pathname;
+  const searchPath = bank && category ? getSearchPath(bank.slug, category.slug) : '/search';
   const faqItems = bank && category ? [
     {
       question: `Como encontrar descuentos de ${bank.name} en ${category.name}?`,
@@ -177,6 +191,13 @@ function LandingPage() {
       : undefined,
   });
 
+  useEffect(() => {
+    if (!bank || !category) return;
+    if (typeof window === 'undefined') return;
+
+    window.sessionStorage.setItem(SEARCH_PARAMS_KEY, searchPath.replace('/search', ''));
+  }, [bank, category, searchPath]);
+
   if (!isValidRoute) {
     return <Navigate to="/search" replace />;
   }
@@ -188,77 +209,173 @@ function LandingPage() {
     .filter((item) => item.slug !== bank!.slug)
     .slice(0, 4);
   const relatedCities = LANDING_CITIES.slice(0, 5);
+  const visibleBusinesses = filteredBusinesses.slice(0, 24);
+  const resultLabel = resultCount === 1 ? '1 resultado' : `${resultCount} resultados`;
 
   return (
-    <div className="bg-blink-bg text-blink-ink min-h-screen font-body">
-      <main className="max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <Link to="/search" className="font-mono text-sm underline">
-            Volver a busqueda
+    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
+      <header
+        className="sticky top-0 z-40 w-full"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(232,230,225,0.8)',
+        }}
+      >
+        <div className="px-4 py-3 flex items-center gap-2.5">
+          <Link
+            to="/search"
+            aria-label="Volver a busqueda"
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </Link>
-          <h1 className="font-display text-3xl sm:text-4xl uppercase mt-4 leading-tight">
-            {`Descuentos ${bank!.name} en ${category!.name}${city ? ` en ${city.name}` : ''}`}
-          </h1>
-          <p className="font-mono text-sm mt-3 max-w-3xl">
-            {pageDescription}
-          </p>
-          <p className="font-mono text-xs mt-2 bg-primary inline-block px-2 py-1 border-2 border-blink-ink">
-            {resultCount} comercios encontrados
-          </p>
+          <Link
+            to={searchPath}
+            className="flex-1 h-11 flex items-center px-3 gap-2 rounded-xl min-w-0"
+            style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
+          >
+            <span className="material-symbols-outlined text-blink-muted shrink-0" style={{ fontSize: 18 }}>search</span>
+            <span className="flex-1 truncate text-sm text-blink-ink">
+              {`${bank!.name} + ${category!.name}${city ? ` + ${city.name}` : ''}`}
+            </span>
+          </Link>
         </div>
 
+        <div className="w-full overflow-x-auto no-scrollbar pb-3 px-4">
+          <div className="flex gap-2 min-w-max items-center">
+            <Link
+              to={searchPath}
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0 bg-primary text-white transition-all duration-150 active:scale-95"
+              aria-label="Abrir filtros"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
+              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                {city ? 3 : 2}
+              </span>
+            </Link>
+            <span className="flex items-center gap-1.5 h-9 rounded-xl bg-primary/10 border border-primary/30 text-primary px-3 text-sm font-semibold">
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>account_balance</span>
+              {bank!.name}
+            </span>
+            <span className="flex items-center gap-1.5 h-9 rounded-xl bg-primary/10 border border-primary/30 text-primary px-3 text-sm font-semibold">
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>restaurant</span>
+              {category!.name}
+            </span>
+            {city && (
+              <span className="flex items-center gap-1.5 h-9 rounded-xl bg-primary/10 border border-primary/30 text-primary px-3 text-sm font-semibold">
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
+                {city.name}
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 px-4 py-5 space-y-4 pb-24">
+        <section
+          className="bg-white rounded-2xl p-4"
+          style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary mb-2">
+            Descuentos
+          </p>
+          <h1 className="font-semibold text-xl text-blink-ink leading-tight">
+            {`Descuentos ${bank!.name} en ${category!.name}${city ? ` en ${city.name}` : ''}`}
+          </h1>
+          <p className="text-sm text-blink-muted mt-2 leading-relaxed">
+            {pageDescription}
+          </p>
+          <div className="flex items-center justify-between gap-3 mt-4">
+            <span
+              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: '#EEF2FF', color: '#4338CA' }}
+            >
+              {resultLabel}
+            </span>
+            <Link
+              to={searchPath}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary active:scale-95 transition-transform"
+            >
+              Ver en busqueda
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+            </Link>
+          </div>
+        </section>
+
         {isLoading && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, idx) => (
-              <div key={idx} className="h-36 border-2 border-blink-ink bg-blink-surface animate-pulse" />
+              <SkeletonCard key={idx} />
             ))}
           </div>
         )}
 
         {!isLoading && error && (
-          <div className="border-2 border-blink-ink bg-white p-4 font-mono text-sm">
+          <div className="bg-white rounded-2xl p-4 text-sm" style={{ border: '1px solid #E8E6E1' }}>
             No se pudo cargar esta landing por ahora.
           </div>
         )}
 
         {!isLoading && !error && resultCount === 0 && (
-          <div className="border-2 border-blink-ink bg-white p-5">
-            <h2 className="font-display text-xl uppercase mb-2">Sin resultados por ahora</h2>
-            <p className="font-mono text-sm">
+          <div className="text-center py-12">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: '#EEF2FF' }}
+            >
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 32 }}>search_off</span>
+            </div>
+            <h2 className="font-semibold text-lg text-blink-ink">Sin resultados por ahora</h2>
+            <p className="text-sm text-blink-muted mt-1">
               Prueba otra ciudad o revisa mas categorias y bancos relacionados abajo.
             </p>
           </div>
         )}
 
         {!isLoading && !error && resultCount > 0 && (
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredBusinesses.slice(0, 24).map((business) => (
-              <Link
-                key={business.id}
-                to={getMerchantSeoPath({ id: business.id, name: business.name })}
-                className="border-2 border-blink-ink bg-white shadow-hard-sm p-4 hover:bg-blink-surface transition-colors"
+          <section className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="font-semibold text-base text-blink-ink">Tiendas</h2>
+              <span
+                className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: '#EEF2FF', color: '#4338CA' }}
               >
-                <p className="font-display text-lg uppercase leading-tight">{business.name}</p>
-                <p className="font-mono text-xs mt-2 uppercase text-blink-muted">
-                  {business.category || category!.name}
-                </p>
-                <p className="font-display text-2xl mt-3">
-                  {getMaxDiscount(business) > 0 ? `Hasta ${getMaxDiscount(business)}% OFF` : `${business.benefits.length} beneficios`}
-                </p>
-              </Link>
+                {resultLabel}
+              </span>
+            </div>
+
+            {visibleBusinesses.map((business) => (
+              <BusinessResultCard
+                key={business.id}
+                business={business}
+                showDistance={false}
+                to={getMerchantSeoPath({ id: business.id, name: business.name })}
+              />
             ))}
+
+            {resultCount > visibleBusinesses.length && (
+              <Link
+                to={searchPath}
+                className="flex items-center justify-center gap-2 h-11 rounded-xl bg-primary text-white text-sm font-semibold active:scale-[0.98] transition-transform"
+              >
+                Ver todos los resultados
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
+              </Link>
+            )}
           </section>
         )}
 
-        <section className="mt-10 space-y-6">
+        <section className="mt-8 pt-8 border-t border-blink-border space-y-6">
           <div>
-            <h2 className="font-display text-xl uppercase mb-3">Categorias relacionadas</h2>
+            <h2 className="font-bold text-sm text-blink-ink mb-3">Categorias relacionadas</h2>
             <div className="flex flex-wrap gap-2">
               {relatedCategories.map((item) => (
                 <Link
                   key={item.slug}
                   to={getLandingPath(bank!.slug, item.slug, city?.slug)}
-                  className="border-2 border-blink-ink px-3 py-1 bg-white font-mono text-xs uppercase"
+                  className="rounded-xl px-3 py-2 bg-white text-xs font-semibold text-blink-ink"
+                  style={{ border: '1px solid #E8E6E1' }}
                 >
                   {`Descuentos ${bank!.name} en ${item.name}`}
                 </Link>
@@ -267,13 +384,14 @@ function LandingPage() {
           </div>
 
           <div>
-            <h2 className="font-display text-xl uppercase mb-3">Bancos relacionados</h2>
+            <h2 className="font-bold text-sm text-blink-ink mb-3">Bancos relacionados</h2>
             <div className="flex flex-wrap gap-2">
               {relatedBanks.map((item) => (
                 <Link
                   key={item.slug}
                   to={getLandingPath(item.slug, category!.slug, city?.slug)}
-                  className="border-2 border-blink-ink px-3 py-1 bg-white font-mono text-xs uppercase"
+                  className="rounded-xl px-3 py-2 bg-white text-xs font-semibold text-blink-ink"
+                  style={{ border: '1px solid #E8E6E1' }}
                 >
                   {`Descuentos ${item.name} en ${category!.name}`}
                 </Link>
@@ -282,13 +400,14 @@ function LandingPage() {
           </div>
 
           <div>
-            <h2 className="font-display text-xl uppercase mb-3">Ciudades populares</h2>
+            <h2 className="font-bold text-sm text-blink-ink mb-3">Ciudades populares</h2>
             <div className="flex flex-wrap gap-2">
               {relatedCities.map((item) => (
                 <Link
                   key={item.slug}
                   to={getLandingPath(bank!.slug, category!.slug, item.slug)}
-                  className="border-2 border-blink-ink px-3 py-1 bg-white font-mono text-xs uppercase"
+                  className="rounded-xl px-3 py-2 bg-white text-xs font-semibold text-blink-ink"
+                  style={{ border: '1px solid #E8E6E1' }}
                 >
                   {`${category!.name} en ${item.name}`}
                 </Link>
@@ -296,7 +415,7 @@ function LandingPage() {
               {city && (
                 <Link
                   to={getLandingPath(bank!.slug, category!.slug)}
-                  className="border-2 border-blink-ink px-3 py-1 bg-primary font-mono text-xs uppercase"
+                  className="rounded-xl px-3 py-2 bg-primary text-white text-xs font-semibold"
                 >
                   {`Ver ${category!.name} en todo Argentina`}
                 </Link>
@@ -305,6 +424,7 @@ function LandingPage() {
           </div>
         </section>
       </main>
+      <BottomNav />
     </div>
   );
 }
