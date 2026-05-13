@@ -65,7 +65,7 @@ const categories = ['gastronomia', 'moda', 'shopping', 'hogar', 'deportes', 'bel
 const cities = ['buenos-aires', 'caba', 'cordoba', 'rosario', 'mendoza'];
 
 const baseRoutes = [
-  { path: '/home', changefreq: 'daily', priority: '1.0' },
+  { path: '/', changefreq: 'daily', priority: '1.0' },
   { path: '/search', changefreq: 'daily', priority: '0.9' },
   { path: '/map', changefreq: 'daily', priority: '0.8' },
 ];

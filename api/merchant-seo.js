@@ -290,7 +290,7 @@ function buildStructuredData({ merchant, activeBenefits, pastBenefits, faqItems,
         '@type': 'ListItem',
         position: 1,
         name: DEFAULT_SITE_NAME,
-        item: new URL('/home', absoluteUrl).toString()
+        item: new URL('/', absoluteUrl).toString()
       },
       {
         '@type': 'ListItem',
@@ -378,7 +378,7 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
 
   return [
     '<main class="blink-seo-shell" data-blink-merchant-seo>',
-    '  <nav class="blink-seo-breadcrumb" aria-label="Breadcrumb"><a href="/home">Blink</a><span>/</span><span>Comercios</span><span>/</span><span>' + escapeHtml(name) + '</span></nav>',
+    '  <nav class="blink-seo-breadcrumb" aria-label="Breadcrumb"><a href="/">Blink</a><span>/</span><span>Comercios</span><span>/</span><span>' + escapeHtml(name) + '</span></nav>',
     '  <section class="blink-seo-hero">',
     '    <p class="blink-seo-kicker">Descuentos y promociones</p>',
     `    <h1>${escapeHtml(name)} descuentos y promociones</h1>`,

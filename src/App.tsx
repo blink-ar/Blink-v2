@@ -38,13 +38,13 @@ const PageLoader = () => (
   </div>
 );
 
-export function RootRedirect() {
+export function HomeRedirect() {
   const { search, hash } = useLocation();
 
   return (
     <Navigate
       to={{
-        pathname: '/home',
+        pathname: '/',
         search,
         hash,
       }}
@@ -64,8 +64,8 @@ function AppContent() {
       <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/home" element={<HomePage />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomeRedirect />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/comercios/:slugId" element={<BusinessDetailPage />} />
           <Route path="/business/:id" element={<BusinessDetailPage />} />

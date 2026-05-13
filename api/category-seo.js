@@ -113,7 +113,7 @@ function buildStructuredData({ category, merchants, absoluteUrl, page, totalPage
       isPartOf: {
         '@type': 'WebSite',
         name: DEFAULT_SITE_NAME,
-        url: new URL('/home', absoluteUrl).toString(),
+        url: new URL('/', absoluteUrl).toString(),
       },
     },
     {
@@ -124,7 +124,7 @@ function buildStructuredData({ category, merchants, absoluteUrl, page, totalPage
           '@type': 'ListItem',
           position: 1,
           name: DEFAULT_SITE_NAME,
-          item: new URL('/home', absoluteUrl).toString(),
+          item: new URL('/', absoluteUrl).toString(),
         },
         {
           '@type': 'ListItem',
@@ -208,7 +208,7 @@ function buildBodyHtml({ category, merchants, total, page, totalPages }) {
 
   return [
     '<main class="blink-category-shell" data-blink-category-seo>',
-    '  <nav class="blink-category-breadcrumb" aria-label="Breadcrumb"><a href="/home">Blink</a><span>/</span><span>Categorias</span><span>/</span><span>' + escapeHtml(category.label) + '</span></nav>',
+    '  <nav class="blink-category-breadcrumb" aria-label="Breadcrumb"><a href="/">Blink</a><span>/</span><span>Categorias</span><span>/</span><span>' + escapeHtml(category.label) + '</span></nav>',
     '  <section class="blink-category-hero">',
     '    <p class="blink-category-kicker">Comercios por categoria</p>',
     `    <h1>Comercios de ${escapeHtml(category.label)} con descuentos</h1>`,

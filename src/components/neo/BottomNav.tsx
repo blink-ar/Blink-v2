@@ -5,7 +5,7 @@ import { SEARCH_PARAMS_KEY } from '../../constants/search';
 export type NavTab = 'home' | 'search' | 'map' | 'saved';
 
 const tabs = [
-  { id: 'home' as NavTab, label: 'Inicio', icon: 'home', path: '/home' },
+  { id: 'home' as NavTab, label: 'Inicio', icon: 'home', path: '/' },
   { id: 'search' as NavTab, label: 'Buscar', icon: 'search', path: '/search' },
   { id: 'map' as NavTab, label: 'Mapa', icon: 'map', path: '/map' },
   { id: 'saved' as NavTab, label: 'Guardados', icon: 'favorite', path: '/saved' },

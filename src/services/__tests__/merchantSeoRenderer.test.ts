@@ -8,7 +8,7 @@ const appShell = [
   '  <meta charset="UTF-8" />',
   '  <meta name="description" content="Default description" />',
   '  <meta property="og:title" content="Default title" />',
-  '  <link rel="canonical" href="/home" />',
+  '  <link rel="canonical" href="/" />',
   '  <title>Default</title>',
   '</head>',
   '<body>',
