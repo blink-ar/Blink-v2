@@ -17,7 +17,7 @@ function RouteSEO() {
     seoConfig = {
       title: `Descuentos bancarios en Argentina | ${SITE_NAME}`,
       description: baseDescription,
-      path: '/home',
+      path: '/',
       keywords: [
         'descuentos bancarios',
         'promociones tarjetas',
@@ -29,13 +29,13 @@ function RouteSEO() {
           '@context': 'https://schema.org',
           '@type': 'Organization',
           name: SITE_NAME,
-          url: toAbsoluteUrl('/home'),
+          url: toAbsoluteUrl('/'),
         },
         {
           '@context': 'https://schema.org',
           '@type': 'WebSite',
           name: SITE_NAME,
-          url: toAbsoluteUrl('/home'),
+          url: toAbsoluteUrl('/'),
           inLanguage: 'es-AR',
           potentialAction: {
             '@type': 'SearchAction',
@@ -117,7 +117,7 @@ function RouteSEO() {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
-      path: '/home',
+      path: '/',
     };
   }
 

@@ -14,7 +14,7 @@ import {
 const merchantSeoAppShell = [
   '<!doctype html>',
   '<html lang="es">',
-  '<head><title>Default</title><link rel="canonical" href="/home" /></head>',
+  '<head><title>Default</title><link rel="canonical" href="/" /></head>',
   '<body><div id="root"></div><script type="module" src="/assets/index-test.js"></script></body>',
   '</html>',
 ].join('\n');

@@ -85,7 +85,7 @@ export function applySEO(config: SEOConfig): void {
   }
 
   const ogImage = toAbsoluteUrl(config.image || DEFAULT_OG_IMAGE);
-  const canonicalPath = config.path || '/home';
+  const canonicalPath = config.path || '/';
   const title = config.title;
   const keywords = config.keywords?.join(', ');
   const robots = config.robots || 'index, follow';

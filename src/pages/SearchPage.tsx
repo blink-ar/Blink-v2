@@ -708,7 +708,7 @@ function SearchPage() {
       >
         <div className="px-4 py-3 flex items-center gap-2.5">
           <button
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/')}
             className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>

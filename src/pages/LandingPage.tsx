@@ -149,7 +149,7 @@ function LandingPage() {
                 '@type': 'ListItem',
                 position: 1,
                 name: 'Home',
-                item: toAbsoluteUrl('/home'),
+                item: toAbsoluteUrl('/'),
               },
               {
                 '@type': 'ListItem',

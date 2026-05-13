@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { RootRedirect } from '../App';
+import { HomeRedirect } from '../App';
 
 function LocationProbe() {
   const location = useLocation();
@@ -12,20 +12,20 @@ function LocationProbe() {
   );
 }
 
-describe('RootRedirect', () => {
-  it('preserves query params and hash when redirecting to home', async () => {
+describe('HomeRedirect', () => {
+  it('preserves query params and hash when redirecting home to the canonical root', async () => {
     render(
-      <MemoryRouter initialEntries={['/?utm_source=reddit&utm_medium=post&utm_campaign=descuentos_argentina#pricing']}>
+      <MemoryRouter initialEntries={['/home?utm_source=reddit&utm_medium=post&utm_campaign=descuentos_argentina#pricing']}>
         <Routes>
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/home" element={<LocationProbe />} />
+          <Route path="/home" element={<HomeRedirect />} />
+          <Route path="/" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/home?utm_source=reddit&utm_medium=post&utm_campaign=descuentos_argentina#pricing',
+        '/?utm_source=reddit&utm_medium=post&utm_campaign=descuentos_argentina#pricing',
       );
     });
   });
