@@ -3,7 +3,10 @@ import { Bell, X } from 'lucide-react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { InstallSheet } from './NotificationBanner';
 
-const PROMPT_SHOWN_KEY = 'blink_notif_prompt_shown';
+// Separate keys so showing the install prompt on iOS Safari doesn't block
+// the notification prompt after the user installs the PWA (they share localStorage).
+const NOTIF_PROMPT_SHOWN_KEY = 'blink_notif_prompt_shown';
+const IOS_INSTALL_SHOWN_KEY = 'blink_ios_install_shown';
 
 function isIOS() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -23,16 +26,17 @@ export const NotificationPermissionModal: React.FC = () => {
   const [iosNotStandalone, setIosNotStandalone] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem(PROMPT_SHOWN_KEY) === '1') return;
-
     const onIOS = isIOS();
     const standalone = isStandalone();
 
     if (onIOS && !standalone) {
+      if (localStorage.getItem(IOS_INSTALL_SHOWN_KEY) === '1') return;
       setIosNotStandalone(true);
       const t = setTimeout(() => setVisible(true), 1500);
       return () => clearTimeout(t);
     }
+
+    if (localStorage.getItem(NOTIF_PROMPT_SHOWN_KEY) === '1') return;
 
     const supported =
       'serviceWorker' in navigator &&
@@ -46,7 +50,11 @@ export const NotificationPermissionModal: React.FC = () => {
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem(PROMPT_SHOWN_KEY, '1');
+    if (iosNotStandalone) {
+      localStorage.setItem(IOS_INSTALL_SHOWN_KEY, '1');
+    } else {
+      localStorage.setItem(NOTIF_PROMPT_SHOWN_KEY, '1');
+    }
     setVisible(false);
   };
 
