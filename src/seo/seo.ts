@@ -12,15 +12,44 @@ export interface SEOConfig {
 export const SITE_NAME = 'Blink';
 export const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 
-const FALLBACK_SITE_URL = 'https://example.com';
-const CONFIGURED_SITE_URL = (import.meta.env.VITE_SITE_URL ?? '').trim().replace(/\/$/, '');
+const BLINK_APEX_HOST = 'blinkapp.com.ar';
+const BLINK_CANONICAL_HOST = 'www.blinkapp.com.ar';
+const FALLBACK_SITE_URL = `https://${BLINK_CANONICAL_HOST}`;
+
+export function normalizeBlinkSiteUrl(value: string | undefined): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const url = new URL(candidate);
+    if (url.hostname === BLINK_APEX_HOST || url.hostname === BLINK_CANONICAL_HOST) {
+      url.protocol = 'https:';
+      url.hostname = BLINK_CANONICAL_HOST;
+      url.port = '';
+    }
+
+    return url.origin.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+const CONFIGURED_SITE_URL = normalizeBlinkSiteUrl(
+  import.meta.env.VITE_CANONICAL_SITE_URL ?? import.meta.env.VITE_SITE_URL
+);
 
 function getSiteUrl(): string {
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return window.location.origin;
+  if (CONFIGURED_SITE_URL) {
+    return CONFIGURED_SITE_URL;
   }
 
-  return CONFIGURED_SITE_URL || FALLBACK_SITE_URL;
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return normalizeBlinkSiteUrl(window.location.origin) || FALLBACK_SITE_URL;
+  }
+
+  return FALLBACK_SITE_URL;
 }
 
 export function toAbsoluteUrl(pathOrUrl: string): string {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getActiveBenefitsMatch,
   handleCategorySeoPage,
@@ -65,6 +65,10 @@ function createAggregateCursor<T>(data: T[]) {
 }
 
 describe('merchant-first serverless helpers', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
     expect(resolveRequestPath(new URL('https://example.com/comercios/coto--merchant_1?path=comercios/coto--merchant_1'))).toBe('/api/comercios/coto--merchant_1');
     expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
@@ -618,6 +622,43 @@ describe('merchant-first serverless helpers', () => {
       benefitCount: { $gt: 0 },
       categories: { $in: ['shopping'] }
     });
+  });
+
+  it('handleCategorySeoPage canonicalizes a non-www site env to the www host', async () => {
+    vi.stubEnv('CANONICAL_SITE_URL', '');
+    vi.stubEnv('VITE_CANONICAL_SITE_URL', '');
+    vi.stubEnv('VITE_SITE_URL', '');
+    vi.stubEnv('SITE_URL', 'https://blinkapp.com.ar');
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 0;
+            },
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/categorias/gastronomia');
+
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'gastronomia', undefined, {
+      appShell: merchantSeoAppShell
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/categorias/gastronomia"');
+    expect(res.body).toContain('property="og:url" content="https://www.blinkapp.com.ar/categorias/gastronomia"');
+    expect(res.body).not.toContain('https://blinkapp.com.ar/categorias/gastronomia');
   });
 
   it('handleCategorySeoPage redirects category aliases to canonical paths', async () => {

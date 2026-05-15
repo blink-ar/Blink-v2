@@ -1,5 +1,6 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import { createPublicKey, createVerify } from 'crypto';
+import { resolveCanonicalSiteUrl } from './canonical-site.js';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
 import { resolveIntentTagsFromTokens } from './search/dictionaries.js';
 import { meiliSearch, isMeilisearchConfigured } from './search/meilisearch.js';
@@ -294,8 +295,13 @@ function setCacheControl(res, directive) {
 }
 
 function getCanonicalSiteUrl(url) {
-  const configuredSiteUrl = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').trim().replace(/\/$/, '');
-  return configuredSiteUrl || url.origin.replace(/\/$/, '');
+  return resolveCanonicalSiteUrl(
+    process.env.CANONICAL_SITE_URL,
+    process.env.VITE_CANONICAL_SITE_URL,
+    process.env.VITE_SITE_URL,
+    process.env.SITE_URL,
+    url?.origin
+  );
 }
 
 function isReadMethod(req) {
