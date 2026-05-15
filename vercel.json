@@ -5,6 +5,19 @@
       "includeFiles": "dist/index.html"
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "blinkapp.com.ar"
+        }
+      ],
+      "destination": "https://www.blinkapp.com.ar/:path*",
+      "permanent": true
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",

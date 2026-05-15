@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
+import { DEFAULT_CANONICAL_SITE_URL, resolveCanonicalSiteUrl } from '../api/canonical-site.js';
 import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
 import { slugify } from '../api/search/normalize.js';
 
-const DEFAULT_SITE_URL = 'https://example.com';
+const DEFAULT_SITE_URL = DEFAULT_CANONICAL_SITE_URL;
 const DEFAULT_DATABASE_NAME = 'benefitsV3';
 const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const MAX_URLS_PER_SITEMAP = 50000;
@@ -35,27 +36,21 @@ function loadEnvFromFile(filePath) {
   }
 }
 
-function normalizeSiteUrl(value) {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return '';
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  return withProtocol.replace(/\/+$/, '');
-}
-
 const envFiles = [path.resolve(process.cwd(), '.env.local'), path.resolve(process.cwd(), '.env')];
 for (const envFile of envFiles) {
   loadEnvFromFile(envFile);
 }
 
-const resolvedSiteUrl = normalizeSiteUrl(
-  process.env.VITE_SITE_URL ||
-    process.env.SITE_URL ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
-    process.env.VERCEL_URL ||
-    '',
-);
-
-const siteUrl = resolvedSiteUrl || DEFAULT_SITE_URL;
+const siteUrlCandidates = [
+  process.env.CANONICAL_SITE_URL,
+  process.env.VITE_CANONICAL_SITE_URL,
+  process.env.VITE_SITE_URL,
+  process.env.SITE_URL,
+  process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  process.env.VERCEL_URL,
+];
+const hasConfiguredSiteUrl = siteUrlCandidates.some((value) => String(value || '').trim());
+const siteUrl = resolveCanonicalSiteUrl(...siteUrlCandidates);
 const mongoUri = process.env.MONGODB_URI_READ_ONLY || '';
 const databaseName = process.env.DATABASE_NAME || DEFAULT_DATABASE_NAME;
 
@@ -229,8 +224,8 @@ if (sitemapChunks.length <= 1) {
 
 fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
 
-if (siteUrl === DEFAULT_SITE_URL) {
-  console.warn('[seo] VITE_SITE_URL/SITE_URL is not set. Using https://example.com in sitemap and robots.txt.');
+if (!hasConfiguredSiteUrl) {
+  console.warn(`[seo] CANONICAL_SITE_URL/VITE_SITE_URL/SITE_URL is not set. Using ${DEFAULT_SITE_URL} in sitemap and robots.txt.`);
 } else {
   console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${merchantRoutes.length} merchant URLs)`);
 }
