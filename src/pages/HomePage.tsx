@@ -15,7 +15,6 @@ import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
-import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function isIOSBrowser(): boolean {
@@ -299,8 +298,6 @@ function HomePage() {
           />
         </form>
       </div>
-
-      <NotificationBanner />
 
       <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}
