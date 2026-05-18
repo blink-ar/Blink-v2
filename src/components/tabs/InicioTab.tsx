@@ -12,7 +12,6 @@ interface InicioTabProps {
   foodOffers: Business[];
   highValueOffers: Business[];
   biggestDiscountOffers: Business[];
-  installmentOffers: Business[];
   onBusinessClick: (businessId: string) => void;
   onViewAllBenefits: () => void;
   onBenefitSelect: (benefit: RawMongoBenefit) => void;
@@ -30,7 +29,6 @@ const InicioTab: React.FC<InicioTabProps> = ({
   foodOffers,
   highValueOffers,
   biggestDiscountOffers,
-  installmentOffers,
   onBusinessClick,
   onViewAllBenefits,
   onBenefitSelect,
@@ -124,20 +122,6 @@ const InicioTab: React.FC<InicioTabProps> = ({
             onBusinessClick={onBusinessClick}
             onViewAll={onViewAllOffers}
             title="Mayores Descuentos"
-          />
-        </div>
-      )}
-
-      {/* Installment Offers */}
-      {installmentOffers.length > 0 && (
-        <div className="animate-fade-in-up" style={{ animationDelay: "425ms" }}>
-          <ActiveOffers
-            businesses={installmentOffers}
-            onBusinessClick={onBusinessClick}
-            onViewAll={() => {
-              onSwitchTab("beneficios");
-            }}
-            title="Cuotas sin interés"
           />
         </div>
       )}
