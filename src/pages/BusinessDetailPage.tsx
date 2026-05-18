@@ -240,12 +240,17 @@ function BusinessDetailPage() {
   }, [business]);
 
   const groupedBenefits = useMemo(() => {
-    return activeBenefits.reduce((acc, benefit) => {
-      const bank = benefit.bankName;
-      if (!acc[bank]) acc[bank] = [];
-      acc[bank].push(benefit);
-      return acc;
-    }, {} as Record<string, BankBenefit[]>);
+    return activeBenefits
+      .filter((b) => {
+        const discount = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
+        return !((b.installments ?? 0) > 0 && discount === 0);
+      })
+      .reduce((acc, benefit) => {
+        const bank = benefit.bankName;
+        if (!acc[bank]) acc[bank] = [];
+        acc[bank].push(benefit);
+        return acc;
+      }, {} as Record<string, BankBenefit[]>);
   }, [activeBenefits]);
 
   const filteredGroupedBenefits = useMemo(() => {
@@ -422,63 +427,6 @@ function BusinessDetailPage() {
         {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (
           <div className="space-y-3 pt-3 px-4">
 
-            {/* Installment group — one card, one row per tier */}
-            {installmentGroups.length > 0 && !filterToday && (
-              <div
-                className="bg-white rounded-2xl overflow-hidden"
-                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
-              >
-                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
-                  <div
-                    className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
-                    style={{ background: '#4338CA' }}
-                  >
-                    CI
-                  </div>
-                  <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: '#4338CA' }}>
-                    Cuotas sin interés
-                  </span>
-                </div>
-
-                {installmentGroups.map(({ count, benefits }) => (
-                  <div
-                    key={`tier-${count}`}
-                    className="px-4 py-4"
-                    style={{ borderTop: '1px solid #E8E6E1' }}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[15px] text-blink-ink leading-tight mb-2">
-                          hasta {count} cuotas sin interés
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {benefits.map((benefit, i) => {
-                            const accent = getBankAccent(benefit.bankName);
-                            const benefitIdx = business.benefits.indexOf(benefit);
-                            return (
-                              <button
-                                key={`tier-${count}-bank-${i}`}
-                                onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
-                                className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md active:scale-95 transition-all"
-                                style={{ background: accent.bg, color: accent.text }}
-                              >
-                                {bankShortName(benefit.bankName)}
-                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>chevron_right</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 text-right">
-                        <p className="font-black text-[22px] leading-tight" style={{ color: '#4338CA' }}>{count}</p>
-                        <p className="text-[11px] font-semibold -mt-0.5" style={{ color: '#6366F1' }}>cuotas</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
               const accent = getBankAccent(bankName);
               const expanded = expandedGroups[bankName];
@@ -620,6 +568,63 @@ function BusinessDetailPage() {
                 </div>
               );
             })}
+
+            {/* Installment group — one card, one row per tier */}
+            {installmentGroups.length > 0 && !filterToday && (
+              <div
+                className="bg-white rounded-2xl overflow-hidden"
+                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+                    style={{ background: '#4338CA' }}
+                  >
+                    CI
+                  </div>
+                  <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: '#4338CA' }}>
+                    Cuotas sin interés
+                  </span>
+                </div>
+
+                {installmentGroups.map(({ count, benefits }) => (
+                  <div
+                    key={`tier-${count}`}
+                    className="px-4 py-4"
+                    style={{ borderTop: '1px solid #E8E6E1' }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[15px] text-blink-ink leading-tight mb-2">
+                          hasta {count} cuotas sin interés
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {benefits.map((benefit, i) => {
+                            const accent = getBankAccent(benefit.bankName);
+                            const benefitIdx = business.benefits.indexOf(benefit);
+                            return (
+                              <button
+                                key={`tier-${count}-bank-${i}`}
+                                onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
+                                className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md active:scale-95 transition-all"
+                                style={{ background: accent.bg, color: accent.text }}
+                              >
+                                {bankShortName(benefit.bankName)}
+                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>chevron_right</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <p className="font-black text-[22px] leading-tight" style={{ color: '#4338CA' }}>{count}</p>
+                        <p className="text-[11px] font-semibold -mt-0.5" style={{ color: '#6366F1' }}>cuotas</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
