@@ -119,6 +119,14 @@ function BusinessDetailPage() {
   const activeBenefitCount = activeBenefits.length;
   const pastBenefitCount = pastBenefits.length;
 
+  const installmentBenefits = useMemo(
+    () =>
+      activeBenefits
+        .filter((b) => (b.installments ?? 0) > 0)
+        .sort((a, b) => (b.installments ?? 0) - (a.installments ?? 0)),
+    [activeBenefits],
+  );
+
   useSEO({
     title: business
       ? `${business.name}: descuentos y beneficios bancarios | Blink`
@@ -408,6 +416,67 @@ function BusinessDetailPage() {
         {/* Grouped by bank — default view */}
         {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (
           <div className="space-y-3 pt-3 px-4">
+
+            {/* Installment section */}
+            {installmentBenefits.length > 0 && !filterToday && (
+              <div
+                className="bg-white rounded-2xl overflow-hidden"
+                style={{ border: '1px solid #C7D2FE', boxShadow: '0 1px 4px rgba(99,102,241,0.08)' }}
+              >
+                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+                    style={{ background: '#6366F1' }}
+                  >
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: 16 }}>credit_card</span>
+                  </div>
+                  <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: '#4338CA' }}>
+                    Cuotas sin interés
+                  </span>
+                </div>
+
+                {installmentBenefits.map((benefit, i) => {
+                  const accent = getBankAccent(benefit.bankName);
+                  const benefitIdx = business.benefits.indexOf(benefit);
+
+                  return (
+                    <div
+                      key={`installment-${i}`}
+                      onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
+                      className="px-4 py-4 cursor-pointer active:bg-gray-50 transition-colors"
+                      style={{ borderTop: '1px solid #E8E6E1' }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-[15px] text-blink-ink leading-tight mb-1">
+                            {benefit.benefit || benefit.cardName}
+                          </p>
+                          {benefit.cardName && (
+                            <p className="text-xs text-blink-muted mb-2">{benefit.cardName}</p>
+                          )}
+                          <span
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                            style={{ background: accent.bg, color: accent.text }}
+                          >
+                            {bankShortName(benefit.bankName)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="font-black text-[26px] leading-tight" style={{ color: '#4338CA' }}>
+                              {benefit.installments}
+                            </p>
+                            <p className="text-[11px] font-semibold -mt-0.5" style={{ color: '#6366F1' }}>cuotas sin int.</p>
+                          </div>
+                          <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>chevron_right</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
               const accent = getBankAccent(bankName);
               const expanded = expandedGroups[bankName];
