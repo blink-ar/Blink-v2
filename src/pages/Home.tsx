@@ -336,6 +336,25 @@ function Home() {
     [enrichedBusinesses]
   );
 
+  // Memoized installment offers (businesses with installment benefits, sorted by max installments)
+  const installmentOffers = useMemo(
+    () =>
+      enrichedBusinesses
+        .map((business) => {
+          let maxInstallments = 0;
+          business.benefits.forEach((benefit) => {
+            if (benefit.installments && benefit.installments > maxInstallments) {
+              maxInstallments = benefit.installments;
+            }
+          });
+          return { ...business, maxInstallments };
+        })
+        .filter((business) => business.maxInstallments > 0)
+        .sort((a, b) => b.maxInstallments - a.maxInstallments)
+        .slice(0, 8),
+    [enrichedBusinesses]
+  );
+
   // Memoized biggest discount offers (sorted by highest percentage) - using enriched businesses for smart sorting
   const biggestDiscountOffers = useMemo(
     () =>
@@ -624,6 +643,7 @@ function Home() {
                   foodOffers={foodOffers}
                   highValueOffers={highValueOffers}
                   biggestDiscountOffers={biggestDiscountOffers}
+                  installmentOffers={installmentOffers}
                   onBusinessClick={handleBusinessClick}
                   onViewAllBenefits={handleViewAllBenefits}
                   onBenefitSelect={handleBenefitSelect}
