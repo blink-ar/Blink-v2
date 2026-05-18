@@ -426,51 +426,53 @@ function BusinessDetailPage() {
             {installmentGroups.length > 0 && !filterToday && (
               <div
                 className="bg-white rounded-2xl overflow-hidden"
-                style={{ border: '1px solid #C7D2FE', boxShadow: '0 2px 8px rgba(99,102,241,0.10)' }}
+                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
               >
-                {/* Group header */}
-                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}>
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>credit_card</span>
-                  <span className="font-bold text-[13px] tracking-widest uppercase text-white">
+                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+                    style={{ background: '#4338CA' }}
+                  >
+                    CI
+                  </div>
+                  <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: '#4338CA' }}>
                     Cuotas sin interés
                   </span>
                 </div>
 
-                {/* One row per installment tier */}
                 {installmentGroups.map(({ count, benefits }) => (
                   <div
                     key={`tier-${count}`}
-                    className="px-4 py-3 flex items-center gap-3"
-                    style={{ borderTop: '1px solid #EEF2FF' }}
+                    className="px-4 py-4"
+                    style={{ borderTop: '1px solid #E8E6E1' }}
                   >
-                    {/* Count badge */}
-                    <div
-                      className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-3 py-2"
-                      style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', minWidth: 58 }}
-                    >
-                      <span className="text-[8px] font-bold uppercase tracking-widest leading-none mb-0.5" style={{ color: '#818CF8' }}>hasta</span>
-                      <span className="font-black text-[22px] leading-none" style={{ color: '#4338CA' }}>{count}</span>
-                      <span className="text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5" style={{ color: '#818CF8' }}>cuotas</span>
-                    </div>
-
-                    {/* Bank chips */}
-                    <div className="flex flex-wrap gap-2 flex-1">
-                      {benefits.map((benefit, i) => {
-                        const accent = getBankAccent(benefit.bankName);
-                        const benefitIdx = business.benefits.indexOf(benefit);
-                        return (
-                          <button
-                            key={`tier-${count}-bank-${i}`}
-                            onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
-                            className="flex items-center gap-1.5 pl-2 pr-2.5 py-2 rounded-xl font-semibold text-[12px] active:scale-95 transition-all"
-                            style={{ background: accent.bg, color: accent.text }}
-                          >
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accent.text }} />
-                            {bankShortName(benefit.bankName)}
-                            <span className="material-symbols-outlined" style={{ fontSize: 13, opacity: 0.6 }}>chevron_right</span>
-                          </button>
-                        );
-                      })}
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[15px] text-blink-ink leading-tight mb-2">
+                          hasta {count} cuotas sin interés
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {benefits.map((benefit, i) => {
+                            const accent = getBankAccent(benefit.bankName);
+                            const benefitIdx = business.benefits.indexOf(benefit);
+                            return (
+                              <button
+                                key={`tier-${count}-bank-${i}`}
+                                onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
+                                className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md active:scale-95 transition-all"
+                                style={{ background: accent.bg, color: accent.text }}
+                              >
+                                {bankShortName(benefit.bankName)}
+                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>chevron_right</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <p className="font-black text-[22px] leading-tight" style={{ color: '#4338CA' }}>{count}</p>
+                        <p className="text-[11px] font-semibold -mt-0.5" style={{ color: '#6366F1' }}>cuotas</p>
+                      </div>
                     </div>
                   </div>
                 ))}
