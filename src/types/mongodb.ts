@@ -5,9 +5,8 @@
 export interface Benefit {
     id: string;
     merchant: Merchant; // The business/store where you can use the benefit
-    bank: string; // The bank offering the benefit (e.g., "Santander", "BBVA")
+    eligibilities: BenefitEligibility[];
     network: string; // Payment network (e.g., "VISA", "Mastercard")
-    cardTypes: CardType[];
     benefitTitle: string;
     description: string;
     validUntil: string | null;
@@ -19,13 +18,21 @@ export interface Benefit {
     online: boolean;
     link: string | null;
     availableDays: string[];
-    subscription?: string | null; // Reference to bank_subscriptions collection ID
     sourceMeta?: {
         type: 'json' | 'text';
         payload: string;
         addedAt: string;
         lastRefreshedAt?: string;
     };
+}
+
+export interface BenefitEligibility {
+    bank: string;
+    bankDisplayName: string;
+    cardTypes: string[];
+    cardResolutionStatus: "resolved" | "partial" | "unresolved" | "not_required";
+    subscription?: string | null;
+    subscriptionResolutionStatus: "resolved" | "unresolved" | "not_required";
 }
 
 export interface CardType {
@@ -281,13 +288,8 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
                 name: rawBenefit.merchant?.name || 'Unknown Merchant',
                 type: (rawBenefit.merchant?.type as Merchant['type']) || 'business'
             },
-            bank: rawBenefit.bank || 'Unknown Bank',
+            eligibilities: Array.isArray(rawBenefit.eligibilities) ? rawBenefit.eligibilities : [],
             network: rawBenefit.network || 'Unknown Network',
-            cardTypes: (rawBenefit.cardTypes || []).map(ct => ({
-                name: ct?.name || 'Unknown Card',
-                category: ct?.category || 'Standard',
-                mode: (ct?.mode === 'credit' || ct?.mode === 'debit') ? ct.mode : 'credit'
-            })),
             benefitTitle: rawBenefit.benefitTitle || 'Benefit Available',
             description: rawBenefit.description || 'No description available',
             validUntil: rawBenefit.validUntil || null,
@@ -302,7 +304,6 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             online: rawBenefit.online || false,
             link: rawBenefit.link || null,
             availableDays: rawBenefit.availableDays || [],
-            subscription: rawBenefit.subscription ? extractId(rawBenefit.subscription) : null,
             sourceMeta: {
                 type: 'json',
                 payload: JSON.stringify(rawBenefit),
@@ -324,13 +325,8 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
                 name: rawBenefit.merchant?.name || 'Unknown Merchant',
                 type: 'business'
             },
-            bank: rawBenefit.bank || 'Unknown Bank',
+            eligibilities: [],
             network: rawBenefit.network || 'Unknown Network',
-            cardTypes: [{
-                name: 'Credit Card',
-                category: 'Standard',
-                mode: 'credit'
-            }],
             benefitTitle: rawBenefit.benefitTitle || 'Benefit Available',
             description: rawBenefit.description || 'No description available',
             validUntil: null,
@@ -350,7 +346,6 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             online: false,
             link: null,
             availableDays: [],
-            subscription: null,
             sourceMeta: {
                 type: 'json',
                 payload: JSON.stringify(rawBenefit),

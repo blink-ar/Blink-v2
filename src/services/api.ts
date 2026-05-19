@@ -74,6 +74,33 @@ function mapSearchResponseToBusinessesResponse(
   };
 }
 
+function getBenefitEligibilities(benefit: any) {
+  return Array.isArray(benefit?.eligibilities)
+    ? benefit.eligibilities.filter((eligibility: any) =>
+        eligibility && typeof eligibility === 'object' && typeof eligibility.bank === 'string'
+      )
+    : [];
+}
+
+function getBenefitProviderNames(benefit: any): string[] {
+  return [...new Set(getBenefitEligibilities(benefit)
+    .map((eligibility: any) => eligibility.bankDisplayName || eligibility.bank)
+    .filter(Boolean))] as string[];
+}
+
+function getBenefitCardNames(benefit: any): string[] {
+  return [...new Set(getBenefitEligibilities(benefit)
+    .flatMap((eligibility: any) => Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : [])
+    .map((card: any) => typeof card === 'string' ? card : card?.name)
+    .filter(Boolean))] as string[];
+}
+
+function getBenefitSubscriptionIds(benefit: any): string[] {
+  return [...new Set(getBenefitEligibilities(benefit)
+    .map((eligibility: any) => eligibility.subscription)
+    .filter(Boolean))] as string[];
+}
+
 export async function fetchSearch(options: {
   q: string;
   limit?: number;
@@ -128,7 +155,10 @@ export function normalizeBusinesses(
     const benefits = Array.isArray(raw.benefits)
       ? raw.benefits.map((b: any) => ({
           ...b,
-          cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : b.cardTypes
+          bankName: b.bankName || getBenefitProviderNames(b).join(', ') || 'Provider',
+          cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : getBenefitCardNames(b),
+          subscription: b.subscription || getBenefitSubscriptionIds(b)[0] || null,
+          subscriptionIds: Array.isArray(b.subscriptionIds) ? b.subscriptionIds : getBenefitSubscriptionIds(b)
         }))
       : [];
     const visibleBenefits = options.includeExpired
@@ -624,10 +654,14 @@ export async function fetchBusinesses(options: {
         };
 
         const discountPct = benefit.discountPercentage || 0;
+        const providerNames = getBenefitProviderNames(benefit);
+        const cardNames = getBenefitCardNames(benefit);
+        const subscriptionIds = getBenefitSubscriptionIds(benefit);
         const bankBenefit: BankBenefit = {
-          bankName: benefit.bank,
-          cardName: benefit.cardTypes[0]?.name || 'Credit Card',
-          cardTypes: benefit.cardTypes.map(ct => ct.name),
+          eligibilities: getBenefitEligibilities(benefit) as any,
+          bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Provider',
+          cardName: cardNames[0] || 'Credit Card',
+          cardTypes: cardNames,
           benefit: benefit.benefitTitle,
           rewardRate: discountPct > 0 ? `${discountPct}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
@@ -637,10 +671,11 @@ export async function fetchBusinesses(options: {
           valor: discountPct > 0 ? `${discountPct}%` : undefined,
           installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
-          requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
+          requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
           textoAplicacion: benefit.link || undefined,
-          subscription: benefit.subscription || null
+          subscription: subscriptionIds[0] || null,
+          subscriptionIds
         };
 
         business.benefits.push(bankBenefit);
@@ -656,10 +691,14 @@ export async function fetchBusinesses(options: {
         business.location.push(...newLocations);
 
         const discountPct2 = benefit.discountPercentage || 0;
+        const providerNames = getBenefitProviderNames(benefit);
+        const cardNames = getBenefitCardNames(benefit);
+        const subscriptionIds = getBenefitSubscriptionIds(benefit);
         const bankBenefit: BankBenefit = {
-          bankName: benefit.bank,
-          cardName: benefit.cardTypes[0]?.name || 'Credit Card',
-          cardTypes: benefit.cardTypes.map(ct => ct.name),
+          eligibilities: getBenefitEligibilities(benefit) as any,
+          bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Provider',
+          cardName: cardNames[0] || 'Credit Card',
+          cardTypes: cardNames,
           benefit: benefit.benefitTitle,
           rewardRate: discountPct2 > 0 ? `${discountPct2}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
@@ -669,10 +708,11 @@ export async function fetchBusinesses(options: {
           valor: discountPct2 > 0 ? `${discountPct2}%` : undefined,
           installments: benefit.installments || null,
           condicion: benefit.termsAndConditions || undefined,
-          requisitos: [benefit.cardTypes[0]?.name || 'Tarjeta de crédito'],
+          requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de crédito'],
           usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
           textoAplicacion: benefit.link || undefined,
-          subscription: benefit.subscription || null
+          subscription: subscriptionIds[0] || null,
+          subscriptionIds
         };
         business.benefits.push(bankBenefit);
       }

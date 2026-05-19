@@ -29,6 +29,7 @@ const asBankText = (value: unknown): string => {
     const objectValue = value as Record<string, unknown>;
     const candidates = [
       objectValue.bank,
+      objectValue.bankDisplayName,
       objectValue.name,
       objectValue.label,
       objectValue.code,
