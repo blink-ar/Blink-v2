@@ -10,6 +10,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
+import { buildBenefitPath } from '../utils/benefitIdentity';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -375,7 +376,7 @@ function BusinessDetailPage() {
     const selectedIndex = business.benefits.indexOf(selectedBenefit);
     if (selectedIndex < 0) return;
     trackViewBenefit({ source: 'business_detail_benefit_list', benefitId: `${business.id}:${selectedIndex}`, businessId: business.id, category: business.category, position });
-    navigate(`/benefit/${business.id}/${selectedIndex}`, { state: { business } });
+    navigate(buildBenefitPath(business.id, selectedBenefit, selectedIndex), { state: { business } });
   };
 
   const handleOpenMap = () => {

@@ -63,6 +63,7 @@ function Home() {
   const [selectedNetwork, setSelectedNetwork] = useState<string | undefined>(undefined);
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
+  const [onlineOnly, setOnlineOnly] = useState(false);
 
   // State for proximity sort — must be declared before useBenefitsData
   const [sortByDistance, setSortByDistance] = useState(false);
@@ -125,9 +126,6 @@ function Home() {
     message: string;
     type: "success" | "warning" | "error" | "info";
   }>({ show: false, message: "", type: "info" });
-
-  // State for online filter
-  const [onlineOnly, setOnlineOnly] = useState(false);
 
   // State for filter dropdown
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -411,6 +409,11 @@ function Home() {
     setActiveTab("beneficios");
   };
 
+  const getRawBenefitRouteRef = (benefit: RawMongoBenefit): string => {
+    const id = (benefit as { id?: string }).id || benefit._id?.$oid;
+    return id ? encodeURIComponent(id) : "0";
+  };
+
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
     // Find the business that matches this benefit's merchant
     const matchingBusiness = paginatedBusinesses.find(
@@ -433,12 +436,13 @@ function Home() {
         matchingBusiness: matchingBusiness.name,
         businessId: matchingBusiness.id,
       });
+      const benefitRef = getRawBenefitRouteRef(benefit);
       console.log(
         "🔗 Navigating to business page with popup:",
-        `/benefit/${matchingBusiness.id}/0?from=${activeTab}`
+        `/benefit/${matchingBusiness.id}/${benefitRef}?from=${activeTab}`
       );
       const scrollY = window.scrollY;
-      navigate(`/benefit/${matchingBusiness.id}/0?from=${activeTab}`, {
+      navigate(`/benefit/${matchingBusiness.id}/${benefitRef}?from=${activeTab}`, {
         state: { scrollY }
       });
     } else {

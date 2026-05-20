@@ -438,7 +438,7 @@ function applyActiveBenefitsFilter(query, searchParams) {
 function serializeDocWithId(doc) {
   return {
     ...doc,
-    id: doc?._id?.toString?.() || doc?.id || null
+    id: doc?.id || doc?._id?.toString?.() || null
   };
 }
 

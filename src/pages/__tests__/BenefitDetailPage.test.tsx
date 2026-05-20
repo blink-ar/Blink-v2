@@ -112,6 +112,80 @@ describe('BenefitDetailPage', () => {
     expect(screen.getByText('30% OFF')).toBeInTheDocument();
   });
 
+  it('selects a benefit by stable benefit id instead of array position', async () => {
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: 'benefit-galicia'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'benefit-naranja',
+          bankName: 'Naranja X',
+          cardName: 'Visa',
+          benefit: '25% reintegro',
+          rewardRate: '25%',
+          color: '#000000',
+          icon: 'credit_card'
+        },
+        {
+          id: 'benefit-galicia',
+          bankName: 'Galicia',
+          cardName: 'Mastercard',
+          benefit: '30% OFF',
+          rewardRate: '30%',
+          color: '#000000',
+          icon: 'credit_card'
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText("McDonald's")).toBeInTheDocument();
+    expect(screen.getByText('Galicia · Mastercard')).toBeInTheDocument();
+    expect(screen.getByText('30% OFF')).toBeInTheDocument();
+  });
+
+  it('replaces legacy index URLs with stable benefit id URLs', async () => {
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: '1'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'benefit-naranja',
+          bankName: 'Naranja X',
+          cardName: 'Visa',
+          benefit: '25% reintegro',
+          rewardRate: '25%',
+          color: '#000000',
+          icon: 'credit_card'
+        },
+        {
+          id: 'benefit-galicia',
+          bankName: 'Galicia',
+          cardName: 'Mastercard',
+          benefit: '30% OFF',
+          rewardRate: '30%',
+          color: '#000000',
+          icon: 'credit_card'
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('Galicia · Mastercard')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(routerMocks.mockNavigate).toHaveBeenCalledWith(
+        '/benefit/merchant_69a6f51cb7ff0ecb9e33bdf3/benefit-galicia',
+        { replace: true, state: null },
+      );
+    });
+  });
+
   it('falls back to the legacy search lookup for non-merchant route ids', async () => {
     const legacyBusiness = makeBusiness({
       id: 'legacy-merchant',
