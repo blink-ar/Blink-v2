@@ -9,7 +9,7 @@ import { SkeletonBusinessDetailPage } from '../components/skeletons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
-import { isBenefitActive } from '../utils/benefits';
+import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -17,6 +17,25 @@ const DAY_ABBR: Record<string, string> = {
   jueves: 'J', viernes: 'V', 'sábado': 'S', sabado: 'S', domingo: 'D',
 };
 const DAY_ORDER = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const DAY_FULL_LABEL: Record<string, string> = {
+  L: 'Lunes',
+  M: 'Martes',
+  X: 'Miercoles',
+  J: 'Jueves',
+  V: 'Viernes',
+  S: 'Sabado',
+  D: 'Domingo',
+};
+const DAY_SHORT_LABEL: Record<string, string> = {
+  L: 'Lun',
+  M: 'Mar',
+  X: 'Mie',
+  J: 'Jue',
+  V: 'Vie',
+  S: 'Sab',
+  D: 'Dom',
+};
+const DAY_TEXT_MAX_LENGTH = 24;
 
 const isAllDays = (cuando?: string): boolean => {
   if (!cuando) return true;
@@ -51,6 +70,43 @@ const TODAY_ABBR = (() => {
 
 const isBenefitAvailableToday = (b: BankBenefit): boolean =>
   isAllDays(b.cuando) || getActiveDays(b.cuando).has(TODAY_ABBR);
+
+const hasPercentDiscount = (benefit: BankBenefit): boolean => {
+  const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
+  return !!(discount && parseInt(discount) > 0);
+};
+
+const normalizeValidityDate = (validUntil?: string | null): string => {
+  if (!validUntil) return 'SIN_VIGENCIA';
+  const trimmed = String(validUntil).trim();
+  if (!trimmed) return 'SIN_VIGENCIA';
+
+  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? trimmed.toLowerCase() : formatLocalDateOnly(parsed);
+};
+
+const getInstallmentValiditySignature = (benefit: BankBenefit): string => {
+  const orderedDays = DAY_ORDER.filter((day) => getInstallmentRowDays(benefit).has(day));
+  return `${orderedDays.join(',')}::${normalizeValidityDate(benefit.validUntil)}`;
+};
+
+const getInstallmentRowDays = (benefit: BankBenefit): Set<string> => {
+  if (!benefit.cuando) return new Set(DAY_ORDER);
+  return isAllDays(benefit.cuando) ? new Set(DAY_ORDER) : getActiveDays(benefit.cuando);
+};
+
+const formatInstallmentDays = (days: Set<string>): string => {
+  const ordered = DAY_ORDER.filter((day) => days.has(day));
+  const full = ordered.map((day) => DAY_FULL_LABEL[day]).join(' ');
+  if (full.length <= DAY_TEXT_MAX_LENGTH) return full;
+  return ordered.map((day) => DAY_SHORT_LABEL[day]).join(' ');
+};
 
 const INITIAL_SHOW = 2;
 
@@ -118,6 +174,64 @@ function BusinessDetailPage() {
 
   const activeBenefitCount = activeBenefits.length;
   const pastBenefitCount = pastBenefits.length;
+
+  const topInstallmentGroupsByBank = useMemo(() => {
+    const byBank = new Map<string, BankBenefit[]>();
+
+    activeBenefits.forEach((benefit) => {
+      const count = benefit.installments || 0;
+      if (count <= 0 || hasPercentDiscount(benefit)) return;
+
+      const bank = benefit.bankName;
+      if (!byBank.has(bank)) byBank.set(bank, []);
+      byBank.get(bank)!.push(benefit);
+    });
+
+    return [...byBank.entries()]
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .flatMap(([bankName, benefits]) => {
+        const orderedByInstallments = [...benefits].sort((a, b) => (b.installments || 0) - (a.installments || 0));
+        const maxInstallments = orderedByInstallments[0]?.installments || 0;
+        if (maxInstallments <= 0) return [];
+
+        const topBenefits = orderedByInstallments.filter((benefit) => (benefit.installments || 0) === maxInstallments);
+        const topSignatures = new Set(topBenefits.map((benefit) => getInstallmentValiditySignature(benefit)));
+
+        const selectedBenefits = [...topBenefits];
+        orderedByInstallments.forEach((benefit) => {
+          const count = benefit.installments || 0;
+          if (count === maxInstallments) return;
+          const signature = getInstallmentValiditySignature(benefit);
+          if (topSignatures.has(signature)) return;
+          selectedBenefits.push(benefit);
+        });
+
+        return selectedBenefits.map((benefit) => ({
+          bankName,
+          count: benefit.installments || 0,
+          benefits: [benefit],
+        }));
+      })
+      .sort((left, right) => right.count - left.count || left.bankName.localeCompare(right.bankName));
+  }, [activeBenefits]);
+
+  const topInstallmentGroupsByAmount = useMemo(() => {
+    const byAmount = new Map<number, { count: number; benefits: BankBenefit[] }>();
+
+    topInstallmentGroupsByBank.forEach(({ count, benefits }) => {
+      const current = byAmount.get(count);
+      if (!current) {
+        byAmount.set(count, { count, benefits: [...benefits] });
+        return;
+      }
+
+      current.benefits.push(...benefits);
+    });
+
+    return [...byAmount.entries()]
+      .sort((left, right) => right[0] - left[0])
+      .map(([count, entry]) => ({ count, benefits: entry.benefits }));
+  }, [topInstallmentGroupsByBank]);
 
   useSEO({
     title: business
@@ -227,12 +341,17 @@ function BusinessDetailPage() {
   }, [business]);
 
   const groupedBenefits = useMemo(() => {
-    return activeBenefits.reduce((acc, benefit) => {
-      const bank = benefit.bankName;
-      if (!acc[bank]) acc[bank] = [];
-      acc[bank].push(benefit);
-      return acc;
-    }, {} as Record<string, BankBenefit[]>);
+    return activeBenefits
+      .filter((b) => {
+        const discount = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
+        return !((b.installments ?? 0) > 0 && discount === 0);
+      })
+      .reduce((acc, benefit) => {
+        const bank = benefit.bankName;
+        if (!acc[bank]) acc[bank] = [];
+        acc[bank].push(benefit);
+        return acc;
+      }, {} as Record<string, BankBenefit[]>);
   }, [activeBenefits]);
 
   const filteredGroupedBenefits = useMemo(() => {
@@ -408,6 +527,7 @@ function BusinessDetailPage() {
         {/* Grouped by bank — default view */}
         {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (
           <div className="space-y-3 pt-3 px-4">
+
             {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
               const accent = getBankAccent(bankName);
               const expanded = expandedGroups[bankName];
@@ -549,6 +669,81 @@ function BusinessDetailPage() {
                 </div>
               );
             })}
+
+            {/* Installment group — one card, one row per tier */}
+            {!!topInstallmentGroupsByAmount.length && !filterToday && (
+              <div
+                className="bg-white rounded-2xl overflow-hidden"
+                style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+                    style={{ background: '#4338CA' }}
+                  >
+                    CI
+                  </div>
+                  <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: '#4338CA' }}>
+                    Cuotas sin interés
+                  </span>
+                </div>
+
+                {topInstallmentGroupsByAmount.map(({ count, benefits }) => {
+                  return (
+                    <div
+                      key={`tier-${count}`}
+                      className="px-4 py-4"
+                      style={{ borderTop: '1px solid #E8E6E1' }}
+                    >
+                      <p className="font-bold text-[15px] text-blink-ink leading-tight mb-2.5">
+                        hasta {count} cuotas sin interés
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {benefits.map((benefit, i) => {
+                          const benefitIdx = business.benefits.indexOf(benefit);
+                          const daySet = getInstallmentRowDays(benefit);
+                          const allDays = isAllDays(benefit.cuando);
+
+                          return (
+                            <button
+                              key={`tier-${count}-bank-${i}`}
+                              onClick={() => { if (benefitIdx >= 0) handleBenefitSelect(benefit, benefitIdx + 1); }}
+                              className="rounded-lg border border-[#E8E6E1] bg-white px-2.5 py-2 text-left transition-all"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                                    <p className="font-semibold text-[12px] leading-tight text-blink-ink">
+                                      {benefit.bankName}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {allDays ? (
+                                        <span className="text-[10px] font-bold text-[#DC2626]">
+                                          Todos los días
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-blink-muted">
+                                          {formatInstallmentDays(daySet)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className="px-2 py-0.5 rounded-md border border-[#C7D2FE] text-[10px] font-bold text-[#4338CA] flex-shrink-0"
+                                  >
+                                    Ver
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -61,7 +61,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   _id: 1,
   id: 1,
   merchantId: 1,
-  bank: 1,
+  eligibilities: 1,
   benefitTitle: 1,
   availableDays: 1,
   discountPercentage: 1,
@@ -72,9 +72,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   description: 1,
   termsAndConditions: 1,
   link: 1,
-  validUntil: 1,
-  cardTypes: 1,
-  subscription: 1
+  validUntil: 1
 };
 
 const REQUIRED_PRODUCTION_ENV_VARS = [
@@ -564,7 +562,7 @@ async function resolveCardNameLookup(db, benefits) {
   const cardIds = Array.from(
     new Set(
       (benefits || [])
-        .flatMap((benefit) => (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : []))
+        .flatMap((benefit) => getBenefitCardTypeIds(benefit))
         .filter((value) => typeof value === 'string' && ObjectId.isValid(value))
     )
   );
@@ -599,6 +597,41 @@ async function resolveCardNameLookup(db, benefits) {
   return new Map(cardIds.map((cardId) => [cardId, allCardNames.get(cardId)]).filter(([, name]) => Boolean(name)));
 }
 
+function getBenefitEligibilities(benefit) {
+  return Array.isArray(benefit?.eligibilities)
+    ? benefit.eligibilities.filter((eligibility) =>
+      eligibility &&
+      typeof eligibility === 'object' &&
+      typeof eligibility.bank === 'string' &&
+      typeof eligibility.bankDisplayName === 'string'
+    )
+    : [];
+}
+
+function getBenefitCardTypeIds(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .flatMap((eligibility) => (Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : []))
+      .filter((value) => typeof value === 'string' && value.trim())
+  ));
+}
+
+function getBenefitProviderNames(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .map((eligibility) => eligibility.bankDisplayName || eligibility.bank)
+      .filter(Boolean)
+  ));
+}
+
+function getBenefitSubscriptionIds(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .map((eligibility) => eligibility.subscription)
+      .filter((value) => typeof value === 'string' && value.trim())
+  ));
+}
+
 function formatBenefitValue(benefit) {
   if (Number.isFinite(benefit?.discountPercentage) && Number(benefit.discountPercentage) > 0) {
     return `${Number(benefit.discountPercentage)}%`;
@@ -613,18 +646,21 @@ function formatBenefitValue(benefit) {
 }
 
 function buildBusinessBenefitSummary(benefit, cardNameLookup) {
+  const eligibilities = getBenefitEligibilities(benefit);
   const cardNames = Array.from(
     new Set(
-      (Array.isArray(benefit?.cardTypes) ? benefit.cardTypes : [])
+      getBenefitCardTypeIds(benefit)
         .map((cardId) => cardNameLookup.get(cardId))
         .filter(Boolean)
     )
   );
   const value = formatBenefitValue(benefit);
+  const providerNames = getBenefitProviderNames(benefit);
 
   return {
     id: benefit?.id || benefit?._id?.toString?.() || null,
-    bankName: benefit?.bank || 'Banco',
+    eligibilities,
+    bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Proveedor',
     cardName: cardNames[0] || 'Tarjeta de credito',
     cardTypes: cardNames,
     benefit: benefit?.benefitTitle || 'Beneficio',
@@ -645,7 +681,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
-    subscription: benefit?.subscription || null
+    subscriptionIds: getBenefitSubscriptionIds(benefit)
   };
 }
 
@@ -1255,13 +1291,13 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     : [];
 
   if (bankFilter.length > 0) {
-    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
   }
   applyActiveBenefitsFilter(benefitQuery, searchParams);
 
   const rawBenefits = await db.collection(collectionName)
     .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
-    .sort({ bank: 1, benefitTitle: 1 })
+    .sort({ 'eligibilities.bank': 1, benefitTitle: 1 })
     .toArray();
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefitsByMerchant = new Map();
@@ -1772,7 +1808,7 @@ async function handleGetBenefits(req, res, url, db) {
   const query = {};
 
   if (bank) {
-    query.bank = { $regex: bank, $options: 'i' };
+    query['eligibilities.bank'] = { $regex: bank, $options: 'i' };
   }
 
   if (network) {
@@ -1911,7 +1947,8 @@ async function handleGetBanks(req, res, url, db) {
   const banks = await db.collection(collectionName)
     .aggregate([
       ...(activeMatch ? [{ $match: activeMatch }] : []),
-      { $group: { _id: '$bank', count: { $sum: 1 } } },
+      { $unwind: '$eligibilities' },
+      { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
       { $match: { count: { $gte: 5 } } },
       { $sort: { count: -1 } }
     ])
@@ -1955,7 +1992,8 @@ async function handleGetStats(req, res, url, db) {
     collection
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
-        { $group: { _id: '$bank', count: { $sum: 1 } } },
+        { $unwind: '$eligibilities' },
+        { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 }
       ])
@@ -2339,10 +2377,10 @@ async function handleGetBusinesses(req, res, url, db) {
   };
 
   if (bankFilter && bankFilter.length > 0) {
-    benefitQuery.bank = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
   }
   if (subscription) {
-    benefitQuery.subscription = subscription;
+    benefitQuery['eligibilities.subscription'] = subscription;
   }
   if (onlineOnly) {
     benefitQuery.online = true;
@@ -2352,7 +2390,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const rawBenefits = merchantIds.length > 0
     ? await db.collection(collectionName)
       .find(benefitQuery, { projection: BENEFIT_SUMMARY_PROJECTION })
-      .sort({ bank: 1, benefitTitle: 1 })
+      .sort({ 'eligibilities.bank': 1, benefitTitle: 1 })
       .toArray()
     : [];
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
@@ -2454,7 +2492,7 @@ async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
         projection: BENEFIT_SUMMARY_PROJECTION
       }
     )
-    .sort({ bank: 1, benefitTitle: 1 })
+    .sort({ 'eligibilities.bank': 1, benefitTitle: 1 })
     .toArray();
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));

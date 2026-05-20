@@ -1,4 +1,16 @@
+export type EligibilityResolutionStatus = 'resolved' | 'partial' | 'unresolved' | 'not_required';
+
+export interface BenefitEligibility {
+  bank: string;
+  bankDisplayName: string;
+  cardTypes: string[];
+  cardResolutionStatus: EligibilityResolutionStatus;
+  subscription?: string | null;
+  subscriptionResolutionStatus: 'resolved' | 'unresolved' | 'not_required';
+}
+
 export interface BankBenefit {
+  eligibilities?: BenefitEligibility[];
   bankName: string;
   cardName: string;
   cardTypes?: string[];
@@ -24,6 +36,7 @@ export interface BankBenefit {
   id?: string;
   // Subscription reference (ID from bank_subscriptions collection)
   subscription?: string | null;
+  subscriptionIds?: string[];
 }
 
 export interface Business {

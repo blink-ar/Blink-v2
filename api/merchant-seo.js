@@ -115,7 +115,12 @@ function getPrimaryAddress(merchant) {
 }
 
 function getBenefitBankName(benefit) {
-  return String(benefit?.bankName || benefit?.bank || 'Banco').trim() || 'Banco';
+  const providerNames = Array.isArray(benefit?.eligibilities)
+    ? benefit.eligibilities
+      .map((eligibility) => eligibility?.bankDisplayName || eligibility?.bank)
+      .filter(Boolean)
+    : [];
+  return String(benefit?.bankName || providerNames.join(', ') || 'Proveedor').trim() || 'Proveedor';
 }
 
 function getBenefitTitle(benefit) {
