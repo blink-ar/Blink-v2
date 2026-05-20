@@ -8,13 +8,15 @@ export interface RawBenefit {
         name: string;
         type: string;
     };
-    bank: string;
-    network: string;
-    cardTypes: Array<{
-        name: string;
-        category: string;
-        mode: string;
+    eligibilities: Array<{
+        bank: string;
+        bankDisplayName: string;
+        cardTypes: string[];
+        cardResolutionStatus: "resolved" | "partial" | "unresolved" | "not_required";
+        subscription?: string | null;
+        subscriptionResolutionStatus: "resolved" | "unresolved" | "not_required";
     }>;
+    network: string;
     benefitTitle: string;
     description: string;
     categories: string[];

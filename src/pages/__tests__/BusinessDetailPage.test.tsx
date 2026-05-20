@@ -174,4 +174,39 @@ describe('BusinessDetailPage', () => {
     expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
     expect(screen.getByText('Venció: 2020-01-01')).toBeInTheDocument();
   });
+
+  it('shows lower-installment rows from the same bank when validity differs', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness,
+      benefits: [
+        {
+          bankName: 'Naranja X',
+          cardName: 'Mastercard',
+          benefit: '12 cuotas sin interés',
+          rewardRate: '12 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 12,
+          cuando: 'Lunes, Martes',
+          validUntil: '2026-06-30'
+        },
+        {
+          bankName: 'Naranja X',
+          cardName: 'Mastercard',
+          benefit: '10 cuotas sin interés',
+          rewardRate: '10 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 10,
+          cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
+          validUntil: '2026-05-31'
+        },
+      ],
+    });
+
+    render(<BusinessDetailPage />);
+
+    expect(await screen.findByText('hasta 12 cuotas sin interés')).toBeInTheDocument();
+    expect(screen.getByText('hasta 10 cuotas sin interés')).toBeInTheDocument();
+  });
 });

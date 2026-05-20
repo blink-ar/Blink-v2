@@ -36,15 +36,15 @@ const makeBenefit = (overrides: Partial<Benefit> = {}): Benefit => ({
         name: 'Restaurante Test',
         type: 'business'
     },
-    bank: 'Banco Test',
+    eligibilities: [{
+        bank: 'banco-test',
+        bankDisplayName: 'Banco Test',
+        cardTypes: ['Visa Gold'],
+        cardResolutionStatus: 'resolved',
+        subscription: null,
+        subscriptionResolutionStatus: 'not_required'
+    }],
     network: 'VISA',
-    cardTypes: [
-        {
-            name: 'Visa Gold',
-            category: 'Gold',
-            mode: 'credit'
-        }
-    ],
     benefitTitle: '10% OFF',
     description: 'Descuento en restaurantes',
     validUntil: '2026-12-31',
@@ -56,7 +56,6 @@ const makeBenefit = (overrides: Partial<Benefit> = {}): Benefit => ({
     online: false,
     link: 'https://example.com/apply',
     availableDays: ['lunes', 'martes'],
-    subscription: null,
     ...overrides
 });
 
@@ -199,11 +198,17 @@ describe('APIService', () => {
                 makeBenefit(),
                 makeBenefit({
                     id: 'benefit-2',
-                    bank: 'BBVA',
+                    eligibilities: [{
+                        bank: 'bbva',
+                        bankDisplayName: 'BBVA',
+                        cardTypes: ['Mastercard Black'],
+                        cardResolutionStatus: 'resolved',
+                        subscription: null,
+                        subscriptionResolutionStatus: 'not_required'
+                    }],
                     benefitTitle: '3 cuotas sin interés',
                     discountPercentage: null,
                     installments: 3,
-                    cardTypes: [{ name: 'Mastercard Black', category: 'Black', mode: 'credit' }]
                 })
             ]);
 
@@ -245,7 +250,14 @@ describe('APIService', () => {
                 makeBenefit({
                     categories: ['INVALID_CATEGORY'] as Benefit['categories'],
                     discountPercentage: null,
-                    cardTypes: [],
+                    eligibilities: [{
+                        bank: 'banco-test',
+                        bankDisplayName: 'Banco Test',
+                        cardTypes: [],
+                        cardResolutionStatus: 'not_required',
+                        subscription: null,
+                        subscriptionResolutionStatus: 'not_required'
+                    }],
                     benefitTitle: '',
                     description: '',
                     termsAndConditions: null,

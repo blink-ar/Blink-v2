@@ -103,6 +103,42 @@ function buildMerchantBusinessSkeleton(merchantName, merchantSlug, representativ
   };
 }
 
+function getBenefitEligibilities(benefit) {
+  return Array.isArray(benefit?.eligibilities)
+    ? benefit.eligibilities.filter((eligibility) =>
+      eligibility &&
+      typeof eligibility === 'object' &&
+      typeof eligibility.bank === 'string' &&
+      typeof eligibility.bankDisplayName === 'string'
+    )
+    : [];
+}
+
+function getProviderNames(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .map((eligibility) => eligibility.bankDisplayName || eligibility.bank)
+      .filter(Boolean)
+  ));
+}
+
+function getCardNames(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .flatMap((eligibility) => (Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : []))
+      .map((card) => typeof card === 'string' ? card : card?.name)
+      .filter(Boolean)
+  ));
+}
+
+function getSubscriptionIds(benefit) {
+  return Array.from(new Set(
+    getBenefitEligibilities(benefit)
+      .map((eligibility) => eligibility.subscription)
+      .filter(Boolean)
+  ));
+}
+
 function enrichMerchantAccumulator(accumulator, benefit) {
   const categories = toArray(benefit.categories).map((category) => normalizeSearchText(category));
   categories.forEach((category) => {
@@ -112,8 +148,9 @@ function enrichMerchantAccumulator(accumulator, benefit) {
     linkedIntentTags.forEach((intentTag) => accumulator.intentTags.add(intentTag));
   });
 
-  const bank = normalizeSearchText(benefit.bank);
-  if (bank) {
+  for (const bankName of getProviderNames(benefit)) {
+    const bank = normalizeSearchText(bankName);
+    if (!bank) continue;
     accumulator.banks.add(bank);
 
     const withoutPrefix = bank.replace(/^banco\s+/, '').trim();
@@ -148,13 +185,14 @@ function enrichMerchantAccumulator(accumulator, benefit) {
     : benefit.installments
       ? `${benefit.installments} cuotas s/int`
       : 'Beneficio';
+  const providerNames = getProviderNames(benefit);
+  const cardNames = getCardNames(benefit);
   const benefitSummary = {
     id: benefit.id || benefit._id?.toString?.() || null,
-    bankName: benefit.bank || 'Banco',
-    cardName: Array.isArray(benefit.cardTypes) && benefit.cardTypes.length > 0
-      ? (benefit.cardTypes[0]?.name || 'Tarjeta de credito')
-      : 'Tarjeta de credito',
-    cardTypes: Array.isArray(benefit.cardTypes) ? benefit.cardTypes.map((card) => card?.name).filter(Boolean) : [],
+    eligibilities: getBenefitEligibilities(benefit),
+    bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Proveedor',
+    cardName: cardNames[0] || 'Tarjeta de credito',
+    cardTypes: cardNames,
     benefit: benefit.benefitTitle || 'Beneficio',
     rewardRate,
     tipo: 'descuento',
@@ -162,7 +200,7 @@ function enrichMerchantAccumulator(accumulator, benefit) {
     valor: Number.isFinite(benefit.discountPercentage) ? `${Number(benefit.discountPercentage)}%` : undefined,
     tope: Array.isArray(benefit.caps) && benefit.caps.length > 0 ? benefit.caps[0]?.amount : null,
     condicion: benefit.termsAndConditions || '',
-    requisitos: Array.isArray(benefit.cardTypes) ? benefit.cardTypes.map((card) => card?.name).filter(Boolean) : [],
+    requisitos: cardNames,
     usos: benefit.online ? ['online', 'presencial'] : ['presencial'],
     textoAplicacion: benefit.link || undefined,
     description: benefit.description || '',
@@ -170,7 +208,7 @@ function enrichMerchantAccumulator(accumulator, benefit) {
     validUntil: benefit.validUntil || null,
     caps: benefit.caps || [],
     otherDiscounts: benefit.otherDiscounts || [],
-    subscription: benefit.subscription || null
+    subscriptionIds: getSubscriptionIds(benefit)
   };
   const dedupeKey = `${benefitSummary.bankName}|${benefitSummary.benefit}|${benefitSummary.rewardRate}`;
   if (!accumulator.benefitKeys.has(dedupeKey)) {

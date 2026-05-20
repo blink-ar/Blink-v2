@@ -231,7 +231,14 @@ describe('handleSearch', () => {
       {
         id: 'galicia-active',
         merchantId: 'merchant_sporting',
-        bank: 'Banco Galicia',
+        eligibilities: [{
+          bank: 'galicia',
+          bankDisplayName: 'Banco Galicia',
+          cardTypes: [],
+          cardResolutionStatus: 'not_required',
+          subscription: null,
+          subscriptionResolutionStatus: 'not_required'
+        }],
         benefitTitle: '10% OFF',
         availableDays: ['Lunes'],
         discountPercentage: 10,
@@ -243,12 +250,18 @@ describe('handleSearch', () => {
         termsAndConditions: '',
         link: null,
         validUntil: '2099-12-31',
-        cardTypes: []
       },
       {
         id: 'naranja-active',
         merchantId: 'merchant_sporting',
-        bank: 'Naranja X',
+        eligibilities: [{
+          bank: 'naranjax',
+          bankDisplayName: 'Naranja X',
+          cardTypes: [],
+          cardResolutionStatus: 'not_required',
+          subscription: null,
+          subscriptionResolutionStatus: 'not_required'
+        }],
         benefitTitle: '15% OFF',
         availableDays: ['Martes'],
         discountPercentage: 15,
@@ -260,7 +273,6 @@ describe('handleSearch', () => {
         termsAndConditions: '',
         link: null,
         validUntil: '2099-12-31',
-        cardTypes: []
       }
     ];
 

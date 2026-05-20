@@ -1,7 +1,7 @@
 import { AbstractBaseService, Logger, NetworkError, ValidationError } from './base';
 import { CacheService } from './CacheService';
 import { HTTPClient } from './HTTPClient';
-import { Business, BankBenefit, CanonicalLocation } from '../types';
+import { Business, BankBenefit, BenefitEligibility, CanonicalLocation } from '../types';
 // Removed mockBusinesses import - using only real MongoDB data
 import { benefitsAPI } from './api';
 import { getCategoryDefaultImage } from '../utils/categoryImages';
@@ -263,6 +263,38 @@ export class APIService extends AbstractBaseService {
                 return strings.length > 0 ? strings : undefined;
             };
 
+            const getEligibilities = (benefit: Record<string, unknown>) => {
+                return Array.isArray(benefit.eligibilities)
+                    ? benefit.eligibilities.filter((eligibility): eligibility is Record<string, unknown> =>
+                        Boolean(eligibility) &&
+                        typeof eligibility === 'object' &&
+                        !Array.isArray(eligibility) &&
+                        typeof (eligibility as Record<string, unknown>).bank === 'string'
+                    )
+                    : [];
+            };
+
+            const getProviderNames = (benefit: Record<string, unknown>) => {
+                return Array.from(new Set(getEligibilities(benefit)
+                    .map((eligibility) => getString(eligibility.bankDisplayName) || getString(eligibility.bank))
+                    .filter(Boolean)));
+            };
+
+            const getEligibilityCardTypes = (benefit: Record<string, unknown>) => {
+                return Array.from(new Set(getEligibilities(benefit)
+                    .flatMap((eligibility) => Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : [])
+                    .map((cardType) => typeof cardType === 'object' && cardType !== null
+                        ? getString((cardType as Record<string, unknown>).name)
+                        : getString(cardType))
+                    .filter(Boolean)));
+            };
+
+            const getEligibilitySubscriptionIds = (benefit: Record<string, unknown>) => {
+                return Array.from(new Set(getEligibilities(benefit)
+                    .map((eligibility) => getString(eligibility.subscription))
+                    .filter(Boolean)));
+            };
+
             const normalizeCategory = (value: unknown): string => {
                 const category = getString(value).toLowerCase().trim();
                 return VALID_CATEGORIES.has(category) ? category : 'otros';
@@ -406,26 +438,28 @@ export class APIService extends AbstractBaseService {
                     // Add benefit to the business
                     const business = businessMap.get(businessName)!;
 
-                    // Extract card types information
-                    const cardTypes = Array.isArray(benefit.cardTypes) ? benefit.cardTypes : [];
-                    const cardName = cardTypes.length > 0
-                        ? getString((cardTypes[0] as Record<string, unknown>)?.name)
-                        : 'Credit Card';
+                    const providerNames = getProviderNames(benefit);
+                    const cardTypes = getEligibilityCardTypes(benefit);
+                    const subscriptionIds = getEligibilitySubscriptionIds(benefit);
 
                     const bankBenefit: BankBenefit = {
-                        bankName: getStringOrDefault(benefit.bank, '') ||
-                            getStringOrDefault(benefit.banco, '') ||
-                            'Bank',
-                        cardName: cardName,
+                        eligibilities: getEligibilities(benefit).map((eligibility) => ({
+                            bank: getString(eligibility.bank),
+                            bankDisplayName: getString(eligibility.bankDisplayName) || getString(eligibility.bank),
+                            cardTypes: Array.isArray(eligibility.cardTypes)
+                                ? eligibility.cardTypes.filter((entry): entry is string => typeof entry === 'string')
+                                : [],
+                            cardResolutionStatus: (getString(eligibility.cardResolutionStatus) || 'not_required') as BenefitEligibility['cardResolutionStatus'],
+                            subscription: getString(eligibility.subscription) || null,
+                            subscriptionResolutionStatus: (getString(eligibility.subscriptionResolutionStatus) || 'not_required') as BenefitEligibility['subscriptionResolutionStatus'],
+                        })),
+                        bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Provider',
+                        cardName: cardTypes[0] || 'Credit Card',
                         benefit: getStringOrDefault(benefit.benefitTitle, '') ||
                             getStringOrDefault(benefit.benefit, '') ||
                             getStringOrDefault(benefit.beneficio, '') ||
                             description,
-                        cardTypes: getStringArray(cardTypes.map((cardType) =>
-                            typeof cardType === 'object' && cardType !== null
-                                ? (cardType as Record<string, unknown>).name
-                                : cardType
-                        )),
+                        cardTypes,
                         rewardRate: getRewardRate(benefit),
                         color: getStringOrDefault(benefit.color, 'bg-blue-500'),
                         icon: getStringOrDefault(benefit.icon, 'CreditCard'),
@@ -446,7 +480,8 @@ export class APIService extends AbstractBaseService {
                             undefined,
                         installments: typeof benefit.installments === 'number' ? benefit.installments : undefined,
                         validUntil: getString(benefit.validUntil) || undefined,
-                        subscription: getString(benefit.subscription) || undefined,
+                        subscription: subscriptionIds[0] || undefined,
+                        subscriptionIds,
                     };
 
                     business.benefits.push(bankBenefit);
