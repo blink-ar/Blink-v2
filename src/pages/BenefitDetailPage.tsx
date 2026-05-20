@@ -18,6 +18,13 @@ import {
 import { getBankAccent } from '../utils/bankColors';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { calculateDistance } from '../utils/distance';
+import {
+  buildBenefitPath,
+  decodeBenefitRouteRef,
+  getBenefitRouteRef,
+  getStableBenefitId,
+  isLegacyBenefitIndexRef,
+} from '../utils/benefitIdentity';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -55,9 +62,28 @@ const parseBenefitIndex = (benefitIndex?: string): number => {
 
 const resolveBenefitSelection = (
   business: Business,
-  benefitIndex?: string
+  benefitRef?: string
 ): { benefit: BankBenefit | null; position: number } => {
-  const safeIndex = parseBenefitIndex(benefitIndex);
+  const decodedRef = decodeBenefitRouteRef(benefitRef);
+
+  if (decodedRef) {
+    const idPosition = business.benefits.findIndex((candidate) => getStableBenefitId(candidate) === decodedRef);
+    if (idPosition >= 0) {
+      return {
+        benefit: business.benefits[idPosition],
+        position: idPosition
+      };
+    }
+
+    if (!isLegacyBenefitIndexRef(decodedRef)) {
+      return {
+        benefit: null,
+        position: 0
+      };
+    }
+  }
+
+  const safeIndex = parseBenefitIndex(decodedRef);
   const position = business.benefits[safeIndex] ? safeIndex : 0;
 
   return {
@@ -100,6 +126,14 @@ const parseTopeAmount = (tope: unknown): number | null => {
 const formatArgentinePeso = (amount: number): string =>
   '$' + Math.round(amount).toLocaleString('es-AR');
 
+const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
+  return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
+};
+
+const getLegacyBenefitTrackingId = (business: Business, position: number): string => {
+  return `${business.id}:${position}`;
+};
+
 const getPaymentMethod = (benefit: BankBenefit): string | null => {
   const tipo = (benefit.tipo || '').toLowerCase();
   if (/cr[eé]d/i.test(tipo)) return 'Tarjeta de Crédito';
@@ -140,7 +174,9 @@ function BenefitDetailPage() {
   const [showTerms, setShowTerms] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
-  const benefitPath = id ? `/benefit/${id}/${benefitIndex ?? '0'}` : '/benefit';
+  const benefitPath = id
+    ? `/benefit/${encodeURIComponent(id)}/${encodeURIComponent(decodeBenefitRouteRef(benefitIndex) ?? '0')}`
+    : '/benefit';
   const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
 
   useSEO({
@@ -150,7 +186,7 @@ function BenefitDetailPage() {
     description: business && benefit
       ? `${benefitDiscount ? `${benefitDiscount}% de ahorro` : 'Beneficio bancario'} en ${business.name}. Revisa vigencia, condiciones y sucursales adheridas.`
       : 'Revisa condiciones, vigencia y ubicaciones de cada beneficio bancario.',
-    path: business ? `/benefit/${business.id}/${benefitPosition}` : benefitPath,
+    path: business && benefit ? buildBenefitPath(business.id, benefit, benefitPosition) : benefitPath,
     type: 'article',
     structuredData: business && benefit
       ? {
@@ -225,8 +261,23 @@ function BenefitDetailPage() {
   }, [id, benefitIndex, passedBusiness]);
 
   useEffect(() => {
+    if (!business || !benefit || !getStableBenefitId(benefit)) return;
+
+    const stablePath = buildBenefitPath(business.id, benefit, benefitPosition);
+    const stableRef = getBenefitRouteRef(benefit, benefitPosition);
+    const currentRef = decodeBenefitRouteRef(benefitIndex);
+
+    if (currentRef === stableRef) return;
+
+    navigate(`${stablePath}${location.search || ''}`, {
+      replace: true,
+      state: location.state,
+    });
+  }, [benefit, benefitIndex, benefitPosition, business, location.search, location.state, navigate]);
+
+  useEffect(() => {
     if (!business || !benefit) return;
-    const benefitId = `${business.id}:${benefitPosition}`;
+    const benefitId = getBenefitTrackingId(business, benefit, benefitPosition);
     const signature = `${benefitId}|detail`;
     if (viewedBenefitSignatureRef.current === signature) return;
     viewedBenefitSignatureRef.current = signature;
@@ -236,12 +287,13 @@ function BenefitDetailPage() {
   useEffect(() => {
     if (!business || !benefit) return;
     if (typeof window === 'undefined') return;
-    const benefitId = `${business.id}:${benefitPosition}`;
+    const benefitId = getBenefitTrackingId(business, benefit, benefitPosition);
+    const legacyBenefitId = getLegacyBenefitTrackingId(business, benefitPosition);
     try {
       const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
-      setIsSaved(savedSet.has(benefitId));
+      setIsSaved(savedSet.has(benefitId) || savedSet.has(legacyBenefitId));
     } catch {
       setIsSaved(false);
     }
@@ -250,13 +302,15 @@ function BenefitDetailPage() {
   const handleToggleSave = () => {
     if (!business || !benefit) return;
     if (typeof window === 'undefined') return;
-    const benefitId = `${business.id}:${benefitPosition}`;
+    const benefitId = getBenefitTrackingId(business, benefit, benefitPosition);
+    const legacyBenefitId = getLegacyBenefitTrackingId(business, benefitPosition);
     try {
       const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
-      if (savedSet.has(benefitId)) {
+      if (savedSet.has(benefitId) || savedSet.has(legacyBenefitId)) {
         savedSet.delete(benefitId);
+        savedSet.delete(legacyBenefitId);
         setIsSaved(false);
         trackUnsaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       } else {
@@ -279,8 +333,8 @@ function BenefitDetailPage() {
   const handleShare = async () => {
     if (!business || !benefit) return;
     if (typeof window === 'undefined') return;
-    const benefitId = `${business.id}:${benefitPosition}`;
-    const url = window.location.href;
+    const benefitId = getBenefitTrackingId(business, benefit, benefitPosition);
+    const url = new URL(buildBenefitPath(business.id, benefit, benefitPosition), window.location.origin).toString();
     const title = `${business.name} · Blink`;
     const text = benefit.description || benefit.benefit || `Beneficio en ${business.name}`;
     try {

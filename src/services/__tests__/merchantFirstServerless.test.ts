@@ -821,6 +821,7 @@ describe('merchant-first serverless helpers', () => {
 
     const payload = JSON.parse(res.body || '{}');
     expect(res.statusCode).toBe(200);
+    expect(payload.benefit.id).toBe('benefit-1');
     expect(payload.benefit.merchant.name).toBe('Adidas');
     expect(payload.benefit.categories).toEqual(['shopping']);
     expect(payload.benefit.locations).toEqual(merchant.locations);

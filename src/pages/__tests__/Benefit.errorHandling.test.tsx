@@ -166,6 +166,27 @@ describe("Benefit detail page error handling", () => {
     expect(screen.getByText("10% OFF")).toBeInTheDocument();
   });
 
+  it("shows not found when a stable benefit id is not present", async () => {
+    routerMocks.useParams.mockReturnValue({ id: "test-business", benefitIndex: "missing-benefit" });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: "benefit-1",
+          bankName: "Banco Test",
+          cardName: "Visa",
+          benefit: "10% OFF",
+          rewardRate: "10%",
+          color: "#000000",
+          icon: "credit_card",
+        },
+      ],
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText("Beneficio no encontrado")).toBeInTheDocument();
+  });
+
   it("shows not found when the route is missing an id", async () => {
     routerMocks.useParams.mockReturnValue({ id: undefined, benefitIndex: undefined });
 
