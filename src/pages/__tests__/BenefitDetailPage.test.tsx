@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BenefitDetailPage from '../BenefitDetailPage';
 import { Business } from '../../types';
@@ -289,5 +289,53 @@ describe('BenefitDetailPage', () => {
     expect(screen.getByText('Galicia')).toBeInTheDocument();
     expect(screen.getByText('NaranjaX')).toBeInTheDocument();
     expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
+  });
+
+  it('expands and collapses the full eligible bank list', async () => {
+    const eligibilities = Array.from({ length: 14 }, (_, index) => ({
+      bank: `bank-${index + 1}`,
+      bankDisplayName: `Banco ${index + 1}`,
+      cardTypes: [],
+      cardResolutionStatus: 'not_required' as const,
+      subscription: null,
+      subscriptionResolutionStatus: 'not_required' as const
+    }));
+
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: 'modo-promos-raw-1'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: eligibilities.map((eligibility) => eligibility.bankDisplayName).join(', '),
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          validUntil: '2099-12-31',
+          eligibilities
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('Banco 1')).toBeInTheDocument();
+    expect(screen.getByText('Banco 12')).toBeInTheDocument();
+    expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar 2 bancos adheridos más' }));
+
+    expect(screen.getByText('Banco 13')).toBeInTheDocument();
+    expect(screen.getByText('Banco 14')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar menos' }));
+
+    expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mostrar 2 bancos adheridos más' })).toBeInTheDocument();
   });
 });

@@ -178,6 +178,7 @@ function BenefitDetailPage() {
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const { position: userPosition } = useGeolocation();
   const [showTerms, setShowTerms] = useState(false);
+  const [showAllEligibleBanks, setShowAllEligibleBanks] = useState(false);
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
   const benefitPath = id
@@ -306,6 +307,10 @@ function BenefitDetailPage() {
     }
   }, [benefit, benefitPosition, business]);
 
+  useEffect(() => {
+    setShowAllEligibleBanks(false);
+  }, [benefit?.id, benefitPosition]);
+
   const handleToggleSave = () => {
     if (!business || !benefit) return;
     if (typeof window === 'undefined') return;
@@ -385,7 +390,10 @@ function BenefitDetailPage() {
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);
   const hasMultipleProviders = hasMultipleBenefitProviders(benefit);
-  const eligibleBankPreview = getBenefitEligibleBankPreview(benefit, 12);
+  const eligibleBankPreview = getBenefitEligibleBankPreview(
+    benefit,
+    showAllEligibleBanks ? Number.MAX_SAFE_INTEGER : 12,
+  );
   const bankAccent = getBankAccent(providerName);
 
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
@@ -788,9 +796,23 @@ function BenefitDetailPage() {
                           </span>
                         ))}
                         {eligibleBankPreview.hiddenCount > 0 && (
-                          <span className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-blink-muted">
+                          <button
+                            type="button"
+                            onClick={() => setShowAllEligibleBanks(true)}
+                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-blink-muted active:scale-95 transition-transform"
+                            aria-label={`Mostrar ${eligibleBankPreview.hiddenCount} bancos adheridos más`}
+                          >
                             +{eligibleBankPreview.hiddenCount}
-                          </span>
+                          </button>
+                        )}
+                        {showAllEligibleBanks && eligibleBankPreview.total > 12 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllEligibleBanks(false)}
+                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-white border border-blink-border text-blink-muted active:scale-95 transition-transform"
+                          >
+                            Mostrar menos
+                          </button>
                         )}
                       </div>
                     </div>
