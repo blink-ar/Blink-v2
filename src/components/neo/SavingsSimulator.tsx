@@ -32,12 +32,10 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
   }, [amount, discountPercentage, maxCap]);
 
   const hasInstallments = installments != null && installments > 0;
-  const { perInstallment, lastInstallment } = useMemo(() => {
-    if (!hasInstallments) return { perInstallment: total, lastInstallment: total };
-    const base = Math.floor(total / installments);
-    const remainder = total - base * installments;
-    return { perInstallment: base, lastInstallment: base + remainder };
-  }, [total, installments, hasInstallments]);
+  const perInstallment = useMemo(() => {
+    if (!hasInstallments) return amount;
+    return Math.round(amount / installments);
+  }, [amount, installments, hasInstallments]);
 
   const formatCurrency = (n: number) =>
     `$${n.toLocaleString('es-AR')}`;
@@ -167,14 +165,11 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
                 {installments} × {formatCurrency(perInstallment)}
               </span>
             </div>
-            {lastInstallment !== perInstallment && (
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-blink-muted">Última cuota</span>
-                <span className="text-xs text-blink-muted">
-                  {formatCurrency(lastInstallment)}
-                </span>
-              </div>
-            )}
+            <p className="text-xs text-blink-muted leading-snug">
+              Las cuotas se calculan sobre el monto total sin el descuento. El reintegro del
+              descuento suele acreditarse en la primera cuota. Consultá los términos y condiciones
+              (TAC) para más detalles.
+            </p>
           </>
         )}
       </div>
