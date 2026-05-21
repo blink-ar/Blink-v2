@@ -4,6 +4,33 @@ export interface BankAccent {
   border: string;
 }
 
+const FALLBACK_PRESETS: BankAccent[] = [
+  // Indigo
+  { bg: '#EEF2FF', text: '#4F46E5', border: '#C7D2FE' },
+  // Emerald / Green
+  { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
+  // Amber / Gold
+  { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' },
+  // Rose / Coral
+  { bg: '#FFF1F2', text: '#E11D48', border: '#FECDD3' },
+  // Cyan
+  { bg: '#ECFEFF', text: '#0891B2', border: '#A5F3FC' },
+  // Violet
+  { bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE' },
+  // Teal
+  { bg: '#F0FDFA', text: '#0D9488', border: '#99F6E4' },
+  // Orange
+  { bg: '#FFF7ED', text: '#EA580C', border: '#FFEDD5' }
+];
+
+const getDeterministicIndex = (str: string, mod: number): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % mod;
+};
+
 export const getBankAccent = (name: string): BankAccent => {
   const n = name.toLowerCase();
 
@@ -70,5 +97,10 @@ export const getBankAccent = (name: string): BankAccent => {
   if (n.includes('personal'))                    return { bg: '#EDE9FE', text: '#7C3AED', border: '#DDD6FE' };
 
   // ── Fallback ─────────────────────────────────────────────────────────────
-  return { bg: '#F3F4F6', text: '#374151', border: '#E5E7EB' };
+  if (!name || n === 'proveedor' || n === 'varios bancos') {
+    return { bg: '#F3F4F6', text: '#374151', border: '#E5E7EB' };
+  }
+
+  const index = getDeterministicIndex(name, FALLBACK_PRESETS.length);
+  return FALLBACK_PRESETS[index];
 };

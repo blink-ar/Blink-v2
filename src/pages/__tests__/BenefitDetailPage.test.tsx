@@ -291,7 +291,7 @@ describe('BenefitDetailPage', () => {
     expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
   });
 
-  it('expands and collapses the full eligible bank list', async () => {
+  it('opens and closes the full eligible bank list inside a bottom-sheet modal', async () => {
     const eligibilities = Array.from({ length: 14 }, (_, index) => ({
       bank: `bank-${index + 1}`,
       bankDisplayName: `Banco ${index + 1}`,
@@ -328,14 +328,25 @@ describe('BenefitDetailPage', () => {
     expect(screen.getByText('Banco 12')).toBeInTheDocument();
     expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar 2 bancos adheridos más' }));
+    const openButton = screen.getByRole('button', { name: 'Ver todos los bancos adheridos' });
+    expect(openButton).toHaveTextContent('Ver todos (14)');
+    fireEvent.click(openButton);
 
-    expect(screen.getByText('Banco 13')).toBeInTheDocument();
-    expect(screen.getByText('Banco 14')).toBeInTheDocument();
+    // After clicking, the modal is shown and shows all bank names including the ones above 12
+    expect(await screen.findByText('Banco 13')).toBeInTheDocument();
+    expect(await screen.findByText('Banco 14')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar menos' }));
+    // Close the modal clicking the close button inside the modal
+    const closeButtons = screen.getAllByRole('button');
+    const closeButton = closeButtons.find(btn => btn.querySelector('.material-symbols-outlined')?.textContent === 'close');
+    expect(closeButton).toBeDefined();
+    fireEvent.click(closeButton!);
 
-    expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mostrar 2 bancos adheridos más' })).toBeInTheDocument();
+    // Now bank 13 and bank 14 should not be in the document
+    await waitFor(() => {
+      expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
+      expect(screen.queryByText('Banco 14')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Ver todos los bancos adheridos' })).toBeInTheDocument();
   });
 });

@@ -30,6 +30,7 @@ import {
   getBenefitProviderDisplayName,
   getBenefitProviderSummary,
   hasMultipleBenefitProviders,
+  getBenefitEligibilityBankNames,
 } from '../utils/benefitDisplay';
 
 const BENEFIT_DAYS = [
@@ -179,6 +180,7 @@ function BenefitDetailPage() {
   const { position: userPosition } = useGeolocation();
   const [showTerms, setShowTerms] = useState(false);
   const [showAllEligibleBanks, setShowAllEligibleBanks] = useState(false);
+  const [bankSearchQuery, setBankSearchQuery] = useState('');
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
   const benefitPath = id
@@ -309,6 +311,7 @@ function BenefitDetailPage() {
 
   useEffect(() => {
     setShowAllEligibleBanks(false);
+    setBankSearchQuery('');
   }, [benefit?.id, benefitPosition]);
 
   const handleToggleSave = () => {
@@ -390,10 +393,7 @@ function BenefitDetailPage() {
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);
   const hasMultipleProviders = hasMultipleBenefitProviders(benefit);
-  const eligibleBankPreview = getBenefitEligibleBankPreview(
-    benefit,
-    showAllEligibleBanks ? Number.MAX_SAFE_INTEGER : 12,
-  );
+  const eligibleBankPreview = getBenefitEligibleBankPreview(benefit, 12);
   const bankAccent = getBankAccent(providerName);
 
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
@@ -781,37 +781,38 @@ function BenefitDetailPage() {
                   )}
 
                   {eligibleBankPreview.total > 1 && (
-                    <div className={cards.length > 0 || subscription ? 'pt-2 mt-2 border-t border-blink-border' : ''}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted mb-2">
-                        Bancos adheridos
-                      </p>
+                    <div className={cards.length > 0 || subscription ? 'pt-3 mt-3 border-t border-blink-border' : ''}>
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 13 }}>account_balance</span>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-blink-muted">
+                          Bancos adheridos
+                        </p>
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {eligibleBankPreview.visible.map((bankName) => (
-                          <span
-                            key={bankName}
-                            className="px-2 py-1 rounded-lg text-[11px] font-semibold"
-                            style={{ background: bankAccent.bg, color: bankAccent.text }}
-                          >
-                            {bankName}
-                          </span>
-                        ))}
-                        {eligibleBankPreview.hiddenCount > 0 && (
+                        {eligibleBankPreview.visible.map((bankName) => {
+                          const accent = getBankAccent(bankName);
+                          return (
+                            <span
+                              key={bankName}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold border hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                              style={{
+                                background: accent.bg,
+                                color: accent.text,
+                                borderColor: accent.border,
+                              }}
+                            >
+                              {bankName}
+                            </span>
+                          );
+                        })}
+                        {eligibleBankPreview.total > 12 && (
                           <button
                             type="button"
                             onClick={() => setShowAllEligibleBanks(true)}
-                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-blink-muted active:scale-95 transition-transform"
-                            aria-label={`Mostrar ${eligibleBankPreview.hiddenCount} bancos adheridos más`}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 active:scale-95 transition-all duration-150 cursor-pointer flex items-center justify-center gap-0.5 shadow-sm"
+                            aria-label="Ver todos los bancos adheridos"
                           >
-                            +{eligibleBankPreview.hiddenCount}
-                          </button>
-                        )}
-                        {showAllEligibleBanks && eligibleBankPreview.total > 12 && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllEligibleBanks(false)}
-                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-white border border-blink-border text-blink-muted active:scale-95 transition-transform"
-                          >
-                            Mostrar menos
+                            Ver todos ({eligibleBankPreview.total})
                           </button>
                         )}
                       </div>
@@ -1081,6 +1082,124 @@ function BenefitDetailPage() {
                   </div>
                 );
               });
+            })()}
+            <div className="h-6" />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+
+    {/* ── Eligible Banks bottom-sheet popup ── */}
+    {showAllEligibleBanks && createPortal(
+      <div
+        className="fixed inset-0 z-[200] bg-black/50"
+        onClick={() => {
+          setShowAllEligibleBanks(false);
+          setBankSearchQuery('');
+        }}
+      >
+        <div
+          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col animate-slide-up"
+          style={{ borderRadius: '20px 20px 0 0', maxHeight: '75vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
+            <div>
+              <h3 className="font-semibold text-base text-blink-ink">Bancos adheridos</h3>
+              <p className="text-xs text-blink-muted mt-0.5">
+                {getBenefitEligibilityBankNames(benefit).length} entidades financieras
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setShowAllEligibleBanks(false);
+                setBankSearchQuery('');
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+            </button>
+          </div>
+
+          {/* Search bar inside modal */}
+          {getBenefitEligibilityBankNames(benefit).length > 8 && (
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F0EC' }}>
+              <div className="relative">
+                <span
+                  className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-blink-muted"
+                  style={{ fontSize: 18 }}
+                >
+                  search
+                </span>
+                <input
+                  className="w-full h-10 bg-blink-bg border border-blink-border rounded-xl pl-9 pr-9 text-sm text-blink-ink placeholder-blink-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="Buscar banco..."
+                  value={bankSearchQuery}
+                  onChange={(e) => setBankSearchQuery(e.target.value)}
+                />
+                {bankSearchQuery && (
+                  <button
+                    onClick={() => setBankSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blink-muted"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bank list/grid container */}
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {(() => {
+              const allBankNames = getBenefitEligibilityBankNames(benefit);
+              const filtered = allBankNames.filter((name) =>
+                name.toLowerCase().includes(bankSearchQuery.toLowerCase())
+              );
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-blink-muted text-sm">
+                    Sin resultados para "{bankSearchQuery}"
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex flex-wrap gap-2 py-2">
+                  {filtered.map((bankName) => {
+                    const accent = getBankAccent(bankName);
+                    const shortName = bankName.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || bankName.substring(0, 8).toUpperCase();
+                    const initialLetters = shortName.substring(0, 2);
+                    return (
+                      <div
+                        key={bankName}
+                        className="px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                        style={{
+                          background: accent.bg,
+                          color: accent.text,
+                          borderColor: accent.border,
+                        }}
+                      >
+                        <span
+                          className="w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black text-white"
+                          style={{ background: accent.text }}
+                        >
+                          {initialLetters}
+                        </span>
+                        {bankName}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
             })()}
             <div className="h-6" />
           </div>

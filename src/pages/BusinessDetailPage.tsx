@@ -602,7 +602,10 @@ function BusinessDetailPage() {
                               </span>
 
                               {providerSummary && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-blink-muted">
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-md border"
+                                  style={{ background: 'transparent', borderColor: accent.border, color: accent.text }}
+                                >
                                   {providerSummary}
                                 </span>
                               )}
@@ -728,7 +731,10 @@ function BusinessDetailPage() {
                                       {providerName}
                                     </p>
                                     {providerSummary && (
-                                      <span className="text-[10px] font-semibold text-blink-muted">
+                                      <span
+                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
+                                        style={{ background: 'transparent', borderColor: getBankAccent(providerName).border, color: getBankAccent(providerName).text }}
+                                      >
                                         {providerSummary}
                                       </span>
                                     )}
@@ -794,7 +800,12 @@ function BusinessDetailPage() {
                         {benefit.benefit || benefit.cardName}
                       </p>
                       {providerSummary && (
-                        <p className="text-[10px] text-blink-muted mt-0.5">{providerSummary}</p>
+                        <span
+                          className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md border mt-1"
+                          style={{ background: 'transparent', borderColor: accent.border, color: accent.text }}
+                        >
+                          {providerSummary}
+                        </span>
                       )}
                       {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
                         <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
@@ -860,7 +871,9 @@ function BusinessDetailPage() {
                         {benefit.benefit || benefit.cardName}
                       </p>
                       {providerSummary && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">{providerSummary}</p>
+                        <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400 border border-gray-200 mt-1">
+                          {providerSummary}
+                        </span>
                       )}
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {benefit.validUntil ? `Venció: ${benefit.validUntil}` : 'Promoción anterior'}
