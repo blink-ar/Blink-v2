@@ -135,7 +135,7 @@ describe("Benefit detail page content", () => {
     expect(screen.getByText("Pagando con")).toBeInTheDocument();
     expect(screen.getByText("Tarjeta de Crédito")).toBeInTheDocument();
     expect(screen.getByText("Accede al beneficio")).toBeInTheDocument();
-    expect(screen.getByText("Con tus tarjetas de Banco Test:")).toBeInTheDocument();
+    expect(screen.getByText("Con tus tarjetas de Banco Test")).toBeInTheDocument();
     expect(screen.getByText("Visa Gold")).toBeInTheDocument();
     expect(screen.getByText("Mastercard Black")).toBeInTheDocument();
     expect(screen.getByText("Disponible en:")).toBeInTheDocument();
