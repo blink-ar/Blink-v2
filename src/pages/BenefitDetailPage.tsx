@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessById, fetchBusinessesPaginated } from '../services/api';
 import SavingsSimulator from '../components/neo/SavingsSimulator';
+import InstallmentSimulator from '../components/neo/InstallmentSimulator';
 import { SkeletonBenefitDetailPage } from '../components/skeletons';
 import { parseDayAvailability } from '../utils/dayAvailabilityParser';
 import { useSubscriptions } from '../hooks/useSubscriptions';
@@ -756,6 +757,11 @@ function BenefitDetailPage() {
           {/* ── Savings Simulator ── */}
           {discount > 0 && (
             <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
+          )}
+
+          {/* ── Installment Simulator ── */}
+          {benefit.installments != null && benefit.installments > 0 && (
+            <InstallmentSimulator installments={benefit.installments} />
           )}
 
           {/* ── Disponible en ── */}
