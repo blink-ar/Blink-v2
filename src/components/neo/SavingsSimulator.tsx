@@ -33,9 +33,9 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
 
   const hasInstallments = installments != null && installments > 0;
   const perInstallment = useMemo(() => {
-    if (!hasInstallments) return amount;
-    return Math.round(amount / installments);
-  }, [amount, installments, hasInstallments]);
+    if (!hasInstallments) return total;
+    return Math.round(total / installments);
+  }, [total, installments, hasInstallments]);
 
   const formatCurrency = (n: number) =>
     `$${n.toLocaleString('es-AR')}`;
@@ -166,9 +166,9 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
               </span>
             </div>
             <p className="text-xs text-blink-muted leading-snug">
-              Las cuotas se calculan sobre el monto total sin el descuento. El reintegro del
-              descuento suele acreditarse en la primera cuota. Consultá los términos y condiciones
-              (TAC) para más detalles.
+              Algunos descuentos se acreditan como reintegro en el primer resumen de la tarjeta, por
+              lo que las cuotas pueden ser mayores. Consultá los términos y condiciones para más
+              detalles.
             </p>
           </>
         )}
