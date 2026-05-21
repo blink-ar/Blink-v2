@@ -3,9 +3,10 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 interface SavingsSimulatorProps {
   discountPercentage: number;
   maxCap?: string | null;
+  installments?: number | null;
 }
 
-const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage, maxCap }) => {
+const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage, maxCap, installments }) => {
   const [amount, setAmount] = useState(12000);
   const [customInput, setCustomInput] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -29,6 +30,14 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
     const capped = Math.min(raw, cap);
     return { savings: raw, total: amount - capped, cappedSavings: capped };
   }, [amount, discountPercentage, maxCap]);
+
+  const hasInstallments = installments != null && installments > 0;
+  const { perInstallment, lastInstallment } = useMemo(() => {
+    if (!hasInstallments) return { perInstallment: total, lastInstallment: total };
+    const base = Math.floor(total / installments);
+    const remainder = total - base * installments;
+    return { perInstallment: base, lastInstallment: base + remainder };
+  }, [total, installments, hasInstallments]);
 
   const formatCurrency = (n: number) =>
     `$${n.toLocaleString('es-AR')}`;
@@ -147,6 +156,27 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
             {formatCurrency(total)}
           </span>
         </div>
+
+        {hasInstallments && (
+          <>
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-blink-positive font-medium">
+                {installments} cuotas sin interés
+              </span>
+              <span className="font-bold text-primary">
+                {installments} × {formatCurrency(perInstallment)}
+              </span>
+            </div>
+            {lastInstallment !== perInstallment && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-blink-muted">Última cuota</span>
+                <span className="text-xs text-blink-muted">
+                  {formatCurrency(lastInstallment)}
+                </span>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

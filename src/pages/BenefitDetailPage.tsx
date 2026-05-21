@@ -754,13 +754,17 @@ function BenefitDetailPage() {
             </div>
           )}
 
-          {/* ── Savings Simulator ── */}
+          {/* ── Savings Simulator (discount, optionally with installments) ── */}
           {discount > 0 && (
-            <SavingsSimulator discountPercentage={discount} maxCap={benefit.tope || null} />
+            <SavingsSimulator
+              discountPercentage={discount}
+              maxCap={benefit.tope || null}
+              installments={benefit.installments}
+            />
           )}
 
-          {/* ── Installment Simulator ── */}
-          {benefit.installments != null && benefit.installments > 0 && (
+          {/* ── Installment Simulator (installments only, no discount) ── */}
+          {discount <= 0 && benefit.installments != null && benefit.installments > 0 && (
             <InstallmentSimulator installments={benefit.installments} />
           )}
 
