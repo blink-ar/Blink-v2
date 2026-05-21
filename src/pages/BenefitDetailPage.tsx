@@ -151,6 +151,9 @@ const getPaymentMethod = (benefit: BankBenefit): string | null => {
   return null;
 };
 
+const isModoBenefit = (benefit: BankBenefit): boolean =>
+  /^modo-promos-raw-/i.test(benefit.id || '');
+
 const isPremiumCard = (cardName: string): boolean =>
   /signature|black|infinite|platinum|select|gold/i.test(cardName);
 
@@ -521,6 +524,17 @@ function BenefitDetailPage() {
               >
                 {providerName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
+              {isModoBenefit(benefit) && (
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-black tracking-wide flex items-center gap-1 shadow-sm"
+                  style={{
+                    background: '#10B981',
+                    color: '#ffffff',
+                  }}
+                >
+                  Modo
+                </span>
+              )}
               {providerSummary && (
                 <span
                   className="px-3 py-1 rounded-full text-xs font-semibold"
@@ -697,20 +711,44 @@ function BenefitDetailPage() {
           </div>
 
           {/* ── Accede al beneficio ── */}
-          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1) && (
+          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1 || isModoBenefit(benefit)) && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
             >
               <div className="px-5 pt-5 pb-5">
-                <p className="font-bold text-[15px] text-blink-ink mb-1">Accede al beneficio</p>
-                <p className="text-xs text-blink-muted mb-4">
-                  {hasMultipleProviders
-                    ? `Con ${providerName} y bancos adheridos:`
-                    : `Con tus tarjetas de ${providerName}:`}
-                </p>
+                <p className="font-bold text-[15px] text-blink-ink mb-4">Accede al beneficio</p>
 
                 <div className="space-y-2.5">
+                  {isModoBenefit(benefit) && (
+                    <>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted">
+                        Método de pago
+                      </p>
+                      <div
+                        className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+                        style={{ background: '#F9FAFB', border: '1px solid #E8E6E1' }}
+                      >
+                        <span
+                          className="material-symbols-outlined flex-shrink-0"
+                          style={{ fontSize: 18, color: '#10B981' }}
+                        >
+                          qr_code_2
+                        </span>
+                        <span className="text-sm font-medium text-blink-ink">Modo</span>
+                      </div>
+                    </>
+                  )}
+
+                  {cards.length > 0 && (
+                    <div className={isModoBenefit(benefit) ? 'pt-3 mt-1 border-t border-blink-border' : ''}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted mb-2.5">
+                        {hasMultipleProviders
+                          ? `Con ${providerName} y bancos adheridos`
+                          : `Con tus tarjetas de ${providerName}`}
+                      </p>
+                    </div>
+                  )}
                   {cards.map((card, i) => {
                     const cardClean = String(card ?? '').replace(/ any$/i, '');
                     const dark = isPremiumCard(cardClean);
