@@ -209,4 +209,58 @@ describe('BusinessDetailPage', () => {
     expect(await screen.findByText('hasta 12 cuotas sin interés')).toBeInTheDocument();
     expect(screen.getByText('hasta 10 cuotas sin interés')).toBeInTheDocument();
   });
+
+  it('renders multi-bank MODO installment benefits with a compact provider label', async () => {
+    const longBankName = 'Banco Nación, Galicia, NaranjaX';
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness,
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: longBankName,
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
+          validUntil: '2026-12-31',
+          eligibilities: [
+            {
+              bank: 'nacion',
+              bankDisplayName: 'Banco Nación',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required',
+            },
+            {
+              bank: 'galicia',
+              bankDisplayName: 'Galicia',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required',
+            },
+            {
+              bank: 'naranjax',
+              bankDisplayName: 'NaranjaX',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required',
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<BusinessDetailPage />);
+
+    expect(await screen.findByText('hasta 6 cuotas sin interés')).toBeInTheDocument();
+    expect(screen.getAllByText('MODO').length).toBeGreaterThan(0);
+    expect(screen.getByText('3 bancos adheridos')).toBeInTheDocument();
+    expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
+  });
 });

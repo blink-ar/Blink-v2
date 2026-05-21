@@ -231,4 +231,63 @@ describe('BenefitDetailPage', () => {
     });
     expect(await screen.findByText('Legacy Merchant')).toBeInTheDocument();
   });
+
+  it('shows multi-bank MODO benefits without rendering the full bank list as the provider', async () => {
+    const longBankName = 'Banco Nación, Galicia, NaranjaX';
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: 'modo-promos-raw-1'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: longBankName,
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          validUntil: '2099-12-31',
+          eligibilities: [
+            {
+              bank: 'nacion',
+              bankDisplayName: 'Banco Nación',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            },
+            {
+              bank: 'galicia',
+              bankDisplayName: 'Galicia',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            },
+            {
+              bank: 'naranjax',
+              bankDisplayName: 'NaranjaX',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            }
+          ]
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('MODO · Tarjeta de credito')).toBeInTheDocument();
+    expect(screen.getAllByText('3 bancos adheridos').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bancos adheridos')).toBeInTheDocument();
+    expect(screen.getByText('Banco Nación')).toBeInTheDocument();
+    expect(screen.getByText('Galicia')).toBeInTheDocument();
+    expect(screen.getByText('NaranjaX')).toBeInTheDocument();
+    expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
+  });
 });

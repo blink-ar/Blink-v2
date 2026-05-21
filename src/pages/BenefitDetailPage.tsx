@@ -25,6 +25,12 @@ import {
   getStableBenefitId,
   isLegacyBenefitIndexRef,
 } from '../utils/benefitIdentity';
+import {
+  getBenefitEligibleBankPreview,
+  getBenefitProviderDisplayName,
+  getBenefitProviderSummary,
+  hasMultipleBenefitProviders,
+} from '../utils/benefitDisplay';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -178,6 +184,7 @@ function BenefitDetailPage() {
     ? `/benefit/${encodeURIComponent(id)}/${encodeURIComponent(decodeBenefitRouteRef(benefitIndex) ?? '0')}`
     : '/benefit';
   const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
+  const benefitProviderName = benefit ? getBenefitProviderDisplayName(benefit) : null;
 
   useSEO({
     title: business && benefit
@@ -197,7 +204,7 @@ function BenefitDetailPage() {
           category: business.category || undefined,
           seller: {
             '@type': 'Organization',
-            name: benefit.bankName,
+            name: benefitProviderName || benefit.bankName,
           },
         }
       : undefined,
@@ -375,7 +382,11 @@ function BenefitDetailPage() {
   const subscription = getSubscriptionById(benefit.subscription);
   const isExpired = !isBenefitActive(benefit.validUntil);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
-  const bankAccent = getBankAccent(benefit.bankName);
+  const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
+  const providerSummary = getBenefitProviderSummary(benefit);
+  const hasMultipleProviders = hasMultipleBenefitProviders(benefit);
+  const eligibleBankPreview = getBenefitEligibleBankPreview(benefit, 12);
+  const bankAccent = getBankAccent(providerName);
 
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
@@ -486,7 +497,7 @@ function BenefitDetailPage() {
                 style={{ background: bankAccent.text, border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
               >
                 <span className="font-black text-white" style={{ fontSize: 8, letterSpacing: '-0.02em' }}>
-                  {benefit.bankName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
+                  {providerName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
                 </span>
               </div>
             </div>
@@ -500,8 +511,16 @@ function BenefitDetailPage() {
                 className="px-3 py-1 rounded-full text-xs font-semibold"
                 style={{ background: bankAccent.text, color: 'white' }}
               >
-                {benefit.bankName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
+                {providerName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
+              {providerSummary && (
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: bankAccent.border, color: bankAccent.text }}
+                >
+                  {providerSummary}
+                </span>
+              )}
               {subscriptionName && (
                 <span
                   className="px-3 py-1 rounded-full text-xs font-semibold"
@@ -670,20 +689,24 @@ function BenefitDetailPage() {
           </div>
 
           {/* ── Accede al beneficio ── */}
-          {(cards.length > 0 || subscription) && (
+          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1) && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
             >
               <div className="px-5 pt-5 pb-5">
                 <p className="font-bold text-[15px] text-blink-ink mb-1">Accede al beneficio</p>
-                <p className="text-xs text-blink-muted mb-4">Con tus tarjetas de {benefit.bankName}:</p>
+                <p className="text-xs text-blink-muted mb-4">
+                  {hasMultipleProviders
+                    ? `Con ${providerName} y bancos adheridos:`
+                    : `Con tus tarjetas de ${providerName}:`}
+                </p>
 
                 <div className="space-y-2.5">
                   {cards.map((card, i) => {
                     const cardClean = String(card ?? '').replace(/ any$/i, '');
                     const dark = isPremiumCard(cardClean);
-                    const network = detectCardNetwork(cardClean) || detectCardNetwork(benefit.bankName);
+                    const network = detectCardNetwork(cardClean) || detectCardNetwork(providerName);
 
                     return (
                       <div
@@ -747,6 +770,30 @@ function BenefitDetailPage() {
                         <span className="text-sm font-medium text-blink-ink">{subscription.name}</span>
                       </div>
                     </>
+                  )}
+
+                  {eligibleBankPreview.total > 1 && (
+                    <div className={cards.length > 0 || subscription ? 'pt-2 mt-2 border-t border-blink-border' : ''}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted mb-2">
+                        Bancos adheridos
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {eligibleBankPreview.visible.map((bankName) => (
+                          <span
+                            key={bankName}
+                            className="px-2 py-1 rounded-lg text-[11px] font-semibold"
+                            style={{ background: bankAccent.bg, color: bankAccent.text }}
+                          >
+                            {bankName}
+                          </span>
+                        ))}
+                        {eligibleBankPreview.hiddenCount > 0 && (
+                          <span className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-blink-muted">
+                            +{eligibleBankPreview.hiddenCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

@@ -25,6 +25,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { matchesSearchPhrase } from '../utils/searchNormalization';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -648,7 +649,7 @@ function SearchPage() {
     source.benefits.forEach((benefit) => {
       if (!benefit.bankName) return;
 
-      const descriptor = toBankDescriptor(benefit.bankName);
+      const descriptor = toBankDescriptor(getBenefitProviderDisplayName(benefit));
       if (!seen.has(descriptor.token)) {
         seen.add(descriptor.token);
         badges.push(descriptor.code);
