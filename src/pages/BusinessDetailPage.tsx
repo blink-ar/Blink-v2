@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
 import { buildBenefitPath } from '../utils/benefitIdentity';
+import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../utils/benefitDisplay';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -183,7 +184,7 @@ function BusinessDetailPage() {
       const count = benefit.installments || 0;
       if (count <= 0 || hasPercentDiscount(benefit)) return;
 
-      const bank = benefit.bankName;
+      const bank = getBenefitProviderDisplayName(benefit);
       if (!byBank.has(bank)) byBank.set(bank, []);
       byBank.get(bank)!.push(benefit);
     });
@@ -348,7 +349,7 @@ function BusinessDetailPage() {
         return !((b.installments ?? 0) > 0 && discount === 0);
       })
       .reduce((acc, benefit) => {
-        const bank = benefit.bankName;
+        const bank = getBenefitProviderDisplayName(benefit);
         if (!acc[bank]) acc[bank] = [];
         acc[bank].push(benefit);
         return acc;
@@ -562,6 +563,7 @@ function BusinessDetailPage() {
                     const allDays = isAllDays(benefit.cuando);
                     const activeDays = !allDays ? getActiveDays(benefit.cuando) : new Set<string>();
                     const benefitIdx = business.benefits.indexOf(benefit);
+                    const providerSummary = getBenefitProviderSummary(benefit);
 
                     return (
                       <div
@@ -598,6 +600,15 @@ function BusinessDetailPage() {
                               >
                                 {bankShortName(bankName)}
                               </span>
+
+                              {providerSummary && (
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-md border"
+                                  style={{ background: 'transparent', borderColor: accent.border, color: accent.text }}
+                                >
+                                  {providerSummary}
+                                </span>
+                              )}
 
                               {allDays ? (
                                 <span
@@ -704,6 +715,8 @@ function BusinessDetailPage() {
                           const benefitIdx = business.benefits.indexOf(benefit);
                           const daySet = getInstallmentRowDays(benefit);
                           const allDays = isAllDays(benefit.cuando);
+                          const providerName = getBenefitProviderDisplayName(benefit);
+                          const providerSummary = getBenefitProviderSummary(benefit);
 
                           return (
                             <button
@@ -715,8 +728,16 @@ function BusinessDetailPage() {
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="min-w-0 flex items-center gap-2 flex-wrap">
                                     <p className="font-semibold text-[12px] leading-tight text-blink-ink">
-                                      {benefit.bankName}
+                                      {providerName}
                                     </p>
+                                    {providerSummary && (
+                                      <span
+                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
+                                        style={{ background: 'transparent', borderColor: getBankAccent(providerName).border, color: getBankAccent(providerName).text }}
+                                      >
+                                        {providerSummary}
+                                      </span>
+                                    )}
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       {allDays ? (
                                         <span className="text-[10px] font-bold text-[#DC2626]">
@@ -755,7 +776,9 @@ function BusinessDetailPage() {
               const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
-              const accent = getBankAccent(benefit.bankName);
+              const providerName = getBenefitProviderDisplayName(benefit);
+              const providerSummary = getBenefitProviderSummary(benefit);
+              const accent = getBankAccent(providerName);
               const benefitIdx = business.benefits.indexOf(benefit);
 
               return (
@@ -770,12 +793,20 @@ function BusinessDetailPage() {
                       className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0"
                       style={{ background: accent.bg, color: accent.text }}
                     >
-                      {bankShortName(benefit.bankName)}
+                      {bankShortName(providerName)}
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold text-sm text-blink-ink leading-tight truncate">
                         {benefit.benefit || benefit.cardName}
                       </p>
+                      {providerSummary && (
+                        <span
+                          className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md border mt-1"
+                          style={{ background: 'transparent', borderColor: accent.border, color: accent.text }}
+                        >
+                          {providerSummary}
+                        </span>
+                      )}
                       {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
                         <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
                       )}
@@ -819,6 +850,8 @@ function BusinessDetailPage() {
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
               const benefitIdx = business.benefits.indexOf(benefit);
+              const providerName = getBenefitProviderDisplayName(benefit);
+              const providerSummary = getBenefitProviderSummary(benefit);
 
               return (
                 <div
@@ -831,12 +864,17 @@ function BusinessDetailPage() {
                     <span
                       className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0 bg-gray-200 text-gray-500"
                     >
-                      {bankShortName(benefit.bankName)}
+                      {bankShortName(providerName)}
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold text-sm text-gray-500 leading-tight truncate">
                         {benefit.benefit || benefit.cardName}
                       </p>
+                      {providerSummary && (
+                        <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400 border border-gray-200 mt-1">
+                          {providerSummary}
+                        </span>
+                      )}
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {benefit.validUntil ? `Venció: ${benefit.validUntil}` : 'Promoción anterior'}
                       </p>

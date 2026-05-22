@@ -55,6 +55,40 @@ function uniqueDisplayStrings(values) {
   return result;
 }
 
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getBenefitEligibilityBankNames(benefit) {
+  const eligibilityNames = Array.isArray(benefit?.eligibilities)
+    ? benefit.eligibilities
+      .map((eligibility) => eligibility?.bankDisplayName || eligibility?.bank)
+      .filter(Boolean)
+    : [];
+
+  if (eligibilityNames.length > 0) {
+    return uniqueDisplayStrings(eligibilityNames);
+  }
+
+  const bankName = String(benefit?.bankName || '').trim();
+  if (!bankName) return [];
+
+  return uniqueDisplayStrings(bankName.includes(',') ? bankName.split(',').map((name) => name.trim()) : [bankName]);
+}
+
+function isModoSourcedBenefit(benefit) {
+  return normalizeText([
+    benefit?.id,
+    benefit?.sourceCollection,
+    benefit?.rawBenefitCollection,
+    benefit?.source
+  ].filter(Boolean).join(' ')).includes('modo');
+}
+
 function formatList(values, fallback) {
   const items = uniqueDisplayStrings(values);
   if (items.length === 0) return fallback;
@@ -115,12 +149,18 @@ function getPrimaryAddress(merchant) {
 }
 
 function getBenefitBankName(benefit) {
-  const providerNames = Array.isArray(benefit?.eligibilities)
-    ? benefit.eligibilities
-      .map((eligibility) => eligibility?.bankDisplayName || eligibility?.bank)
-      .filter(Boolean)
-    : [];
-  return String(benefit?.bankName || providerNames.join(', ') || 'Proveedor').trim() || 'Proveedor';
+  const providerNames = getBenefitEligibilityBankNames(benefit);
+
+  if (providerNames.length > 1) {
+    return isModoSourcedBenefit(benefit) ? 'MODO' : 'Varios bancos';
+  }
+
+  return String(benefit?.bankName || providerNames[0] || 'Proveedor').trim() || 'Proveedor';
+}
+
+function getBenefitBankSummary(benefit) {
+  const providerCount = getBenefitEligibilityBankNames(benefit).length;
+  return providerCount > 1 ? `${providerCount} bancos adheridos` : '';
 }
 
 function getBenefitTitle(benefit) {
@@ -334,6 +374,7 @@ function renderBenefitList(benefits, emptyText, isPast = false) {
   }
 
   const items = benefits.map((benefit) => {
+    const bankSummary = getBenefitBankSummary(benefit);
     const validUntil = benefit?.validUntil
       ? `<span>Vigencia: ${escapeHtml(benefit.validUntil)}</span>`
       : '';
@@ -347,7 +388,7 @@ function renderBenefitList(benefits, emptyText, isPast = false) {
     return [
       '<li class="blink-seo-benefit">',
       `  <strong>${escapeHtml(formatBenefitValue(benefit))}</strong>`,
-      `  <span>${escapeHtml(getBenefitBankName(benefit))} - ${escapeHtml(benefit?.cardName || 'Tarjeta')}</span>`,
+      `  <span>${escapeHtml(getBenefitBankName(benefit))} - ${escapeHtml(benefit?.cardName || 'Tarjeta')}${bankSummary ? ` · ${escapeHtml(bankSummary)}` : ''}</span>`,
       `  <p>${escapeHtml(getBenefitTitle(benefit))}</p>`,
       `  <small>${[days, cap, validUntil].filter(Boolean).join(' ') || (isPast ? 'Promocion anterior' : 'Beneficio activo')}</small>`,
       '</li>'

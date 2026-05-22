@@ -6,6 +6,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDistance } from '../utils/distance';
 import { filterActiveBenefits } from '../utils/benefits';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 
 interface MerchantCardProps {
   business: Business;
@@ -41,7 +42,7 @@ const getBankBadges = (benefits: Business['benefits']): string[] => {
   benefits.forEach((b) => {
     if (!b.bankName) return;
 
-    const descriptor = toBankDescriptor(b.bankName);
+    const descriptor = toBankDescriptor(getBenefitProviderDisplayName(b));
     if (!seen.has(descriptor.token)) {
       seen.add(descriptor.token);
       badges.push(descriptor.code);

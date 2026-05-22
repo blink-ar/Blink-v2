@@ -14,6 +14,7 @@ import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { buildBenefitPath } from '../utils/benefitIdentity';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { NotificationBanner } from '../components/NotificationBanner';
@@ -471,7 +472,7 @@ function HomePage() {
                       )}
                     </h3>
                     <p className="text-xs text-blink-muted truncate mb-2">
-                      {item.benefit.bankName} · {item.benefit.cardName}
+                      {getBenefitProviderDisplayName(item.benefit)} · {item.benefit.cardName}
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-medium text-blink-muted">

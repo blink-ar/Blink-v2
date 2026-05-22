@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BenefitDetailPage from '../BenefitDetailPage';
 import { Business } from '../../types';
@@ -230,5 +230,123 @@ describe('BenefitDetailPage', () => {
       });
     });
     expect(await screen.findByText('Legacy Merchant')).toBeInTheDocument();
+  });
+
+  it('shows multi-bank MODO benefits without rendering the full bank list as the provider', async () => {
+    const longBankName = 'Banco Nación, Galicia, NaranjaX';
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: 'modo-promos-raw-1'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: longBankName,
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          validUntil: '2099-12-31',
+          eligibilities: [
+            {
+              bank: 'nacion',
+              bankDisplayName: 'Banco Nación',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            },
+            {
+              bank: 'galicia',
+              bankDisplayName: 'Galicia',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            },
+            {
+              bank: 'naranjax',
+              bankDisplayName: 'NaranjaX',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            }
+          ]
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('MODO · Tarjeta de credito')).toBeInTheDocument();
+    expect(screen.getAllByText('3 bancos adheridos').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bancos adheridos')).toBeInTheDocument();
+    expect(screen.getByText('Banco Nación')).toBeInTheDocument();
+    expect(screen.getByText('Galicia')).toBeInTheDocument();
+    expect(screen.getByText('NaranjaX')).toBeInTheDocument();
+    expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
+  });
+
+  it('opens and closes the full eligible bank list inside a bottom-sheet modal', async () => {
+    const eligibilities = Array.from({ length: 14 }, (_, index) => ({
+      bank: `bank-${index + 1}`,
+      bankDisplayName: `Banco ${index + 1}`,
+      cardTypes: [],
+      cardResolutionStatus: 'not_required' as const,
+      subscription: null,
+      subscriptionResolutionStatus: 'not_required' as const
+    }));
+
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',
+      benefitIndex: 'modo-promos-raw-1'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: eligibilities.map((eligibility) => eligibility.bankDisplayName).join(', '),
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          validUntil: '2099-12-31',
+          eligibilities
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('Banco 1')).toBeInTheDocument();
+    expect(screen.getByText('Banco 12')).toBeInTheDocument();
+    expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
+
+    const openButton = screen.getByRole('button', { name: 'Ver todos los bancos adheridos' });
+    expect(openButton).toHaveTextContent('Ver todos (14)');
+    fireEvent.click(openButton);
+
+    // After clicking, the modal is shown and shows all bank names including the ones above 12
+    expect(await screen.findByText('Banco 13')).toBeInTheDocument();
+    expect(await screen.findByText('Banco 14')).toBeInTheDocument();
+
+    // Close the modal clicking the close button inside the modal
+    const closeButtons = screen.getAllByRole('button');
+    const closeButton = closeButtons.find(btn => btn.querySelector('.material-symbols-outlined')?.textContent === 'close');
+    expect(closeButton).toBeDefined();
+    fireEvent.click(closeButton!);
+
+    // Now bank 13 and bank 14 should not be in the document
+    await waitFor(() => {
+      expect(screen.queryByText('Banco 13')).not.toBeInTheDocument();
+      expect(screen.queryByText('Banco 14')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Ver todos los bancos adheridos' })).toBeInTheDocument();
   });
 });
