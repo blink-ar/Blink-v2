@@ -153,7 +153,7 @@ const getPaymentMethod = (benefit: BankBenefit): string | null => {
 };
 
 const isModoBenefit = (benefit: BankBenefit): boolean =>
-  /^modo-promos-raw-/i.test(benefit.id || '');
+  /^modo-promos-raw-/i.test(benefit.id || '') || benefit.acceptsModo === true;
 
 const isPremiumCard = (cardName: string): boolean =>
   /signature|black|infinite|platinum|select|gold/i.test(cardName);

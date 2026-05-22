@@ -12,6 +12,7 @@ import {
   BankSubscription
 } from '../types/mongodb';
 import { filterActiveBenefits } from '../utils/benefits';
+import { dedupeModoBenefits } from '../utils/dedupeModoBenefits';
 
 declare global {
   // Extend the globalThis type to include allCategories
@@ -161,9 +162,10 @@ export function normalizeBusinesses(
           subscriptionIds: Array.isArray(b.subscriptionIds) ? b.subscriptionIds : getBenefitSubscriptionIds(b)
         }))
       : [];
+    const dedupedBenefits = dedupeModoBenefits(benefits);
     const visibleBenefits = options.includeExpired
-      ? benefits
-      : filterActiveBenefits(benefits);
+      ? dedupedBenefits
+      : filterActiveBenefits(dedupedBenefits);
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
