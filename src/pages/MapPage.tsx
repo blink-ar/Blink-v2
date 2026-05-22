@@ -51,6 +51,32 @@ interface MapMarker {
   address: string;
 }
 
+interface MarkerCluster {
+  markers: MapMarker[];
+  lat: number;
+  lng: number;
+}
+
+const getMarkerKey = (marker: MapMarker) => `${marker.business.id}:${marker.lat.toFixed(6)}:${marker.lng.toFixed(6)}`;
+
+function clusterMapMarkers(markers: MapMarker[], zoom: number): MarkerCluster[] {
+  // At street level, always show individual markers so co-located businesses are never stuck
+  if (zoom >= 17) return markers.map((m) => ({ markers: [m], lat: m.lat, lng: m.lng }));
+  // Cell size in degrees shrinks as zoom increases — keeps ~60px cluster radius at each level
+  const cellSize = 140 / Math.pow(2, zoom);
+  const cells = new Map<string, MapMarker[]>();
+  markers.forEach((m) => {
+    const key = `${Math.floor(m.lng / cellSize)},${Math.floor(m.lat / cellSize)}`;
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key)!.push(m);
+  });
+  return Array.from(cells.values()).map((group) => ({
+    markers: group,
+    lat: group.reduce((s, m) => s + m.lat, 0) / group.length,
+    lng: group.reduce((s, m) => s + m.lng, 0) / group.length,
+  }));
+}
+
 interface MapFilterState {
   activeChip: string;
   onlineOnly: boolean;
@@ -116,9 +142,14 @@ function MapPage() {
   const overlaysRef = useRef<any[]>([]);
   const userOverlayRef = useRef<any>(null);
   const googleRef = useRef<any>(null);
+  const selectedBusinessRef = useRef<Business | null>(null);
+  const selectedMarkerIdxRef = useRef<number | null>(null);
+  const selectedMarkerKeyRef = useRef<string | null>(null);
+  const buildOverlaysRef = useRef<((google: any, map: any, selected: Business | null) => void) | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
+  const [selectedMarkerKey, setSelectedMarkerKey] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
@@ -128,6 +159,11 @@ function MapPage() {
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
   const mapInteractionTimestampsRef = useRef<Record<string, number>>({});
+
+  // Keep refs in sync so zoom_changed listener always has fresh state
+  useEffect(() => { selectedBusinessRef.current = selectedBusiness; }, [selectedBusiness]);
+  useEffect(() => { selectedMarkerIdxRef.current = selectedMarkerIdx; }, [selectedMarkerIdx]);
+  useEffect(() => { selectedMarkerKeyRef.current = selectedMarkerKey; }, [selectedMarkerKey]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -316,6 +352,7 @@ function MapPage() {
 
   const buildOverlays = useCallback((google: any, map: any, selected: Business | null) => {
     clearOverlays();
+    const zoom = map.getZoom() ?? 15;
 
     class BusinessOverlay extends google.maps.OverlayView {
       private pos: any;
@@ -355,7 +392,6 @@ function MapPage() {
 
         let html = '';
 
-        // Soft glassmorphic tooltip for selected
         if (this.isSelected) {
           const benefitText = getShortBenefitForTooltip(this.biz);
           html += `
@@ -370,7 +406,6 @@ function MapPage() {
             </div>`;
         }
 
-        // Marker: white circle with soft shadow + indigo ring when selected
         const ringStyle = this.isSelected
           ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
           : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;';
@@ -385,7 +420,6 @@ function MapPage() {
             }
           </div>`;
 
-        // Soft drop shadow dot
         html += `<div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
 
         this.div.innerHTML = html;
@@ -418,24 +452,154 @@ function MapPage() {
       }
     }
 
-    mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
-      // Use idx === 0 as initial selection only in single-business mode on first load;
-      // the updateSelection effect will immediately reconcile once selectedMarkerIdx is set.
-      const isSelected = selected?.id === biz.id && (isSingleBusinessMode ? idx === 0 : false);
-      const pos = new google.maps.LatLng(lat, lng);
-      const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
-        trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
-        trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
-        setSelectedBusiness(biz);
-        setSelectedMarkerIdx(idx);
-        map.panTo(pos);
+    // ── ClusterOverlay ───────────────────────────────────────────
+    class ClusterOverlay extends google.maps.OverlayView {
+      private pos: any;
+      private div: HTMLDivElement | null = null;
+      private count: number;
+      private onTap: () => void;
+
+      constructor(pos: any, count: number, onTap: () => void) {
+        super();
+        this.pos = pos;
+        this.count = count;
+        this.onTap = onTap;
+      }
+
+      onAdd() {
+        this.div = document.createElement('div');
+        this.div.style.position = 'absolute';
+        this.div.style.cursor = 'pointer';
+        this.div.style.zIndex = '15';
+        this.div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onTap();
+        });
+        this.render();
+        this.getPanes().overlayMouseTarget.appendChild(this.div);
+      }
+
+      render() {
+        if (!this.div) return;
+        const n = this.count;
+        const size = n < 5 ? 44 : n < 10 ? 50 : 58;
+        const fontSize = n < 10 ? 15 : n < 100 ? 13 : 11;
+        this.div.innerHTML = `
+          <div style="width:${size}px;height:${size}px;border-radius:50%;
+            background:linear-gradient(135deg,#6366F1 0%,#818CF8 100%);
+            display:flex;align-items:center;justify-content:center;
+            box-shadow:0 4px 16px rgba(99,102,241,0.40),0 2px 6px rgba(0,0,0,0.10);
+            border:2.5px solid #ffffff;position:relative;z-index:20;">
+            <span style="color:#ffffff;font-size:${fontSize}px;font-weight:700;
+              font-family:'Space Grotesk',sans-serif;line-height:1;">${n}</span>
+          </div>
+          <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
+      }
+
+      draw() {
+        if (!this.div) return;
+        const proj = this.getProjection();
+        if (!proj) return;
+        const px = proj.fromLatLngToDivPixel(this.pos);
+        if (px) {
+          const n = this.count;
+          const size = n < 5 ? 44 : n < 10 ? 50 : 58;
+          this.div.style.left = (px.x - size / 2) + 'px';
+          this.div.style.top = (px.y - size - 4) + 'px';
+        }
+      }
+
+      onRemove() {
+        if (this.div && this.div.parentNode) {
+          this.div.parentNode.removeChild(this.div);
+          this.div = null;
+        }
+      }
+    }
+
+    // ── Single-business mode: no clustering ──────────────────────
+    if (isSingleBusinessMode) {
+      const currentSelectedIdx = selectedMarkerIdxRef.current;
+      mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
+        const isSelected =
+          selected?.id === biz.id &&
+          (currentSelectedIdx === null ? idx === 0 : idx === currentSelectedIdx);
+        const pos = new google.maps.LatLng(lat, lng);
+        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+          trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
+          trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
+          setSelectedBusiness(biz);
+          setSelectedMarkerIdx(idx);
+          setSelectedMarkerKey(getMarkerKey({ business: biz, lat, lng, address: '' }));
+          map.panTo(pos);
+        });
+        overlay.setMap(map);
+        (overlay as any).__businessId = biz.id;
+        (overlay as any).__markerIdx = idx;
+        (overlay as any).__markerKey = getMarkerKey({ business: biz, lat, lng, address: '' });
+        overlaysRef.current.push(overlay);
       });
-      overlay.setMap(map);
-      (overlay as any).__businessId = biz.id;
-      (overlay as any).__markerIdx = idx;
-      overlaysRef.current.push(overlay);
+      return;
+    }
+
+    // ── Clustered browse mode ────────────────────────────────────
+    const clusters = clusterMapMarkers(mapMarkers, zoom);
+    // Map each marker back to its index in mapMarkers, since cluster iteration
+    // order does not preserve original order and the list uses mapMarkers indices.
+    const markerIdxByRef = new Map<MapMarker, number>();
+    mapMarkers.forEach((m, i) => markerIdxByRef.set(m, i));
+    const currentSelectedIdx = selectedMarkerIdxRef.current;
+    const currentSelectedKey = selectedMarkerKeyRef.current;
+
+    clusters.forEach((cluster) => {
+      if (cluster.markers.length === 1) {
+        const marker = cluster.markers[0];
+        const { business: biz, lat, lng } = marker;
+        const idx = markerIdxByRef.get(marker) ?? 0;
+        // Match by marker index too so multi-branch businesses don't light up
+        // every overlay when zoom rebuilds before the reconciliation effect fires.
+        const markerKey = getMarkerKey(marker);
+        const isSelected = currentSelectedKey
+          ? markerKey === currentSelectedKey
+          : selected?.id === biz.id && (currentSelectedIdx === null || idx === currentSelectedIdx);
+        const pos = new google.maps.LatLng(lat, lng);
+        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+          trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
+          trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
+          setSelectedBusiness(biz);
+          setSelectedMarkerIdx(idx);
+          setSelectedMarkerKey(markerKey);
+          map.panTo(pos);
+        });
+        overlay.setMap(map);
+        (overlay as any).__businessId = biz.id;
+        (overlay as any).__markerIdx = idx;
+        (overlay as any).__markerKey = markerKey;
+        overlaysRef.current.push(overlay);
+      } else {
+        const pos = new google.maps.LatLng(cluster.lat, cluster.lng);
+        const clusterOverlay = new ClusterOverlay(pos, cluster.markers.length, () => {
+          trackMapInteractionThrottled('cluster_tap', { zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
+          const bounds = new google.maps.LatLngBounds();
+          cluster.markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          const sameSpot = Math.abs(ne.lat() - sw.lat()) < 0.0001 && Math.abs(ne.lng() - sw.lng()) < 0.0001;
+          if (sameSpot) {
+            map.setCenter({ lat: cluster.lat, lng: cluster.lng });
+            map.setZoom(17);
+          } else {
+            map.fitBounds(bounds, 80);
+          }
+        });
+        clusterOverlay.setMap(map);
+        overlaysRef.current.push(clusterOverlay);
+      }
     });
   }, [mapMarkers, clearOverlays, isSingleBusinessMode, trackMapInteractionThrottled]);
+
+  // Keep ref current so the zoom_changed listener always calls the latest version
+  useEffect(() => { buildOverlaysRef.current = buildOverlays; }, [buildOverlays]);
 
   // ─── User location overlay ────────────────────────────────────
 
@@ -515,6 +679,8 @@ function MapPage() {
 
         mapRef.current.addListener('click', () => {
           setSelectedBusiness(null);
+          setSelectedMarkerIdx(null);
+          setSelectedMarkerKey(null);
           trackMapInteractionThrottled('map_click', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
         });
       }
@@ -524,7 +690,11 @@ function MapPage() {
           trackMapInteractionThrottled('pan', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 1500 });
         });
         mapRef.current.addListener('zoom_changed', () => {
-          trackMapInteractionThrottled('zoom', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 800 });
+          const zoomLevel = mapRef.current?.getZoom() || undefined;
+          trackMapInteractionThrottled('zoom', { zoomLevel, minIntervalMs: 800 });
+          if (googleRef.current && mapRef.current) {
+            buildOverlaysRef.current?.(googleRef.current, mapRef.current, selectedBusinessRef.current);
+          }
         });
         (mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached = true;
       }
@@ -548,6 +718,7 @@ function MapPage() {
           if (focusedBusiness) {
             setSelectedBusiness(focusedBusiness);
             setSelectedMarkerIdx(0);
+            setSelectedMarkerKey(getMarkerKey(mapMarkers[0]));
             mapRef.current.panTo({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
           }
         }
@@ -578,25 +749,29 @@ function MapPage() {
       if (typeof o.updateSelection === 'function') {
         // Always match both business ID and exact marker index so only the
         // clicked pin is highlighted, even when a business has multiple locations.
-        const isSelected =
-          selectedBusiness?.id === o.__businessId &&
-          selectedMarkerIdx === o.__markerIdx;
+        const isSelected = selectedMarkerKey
+          ? selectedMarkerKey === o.__markerKey
+          : selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx;
         o.updateSelection(isSelected);
       }
     });
-  }, [selectedBusiness, selectedMarkerIdx]);
+  }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey]);
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
-      let el;
-      if (isSingleBusinessMode && selectedMarkerIdx !== null) {
+      const rows = Array.from(listRef.current.querySelectorAll<HTMLElement>('[data-marker-key]'));
+      let el = selectedMarkerKey
+        ? rows.find((row) => row.dataset.markerKey === selectedMarkerKey)
+        : undefined;
+      if (!el && isSingleBusinessMode && selectedMarkerIdx !== null) {
         el = listRef.current.querySelector(`[data-marker-idx="${selectedMarkerIdx}"]`);
-      } else {
+      }
+      if (!el) {
         el = listRef.current.querySelector(`[data-biz-id="${selectedBusiness.id}"]`);
       }
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
+  }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey, isSingleBusinessMode]);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body h-[100dvh] flex flex-col overflow-hidden relative">
@@ -814,9 +989,10 @@ function MapPage() {
             )}
 
             {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
+              const markerKey = getMarkerKey({ business: biz, lat, lng, address });
               const isSelected = isSingleBusinessMode
                 ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
-                : selectedBusiness?.id === biz.id;
+                : selectedMarkerKey ? selectedMarkerKey === markerKey : selectedBusiness?.id === biz.id;
               const maxDiscount = getMaxDiscount(biz);
 
               return (
@@ -824,13 +1000,17 @@ function MapPage() {
                   key={`${biz.id}-${idx}`}
                   data-biz-id={biz.id}
                   data-marker-idx={idx}
+                  data-marker-key={markerKey}
                   onClick={() => {
                     trackMapInteractionThrottled('list_select', { businessId: biz.id, zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 300 });
                     trackSelectBusiness({ source: 'map_list', businessId: biz.id, category: biz.category, position: idx + 1 });
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
+                    setSelectedMarkerKey(markerKey);
                     mapRef.current?.panTo({ lat, lng });
-                    if ((mapRef.current?.getZoom() || 0) < 15) mapRef.current?.setZoom(15);
+                    // Cross the cluster threshold (zoom >= 17) so the selected
+                    // business renders as a singleton overlay we can highlight.
+                    if ((mapRef.current?.getZoom() || 0) < 17) mapRef.current?.setZoom(17);
                   }}
                   className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.98] relative"
                   style={isSelected ? {

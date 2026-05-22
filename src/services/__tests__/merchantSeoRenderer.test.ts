@@ -106,4 +106,55 @@ describe('merchant SEO renderer', () => {
     expect(html).toContain('bancos seleccionados');
     expect(html).toContain('promociones bancarias');
   });
+
+  it('renders multi-bank MODO benefits with compact provider text', () => {
+    const longBankName = 'Banco Nación, Galicia, NaranjaX';
+    const html = renderMerchantSeoHtml({
+      appShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      path: '/comercios/cuesta-blanca--merchant_1',
+      now: new Date('2026-05-11T12:00:00.000Z'),
+      merchant: {
+        merchantId: 'merchant_1',
+        merchantName: 'Cuesta Blanca',
+        categories: ['moda'],
+      },
+      benefits: [
+        {
+          id: 'modo-promos-raw-1',
+          bankName: longBankName,
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          installments: 6,
+          validUntil: '2099-12-31',
+          eligibilities: [
+            {
+              bank: 'nacion',
+              bankDisplayName: 'Banco Nación',
+            },
+            {
+              bank: 'galicia',
+              bankDisplayName: 'Galicia',
+            },
+            {
+              bank: 'naranjax',
+              bankDisplayName: 'NaranjaX',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(html).toContain('MODO - Tarjeta de credito · 3 bancos adheridos');
+    expect(html).not.toContain(`${longBankName} - Tarjeta de credito`);
+
+    const jsonLd = html.match(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)?.[1];
+    const structuredData = JSON.parse(jsonLd || '[]') as Array<Record<string, unknown>>;
+    const offer = structuredData.find((item) => item['@type'] === 'Offer') as
+      | { offeredBy?: { name?: string } }
+      | undefined;
+
+    expect(offer?.offeredBy?.name).toBe('MODO');
+  });
 });

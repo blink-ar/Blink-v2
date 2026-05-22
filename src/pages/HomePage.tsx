@@ -13,16 +13,22 @@ import { fetchBanks, fetchMongoStats } from '../services/api';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
+import { buildBenefitPath } from '../utils/benefitIdentity';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+
+type NavigatorWithStandalone = Navigator & {
+  standalone?: boolean;
+};
 
 function isIOSBrowser(): boolean {
   if (typeof window === 'undefined') return false;
   if (!/iphone|ipad|ipod/i.test(navigator.userAgent)) return false;
   const standalone =
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true;
+    (window.navigator as NavigatorWithStandalone).standalone === true;
   return !standalone;
 }
 
@@ -127,6 +133,7 @@ function HomePage() {
     category: string | undefined,
     benefitPosition: number,
     benefitIndex: number,
+    benefit: Business['benefits'][number],
     business: Business,
   ) => {
     trackViewBenefit({
@@ -136,7 +143,7 @@ function HomePage() {
       category,
       position: benefitPosition,
     });
-    navigate(`/benefit/${businessId}/${benefitIndex}`, { state: { business } });
+    navigate(buildBenefitPath(businessId, benefit, benefitIndex), { state: { business } });
   };
 
   // Top 5 individual benefits by discount, ensuring different merchants
@@ -402,6 +409,7 @@ function HomePage() {
                     item.business.category,
                     idx + 1,
                     item.benefitIndex,
+                    item.benefit,
                     item.business,
                   )}
                   className="group relative flex-shrink-0 w-[240px] snap-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.97]"
@@ -461,7 +469,7 @@ function HomePage() {
                       )}
                     </h3>
                     <p className="text-xs text-blink-muted truncate mb-2">
-                      {item.benefit.bankName} · {item.benefit.cardName}
+                      {getBenefitProviderDisplayName(item.benefit)} · {item.benefit.cardName}
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-medium text-blink-muted">

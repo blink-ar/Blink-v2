@@ -27,6 +27,7 @@ const BeneficiosTab = lazy(() => import("../components/tabs/BeneficiosTab"));
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
+import { getStableBenefitId } from "../utils/benefitIdentity";
 import { useNavigate, useLocation } from "react-router-dom";
 
 function Home() {
@@ -63,6 +64,7 @@ function Home() {
   const [selectedNetwork, setSelectedNetwork] = useState<string | undefined>(undefined);
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>(undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(undefined);
+  const [onlineOnly, setOnlineOnly] = useState(false);
 
   // State for proximity sort — must be declared before useBenefitsData
   const [sortByDistance, setSortByDistance] = useState(false);
@@ -125,9 +127,6 @@ function Home() {
     message: string;
     type: "success" | "warning" | "error" | "info";
   }>({ show: false, message: "", type: "info" });
-
-  // State for online filter
-  const [onlineOnly, setOnlineOnly] = useState(false);
 
   // State for filter dropdown
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -411,6 +410,21 @@ function Home() {
     setActiveTab("beneficios");
   };
 
+  const getRawBenefitId = (benefit: RawMongoBenefit): string | null => {
+    const id = (benefit as { id?: string }).id || benefit._id?.$oid;
+    return id ? String(id).trim() : null;
+  };
+
+  const getMatchedBusinessBenefitRouteRef = (business: Business, benefit: RawMongoBenefit): string => {
+    const rawBenefitId = getRawBenefitId(benefit);
+    if (!rawBenefitId) return "0";
+
+    const matchingBenefitIndex = business.benefits.findIndex(
+      (candidate) => getStableBenefitId(candidate) === rawBenefitId
+    );
+    return matchingBenefitIndex >= 0 ? encodeURIComponent(rawBenefitId) : "0";
+  };
+
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
     // Find the business that matches this benefit's merchant
     const matchingBusiness = paginatedBusinesses.find(
@@ -433,12 +447,13 @@ function Home() {
         matchingBusiness: matchingBusiness.name,
         businessId: matchingBusiness.id,
       });
+      const benefitRef = getMatchedBusinessBenefitRouteRef(matchingBusiness, benefit);
       console.log(
         "🔗 Navigating to business page with popup:",
-        `/benefit/${matchingBusiness.id}/0?from=${activeTab}`
+        `/benefit/${matchingBusiness.id}/${benefitRef}?from=${activeTab}`
       );
       const scrollY = window.scrollY;
-      navigate(`/benefit/${matchingBusiness.id}/0?from=${activeTab}`, {
+      navigate(`/benefit/${matchingBusiness.id}/${benefitRef}?from=${activeTab}`, {
         state: { scrollY }
       });
     } else {

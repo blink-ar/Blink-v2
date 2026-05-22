@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { toBankDescriptor } from '../utils/banks';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 
 interface BusinessResultCardProps {
   business: Business;
@@ -50,7 +51,7 @@ const getBusinessBankBadges = (business: Business) => {
   business.benefits.forEach((benefit) => {
     if (!benefit.bankName) return;
 
-    const descriptor = toBankDescriptor(benefit.bankName);
+    const descriptor = toBankDescriptor(getBenefitProviderDisplayName(benefit));
     if (!seen.has(descriptor.token)) {
       seen.add(descriptor.token);
       badges.push(descriptor.code);
