@@ -161,6 +161,57 @@ describe('dedupeModoBenefits', () => {
     expect(result[0].acceptsModo).toBe(true);
   });
 
+  it('does not merge benefits with differing cuando day strings when availableDays is missing', () => {
+    const bank = makeBenefit({
+      banks: ['bbva'],
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Jueves',
+    });
+    const modo = makeModo(['bbva'], {
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Viernes',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(2);
+    expect(result.find((b) => b.id === bank.id)?.acceptsModo).toBeUndefined();
+  });
+
+  it('falls back to cuando when availableDays is absent and merges matching days', () => {
+    const bank = makeBenefit({
+      banks: ['bbva'],
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Jueves',
+    });
+    const modo = makeModo(['bbva'], {
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Jueves',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+  });
+
+  it('treats cuando with multiple days as a set (order independent)', () => {
+    const bank = makeBenefit({
+      banks: ['bbva'],
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Viernes, Jueves',
+    });
+    const modo = makeModo(['bbva'], {
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'Jueves, Viernes',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+  });
+
   it('normalizes accents and case on bank and day names', () => {
     const bank = makeBenefit({
       banks: ['Galicia'],

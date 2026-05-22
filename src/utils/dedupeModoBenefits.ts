@@ -10,10 +10,37 @@ const normalizeText = (value: unknown): string =>
     ? value.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase().trim()
     : '';
 
+const SPANISH_DAY_KEYS: Array<[string, string]> = [
+  ['lunes', 'L'],
+  ['martes', 'M'],
+  ['miercoles', 'X'],
+  ['jueves', 'J'],
+  ['viernes', 'V'],
+  ['sabado', 'S'],
+  ['domingo', 'D'],
+];
+
+const extractDayAbbrs = (text: string): string[] => {
+  const normalized = normalizeText(text);
+  if (!normalized) return [];
+  return SPANISH_DAY_KEYS
+    .filter(([day]) => normalized.includes(day))
+    .map(([, abbr]) => abbr);
+};
+
 const getAvailableDaysKey = (benefit: BankBenefit): string => {
   const raw = (benefit as BankBenefit & { availableDays?: unknown }).availableDays;
-  if (!Array.isArray(raw)) return '';
-  return [...new Set(raw.map(normalizeText).filter(Boolean))].sort().join('|');
+  const abbrs: string[] = [];
+  if (Array.isArray(raw)) {
+    raw.forEach((d) => {
+      if (typeof d === 'string') abbrs.push(...extractDayAbbrs(d));
+    });
+  }
+  if (abbrs.length === 0) {
+    const cuando = (benefit as BankBenefit & { cuando?: unknown }).cuando;
+    if (typeof cuando === 'string') abbrs.push(...extractDayAbbrs(cuando));
+  }
+  return [...new Set(abbrs)].sort().join('|');
 };
 
 const getInstallments = (benefit: BankBenefit): number => {
