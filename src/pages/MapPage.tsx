@@ -542,13 +542,18 @@ function MapPage() {
     // order does not preserve original order and the list uses mapMarkers indices.
     const markerIdxByRef = new Map<MapMarker, number>();
     mapMarkers.forEach((m, i) => markerIdxByRef.set(m, i));
+    const currentSelectedIdx = selectedMarkerIdxRef.current;
 
     clusters.forEach((cluster) => {
       if (cluster.markers.length === 1) {
         const marker = cluster.markers[0];
         const { business: biz, lat, lng } = marker;
         const idx = markerIdxByRef.get(marker) ?? 0;
-        const isSelected = selected?.id === biz.id;
+        // Match by marker index too so multi-branch businesses don't light up
+        // every overlay when zoom rebuilds before the reconciliation effect fires.
+        const isSelected =
+          selected?.id === biz.id &&
+          (currentSelectedIdx === null || idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
         const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
@@ -983,7 +988,9 @@ function MapPage() {
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
                     mapRef.current?.panTo({ lat, lng });
-                    if ((mapRef.current?.getZoom() || 0) < 15) mapRef.current?.setZoom(15);
+                    // Cross the cluster threshold (zoom >= 17) so the selected
+                    // business renders as a singleton overlay we can highlight.
+                    if ((mapRef.current?.getZoom() || 0) < 17) mapRef.current?.setZoom(17);
                   }}
                   className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.98] relative"
                   style={isSelected ? {

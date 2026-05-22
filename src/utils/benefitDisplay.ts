@@ -38,7 +38,7 @@ const splitBankNameList = (bankName: string): string[] =>
     .map((name) => name.trim())
     .filter(Boolean);
 
-const isModoSourcedBenefit = (benefit: BankBenefit): boolean => {
+export const isModoSourcedBenefit = (benefit: BankBenefit): boolean => {
   const benefitRecord = benefit as BankBenefit & Record<string, unknown>;
   const sourceText = [
     benefit.id,
