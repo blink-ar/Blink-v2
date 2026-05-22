@@ -11,7 +11,7 @@ import {
   transformRawBenefitToBenefit,
   BankSubscription
 } from '../types/mongodb';
-import { filterActiveBenefits } from '../utils/benefits';
+import { isBenefitActive } from '../utils/benefits';
 import { dedupeModoBenefits } from '../utils/dedupeModoBenefits';
 
 declare global {
@@ -162,10 +162,17 @@ export function normalizeBusinesses(
           subscriptionIds: Array.isArray(b.subscriptionIds) ? b.subscriptionIds : getBenefitSubscriptionIds(b)
         }))
       : [];
-    const dedupedBenefits = dedupeModoBenefits(benefits);
+    const now = new Date();
+    const activeBenefits: any[] = [];
+    const expiredBenefits: any[] = [];
+    benefits.forEach((b: any) => {
+      if (isBenefitActive(b, now)) activeBenefits.push(b);
+      else expiredBenefits.push(b);
+    });
+    const dedupedActive = dedupeModoBenefits(activeBenefits);
     const visibleBenefits = options.includeExpired
-      ? dedupedBenefits
-      : filterActiveBenefits(dedupedBenefits);
+      ? [...dedupedActive, ...dedupeModoBenefits(expiredBenefits)]
+      : dedupedActive;
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
