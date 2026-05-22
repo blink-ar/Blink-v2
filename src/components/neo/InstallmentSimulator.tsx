@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 
-interface SavingsSimulatorProps {
-  discountPercentage: number;
-  maxCap?: string | null;
-  installments?: number | null;
+interface InstallmentSimulatorProps {
+  installments: number;
 }
 
-const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage, maxCap, installments }) => {
-  const [amount, setAmount] = useState(12000);
+const InstallmentSimulator: React.FC<InstallmentSimulatorProps> = ({ installments }) => {
+  const [amount, setAmount] = useState(60000);
   const [customInput, setCustomInput] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -18,24 +16,13 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
     }
   }, [isEditing]);
 
-  const presets = [5000, 10000, 15000, 25000];
+  const presets = [30000, 60000, 100000, 150000];
 
-  const { savings, total, cappedSavings } = useMemo(() => {
-    const raw = Math.round((amount * discountPercentage) / 100);
-    let cap = Infinity;
-    if (maxCap) {
-      const numStr = String(maxCap).replace(/[^0-9]/g, '');
-      if (numStr) cap = parseInt(numStr, 10);
-    }
-    const capped = Math.min(raw, cap);
-    return { savings: raw, total: amount - capped, cappedSavings: capped };
-  }, [amount, discountPercentage, maxCap]);
-
-  const hasInstallments = installments != null && installments > 0;
-  const perInstallment = useMemo(() => {
-    if (!hasInstallments) return total;
-    return Math.round(total / installments);
-  }, [total, installments, hasInstallments]);
+  const { perInstallment, remainder } = useMemo(() => {
+    if (installments <= 0) return { perInstallment: amount, remainder: 0 };
+    const base = Math.floor(amount / installments);
+    return { perInstallment: base, remainder: amount - base * installments };
+  }, [amount, installments]);
 
   const formatCurrency = (n: number) =>
     `$${n.toLocaleString('es-AR')}`;
@@ -51,12 +38,12 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
     >
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold text-sm text-blink-ink">Simulación de ahorro</h3>
+        <h3 className="font-semibold text-sm text-blink-ink">Simulación de cuotas</h3>
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center"
           style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}
         >
-          <span className="material-symbols-outlined text-primary text-base">calculate</span>
+          <span className="material-symbols-outlined text-primary text-base">calendar_month</span>
         </div>
       </div>
 
@@ -127,19 +114,19 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
       {/* Results */}
       <div className="space-y-2.5 text-sm">
         <div className="flex justify-between items-center">
-          <span className="text-blink-muted">Consumo estimado</span>
-          <span className="font-medium text-blink-muted line-through">
-            {formatCurrency(amount)}
-          </span>
+          <span className="text-blink-muted">Monto total</span>
+          <span className="font-medium text-blink-ink">{formatCurrency(amount)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-blink-positive font-medium">Descuento ({discountPercentage}%)</span>
-          <span className="font-semibold text-blink-positive">−{formatCurrency(cappedSavings)}</span>
+          <span className="text-blink-positive font-medium">{installments} cuotas sin interés</span>
+          <span className="font-semibold text-blink-positive">$0 de interés</span>
         </div>
-        {maxCap && savings > cappedSavings && (
+        {remainder > 0 && (
           <div className="flex justify-between items-center">
-            <span className="text-xs text-blink-muted">Tope aplicado</span>
-            <span className="text-xs text-blink-muted">{maxCap}</span>
+            <span className="text-xs text-blink-muted">Última cuota</span>
+            <span className="text-xs text-blink-muted">
+              {formatCurrency(perInstallment + remainder)}
+            </span>
           </div>
         )}
 
@@ -149,32 +136,14 @@ const SavingsSimulator: React.FC<SavingsSimulatorProps> = ({ discountPercentage,
           className="flex justify-between items-center p-3 rounded-xl"
           style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' }}
         >
-          <span className="font-semibold text-blink-ink">Total a pagar</span>
+          <span className="font-semibold text-blink-ink">{installments} cuotas de</span>
           <span className="font-bold text-lg text-primary">
-            {formatCurrency(total)}
+            {formatCurrency(perInstallment)}
           </span>
         </div>
-
-        {hasInstallments && (
-          <>
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-blink-positive font-medium">
-                {installments} cuotas sin interés
-              </span>
-              <span className="font-bold text-primary">
-                {installments} × {formatCurrency(perInstallment)}
-              </span>
-            </div>
-            <p className="text-xs text-blink-muted leading-snug">
-              Algunos descuentos se acreditan como reintegro en el primer resumen de la tarjeta, por
-              lo que las cuotas pueden ser mayores. Consultá los términos y condiciones para más
-              detalles.
-            </p>
-          </>
-        )}
       </div>
     </div>
   );
 };
 
-export default SavingsSimulator;
+export default InstallmentSimulator;
