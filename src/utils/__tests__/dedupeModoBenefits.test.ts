@@ -161,6 +161,40 @@ describe('dedupeModoBenefits', () => {
     expect(result[0].acceptsModo).toBe(true);
   });
 
+  it('does not merge "lunes a viernes" (range) with "lunes y viernes" (two days)', () => {
+    const bank = makeBenefit({
+      banks: ['bbva'],
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'lunes a viernes',
+    });
+    const modo = makeModo(['bbva'], {
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'lunes y viernes',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(2);
+    expect(result.find((b) => b.id === bank.id)?.acceptsModo).toBeUndefined();
+  });
+
+  it('expands "lunes a viernes" the same way on both sides so weekday ranges merge', () => {
+    const bank = makeBenefit({
+      banks: ['bbva'],
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'lunes a viernes',
+    });
+    const modo = makeModo(['bbva'], {
+      discountPercentage: 20,
+      installments: 3,
+      cuando: 'lunes a viernes',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+  });
+
   it('does not merge benefits with differing cuando day strings when availableDays is missing', () => {
     const bank = makeBenefit({
       banks: ['bbva'],

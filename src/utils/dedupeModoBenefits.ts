@@ -1,4 +1,5 @@
 import { BankBenefit } from '../types';
+import { parseDayAvailability, DayAvailability, hasAnyDayAvailable } from './dayAvailabilityParser';
 
 const isModoBenefit = (benefit: BankBenefit): boolean =>
   /^modo-promos-raw-/i.test(benefit.id || '');
@@ -10,37 +11,48 @@ const normalizeText = (value: unknown): string =>
     ? value.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase().trim()
     : '';
 
-const SPANISH_DAY_KEYS: Array<[string, string]> = [
-  ['lunes', 'L'],
-  ['martes', 'M'],
-  ['miercoles', 'X'],
-  ['jueves', 'J'],
-  ['viernes', 'V'],
-  ['sabado', 'S'],
-  ['domingo', 'D'],
-];
+const DAY_NAME_TO_ABBR: Record<string, string> = {
+  lunes: 'L', monday: 'L',
+  martes: 'M', tuesday: 'M',
+  miercoles: 'X', wednesday: 'X',
+  jueves: 'J', thursday: 'J',
+  viernes: 'V', friday: 'V',
+  sabado: 'S', saturday: 'S',
+  domingo: 'D', sunday: 'D',
+};
 
-const extractDayAbbrs = (text: string): string[] => {
-  const normalized = normalizeText(text);
-  if (!normalized) return [];
-  return SPANISH_DAY_KEYS
-    .filter(([day]) => normalized.includes(day))
-    .map(([, abbr]) => abbr);
+const ALL_DAYS_KEY = 'D|J|L|M|S|V|X';
+
+const dayKeyFromAvailability = (a: DayAvailability): string => {
+  if (a.allDays) return ALL_DAYS_KEY;
+  const abbrs: string[] = [];
+  if (a.monday) abbrs.push('L');
+  if (a.tuesday) abbrs.push('M');
+  if (a.wednesday) abbrs.push('X');
+  if (a.thursday) abbrs.push('J');
+  if (a.friday) abbrs.push('V');
+  if (a.saturday) abbrs.push('S');
+  if (a.sunday) abbrs.push('D');
+  return abbrs.sort().join('|');
 };
 
 const getAvailableDaysKey = (benefit: BankBenefit): string => {
   const raw = (benefit as BankBenefit & { availableDays?: unknown }).availableDays;
-  const abbrs: string[] = [];
-  if (Array.isArray(raw)) {
+  if (Array.isArray(raw) && raw.length > 0) {
+    const abbrs = new Set<string>();
     raw.forEach((d) => {
-      if (typeof d === 'string') abbrs.push(...extractDayAbbrs(d));
+      if (typeof d !== 'string') return;
+      const abbr = DAY_NAME_TO_ABBR[normalizeText(d)];
+      if (abbr) abbrs.add(abbr);
     });
+    if (abbrs.size > 0) return [...abbrs].sort().join('|');
   }
-  if (abbrs.length === 0) {
-    const cuando = (benefit as BankBenefit & { cuando?: unknown }).cuando;
-    if (typeof cuando === 'string') abbrs.push(...extractDayAbbrs(cuando));
-  }
-  return [...new Set(abbrs)].sort().join('|');
+
+  const cuando = (benefit as BankBenefit & { cuando?: unknown }).cuando;
+  const parsed = parseDayAvailability(typeof cuando === 'string' ? cuando : undefined);
+  if (!parsed) return ALL_DAYS_KEY;
+  if (hasAnyDayAvailable(parsed)) return dayKeyFromAvailability(parsed);
+  return parsed.customText ? `text:${normalizeText(parsed.customText)}` : ALL_DAYS_KEY;
 };
 
 const getInstallments = (benefit: BankBenefit): number => {
