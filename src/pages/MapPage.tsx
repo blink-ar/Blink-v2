@@ -142,6 +142,7 @@ function MapPage() {
   const userOverlayRef = useRef<any>(null);
   const googleRef = useRef<any>(null);
   const selectedBusinessRef = useRef<Business | null>(null);
+  const selectedMarkerIdxRef = useRef<number | null>(null);
   const buildOverlaysRef = useRef<((google: any, map: any, selected: Business | null) => void) | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
@@ -158,6 +159,7 @@ function MapPage() {
 
   // Keep refs in sync so zoom_changed listener always has fresh state
   useEffect(() => { selectedBusinessRef.current = selectedBusiness; }, [selectedBusiness]);
+  useEffect(() => { selectedMarkerIdxRef.current = selectedMarkerIdx; }, [selectedMarkerIdx]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -513,8 +515,11 @@ function MapPage() {
 
     // ── Single-business mode: no clustering ──────────────────────
     if (isSingleBusinessMode) {
+      const currentSelectedIdx = selectedMarkerIdxRef.current;
       mapMarkers.forEach(({ business: biz, lat, lng }, idx) => {
-        const isSelected = selected?.id === biz.id && idx === 0;
+        const isSelected =
+          selected?.id === biz.id &&
+          (currentSelectedIdx === null ? idx === 0 : idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
         const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
@@ -533,12 +538,16 @@ function MapPage() {
 
     // ── Clustered browse mode ────────────────────────────────────
     const clusters = clusterMapMarkers(mapMarkers, zoom);
-    let globalIdx = 0;
+    // Map each marker back to its index in mapMarkers, since cluster iteration
+    // order does not preserve original order and the list uses mapMarkers indices.
+    const markerIdxByRef = new Map<MapMarker, number>();
+    mapMarkers.forEach((m, i) => markerIdxByRef.set(m, i));
 
     clusters.forEach((cluster) => {
       if (cluster.markers.length === 1) {
-        const { business: biz, lat, lng } = cluster.markers[0];
-        const idx = globalIdx++;
+        const marker = cluster.markers[0];
+        const { business: biz, lat, lng } = marker;
+        const idx = markerIdxByRef.get(marker) ?? 0;
         const isSelected = selected?.id === biz.id;
         const pos = new google.maps.LatLng(lat, lng);
         const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
@@ -553,7 +562,6 @@ function MapPage() {
         (overlay as any).__markerIdx = idx;
         overlaysRef.current.push(overlay);
       } else {
-        globalIdx += cluster.markers.length;
         const pos = new google.maps.LatLng(cluster.lat, cluster.lng);
         const clusterOverlay = new ClusterOverlay(pos, cluster.markers.length, () => {
           trackMapInteractionThrottled('cluster_tap', { zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
