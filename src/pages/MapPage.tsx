@@ -57,6 +57,7 @@ interface MarkerCluster {
   lng: number;
 }
 
+const getMarkerKey = (marker: MapMarker) => `${marker.business.id}:${marker.lat.toFixed(6)}:${marker.lng.toFixed(6)}`;
 
 function clusterMapMarkers(markers: MapMarker[], zoom: number): MarkerCluster[] {
   // At street level, always show individual markers so co-located businesses are never stuck
@@ -143,10 +144,12 @@ function MapPage() {
   const googleRef = useRef<any>(null);
   const selectedBusinessRef = useRef<Business | null>(null);
   const selectedMarkerIdxRef = useRef<number | null>(null);
+  const selectedMarkerKeyRef = useRef<string | null>(null);
   const buildOverlaysRef = useRef<((google: any, map: any, selected: Business | null) => void) | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
+  const [selectedMarkerKey, setSelectedMarkerKey] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
@@ -160,6 +163,7 @@ function MapPage() {
   // Keep refs in sync so zoom_changed listener always has fresh state
   useEffect(() => { selectedBusinessRef.current = selectedBusiness; }, [selectedBusiness]);
   useEffect(() => { selectedMarkerIdxRef.current = selectedMarkerIdx; }, [selectedMarkerIdx]);
+  useEffect(() => { selectedMarkerKeyRef.current = selectedMarkerKey; }, [selectedMarkerKey]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -526,11 +530,13 @@ function MapPage() {
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
           setSelectedMarkerIdx(idx);
+          setSelectedMarkerKey(getMarkerKey({ business: biz, lat, lng, address: '' }));
           map.panTo(pos);
         });
         overlay.setMap(map);
         (overlay as any).__businessId = biz.id;
         (overlay as any).__markerIdx = idx;
+        (overlay as any).__markerKey = getMarkerKey({ business: biz, lat, lng, address: '' });
         overlaysRef.current.push(overlay);
       });
       return;
@@ -543,6 +549,7 @@ function MapPage() {
     const markerIdxByRef = new Map<MapMarker, number>();
     mapMarkers.forEach((m, i) => markerIdxByRef.set(m, i));
     const currentSelectedIdx = selectedMarkerIdxRef.current;
+    const currentSelectedKey = selectedMarkerKeyRef.current;
 
     clusters.forEach((cluster) => {
       if (cluster.markers.length === 1) {
@@ -551,20 +558,23 @@ function MapPage() {
         const idx = markerIdxByRef.get(marker) ?? 0;
         // Match by marker index too so multi-branch businesses don't light up
         // every overlay when zoom rebuilds before the reconciliation effect fires.
-        const isSelected =
-          selected?.id === biz.id &&
-          (currentSelectedIdx === null || idx === currentSelectedIdx);
+        const markerKey = getMarkerKey(marker);
+        const isSelected = currentSelectedKey
+          ? markerKey === currentSelectedKey
+          : selected?.id === biz.id && (currentSelectedIdx === null || idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
         const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
           setSelectedMarkerIdx(idx);
+          setSelectedMarkerKey(markerKey);
           map.panTo(pos);
         });
         overlay.setMap(map);
         (overlay as any).__businessId = biz.id;
         (overlay as any).__markerIdx = idx;
+        (overlay as any).__markerKey = markerKey;
         overlaysRef.current.push(overlay);
       } else {
         const pos = new google.maps.LatLng(cluster.lat, cluster.lng);
@@ -706,6 +716,7 @@ function MapPage() {
           if (focusedBusiness) {
             setSelectedBusiness(focusedBusiness);
             setSelectedMarkerIdx(0);
+            setSelectedMarkerKey(getMarkerKey(mapMarkers[0]));
             mapRef.current.panTo({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
           }
         }
@@ -736,13 +747,13 @@ function MapPage() {
       if (typeof o.updateSelection === 'function') {
         // Always match both business ID and exact marker index so only the
         // clicked pin is highlighted, even when a business has multiple locations.
-        const isSelected =
-          selectedBusiness?.id === o.__businessId &&
-          selectedMarkerIdx === o.__markerIdx;
+        const isSelected = selectedMarkerKey
+          ? selectedMarkerKey === o.__markerKey
+          : selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx;
         o.updateSelection(isSelected);
       }
     });
-  }, [selectedBusiness, selectedMarkerIdx]);
+  }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey]);
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
@@ -974,7 +985,7 @@ function MapPage() {
             {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
               const isSelected = isSingleBusinessMode
                 ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
-                : selectedBusiness?.id === biz.id;
+                : selectedMarkerKey ? selectedMarkerKey === getMarkerKey({ business: biz, lat, lng, address }) : selectedBusiness?.id === biz.id;
               const maxDiscount = getMaxDiscount(biz);
 
               return (
@@ -987,6 +998,7 @@ function MapPage() {
                     trackSelectBusiness({ source: 'map_list', businessId: biz.id, category: biz.category, position: idx + 1 });
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
+                    setSelectedMarkerKey(getMarkerKey({ business: biz, lat, lng, address }));
                     mapRef.current?.panTo({ lat, lng });
                     // Cross the cluster threshold (zoom >= 17) so the selected
                     // business renders as a singleton overlay we can highlight.
