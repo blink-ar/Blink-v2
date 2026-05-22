@@ -679,6 +679,8 @@ function MapPage() {
 
         mapRef.current.addListener('click', () => {
           setSelectedBusiness(null);
+          setSelectedMarkerIdx(null);
+          setSelectedMarkerKey(null);
           trackMapInteractionThrottled('map_click', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
         });
       }
@@ -757,15 +759,19 @@ function MapPage() {
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
-      let el;
-      if (isSingleBusinessMode && selectedMarkerIdx !== null) {
+      const rows = Array.from(listRef.current.querySelectorAll<HTMLElement>('[data-marker-key]'));
+      let el = selectedMarkerKey
+        ? rows.find((row) => row.dataset.markerKey === selectedMarkerKey)
+        : undefined;
+      if (!el && isSingleBusinessMode && selectedMarkerIdx !== null) {
         el = listRef.current.querySelector(`[data-marker-idx="${selectedMarkerIdx}"]`);
-      } else {
+      }
+      if (!el) {
         el = listRef.current.querySelector(`[data-biz-id="${selectedBusiness.id}"]`);
       }
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [selectedBusiness, selectedMarkerIdx, isSingleBusinessMode]);
+  }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey, isSingleBusinessMode]);
 
   return (
     <div className="bg-blink-bg text-blink-ink font-body h-[100dvh] flex flex-col overflow-hidden relative">
@@ -983,9 +989,10 @@ function MapPage() {
             )}
 
             {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
+              const markerKey = getMarkerKey({ business: biz, lat, lng, address });
               const isSelected = isSingleBusinessMode
                 ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
-                : selectedMarkerKey ? selectedMarkerKey === getMarkerKey({ business: biz, lat, lng, address }) : selectedBusiness?.id === biz.id;
+                : selectedMarkerKey ? selectedMarkerKey === markerKey : selectedBusiness?.id === biz.id;
               const maxDiscount = getMaxDiscount(biz);
 
               return (
@@ -993,12 +1000,13 @@ function MapPage() {
                   key={`${biz.id}-${idx}`}
                   data-biz-id={biz.id}
                   data-marker-idx={idx}
+                  data-marker-key={markerKey}
                   onClick={() => {
                     trackMapInteractionThrottled('list_select', { businessId: biz.id, zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 300 });
                     trackSelectBusiness({ source: 'map_list', businessId: biz.id, category: biz.category, position: idx + 1 });
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
-                    setSelectedMarkerKey(getMarkerKey({ business: biz, lat, lng, address }));
+                    setSelectedMarkerKey(markerKey);
                     mapRef.current?.panTo({ lat, lng });
                     // Cross the cluster threshold (zoom >= 17) so the selected
                     // business renders as a singleton overlay we can highlight.
