@@ -3,6 +3,7 @@ import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { toBankDescriptor } from '../utils/banks';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
+import BankLogo from './BankLogos/BankLogo';
 
 interface BusinessResultCardProps {
   business: Business;
@@ -54,7 +55,7 @@ const getBusinessBankBadges = (business: Business) => {
     const descriptor = toBankDescriptor(getBenefitProviderDisplayName(benefit));
     if (!seen.has(descriptor.token)) {
       seen.add(descriptor.token);
-      badges.push(descriptor.code);
+      badges.push(descriptor.token);
     }
   });
 
@@ -117,15 +118,9 @@ function BusinessResultCard({
           )}
         </h2>
 
-        <div className="flex items-center gap-1.5 overflow-hidden">
-          {visibleBadges.map((badge) => (
-            <span
-              key={`${business.id}-${badge}`}
-              className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
-              style={{ background: '#1E293B', color: '#E2E8F0' }}
-            >
-              {badge}
-            </span>
+        <div className="flex items-center gap-1 overflow-hidden">
+          {visibleBadges.map((token) => (
+            <BankLogo key={`${business.id}-${token}`} bankName={token} size={22} />
           ))}
           {remaining > 0 && (
             <span
