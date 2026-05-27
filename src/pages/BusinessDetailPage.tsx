@@ -718,9 +718,7 @@ function BusinessDetailPage() {
                               <div className="min-w-0">
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                                    <p className="font-semibold text-[12px] leading-tight text-blink-ink">
-                                      {providerName}
-                                    </p>
+                                    <BankLogo bankName={providerName} size={20} />
                                     {providerSummary && (
                                       <span
                                         className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
