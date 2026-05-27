@@ -4,4 +4,121 @@ export interface BankLogoEntry {
   name: string;
 }
 
-export const bankLogosManifest: Record<string, BankLogoEntry> = {};
+export const bankLogosManifest: Record<string, BankLogoEntry> = {
+  "bancor": {
+    "file": "bancor.png",
+    "name": "BANCOR"
+  },
+  "bbva": {
+    "file": "bbva.png",
+    "name": "BBVA"
+  },
+  "bica": {
+    "file": "bica.png",
+    "name": "Banco Bica"
+  },
+  "bpn": {
+    "file": "bpn.png",
+    "name": "BPN"
+  },
+  "brubank": {
+    "file": "brubank.png",
+    "name": "Brubank"
+  },
+  "bse": {
+    "file": "bse.png",
+    "name": "Banco Santiago"
+  },
+  "buepp": {
+    "file": "buepp.png",
+    "name": "Buepp"
+  },
+  "ciudad": {
+    "file": "ciudad.png",
+    "name": "Ciudad"
+  },
+  "columbia": {
+    "file": "columbia.png",
+    "name": "Banco Columbia"
+  },
+  "comafi": {
+    "file": "comafi.png",
+    "name": "Comafi"
+  },
+  "corrientes": {
+    "file": "corrientes.png",
+    "name": "Banco Corrientes"
+  },
+  "credicoop": {
+    "file": "credicoop.png",
+    "name": "Credicoop"
+  },
+  "delsol": {
+    "file": "delsol.png",
+    "name": "Banco del Sol"
+  },
+  "entrerios": {
+    "file": "entrerios.png",
+    "name": "Banco Entre Rios"
+  },
+  "galicia": {
+    "file": "galicia.png",
+    "name": "Galicia"
+  },
+  "hipotecario": {
+    "file": "hipotecario.png",
+    "name": "Hipotecario"
+  },
+  "icbc": {
+    "file": "icbc.png",
+    "name": "ICBC"
+  },
+  "macro": {
+    "file": "macro.png",
+    "name": "Macro"
+  },
+  "municipal": {
+    "file": "municipal.png",
+    "name": "Banco Municipal"
+  },
+  "nacion": {
+    "file": "nacion.png",
+    "name": "Banco Nación"
+  },
+  "naranjax": {
+    "file": "naranjax.png",
+    "name": "NaranjaX"
+  },
+  "patagonia": {
+    "file": "patagonia.png",
+    "name": "Patagonia"
+  },
+  "piano": {
+    "file": "piano.png",
+    "name": "Banco Piano"
+  },
+  "sanjuan": {
+    "file": "sanjuan.png",
+    "name": "Banco San Juan"
+  },
+  "santacruz": {
+    "file": "santacruz.png",
+    "name": "Banco Santa Cruz"
+  },
+  "santafe": {
+    "file": "santafe.png",
+    "name": "Banco Santa Fe"
+  },
+  "santander": {
+    "file": "santander.png",
+    "name": "Santander"
+  },
+  "supervielle": {
+    "file": "supervielle.png",
+    "name": "Supervielle"
+  },
+  "yoy": {
+    "file": "yoy.png",
+    "name": "YOY"
+  }
+};
