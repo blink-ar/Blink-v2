@@ -12,6 +12,7 @@ import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
 import { buildBenefitPath } from '../utils/benefitIdentity';
 import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../utils/benefitDisplay';
+import BankLogo from '../components/BankLogos/BankLogo';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -544,12 +545,7 @@ function BusinessDetailPage() {
                 >
                   {/* Bank section header */}
                   <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: accent.bg }}>
-                    <div
-                      className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
-                      style={{ background: accent.text }}
-                    >
-                      {bankShortName(bankName).substring(0, 2)}
-                    </div>
+                    <BankLogo bankName={bankName} size={28} />
                     <span className="font-bold text-[13px] tracking-wide uppercase" style={{ color: accent.text }}>
                       {bankName}
                     </span>
@@ -594,12 +590,7 @@ function BusinessDetailPage() {
                             )}
 
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                                style={{ background: accent.bg, color: accent.text }}
-                              >
-                                {bankShortName(bankName)}
-                              </span>
+                              <BankLogo bankName={bankName} size={18} />
 
                               {providerSummary && (
                                 <span
@@ -789,12 +780,7 @@ function BusinessDetailPage() {
                   style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0"
-                      style={{ background: accent.bg, color: accent.text }}
-                    >
-                      {bankShortName(providerName)}
-                    </span>
+                    <BankLogo bankName={providerName} size={24} />
                     <div className="min-w-0">
                       <p className="font-semibold text-sm text-blink-ink leading-tight truncate">
                         {benefit.benefit || benefit.cardName}
@@ -861,11 +847,7 @@ function BusinessDetailPage() {
                   style={{ border: '1px solid #E8E6E1', filter: 'grayscale(0.6)', opacity: 0.7 }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0 bg-gray-200 text-gray-500"
-                    >
-                      {bankShortName(providerName)}
-                    </span>
+                    <BankLogo bankName={providerName} size={24} />
                     <div className="min-w-0">
                       <p className="font-semibold text-sm text-gray-500 leading-tight truncate">
                         {benefit.benefit || benefit.cardName}
