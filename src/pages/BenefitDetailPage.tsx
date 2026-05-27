@@ -505,7 +505,7 @@ function BenefitDetailPage() {
               {/* Bank badge */}
               <div
                 className="absolute -bottom-2 -right-2 rounded-full"
-                style={{ border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
+                style={{ display: 'flex', border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
               >
                 <BankLogo bankName={providerName} size={26} />
               </div>
