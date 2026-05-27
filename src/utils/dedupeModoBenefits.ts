@@ -22,6 +22,8 @@ const DAY_NAME_TO_ABBR: Record<string, string> = {
 };
 
 const ALL_DAYS_KEY = 'D|J|L|M|S|V|X';
+const UNKNOWN_DAYS_KEY = '__UNKNOWN_DAYS__';
+const UNKNOWN_INSTALLMENTS = '__UNKNOWN_INSTALLMENTS__';
 
 const dayKeyFromAvailability = (a: DayAvailability): string => {
   if (a.allDays) return ALL_DAYS_KEY;
@@ -49,15 +51,16 @@ const getAvailableDaysKey = (benefit: BankBenefit): string => {
   }
 
   const cuando = (benefit as BankBenefit & { cuando?: unknown }).cuando;
-  const parsed = parseDayAvailability(typeof cuando === 'string' ? cuando : undefined);
-  if (!parsed) return ALL_DAYS_KEY;
+  if (typeof cuando !== 'string' || cuando.trim() === '') return UNKNOWN_DAYS_KEY;
+  const parsed = parseDayAvailability(cuando);
+  if (!parsed) return UNKNOWN_DAYS_KEY;
   if (hasAnyDayAvailable(parsed)) return dayKeyFromAvailability(parsed);
-  return parsed.customText ? `text:${normalizeText(parsed.customText)}` : ALL_DAYS_KEY;
+  return parsed.customText ? `text:${normalizeText(parsed.customText)}` : UNKNOWN_DAYS_KEY;
 };
 
-const getInstallments = (benefit: BankBenefit): number => {
+const getInstallments = (benefit: BankBenefit): number | typeof UNKNOWN_INSTALLMENTS => {
   const value = benefit.installments;
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? value : UNKNOWN_INSTALLMENTS;
 };
 
 const getDiscountPercentage = (benefit: BankBenefit): number => {
@@ -76,7 +79,7 @@ const getEligibilityBankKeys = (benefit: BankBenefit): string[] => {
 
 interface MatchKey {
   days: string;
-  installments: number;
+  installments: number | typeof UNKNOWN_INSTALLMENTS;
   discount: number;
 }
 
@@ -86,8 +89,11 @@ const benefitMatchKey = (benefit: BankBenefit): MatchKey => ({
   discount: getDiscountPercentage(benefit),
 });
 
-const keysEqual = (a: MatchKey, b: MatchKey): boolean =>
-  a.days === b.days && a.installments === b.installments && a.discount === b.discount;
+const keysEqual = (a: MatchKey, b: MatchKey): boolean => {
+  if (a.days === UNKNOWN_DAYS_KEY || b.days === UNKNOWN_DAYS_KEY) return false;
+  if (a.installments === UNKNOWN_INSTALLMENTS || b.installments === UNKNOWN_INSTALLMENTS) return false;
+  return a.days === b.days && a.installments === b.installments && a.discount === b.discount;
+};
 
 export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
   if (!Array.isArray(benefits) || benefits.length === 0) return benefits;
