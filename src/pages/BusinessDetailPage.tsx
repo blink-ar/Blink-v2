@@ -63,9 +63,6 @@ const formatDistanceText = (business: Business): string => {
   return `${km.toFixed(1)} km`;
 };
 
-const bankShortName = (name: string) =>
-  name.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || name.substring(0, 8).toUpperCase();
-
 const TODAY_ABBR = (() => {
   const names = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   return DAY_ABBR[names[new Date().getDay()]] || '';
