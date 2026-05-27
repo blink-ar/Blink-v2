@@ -90,8 +90,8 @@ const benefitMatchKey = (benefit: BankBenefit): MatchKey => ({
 });
 
 const keysEqual = (a: MatchKey, b: MatchKey): boolean => {
-  if (a.days === UNKNOWN_DAYS_KEY || b.days === UNKNOWN_DAYS_KEY) return false;
-  if (a.installments === UNKNOWN_INSTALLMENTS || b.installments === UNKNOWN_INSTALLMENTS) return false;
+  if ((a.days === UNKNOWN_DAYS_KEY) !== (b.days === UNKNOWN_DAYS_KEY)) return false;
+  if ((a.installments === UNKNOWN_INSTALLMENTS) !== (b.installments === UNKNOWN_INSTALLMENTS)) return false;
   return a.days === b.days && a.installments === b.installments && a.discount === b.discount;
 };
 
