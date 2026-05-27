@@ -52,10 +52,11 @@ const getBusinessBankBadges = (business: Business) => {
   business.benefits.forEach((benefit) => {
     if (!benefit.bankName) return;
 
-    const descriptor = toBankDescriptor(getBenefitProviderDisplayName(benefit));
+    const providerName = getBenefitProviderDisplayName(benefit);
+    const descriptor = toBankDescriptor(providerName);
     if (!seen.has(descriptor.token)) {
       seen.add(descriptor.token);
-      badges.push(descriptor.token);
+      badges.push(providerName);
     }
   });
 
