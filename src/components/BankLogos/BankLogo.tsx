@@ -21,7 +21,13 @@ const lookupManifestEntry = (bankName: string) => {
   if (direct) return direct;
 
   const normalized = normalizeKey(bankName);
-  if (normalized && bankLogosManifest[normalized]) return bankLogosManifest[normalized];
+  if (normalized) {
+    if (bankLogosManifest[normalized]) return bankLogosManifest[normalized];
+    if (normalized.startsWith('banco')) {
+      const stripped = normalized.slice(5);
+      if (stripped && bankLogosManifest[stripped]) return bankLogosManifest[stripped];
+    }
+  }
 
   const descriptor = toBankDescriptor(bankName);
   return bankLogosManifest[descriptor.token] ?? null;
