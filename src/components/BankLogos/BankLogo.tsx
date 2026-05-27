@@ -49,7 +49,7 @@ const BankLogo: React.FC<BankLogoProps> = ({ bankName, size = 28, className = ''
           src={`/banks/${entry.file}`}
           alt={entry.name || bankName}
           onError={() => setImageFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          style={{ width: '125%', height: '125%', objectFit: 'contain' }}
         />
       </div>
     );
