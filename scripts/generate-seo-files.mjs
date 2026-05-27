@@ -200,26 +200,34 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-for (const fileName of fs.readdirSync(publicDir)) {
-  if (/^sitemap-\d+\.xml$/.test(fileName)) {
-    fs.unlinkSync(path.join(publicDir, fileName));
+const sitemapPath = path.join(publicDir, 'sitemap.xml');
+const shouldPreserveExistingSitemap = !mongoUri && fs.existsSync(sitemapPath);
+if (shouldPreserveExistingSitemap) {
+  console.warn('[seo] Preserving existing sitemap.xml because MONGODB_URI_READ_ONLY is not set.');
+}
+
+if (!shouldPreserveExistingSitemap) {
+  for (const fileName of fs.readdirSync(publicDir)) {
+    if (/^sitemap-\d+\.xml$/.test(fileName)) {
+      fs.unlinkSync(path.join(publicDir, fileName));
+    }
   }
-}
 
-const sitemapChunks = [];
-for (let index = 0; index < uniqueRoutes.length; index += MAX_URLS_PER_SITEMAP) {
-  sitemapChunks.push(uniqueRoutes.slice(index, index + MAX_URLS_PER_SITEMAP));
-}
+  const sitemapChunks = [];
+  for (let index = 0; index < uniqueRoutes.length; index += MAX_URLS_PER_SITEMAP) {
+    sitemapChunks.push(uniqueRoutes.slice(index, index + MAX_URLS_PER_SITEMAP));
+  }
 
-if (sitemapChunks.length <= 1) {
-  fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), buildUrlset(sitemapChunks[0] || []), 'utf8');
-} else {
-  const sitemapPaths = sitemapChunks.map((chunk, index) => {
-    const sitemapPath = `/sitemap-${index + 1}.xml`;
-    fs.writeFileSync(path.join(publicDir, `sitemap-${index + 1}.xml`), buildUrlset(chunk), 'utf8');
-    return sitemapPath;
-  });
-  fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), buildSitemapIndex(sitemapPaths), 'utf8');
+  if (sitemapChunks.length <= 1) {
+    fs.writeFileSync(sitemapPath, buildUrlset(sitemapChunks[0] || []), 'utf8');
+  } else {
+    const sitemapPaths = sitemapChunks.map((chunk, index) => {
+      const childPath = `/sitemap-${index + 1}.xml`;
+      fs.writeFileSync(path.join(publicDir, `sitemap-${index + 1}.xml`), buildUrlset(chunk), 'utf8');
+      return childPath;
+    });
+    fs.writeFileSync(sitemapPath, buildSitemapIndex(sitemapPaths), 'utf8');
+  }
 }
 
 fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
