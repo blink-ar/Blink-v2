@@ -9,9 +9,19 @@ interface BankLogoProps {
   className?: string;
 }
 
+const normalizeKey = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
 const lookupManifestEntry = (bankName: string) => {
   const direct = bankLogosManifest[bankName];
   if (direct) return direct;
+
+  const normalized = normalizeKey(bankName);
+  if (normalized && bankLogosManifest[normalized]) return bankLogosManifest[normalized];
 
   const descriptor = toBankDescriptor(bankName);
   return bankLogosManifest[descriptor.token] ?? null;
