@@ -1,7 +1,6 @@
 export { default as SkeletonCard } from './SkeletonCard';
 export { default as SkeletonFeaturedBanner } from './SkeletonFeaturedBanner';
 export { default as SkeletonActiveOffers } from './SkeletonActiveOffers';
-export { default as SkeletonBenefitPage } from './SkeletonBenefitPage';
 export { default as SkeletonBeneficiosTab } from './SkeletonBeneficiosTab';
 export { default as SkeletonHomePage } from './SkeletonHomePage';
 export { default as SkeletonSearchPage } from './SkeletonSearchPage';
