@@ -15,6 +15,7 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
@@ -415,7 +416,7 @@ function MapPage() {
             display:flex;align-items:center;justify-content:center;position:relative;z-index:20;
             transition:all 0.15s;">
             ${this.imgSrc
-              ? `<img src="${this.imgSrc}" alt="" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
+              ? `<img src="${this.imgSrc}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
               : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
             }
           </div>`;
@@ -525,7 +526,7 @@ function MapPage() {
           selected?.id === biz.id &&
           (currentSelectedIdx === null ? idx === 0 : idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
@@ -563,7 +564,7 @@ function MapPage() {
           ? markerKey === currentSelectedKey
           : selected?.id === biz.id && (currentSelectedIdx === null || idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
@@ -1040,8 +1041,10 @@ function MapPage() {
                       <img
                         alt={biz.name}
                         className="w-full h-full object-cover"
-                        src={biz.image}
+                        src={getOptimizedImageUrl(biz.image, { width: 112 })}
                         loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       <span className="font-bold text-xl text-blink-muted">{biz.name?.charAt(0)}</span>

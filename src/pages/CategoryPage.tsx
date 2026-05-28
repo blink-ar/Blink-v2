@@ -5,6 +5,7 @@ import { useSEO } from '../hooks/useSEO';
 import { fetchBusinessesPaginated } from '../services/api';
 import { getCategorySeoPath, resolveSeoCategory, type SeoCategoryLink } from '../seo/categoryPages';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const PAGE_SIZE = 50;
 
@@ -112,7 +113,7 @@ function CategoryPageContent({ category, page }: { category: SeoCategoryLink; pa
                     <div className="flex items-start gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-blink-bg overflow-hidden flex items-center justify-center shrink-0">
                         {business.image ? (
-                          <img src={business.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          <img src={getOptimizedImageUrl(business.image, { width: 96 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                         ) : (
                           <span className="text-xl">{category.emoji}</span>
                         )}

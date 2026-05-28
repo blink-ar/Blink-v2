@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { Business } from "../types";
+import { getOptimizedImageUrl } from "../utils/images";
 
 interface StoreHeaderProps {
   business: Business;
@@ -41,9 +42,11 @@ const StoreHeader: React.FC<StoreHeaderProps> = ({
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
             <img
-              src={business.image}
+              src={getOptimizedImageUrl(business.image, { width: 160 })}
               alt={`${business.name} logo`}
               className="w-full h-full object-cover"
+              decoding="async"
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
