@@ -32,7 +32,9 @@ import {
   getBenefitProviderSummary,
   hasMultipleBenefitProviders,
   getBenefitEligibilityBankNames,
+  isModoSourcedBenefit,
 } from '../utils/benefitDisplay';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -153,7 +155,7 @@ const getPaymentMethod = (benefit: BankBenefit): string | null => {
 };
 
 const isModoBenefit = (benefit: BankBenefit): boolean =>
-  /^modo-promos-raw-/i.test(benefit.id || '') || benefit.acceptsModo === true;
+  isModoSourcedBenefit(benefit) || benefit.acceptsModo === true;
 
 const isPremiumCard = (cardName: string): boolean =>
   /signature|black|infinite|platinum|select|gold/i.test(cardName);
@@ -498,7 +500,7 @@ function BenefitDetailPage() {
                 style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.12)', border: `2px solid ${bankAccent.border}` }}
               >
                 {business.image ? (
-                  <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
+                  <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 160 })} decoding="async" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="font-black text-2xl" style={{ color: bankAccent.text }}>{business.name?.charAt(0)}</span>
                 )}
@@ -802,9 +804,12 @@ function BenefitDetailPage() {
                       >
                         {subscription.icon ? (
                           <img
-                            src={subscription.icon}
+                            src={getOptimizedImageUrl(subscription.icon, { width: 64 })}
                             alt={subscription.name}
                             className="w-6 h-6 rounded object-contain flex-shrink-0"
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <span

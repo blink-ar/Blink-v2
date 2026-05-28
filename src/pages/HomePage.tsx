@@ -19,6 +19,7 @@ import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking'
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { getOptimizedImageUrl } from '../utils/images';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -430,8 +431,10 @@ function HomePage() {
                       <img
                         alt={item.business.name}
                         className="absolute inset-0 w-full h-full object-cover"
-                        src={item.business.image}
+                        src={getOptimizedImageUrl(item.business.image, { width: 480 })}
                         loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
                       />
                     )}
                     {/* Dark scrim */}

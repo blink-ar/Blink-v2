@@ -27,6 +27,7 @@ const BeneficiosTab = lazy(() => import("../components/tabs/BeneficiosTab"));
 // Categories are now defined inline for the modern UI
 import { Business, Category } from "../types";
 import { RawMongoBenefit } from "../types/mongodb";
+import { getStableBenefitId } from "../utils/benefitIdentity";
 import { useNavigate, useLocation } from "react-router-dom";
 
 function Home() {
@@ -409,9 +410,19 @@ function Home() {
     setActiveTab("beneficios");
   };
 
-  const getRawBenefitRouteRef = (benefit: RawMongoBenefit): string => {
+  const getRawBenefitId = (benefit: RawMongoBenefit): string | null => {
     const id = (benefit as { id?: string }).id || benefit._id?.$oid;
-    return id ? encodeURIComponent(id) : "0";
+    return id ? String(id).trim() : null;
+  };
+
+  const getMatchedBusinessBenefitRouteRef = (business: Business, benefit: RawMongoBenefit): string => {
+    const rawBenefitId = getRawBenefitId(benefit);
+    if (!rawBenefitId) return "0";
+
+    const matchingBenefitIndex = business.benefits.findIndex(
+      (candidate) => getStableBenefitId(candidate) === rawBenefitId
+    );
+    return matchingBenefitIndex >= 0 ? encodeURIComponent(rawBenefitId) : "0";
   };
 
   const handleBenefitSelect = (benefit: RawMongoBenefit) => {
@@ -436,7 +447,7 @@ function Home() {
         matchingBusiness: matchingBusiness.name,
         businessId: matchingBusiness.id,
       });
-      const benefitRef = getRawBenefitRouteRef(benefit);
+      const benefitRef = getMatchedBusinessBenefitRouteRef(matchingBusiness, benefit);
       console.log(
         "🔗 Navigating to business page with popup:",
         `/benefit/${matchingBusiness.id}/${benefitRef}?from=${activeTab}`

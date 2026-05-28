@@ -26,6 +26,7 @@ const ATTRIBUTION_QUERY_KEYS = [
 // Maintenance note:
 // If event names/params change here, update /Users/tomas/Dev/Blink/Blink-v2/ANALYTICS_EVENTS.md.
 let isInitialized = false;
+let isScriptLoadScheduled = false;
 let lastTrackedPageView: { path: string; timestamp: number } | null = null;
 let attributionParams: AnalyticsParams = {};
 
@@ -235,6 +236,43 @@ function refreshAttributionFromUrl(): void {
   }
 }
 
+function appendAnalyticsScript(scriptSrc: string): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${scriptSrc}"]`);
+  if (existingScript) {
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = scriptSrc;
+  document.head.appendChild(script);
+}
+
+function scheduleAnalyticsScript(scriptSrc: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+
+  if (isScriptLoadScheduled || document.querySelector<HTMLScriptElement>(`script[src="${scriptSrc}"]`)) {
+    return;
+  }
+
+  isScriptLoadScheduled = true;
+
+  const appendScript = () => appendAnalyticsScript(scriptSrc);
+
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(appendScript, { timeout: 3000 });
+    return;
+  }
+
+  window.setTimeout(appendScript, 1500);
+}
+
 export function initializeGoogleAnalytics(): boolean {
   if (typeof window === 'undefined' || !isEnabled()) {
     return false;
@@ -256,14 +294,7 @@ export function initializeGoogleAnalytics(): boolean {
   }
 
   const scriptSrc = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${scriptSrc}"]`);
-
-  if (!existingScript) {
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = scriptSrc;
-    document.head.appendChild(script);
-  }
+  scheduleAnalyticsScript(scriptSrc);
 
   window.gtag('js', new Date());
   window.gtag('config', GA_MEASUREMENT_ID, {
