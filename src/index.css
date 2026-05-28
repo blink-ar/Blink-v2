@@ -28,6 +28,10 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  :root:not(.material-symbols-ready) .material-symbols-outlined {
+    visibility: hidden;
+  }
+
   /* Soft selection highlight */
   ::selection {
     @apply bg-primary/20 text-blink-ink;

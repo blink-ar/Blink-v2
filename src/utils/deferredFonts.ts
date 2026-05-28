@@ -2,6 +2,8 @@ const MATERIAL_SYMBOLS_STYLESHEET =
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap';
 
 const MATERIAL_SYMBOLS_LINK_SELECTOR = 'link[data-deferred-font="material-symbols"]';
+const MATERIAL_SYMBOLS_READY_CLASS = 'material-symbols-ready';
+const MATERIAL_SYMBOLS_FONT_DESCRIPTOR = '24px "Material Symbols Outlined"';
 const FONT_LOAD_FALLBACK_DELAY_MS = 2500;
 
 type IdleCallbackWindow = Window & {
@@ -11,8 +13,50 @@ type IdleCallbackWindow = Window & {
   ) => number;
 };
 
+type FontLoadingDocument = Document & {
+  fonts?: FontFaceSet;
+};
+
+function markMaterialSymbolsReady(): void {
+  document.documentElement.classList.add(MATERIAL_SYMBOLS_READY_CLASS);
+}
+
+function materialSymbolsFontIsReady(fonts: FontFaceSet): boolean {
+  try {
+    return fonts.check(MATERIAL_SYMBOLS_FONT_DESCRIPTOR);
+  } catch {
+    return false;
+  }
+}
+
+function waitForMaterialSymbolsFont(): void {
+  const fonts = (document as FontLoadingDocument).fonts;
+
+  if (!fonts || typeof fonts.load !== 'function' || typeof fonts.check !== 'function') {
+    markMaterialSymbolsReady();
+    return;
+  }
+
+  if (materialSymbolsFontIsReady(fonts)) {
+    markMaterialSymbolsReady();
+    return;
+  }
+
+  fonts
+    .load(MATERIAL_SYMBOLS_FONT_DESCRIPTOR)
+    .then(() => {
+      if (materialSymbolsFontIsReady(fonts)) {
+        markMaterialSymbolsReady();
+      }
+    })
+    .catch(() => {
+      // Keep ligature text hidden if the icon font fails to load.
+    });
+}
+
 function appendMaterialSymbolsStylesheet(): void {
   if (document.querySelector(MATERIAL_SYMBOLS_LINK_SELECTOR)) {
+    waitForMaterialSymbolsFont();
     return;
   }
 
@@ -20,6 +64,7 @@ function appendMaterialSymbolsStylesheet(): void {
   link.rel = 'stylesheet';
   link.href = MATERIAL_SYMBOLS_STYLESHEET;
   link.dataset.deferredFont = 'material-symbols';
+  link.addEventListener('load', waitForMaterialSymbolsFont, { once: true });
   document.head.appendChild(link);
 }
 
