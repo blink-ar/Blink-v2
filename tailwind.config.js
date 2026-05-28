@@ -31,7 +31,7 @@ export default {
       fontFamily: {
         display: ['Space Grotesk', 'sans-serif'],
         body: ['Space Grotesk', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        mono: ['SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', 'Consolas', 'Courier New', 'monospace'],
       },
       boxShadow: {
         'soft': '0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
