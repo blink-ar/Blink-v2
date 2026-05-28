@@ -4,6 +4,7 @@ import { formatDistance } from '../utils/distance';
 import { toBankDescriptor } from '../utils/banks';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import BankLogo from './BankLogos/BankLogo';
+import { getOptimizedImageUrl } from '../utils/images';
 
 interface BusinessResultCardProps {
   business: Business;
@@ -77,6 +78,7 @@ function BusinessResultCard({
   const maxDiscount = getBusinessMaxDiscount(business);
   const maxInstallments = getBusinessMaxInstallments(business);
   const categoryStyle = getCategoryStyle(business.category);
+  const imageSrc = getOptimizedImageUrl(business.image, { width: 96 });
   const baseClassName = `w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex text-left ${className}`;
   const style = {
     border: '1px solid #E8E6E1',
@@ -88,16 +90,18 @@ function BusinessResultCard({
       <div
         className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
         style={{
-          background: business.image ? '#F7F6F4' : categoryStyle.bg,
+          background: imageSrc ? '#F7F6F4' : categoryStyle.bg,
           border: '1px solid rgba(0,0,0,0.07)',
         }}
       >
-        {business.image ? (
+        {imageSrc ? (
           <img
             alt=""
             className="w-full h-full object-cover"
-            src={business.image}
+            src={imageSrc}
             loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
           />
         ) : (
           <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>

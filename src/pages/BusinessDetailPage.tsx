@@ -13,6 +13,7 @@ import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
 import { buildBenefitPath } from '../utils/benefitIdentity';
 import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../utils/benefitDisplay';
 import BankLogo from '../components/BankLogos/BankLogo';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -427,7 +428,7 @@ function BusinessDetailPage() {
             style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
           >
             {business.image ? (
-              <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
+              <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 160 })} decoding="async" referrerPolicy="no-referrer" />
             ) : (
               <span className="font-black text-2xl text-blink-muted">{business.name?.charAt(0)}</span>
             )}
