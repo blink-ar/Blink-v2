@@ -154,6 +154,9 @@ const getPaymentMethod = (benefit: BankBenefit): string | null => {
   return null;
 };
 
+const isModoBenefit = (benefit: BankBenefit): boolean =>
+  isModoSourcedBenefit(benefit) || benefit.acceptsModo === true;
+
 const isPremiumCard = (cardName: string): boolean =>
   /signature|black|infinite|platinum|select|gold/i.test(cardName);
 
@@ -524,7 +527,7 @@ function BenefitDetailPage() {
               >
                 {providerName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
-              {isModoSourcedBenefit(benefit) && (
+              {isModoBenefit(benefit) && (
                 <span
                   className="px-3 py-1 rounded-full text-xs font-black tracking-wide flex items-center gap-1 shadow-sm"
                   style={{
@@ -711,7 +714,7 @@ function BenefitDetailPage() {
           </div>
 
           {/* ── Accede al beneficio ── */}
-          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1 || isModoSourcedBenefit(benefit)) && (
+          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1 || isModoBenefit(benefit)) && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
@@ -720,7 +723,7 @@ function BenefitDetailPage() {
                 <p className="font-bold text-[15px] text-blink-ink mb-4">Accede al beneficio</p>
 
                 <div className="space-y-2.5">
-                  {isModoSourcedBenefit(benefit) && (
+                  {isModoBenefit(benefit) && (
                     <>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted">
                         Método de pago
@@ -741,7 +744,7 @@ function BenefitDetailPage() {
                   )}
 
                   {cards.length > 0 && (
-                    <div className={isModoSourcedBenefit(benefit) ? 'pt-3 mt-1 border-t border-blink-border' : ''}>
+                    <div className={isModoBenefit(benefit) ? 'pt-3 mt-1 border-t border-blink-border' : ''}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted mb-2.5">
                         {hasMultipleProviders
                           ? `Con ${providerName} y bancos adheridos`
