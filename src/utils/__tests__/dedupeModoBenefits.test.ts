@@ -246,6 +246,90 @@ describe('dedupeModoBenefits', () => {
     expect(result[0].acceptsModo).toBe(true);
   });
 
+  it('single-eligibility Modo: keeps the longest validUntil after merging', () => {
+    const bank = makeBenefit({
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: '2026-07-15',
+    });
+    const modo = makeModo(['galicia'], {
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: '2026-06-30',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+    expect(result[0].validUntil).toBe('2026-07-15');
+  });
+
+  it('single-eligibility Modo: adopts Modo validUntil when it is the longest', () => {
+    const bank = makeBenefit({
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: '2026-06-30',
+    });
+    const modo = makeModo(['galicia'], {
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: '2026-07-15',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+    expect(result[0].validUntil).toBe('2026-07-15');
+  });
+
+  it('single-eligibility Modo: prefers the valid date when one side is null', () => {
+    const bank = makeBenefit({
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: null,
+    });
+    const modo = makeModo(['galicia'], {
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      validUntil: '2026-07-15',
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].acceptsModo).toBe(true);
+    expect(result[0].validUntil).toBe('2026-07-15');
+  });
+
+  it('multi-eligibility Modo: surviving Modo keeps the longest validUntil', () => {
+    const bankA = makeBenefit({
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-09-01',
+    });
+    const bankB = makeBenefit({
+      banks: ['santander'],
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-07-01',
+    });
+    const modo = makeModo(['galicia', 'santander'], {
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-08-01',
+    });
+    const result = dedupeModoBenefits([bankA, bankB, modo]);
+    expect(result).toHaveLength(1);
+    expect(/^modo-/.test(result[0].id || '')).toBe(true);
+    expect(result[0].validUntil).toBe('2026-09-01');
+  });
+
   it('normalizes accents and case on bank and day names', () => {
     const bank = makeBenefit({
       banks: ['Galicia'],

@@ -77,6 +77,25 @@ const getEligibilityBankKeys = (benefit: BankBenefit): string[] => {
     .filter(Boolean);
 };
 
+const parseValidUntil = (value: BankBenefit['validUntil']): number | null => {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const ts = Date.parse(value.trim());
+  return Number.isNaN(ts) ? null : ts;
+};
+
+// When two benefits merge, keep the longest validity. A valid date always beats a
+// missing/invalid one; ties keep the current value.
+const pickLongerValidUntil = (
+  current: BankBenefit['validUntil'],
+  incoming: BankBenefit['validUntil'],
+): BankBenefit['validUntil'] => {
+  const tc = parseValidUntil(current);
+  const ti = parseValidUntil(incoming);
+  if (tc === null) return ti === null ? current : incoming;
+  if (ti === null) return current;
+  return ti > tc ? incoming : current;
+};
+
 interface MatchKey {
   days: string;
   installments: number | typeof UNKNOWN_INSTALLMENTS;
@@ -113,6 +132,7 @@ export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
 
   const dropIndices = new Set<number>();
   const acceptsModoIndices = new Set<number>();
+  const validUntilByIndex = new Map<number, BankBenefit['validUntil']>();
 
   modoEntries.forEach(({ index: modoIdx, benefit: modo }) => {
     const modoBanks = getEligibilityBankKeys(modo);
@@ -130,10 +150,16 @@ export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
       if (match) {
         dropIndices.add(modoIdx);
         acceptsModoIndices.add(match.index);
+        const base = validUntilByIndex.has(match.index)
+          ? validUntilByIndex.get(match.index)
+          : match.benefit.validUntil;
+        validUntilByIndex.set(match.index, pickLongerValidUntil(base, modo.validUntil));
       }
       return;
     }
 
+    let mergedValidUntil = modo.validUntil;
+    let didMerge = false;
     modoBanks.forEach((modoBank) => {
       const match = bankEntries.find(({ index, benefit }) => {
         if (dropIndices.has(index)) return false;
@@ -142,15 +168,23 @@ export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
       });
       if (match) {
         dropIndices.add(match.index);
+        mergedValidUntil = pickLongerValidUntil(mergedValidUntil, match.benefit.validUntil);
+        didMerge = true;
       }
     });
+    if (didMerge) validUntilByIndex.set(modoIdx, mergedValidUntil);
   });
 
   if (dropIndices.size === 0 && acceptsModoIndices.size === 0) return benefits;
 
   return benefits.reduce<BankBenefit[]>((acc, benefit, index) => {
     if (dropIndices.has(index)) return acc;
-    acc.push(acceptsModoIndices.has(index) ? { ...benefit, acceptsModo: true } : benefit);
+    let result = acceptsModoIndices.has(index) ? { ...benefit, acceptsModo: true } : benefit;
+    if (validUntilByIndex.has(index)) {
+      const chosen = validUntilByIndex.get(index);
+      if (chosen !== result.validUntil) result = { ...result, validUntil: chosen ?? null };
+    }
+    acc.push(result);
     return acc;
   }, []);
 }
