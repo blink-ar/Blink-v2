@@ -1,5 +1,6 @@
 // Clean service to match your backend exactly
 const BASE_URL = '';
+const DIRECT_GOOGLE_PLACES_FALLBACK_ENABLED = import.meta.env.VITE_ENABLE_DIRECT_GOOGLE_PLACES_FALLBACK === 'true';
 
 // Backend response structure
 interface BackendResponse {
@@ -127,10 +128,13 @@ class GooglePlacesService {
                 return backendResult;
             }
         } catch (error) {
-            console.warn('Backend API failed, trying direct Google Places API:', error);
+            console.warn('Backend API failed while fetching place details:', error);
         }
 
-        // Fallback to direct Google Places API
+        if (!DIRECT_GOOGLE_PLACES_FALLBACK_ENABLED) {
+            return null;
+        }
+
         try {
             const directResult = await this.getPlaceDetailsFromGoogle(placeId);
             if (directResult) {
