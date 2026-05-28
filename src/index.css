@@ -20,6 +20,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1em;
+    min-width: 1em;
+    height: 1em;
     white-space: nowrap;
     word-wrap: normal;
     direction: ltr;
