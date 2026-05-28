@@ -20,7 +20,7 @@ const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
 const KM5_IN_LAT = 0.045;
 const km5InLng = (lat: number) => 0.045 / Math.cos((lat * Math.PI) / 180);
-const UI_FONT_STACK = "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+const UI_FONT_STACK = "'Space Grotesk',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
 // Soft, minimal map style — light roads, no clutter
 const MAP_STYLE = [

@@ -11,6 +11,9 @@ importers:
       '@auth0/auth0-react':
         specifier: ^2.16.2
         version: 2.16.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@fontsource/space-grotesk':
+        specifier: ^5.2.10
+        version: 5.2.10
       '@tanstack/react-query':
         specifier: ^5.90.12
         version: 5.90.15(react@18.3.1)
@@ -865,6 +868,9 @@ packages:
     peerDependenciesMeta:
       '@exodus/crypto':
         optional: true
+
+  '@fontsource/space-grotesk@5.2.10':
+    resolution: {integrity: sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -4048,6 +4054,8 @@ snapshots:
       levn: 0.4.1
 
   '@exodus/bytes@1.7.0': {}
+
+  '@fontsource/space-grotesk@5.2.10': {}
 
   '@humanfs/core@0.19.1': {}
 
