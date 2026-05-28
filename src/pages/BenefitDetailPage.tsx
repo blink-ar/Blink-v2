@@ -17,6 +17,7 @@ import {
   trackViewBenefit,
 } from '../analytics/intentTracking';
 import { getBankAccent } from '../utils/bankColors';
+import BankLogo from '../components/BankLogos/BankLogo';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { calculateDistance } from '../utils/distance';
 import {
@@ -507,12 +508,10 @@ function BenefitDetailPage() {
               </div>
               {/* Bank badge */}
               <div
-                className="absolute -bottom-2 -right-2 w-[26px] h-[26px] rounded-full flex items-center justify-center"
-                style={{ background: bankAccent.text, border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
+                className="absolute -bottom-2 -right-2 rounded-full"
+                style={{ display: 'flex', border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
               >
-                <span className="font-black text-white" style={{ fontSize: 8, letterSpacing: '-0.02em' }}>
-                  {providerName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
-                </span>
+                <BankLogo bankName={providerName} size={26} />
               </div>
             </div>
 
@@ -838,13 +837,15 @@ function BenefitDetailPage() {
                           return (
                             <span
                               key={bankName}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold border hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                              title={bankName}
+                              className="pl-1 pr-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
                               style={{
                                 background: accent.bg,
                                 color: accent.text,
                                 borderColor: accent.border,
                               }}
                             >
+                              <BankLogo bankName={bankName} size={18} />
                               {bankName}
                             </span>
                           );
@@ -1229,24 +1230,17 @@ function BenefitDetailPage() {
                 <div className="flex flex-wrap gap-2 py-2">
                   {filtered.map((bankName) => {
                     const accent = getBankAccent(bankName);
-                    const shortName = bankName.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || bankName.substring(0, 8).toUpperCase();
-                    const initialLetters = shortName.substring(0, 2);
                     return (
                       <div
                         key={bankName}
-                        className="px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                        className="pl-1.5 pr-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-2 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
                         style={{
                           background: accent.bg,
                           color: accent.text,
                           borderColor: accent.border,
                         }}
                       >
-                        <span
-                          className="w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black text-white"
-                          style={{ background: accent.text }}
-                        >
-                          {initialLetters}
-                        </span>
+                        <BankLogo bankName={bankName} size={22} />
                         {bankName}
                       </div>
                     );

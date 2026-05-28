@@ -1,3 +1,4 @@
+export { default as BankLogo } from './BankLogo';
 export { default as BBVALogo } from './BBVALogo';
 export { default as SantanderLogo } from './SantanderLogo';
 export { default as GaliciaLogo } from './GaliciaLogo';

@@ -73,6 +73,7 @@ const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
   if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
   if (normalized.includes('visa')) return KNOWN_BANKS[12];
   if (normalized.includes('master')) return KNOWN_BANKS[13];
+  if (normalized.includes('gaceta')) return KNOWN_BANKS[14];
   if (normalized.includes('buepp')) return KNOWN_BANKS[15];
   return null;
 };
