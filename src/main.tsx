@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Auth0Provider } from '@auth0/auth0-react';
 import App from './App.tsx';
 import './index.css';
+import { loadDeferredFonts } from './utils/deferredFonts';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,3 +34,5 @@ createRoot(document.getElementById('root')!).render(
     </Auth0Provider>
   </StrictMode>
 );
+
+loadDeferredFonts();
