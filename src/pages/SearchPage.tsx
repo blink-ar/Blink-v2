@@ -25,7 +25,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { matchesSearchPhrase } from '../utils/searchNormalization';
-import { getBenefitProviderDisplayName, isModoSourcedBenefit } from '../utils/benefitDisplay';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { getOptimizedImageUrl } from '../utils/images';
 
 interface SearchFilterState {
@@ -264,24 +264,12 @@ function SearchPage() {
     ? Array.from({ length: 4 }, () => null)
     : relativeBusinesses;
 
-  const businessBankNames = useMemo(() => {
-    const names = new Set<string>();
-    businesses.forEach((business) => {
-      business.benefits.forEach((benefit) => {
-        // Modo promos list every adhered bank in their bankName, so skip them
-        // to keep banks we only have via Modo out of the available options.
-        if (isModoSourcedBenefit(benefit)) return;
-        if (benefit.bankName) {
-          names.add(benefit.bankName);
-        }
-      });
-    });
-    return Array.from(names);
-  }, [businesses]);
-
+  // Available banks come solely from /api/banks, which excludes Modo-sourced
+  // benefits and keeps only banks with 5+ benefits. selectedBanks is unioned in
+  // so an active filter stays visible even if it falls outside that list.
   const bankOptions = useMemo<BankFilterOption[]>(() => {
-    return buildBankOptions(availableBankNames, businessBankNames, selectedBanks);
-  }, [availableBankNames, businessBankNames, selectedBanks]);
+    return buildBankOptions(availableBankNames, selectedBanks);
+  }, [availableBankNames, selectedBanks]);
 
   const activeFilterCount = [
     selectedBanks.length > 0,

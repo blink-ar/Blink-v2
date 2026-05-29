@@ -14,7 +14,7 @@ import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { buildBenefitPath } from '../utils/benefitIdentity';
-import { getBenefitProviderDisplayName, isModoSourcedBenefit } from '../utils/benefitDisplay';
+import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { NotificationBanner } from '../components/NotificationBanner';
@@ -183,24 +183,13 @@ function HomePage() {
     return selected;
   }, [businesses]);
 
-  const businessBankNames = useMemo(() => {
-    const names: string[] = [];
-    businesses.forEach((business) => {
-      business.benefits.forEach((benefit) => {
-        // Modo promos list every adhered bank in their bankName, so skip them
-        // to keep banks we only have via Modo out of the available options.
-        if (isModoSourcedBenefit(benefit)) return;
-        if (benefit.bankName) {
-          names.push(benefit.bankName);
-        }
-      });
-    });
-    return names;
-  }, [businesses]);
-
+  // Available banks come solely from /api/banks, which excludes Modo-sourced
+  // benefits and keeps only banks with 5+ benefits. Deriving from loaded
+  // businesses would re-add banks that only exist via Modo promos and bypass
+  // the count threshold.
   const indexedEntities = useMemo(
-    () => buildBankOptions(availableBankNames, businessBankNames),
-    [availableBankNames, businessBankNames],
+    () => buildBankOptions(availableBankNames),
+    [availableBankNames],
   );
 
   return (
