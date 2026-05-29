@@ -111,7 +111,13 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
-  const [sortByDistance, setSortByDistance] = useState(searchParams.get('nearby') === '1');
+  const [sortByDistance, setSortByDistance] = useState(() => {
+    if (searchParams.get('nearby') === '1') return true;
+    if (!searchParams.has('nearby')) {
+      return localStorage.getItem('locationPermission') === 'granted';
+    }
+    return false;
+  });
 
   const { data: availableBankNames = [] } = useQuery({
     queryKey: ['availableBanks'],
