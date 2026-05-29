@@ -40,13 +40,16 @@ const NOTIFICATION_HISTORY_COLLECTION = 'notification_history';
 
 // Benefits sourced from Modo's raw collection (MODO_PROMOS_RAW) list every
 // adhered bank inside their eligibilities, which would otherwise surface dozens
-// of banks we don't actually scrape directly. Identify them by sourceCollection
-// or by their id prefix so we can exclude them from the available banks list.
-const MODO_SOURCE_PATTERN = /modo[_-]?promos[_-]?raw/i;
+// of banks we don't actually scrape directly. Identify them the same way the
+// rest of the codebase does (api/merchant-seo.js, src/utils/benefitDisplay.ts):
+// any of these source markers referencing Modo flags the benefit as Modo-sourced.
+const MODO_SOURCE_FIELD_PATTERN = /modo/i;
 const MODO_ID_PREFIX_PATTERN = /^modo-promos-raw-/i;
 const EXCLUDE_MODO_SOURCE_MATCH = {
   $nor: [
-    { sourceCollection: { $regex: MODO_SOURCE_PATTERN } },
+    { sourceCollection: { $regex: MODO_SOURCE_FIELD_PATTERN } },
+    { rawBenefitCollection: { $regex: MODO_SOURCE_FIELD_PATTERN } },
+    { source: { $regex: MODO_SOURCE_FIELD_PATTERN } },
     { id: { $regex: MODO_ID_PREFIX_PATTERN } }
   ]
 };

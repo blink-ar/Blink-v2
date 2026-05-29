@@ -25,7 +25,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { matchesSearchPhrase } from '../utils/searchNormalization';
-import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
+import { getBenefitProviderDisplayName, isModoSourcedBenefit } from '../utils/benefitDisplay';
 import { getOptimizedImageUrl } from '../utils/images';
 
 interface SearchFilterState {
@@ -268,6 +268,9 @@ function SearchPage() {
     const names = new Set<string>();
     businesses.forEach((business) => {
       business.benefits.forEach((benefit) => {
+        // Modo promos list every adhered bank in their bankName, so skip them
+        // to keep banks we only have via Modo out of the available options.
+        if (isModoSourcedBenefit(benefit)) return;
         if (benefit.bankName) {
           names.add(benefit.bankName);
         }
