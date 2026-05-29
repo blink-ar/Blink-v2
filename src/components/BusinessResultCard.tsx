@@ -136,7 +136,7 @@ function BusinessResultCard({
             </span>
           )}
         </div>
-        <span className="block text-[10px] text-blink-muted mt-[3px]">
+        <span className="block text-[10px] text-blink-muted mt-[7px]">
           {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
         </span>
       </div>
