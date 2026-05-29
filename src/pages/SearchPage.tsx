@@ -264,21 +264,12 @@ function SearchPage() {
     ? Array.from({ length: 4 }, () => null)
     : relativeBusinesses;
 
-  const businessBankNames = useMemo(() => {
-    const names = new Set<string>();
-    businesses.forEach((business) => {
-      business.benefits.forEach((benefit) => {
-        if (benefit.bankName) {
-          names.add(benefit.bankName);
-        }
-      });
-    });
-    return Array.from(names);
-  }, [businesses]);
-
+  // Available banks come solely from /api/banks, which excludes Modo-sourced
+  // benefits and keeps only banks with 5+ benefits. selectedBanks is unioned in
+  // so an active filter stays visible even if it falls outside that list.
   const bankOptions = useMemo<BankFilterOption[]>(() => {
-    return buildBankOptions(availableBankNames, businessBankNames, selectedBanks);
-  }, [availableBankNames, businessBankNames, selectedBanks]);
+    return buildBankOptions(availableBankNames, selectedBanks);
+  }, [availableBankNames, selectedBanks]);
 
   const activeFilterCount = [
     selectedBanks.length > 0,
