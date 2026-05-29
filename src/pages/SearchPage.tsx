@@ -136,9 +136,10 @@ function SearchPage() {
     setSearchParams(params, { replace: true });
   }, [debouncedSearch, selectedCategory, selectedBanks, onlineOnly, maxDistance, minDiscount, availableDay, cardMode, network, hasInstallments, sortByDistance, setSearchParams]);
 
-  // Debounce search
+  // Debounce search — short enough to feel responsive while still collapsing
+  // a burst of keystrokes into a single request.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
