@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import BankLogo from '../BankLogos/BankLogo';
 
 export interface BankFilterOption {
   token: string;
@@ -166,14 +167,9 @@ const BankFilterSheet = ({
                     border: `1px solid ${brand.color}25`,
                   }}
                 >
+                  <BankLogo bankName={option.token} size={40} />
                   <span
-                    className="font-bold text-lg tracking-tight"
-                    style={{ color: brand.color }}
-                  >
-                    {option.code}
-                  </span>
-                  <span
-                    className="text-[10px] font-medium mt-0.5 text-center leading-tight"
+                    className="text-[10px] font-medium mt-1.5 text-center leading-tight"
                     style={{ color: isSelected ? brand.color : `${brand.color}CC` }}
                   >
                     {option.label}

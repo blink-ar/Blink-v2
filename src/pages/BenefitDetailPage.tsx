@@ -17,6 +17,7 @@ import {
   trackViewBenefit,
 } from '../analytics/intentTracking';
 import { getBankAccent } from '../utils/bankColors';
+import BankLogo from '../components/BankLogos/BankLogo';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { calculateDistance } from '../utils/distance';
 import {
@@ -34,6 +35,7 @@ import {
   getBenefitEligibilityBankNames,
   isModoSourcedBenefit,
 } from '../utils/benefitDisplay';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -152,6 +154,9 @@ const getPaymentMethod = (benefit: BankBenefit): string | null => {
   if (/d[eé]b/i.test(allCards)) return 'Tarjeta de Débito';
   return null;
 };
+
+const isModoBenefit = (benefit: BankBenefit): boolean =>
+  isModoSourcedBenefit(benefit) || benefit.acceptsModo === true;
 
 const isPremiumCard = (cardName: string): boolean =>
   /signature|black|infinite|platinum|select|gold/i.test(cardName);
@@ -496,19 +501,17 @@ function BenefitDetailPage() {
                 style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.12)', border: `2px solid ${bankAccent.border}` }}
               >
                 {business.image ? (
-                  <img alt={business.name} className="w-full h-full object-cover" src={business.image} />
+                  <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 160 })} decoding="async" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="font-black text-2xl" style={{ color: bankAccent.text }}>{business.name?.charAt(0)}</span>
                 )}
               </div>
               {/* Bank badge */}
               <div
-                className="absolute -bottom-2 -right-2 w-[26px] h-[26px] rounded-full flex items-center justify-center"
-                style={{ background: bankAccent.text, border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
+                className="absolute -bottom-2 -right-2 rounded-full"
+                style={{ display: 'flex', border: '2.5px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }}
               >
-                <span className="font-black text-white" style={{ fontSize: 8, letterSpacing: '-0.02em' }}>
-                  {providerName.replace(/banco\s*/i, '').trim().substring(0, 2).toUpperCase()}
-                </span>
+                <BankLogo bankName={providerName} size={26} />
               </div>
             </div>
 
@@ -523,7 +526,7 @@ function BenefitDetailPage() {
               >
                 {providerName}{benefit.cardName ? ` · ${benefit.cardName.replace(/ any$/i, '')}` : ''}
               </span>
-              {isModoSourcedBenefit(benefit) && (
+              {isModoBenefit(benefit) && (
                 <span
                   className="px-3 py-1 rounded-full text-xs font-black tracking-wide flex items-center gap-1 shadow-sm"
                   style={{
@@ -710,7 +713,7 @@ function BenefitDetailPage() {
           </div>
 
           {/* ── Accede al beneficio ── */}
-          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1 || isModoSourcedBenefit(benefit)) && (
+          {(cards.length > 0 || subscription || eligibleBankPreview.total > 1 || isModoBenefit(benefit)) && (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
@@ -719,7 +722,7 @@ function BenefitDetailPage() {
                 <p className="font-bold text-[15px] text-blink-ink mb-4">Accede al beneficio</p>
 
                 <div className="space-y-2.5">
-                  {isModoSourcedBenefit(benefit) && (
+                  {isModoBenefit(benefit) && (
                     <>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted">
                         Método de pago
@@ -740,7 +743,7 @@ function BenefitDetailPage() {
                   )}
 
                   {cards.length > 0 && (
-                    <div className={isModoSourcedBenefit(benefit) ? 'pt-3 mt-1 border-t border-blink-border' : ''}>
+                    <div className={isModoBenefit(benefit) ? 'pt-3 mt-1 border-t border-blink-border' : ''}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-blink-muted mb-2.5">
                         {hasMultipleProviders
                           ? `Con ${providerName} y bancos adheridos`
@@ -800,9 +803,12 @@ function BenefitDetailPage() {
                       >
                         {subscription.icon ? (
                           <img
-                            src={subscription.icon}
+                            src={getOptimizedImageUrl(subscription.icon, { width: 64 })}
                             alt={subscription.name}
                             className="w-6 h-6 rounded object-contain flex-shrink-0"
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <span
@@ -831,13 +837,15 @@ function BenefitDetailPage() {
                           return (
                             <span
                               key={bankName}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold border hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                              title={bankName}
+                              className="pl-1 pr-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
                               style={{
                                 background: accent.bg,
                                 color: accent.text,
                                 borderColor: accent.border,
                               }}
                             >
+                              <BankLogo bankName={bankName} size={18} />
                               {bankName}
                             </span>
                           );
@@ -1222,24 +1230,17 @@ function BenefitDetailPage() {
                 <div className="flex flex-wrap gap-2 py-2">
                   {filtered.map((bankName) => {
                     const accent = getBankAccent(bankName);
-                    const shortName = bankName.replace(/banco\s*/i, '').trim().substring(0, 8).toUpperCase() || bankName.substring(0, 8).toUpperCase();
-                    const initialLetters = shortName.substring(0, 2);
                     return (
                       <div
                         key={bankName}
-                        className="px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
+                        className="pl-1.5 pr-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-2 hover:scale-[1.04] active:scale-[0.98] transition-all duration-150 cursor-default select-none"
                         style={{
                           background: accent.bg,
                           color: accent.text,
                           borderColor: accent.border,
                         }}
                       >
-                        <span
-                          className="w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black text-white"
-                          style={{ background: accent.text }}
-                        >
-                          {initialLetters}
-                        </span>
+                        <BankLogo bankName={bankName} size={22} />
                         {bankName}
                       </div>
                     );

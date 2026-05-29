@@ -9,6 +9,32 @@
     min-height: 100dvh;
   }
 
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    min-width: 1em;
+    height: 1em;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :root:not(.material-symbols-ready) .material-symbols-outlined {
+    visibility: hidden;
+  }
+
   /* Soft selection highlight */
   ::selection {
     @apply bg-primary/20 text-blink-ink;

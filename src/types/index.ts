@@ -37,6 +37,8 @@ export interface BankBenefit {
   // Subscription reference (ID from bank_subscriptions collection)
   subscription?: string | null;
   subscriptionIds?: string[];
+  // Set when a duplicate Modo benefit was merged into this bank benefit
+  acceptsModo?: boolean;
 }
 
 export interface Business {

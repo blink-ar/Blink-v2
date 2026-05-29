@@ -15,11 +15,13 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { getOptimizedImageUrl } from '../utils/images';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 
 const KM5_IN_LAT = 0.045;
 const km5InLng = (lat: number) => 0.045 / Math.cos((lat * Math.PI) / 180);
+const UI_FONT_STACK = "'Space Grotesk',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
 // Soft, minimal map style — light roads, no clutter
 const MAP_STYLE = [
@@ -400,8 +402,8 @@ function MapPage() {
               box-shadow:0 4px 20px rgba(99,102,241,0.18),0 1px 4px rgba(0,0,0,0.08);
               padding:7px 12px;display:flex;flex-direction:column;align-items:center;
               z-index:200;pointer-events:none;border:1px solid rgba(199,210,254,0.8);">
-              <span style="color:#1C1C1E;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;line-height:1.3;">${this.biz.name}</span>
-              <span style="color:#6366F1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
+              <span style="color:#1C1C1E;font-family:${UI_FONT_STACK};font-size:12px;font-weight:600;line-height:1.3;">${this.biz.name}</span>
+              <span style="color:#6366F1;font-family:${UI_FONT_STACK};font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
               <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:rgba(255,255,255,0.96);border-right:1px solid rgba(199,210,254,0.8);border-bottom:1px solid rgba(199,210,254,0.8);"></div>
             </div>`;
         }
@@ -415,8 +417,8 @@ function MapPage() {
             display:flex;align-items:center;justify-content:center;position:relative;z-index:20;
             transition:all 0.15s;">
             ${this.imgSrc
-              ? `<img src="${this.imgSrc}" alt="" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
-              : `<span style="font-family:'Space Grotesk',sans-serif;font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
+              ? `<img src="${this.imgSrc}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
+              : `<span style="font-family:${UI_FONT_STACK};font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
             }
           </div>`;
 
@@ -491,7 +493,7 @@ function MapPage() {
             box-shadow:0 4px 16px rgba(99,102,241,0.40),0 2px 6px rgba(0,0,0,0.10);
             border:2.5px solid #ffffff;position:relative;z-index:20;">
             <span style="color:#ffffff;font-size:${fontSize}px;font-weight:700;
-              font-family:'Space Grotesk',sans-serif;line-height:1;">${n}</span>
+              font-family:${UI_FONT_STACK};line-height:1;">${n}</span>
           </div>
           <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
       }
@@ -525,7 +527,7 @@ function MapPage() {
           selected?.id === biz.id &&
           (currentSelectedIdx === null ? idx === 0 : idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
@@ -563,7 +565,7 @@ function MapPage() {
           ? markerKey === currentSelectedKey
           : selected?.id === biz.id && (currentSelectedIdx === null || idx === currentSelectedIdx);
         const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, biz.image || '', () => {
+        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
@@ -1040,8 +1042,10 @@ function MapPage() {
                       <img
                         alt={biz.name}
                         className="w-full h-full object-cover"
-                        src={biz.image}
+                        src={getOptimizedImageUrl(biz.image, { width: 112 })}
                         loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       <span className="font-bold text-xl text-blink-muted">{biz.name?.charAt(0)}</span>

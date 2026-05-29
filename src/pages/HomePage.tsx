@@ -18,6 +18,7 @@ import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { getOptimizedImageUrl } from '../utils/images';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -181,21 +182,13 @@ function HomePage() {
     return selected;
   }, [businesses]);
 
-  const businessBankNames = useMemo(() => {
-    const names: string[] = [];
-    businesses.forEach((business) => {
-      business.benefits.forEach((benefit) => {
-        if (benefit.bankName) {
-          names.push(benefit.bankName);
-        }
-      });
-    });
-    return names;
-  }, [businesses]);
-
+  // Available banks come solely from /api/banks, which excludes Modo-sourced
+  // benefits and keeps only banks with 5+ benefits. Deriving from loaded
+  // businesses would re-add banks that only exist via Modo promos and bypass
+  // the count threshold.
   const indexedEntities = useMemo(
-    () => buildBankOptions(availableBankNames, businessBankNames),
-    [availableBankNames, businessBankNames],
+    () => buildBankOptions(availableBankNames),
+    [availableBankNames],
   );
 
   return (
@@ -427,8 +420,10 @@ function HomePage() {
                       <img
                         alt={item.business.name}
                         className="absolute inset-0 w-full h-full object-cover"
-                        src={item.business.image}
+                        src={getOptimizedImageUrl(item.business.image, { width: 480 })}
                         loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
                       />
                     )}
                     {/* Dark scrim */}

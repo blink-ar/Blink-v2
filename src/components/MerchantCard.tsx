@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatDistance } from '../utils/distance';
 import { filterActiveBenefits } from '../utils/benefits';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
+import { getOptimizedImageUrl } from '../utils/images';
 
 interface MerchantCardProps {
   business: Business;
@@ -64,6 +65,7 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
   const maxDiscount = getMaxDiscount(activeBenefits);
   const maxInstallments = getMaxInstallments(activeBenefits);
   const categoryStyle = CATEGORY_STYLE[business.category] ?? { bg: '#DCFCE7', color: '#16A34A' };
+  const imageSrc = getOptimizedImageUrl(business.image, { width: 96 });
 
   return (
     <div
@@ -76,10 +78,10 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
         {/* Logo */}
         <div
           className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-          style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
+          style={{ background: imageSrc ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
         >
-          {business.image ? (
-            <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
+          {imageSrc ? (
+            <img alt={business.name} className="w-full h-full object-cover" src={imageSrc} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
           ) : (
             <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
               {business.name?.charAt(0)}

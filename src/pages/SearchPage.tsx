@@ -26,6 +26,7 @@ import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { matchesSearchPhrase } from '../utils/searchNormalization';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
+import { getOptimizedImageUrl } from '../utils/images';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -263,21 +264,12 @@ function SearchPage() {
     ? Array.from({ length: 4 }, () => null)
     : relativeBusinesses;
 
-  const businessBankNames = useMemo(() => {
-    const names = new Set<string>();
-    businesses.forEach((business) => {
-      business.benefits.forEach((benefit) => {
-        if (benefit.bankName) {
-          names.add(benefit.bankName);
-        }
-      });
-    });
-    return Array.from(names);
-  }, [businesses]);
-
+  // Available banks come solely from /api/banks, which excludes Modo-sourced
+  // benefits and keeps only banks with 5+ benefits. selectedBanks is unioned in
+  // so an active filter stays visible even if it falls outside that list.
   const bankOptions = useMemo<BankFilterOption[]>(() => {
-    return buildBankOptions(availableBankNames, businessBankNames, selectedBanks);
-  }, [availableBankNames, businessBankNames, selectedBanks]);
+    return buildBankOptions(availableBankNames, selectedBanks);
+  }, [availableBankNames, selectedBanks]);
 
   const activeFilterCount = [
     selectedBanks.length > 0,
@@ -1040,7 +1032,7 @@ function SearchPage() {
                         style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
                       >
                         {business.image ? (
-                          <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
+                          <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 96 })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                         ) : (
                           <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
                         )}
@@ -1131,7 +1123,7 @@ function SearchPage() {
                             style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
                           >
                             {business.image ? (
-                              <img alt={business.name} className="w-full h-full object-cover" src={business.image} loading="lazy" />
+                              <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 96 })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                             ) : (
                               <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
                             )}
@@ -1260,8 +1252,10 @@ function SearchPage() {
                             <img
                               alt={business.name}
                               className="w-full h-full object-cover"
-                              src={business.image}
+                              src={getOptimizedImageUrl(business.image, { width: 96 })}
                               loading="lazy"
+                              decoding="async"
+                              referrerPolicy="no-referrer"
                             />
                           ) : (
                             <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
