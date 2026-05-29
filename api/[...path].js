@@ -37,6 +37,19 @@ const MERCHANT_ASSETS_COLLECTION = 'merchant_assets';
 const BANK_CARDS_COLLECTION = 'bank_cards';
 const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
 const NOTIFICATION_HISTORY_COLLECTION = 'notification_history';
+
+// Benefits sourced from Modo's raw collection (MODO_PROMOS_RAW) list every
+// adhered bank inside their eligibilities, which would otherwise surface dozens
+// of banks we don't actually scrape directly. Identify them by sourceCollection
+// or by their id prefix so we can exclude them from the available banks list.
+const MODO_SOURCE_PATTERN = /modo[_-]?promos[_-]?raw/i;
+const MODO_ID_PREFIX_PATTERN = /^modo-promos-raw-/i;
+const EXCLUDE_MODO_SOURCE_MATCH = {
+  $nor: [
+    { sourceCollection: { $regex: MODO_SOURCE_PATTERN } },
+    { id: { $regex: MODO_ID_PREFIX_PATTERN } }
+  ]
+};
 const DEFAULT_BUSINESS_IMAGE =
   'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=400';
 const MERCHANT_SEO_PROJECTION = {
@@ -1947,6 +1960,9 @@ async function handleGetBanks(req, res, url, db) {
   const banks = await db.collection(collectionName)
     .aggregate([
       ...(activeMatch ? [{ $match: activeMatch }] : []),
+      // Exclude Modo-sourced benefits so the banks they list as eligible don't
+      // appear as available unless they have their own (non-Modo) benefits.
+      { $match: EXCLUDE_MODO_SOURCE_MATCH },
       { $unwind: '$eligibilities' },
       { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
       { $match: { count: { $gte: 5 } } },
