@@ -21,6 +21,13 @@ interface UseBenefitsDataReturn {
     featuredBenefits: RawMongoBenefit[];
     isLoading: boolean;
     isLoadingMore: boolean;
+    /**
+     * True whenever a request for the *current* query (search term + filters +
+     * location) is in flight — including the keepPreviousData window where stale
+     * results are still on screen. Use this to show a "searching" state instead
+     * of a premature "no results" message.
+     */
+    isFetching: boolean;
     error: string | null;
     hasMore: boolean;
     loadMore: () => void;
@@ -81,6 +88,7 @@ export function useBenefitsData(filters?: BenefitsFilters, options?: UseBenefits
     const {
         data,
         isLoading: isLoadingBusinesses,
+        isFetching: isFetchingBusinesses,
         isFetchingNextPage,
         error: businessesError,
         fetchNextPage,
@@ -164,6 +172,9 @@ export function useBenefitsData(filters?: BenefitsFilters, options?: UseBenefits
     // never hold the page in a skeleton state.
     const isLoading = isLoadingBusinesses;
     const isLoadingMore = isFetchingNextPage;
+    // Fetching the current query's first page (term/filter/location change), but
+    // not loading another page of the same query.
+    const isFetching = isFetchingBusinesses && !isFetchingNextPage;
 
     const error = businessesError
         ? (businessesError as Error).message
@@ -189,6 +200,7 @@ export function useBenefitsData(filters?: BenefitsFilters, options?: UseBenefits
         featuredBenefits,
         isLoading,
         isLoadingMore,
+        isFetching,
         error,
         hasMore: hasNextPage ?? false,
         loadMore,

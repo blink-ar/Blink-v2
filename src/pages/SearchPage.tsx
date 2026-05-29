@@ -163,6 +163,7 @@ function SearchPage() {
     businesses,
     isLoading,
     isLoadingMore,
+    isFetching,
     hasMore,
     loadMore,
     totalBusinesses,
@@ -202,6 +203,14 @@ function SearchPage() {
   const hasSelectedBanks = selectedBanks.length > 0;
   const hasSearchTerm = debouncedSearch.trim().length > 0;
 
+  // A search is "in progress" while the user is still typing (the debounce
+  // hasn't caught up yet) or the request for the current term is in flight.
+  // During this window strictMatches may be filtering stale results, so we must
+  // NOT treat an empty list as "no results" — that produced a premature
+  // "no encontramos" flash on every keystroke.
+  const pendingSearch = searchTerm.trim() !== debouncedSearch.trim();
+  const isSearching = pendingSearch || isFetching;
+
   // When a bank filter is active the API only returns filtered benefits per merchant.
   // Batch-fetch full business data so cards can show all their bank badges.
   const [fullBusinessesMap, setFullBusinessesMap] = useState<Map<string, Business>>(new Map());
@@ -220,7 +229,9 @@ function SearchPage() {
     });
     return () => { cancelled = true; };
   }, [enrichedIds, hasSelectedBanks]);
-  const primaryResultsEmpty = !isLoading && strictMatches.length === 0 && hasSearchTerm;
+  // Only consider results "empty" once a search has actually settled — never
+  // while one is still in progress.
+  const primaryResultsEmpty = !isLoading && !isSearching && strictMatches.length === 0 && hasSearchTerm;
 
   // Stable signature to re-trigger fallback queries when intent changes
   const searchIntentSignature = [
@@ -977,14 +988,26 @@ function SearchPage() {
         <div className="flex justify-between items-center mb-2">
           <h1 className="font-semibold text-base text-blink-ink">Tiendas</h1>
           <span
-            className="text-xs font-semibold px-2.5 py-1 rounded-full"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
             style={{ background: '#EEF2FF', color: '#4338CA' }}
           >
-            {totalBusinesses} resultados
+            {isSearching ? (
+              <>
+                <span className="w-3 h-3 border-2 border-[#4338CA]/30 border-t-[#4338CA] rounded-full animate-spin" />
+                Buscando…
+              </>
+            ) : (
+              `${totalBusinesses} resultados`
+            )}
           </span>
         </div>
 
-        {isLoading && !enrichedBusinesses.length ? (
+        {/* Show skeletons on the first load and whenever a search is in
+            progress with nothing matching yet — this prevents the "no
+            encontramos" message from flashing before results arrive. When the
+            new term refines the current list (strictMatches still has items),
+            those stay visible so it never blanks. */}
+        {(isLoading && !enrichedBusinesses.length) || (isSearching && strictMatches.length === 0) ? (
           Array.from({ length: 5 }).map((_, index) => (
             <SkeletonCard key={index} />
           ))
