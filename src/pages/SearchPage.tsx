@@ -154,7 +154,7 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position, permissionDenied, requestPermission } = useGeolocation();
+  const { position, permissionDenied, requestPermission, loading: locationLoading } = useGeolocation();
 
   const {
     businesses,
@@ -831,7 +831,7 @@ function SearchPage() {
                 <button
                   key="proximity"
                   onClick={() => {
-                    if (permissionDenied) {
+                    if (permissionDenied || (!position && !locationLoading)) {
                       requestPermission();
                       setSortByDistance(true);
                     } else {
