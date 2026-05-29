@@ -8,6 +8,7 @@ import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterS
 import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
 import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/UnifiedFilterSheet';
 import { useBenefitsData } from '../hooks/useBenefitsData';
+import { useMerchantDirectory } from '../hooks/useMerchantDirectory';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { useFallbackSearch } from '../hooks/useFallbackSearch';
 import { fetchBanks, fetchBusinessesPaginated, fetchBusinessById } from '../services/api';
@@ -210,6 +211,42 @@ function SearchPage() {
   // "no encontramos" flash on every keystroke.
   const pendingSearch = searchTerm.trim() !== debouncedSearch.trim();
   const isSearching = pendingSearch || isFetching;
+
+  // ── Instant search-as-you-type ───────────────────────────────────────────
+  // A bounded, locally-cached directory of merchants lets us match the typed
+  // term on the client with zero latency, painting results on every keystroke
+  // while the debounced /api/search request fetches the authoritative, complete
+  // list behind it. Gated to plain text searches with no other filters so every
+  // server-dependent feature (bank/category/online/proximity, fallbacks) keeps
+  // using the network path unchanged.
+  const { directory } = useMerchantDirectory();
+  const liveTerm = searchTerm.trim();
+  const instantEligible =
+    liveTerm.length > 0 &&
+    selectedBanks.length === 0 &&
+    !selectedCategory &&
+    !onlineOnly &&
+    !sortByDistance &&
+    minDiscount === undefined &&
+    availableDay === undefined &&
+    cardMode === undefined &&
+    network === undefined &&
+    hasInstallments === undefined;
+
+  const instantMatches = useMemo(() => {
+    if (!instantEligible) return [];
+    return directory.filter((b) =>
+      matchesSearchPhrase(b.name, liveTerm) ||
+      b.aliases?.some((alias) => matchesSearchPhrase(alias, liveTerm)),
+    );
+  }, [directory, instantEligible, liveTerm]);
+
+  // Show instant local matches while the network result for the current term is
+  // still loading; swap to the authoritative network results once they settle.
+  const displayMatches =
+    instantEligible && isSearching && instantMatches.length > 0
+      ? instantMatches
+      : strictMatches;
 
   // When a bank filter is active the API only returns filtered benefits per merchant.
   // Batch-fetch full business data so cards can show all their bank badges.
@@ -994,7 +1031,7 @@ function SearchPage() {
             {isSearching ? (
               <>
                 <span className="w-3 h-3 border-2 border-[#4338CA]/30 border-t-[#4338CA] rounded-full animate-spin" />
-                Buscando…
+                {displayMatches.length > 0 ? `${displayMatches.length}+` : 'Buscando…'}
               </>
             ) : (
               `${totalBusinesses} resultados`
@@ -1004,10 +1041,10 @@ function SearchPage() {
 
         {/* Show skeletons on the first load and whenever a search is in
             progress with nothing matching yet — this prevents the "no
-            encontramos" message from flashing before results arrive. When the
-            new term refines the current list (strictMatches still has items),
-            those stay visible so it never blanks. */}
-        {(isLoading && !enrichedBusinesses.length) || (isSearching && strictMatches.length === 0) ? (
+            encontramos" message from flashing before results arrive. Instant
+            local matches (displayMatches) keep the list populated as you type,
+            so it only falls back to skeletons when nothing matches yet. */}
+        {(isLoading && !enrichedBusinesses.length) || (isSearching && displayMatches.length === 0) ? (
           Array.from({ length: 5 }).map((_, index) => (
             <SkeletonCard key={index} />
           ))
@@ -1199,7 +1236,7 @@ function SearchPage() {
               </>
             )}
           </div>
-        ) : strictMatches.length === 0 ? (
+        ) : displayMatches.length === 0 ? (
           /* ── Generic empty (filters applied, no search term) ── */
           <div className="text-center py-16">
             <div
@@ -1212,7 +1249,7 @@ function SearchPage() {
             <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
-          strictMatches.map((business, index) => (
+          displayMatches.map((business, index) => (
             <BusinessResultCard
               key={business.id}
               business={business}

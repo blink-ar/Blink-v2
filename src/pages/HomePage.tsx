@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +19,7 @@ import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking'
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { prefetchMerchantDirectory } from '../hooks/useMerchantDirectory';
 import { getOptimizedImageUrl } from '../utils/images';
 
 type NavigatorWithStandalone = Navigator & {
@@ -36,6 +37,7 @@ function isIOSBrowser(): boolean {
 
 function HomePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isSupported, isSubscribed } = usePushNotifications();
   const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
   const showBell = iosNotInstalled || isSupported;
@@ -79,6 +81,8 @@ function HomePage() {
   }, []);
 
   const openSearchOverlay = () => {
+    // Warm the instant-search corpus the moment the user shows search intent.
+    prefetchMerchantDirectory(queryClient);
     focusSearchInput();
     flushSync(() => {
       setHomeSearchTerm('');
@@ -328,7 +332,7 @@ function HomePage() {
 
           {/* CTA Button */}
           <button
-            onClick={() => navigate('/search')}
+            onClick={() => { prefetchMerchantDirectory(queryClient); navigate('/search'); }}
             className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 px-5 transition-all duration-150 active:scale-[0.98]"
             style={{
               background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
