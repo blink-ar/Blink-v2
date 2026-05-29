@@ -136,10 +136,12 @@ function SearchPage() {
     setSearchParams(params, { replace: true });
   }, [debouncedSearch, selectedCategory, selectedBanks, onlineOnly, maxDistance, minDiscount, availableDay, cardMode, network, hasInstallments, sortByDistance, setSearchParams]);
 
-  // Debounce search — short enough to feel responsive while still collapsing
-  // a burst of keystrokes into a single request.
+  // Debounce search so a burst of keystrokes collapses into a single request
+  // once typing pauses. Previous results stay on screen during the fetch (see
+  // keepPreviousData in useBenefitsData) and strictMatches re-filters them by
+  // the new term instantly, so this never blanks the list per keystroke.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 

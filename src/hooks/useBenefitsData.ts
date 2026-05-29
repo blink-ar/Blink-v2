@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
@@ -123,6 +123,11 @@ export function useBenefitsData(filters?: BenefitsFilters, options?: UseBenefits
         // and tab navigation render instantly from cache instead of re-fetching
         // the whole list and flashing skeletons on every mount.
         staleTime: 2 * 60 * 1000,
+        // While the search term / filters change, keep the previous results on
+        // screen until the new ones arrive instead of blanking to skeletons.
+        // This is what makes search-as-you-type feel smooth rather than
+        // "re-running" on every keystroke.
+        placeholderData: keepPreviousData,
     });
 
     // No need for refetch useEffect - enabled option handles waiting for position
