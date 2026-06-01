@@ -2662,11 +2662,22 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     });
   }
 
-  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants) || requestedBank;
-  const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants) || requestedCategory;
+  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants);
+  const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants);
   const city = cityParam
-    ? (resolveLandingCityFromMerchants(cityParam, data.merchants) || requestedCity)
+    ? resolveLandingCityFromMerchants(cityParam, data.merchants)
     : null;
+
+  if (!bank || !category || (cityParam && !city)) {
+    return json(res, 404, {
+      success: false,
+      error: 'Landing page not found',
+      bank: bankParam,
+      category: categoryParam,
+      ...(cityParam && { city: cityParam })
+    });
+  }
+
   const canonicalPath = getLandingSeoPath(bank, category, city);
   const requestedPath = cityParam
     ? `/descuentos/${bankParam}/${categoryParam}/${cityParam}`

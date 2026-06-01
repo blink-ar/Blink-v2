@@ -57,6 +57,28 @@ function createCursor<T>(data: T[]) {
   return cursor;
 }
 
+function createPaginatedCursor<T>(data: T[]) {
+  let offset = 0;
+  let count = data.length;
+  const cursor = {
+    sort() {
+      return cursor;
+    },
+    skip(value: number) {
+      offset = value;
+      return cursor;
+    },
+    limit(value: number) {
+      count = value;
+      return cursor;
+    },
+    async toArray() {
+      return data.slice(offset, offset + count);
+    }
+  };
+  return cursor;
+}
+
 function createAggregateCursor<T>(data: T[]) {
   return {
     async toArray() {
@@ -572,6 +594,9 @@ describe('merchant-first serverless helpers', () => {
       merchantName: 'Coto',
       categories: ['shopping'],
       banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
       activeBenefitCount: 2,
       benefitCount: 4,
       maxDiscountPercentage: 25,
@@ -723,6 +748,9 @@ describe('merchant-first serverless helpers', () => {
       merchantName: 'Coto',
       categories: ['shopping'],
       banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
       activeBenefitCount: 2,
       benefitCount: 4,
       maxDiscountPercentage: 25,
@@ -774,9 +802,9 @@ describe('merchant-first serverless helpers', () => {
     expect(merchantQueries[0]).toEqual({
       isActive: { $ne: false },
       merchantId: { $exists: true, $type: 'string' },
-      benefitCount: { $gt: 0 },
+      activeBenefitCount: { $gt: 0 },
       categories: { $in: ['shopping'] },
-      banks: { $in: expect.arrayContaining([expect.any(RegExp)]) }
+      'searchProfile.benefits.bankName': { $in: expect.arrayContaining([expect.any(RegExp)]) }
     });
   });
 
@@ -839,12 +867,86 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('href="/comercios/ypf--merchant_2"');
   });
 
+  it('handleLandingSeoPage scans city matches beyond the first merchant fetch window', async () => {
+    const nonMatchingMerchants = Array.from({ length: 500 }, (_, index) => ({
+      merchantId: `merchant_other_${index}`,
+      merchantName: `Other ${index}`,
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 10,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Cordoba'
+          }
+        }
+      ]
+    }));
+    const matchingMerchant = {
+      merchantId: 'merchant_match',
+      merchantName: 'Coto Buenos Aires',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 2,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              throw new Error('City landing pages should count by scanning all matching merchants');
+            },
+            find() {
+              return createPaginatedCursor([...nonMatchingMerchants, matchingMerchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping/buenos-aires');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', 'buenos-aires', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('1 comercios encontrados');
+    expect(res.body).toContain('Coto Buenos Aires');
+    expect(res.body).not.toContain('Other 0');
+  });
+
   it('handleLandingSeoPage redirects dynamic aliases to canonical landing paths', async () => {
     const merchant = {
       merchantId: 'merchant_1',
       merchantName: 'Coto',
       categories: ['shopping'],
       banks: ['Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
       activeBenefitCount: 2,
       benefitCount: 4,
       maxDiscountPercentage: 25,
@@ -875,6 +977,52 @@ describe('merchant-first serverless helpers', () => {
 
     expect(res.statusCode).toBe(301);
     expect(res.headers.Location).toBe('/descuentos/galicia/shopping');
+  });
+
+  it('handleLandingSeoPage rejects unknown bank slugs not backed by canonical merchant banks', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/a/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'a', 'shopping');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'a',
+      category: 'shopping'
+    });
   });
 
   it('handleLandingSeoPage returns 404 for invalid landing combinations', async () => {

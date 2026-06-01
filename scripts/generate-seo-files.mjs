@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
+import ts from 'typescript';
 import { DEFAULT_CANONICAL_SITE_URL, resolveCanonicalSiteUrl } from '../api/canonical-site.js';
 import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
 import { buildLandingSeoRoutesFromMerchants } from '../api/landing-seo-data.js';
@@ -74,6 +75,52 @@ const categorySeoRoutes = SEO_CATEGORY_DEFINITIONS.map((category) => ({
   priority: '0.8',
 }));
 
+function extractExportedSlugArray(sourceFile, exportName) {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== exportName) continue;
+      if (!declaration.initializer || !ts.isArrayLiteralExpression(declaration.initializer)) return [];
+
+      return declaration.initializer.elements.flatMap((element) => {
+        if (!ts.isObjectLiteralExpression(element)) return [];
+        const slugProperty = element.properties.find((property) => {
+          return ts.isPropertyAssignment(property) &&
+            ts.isIdentifier(property.name) &&
+            property.name.text === 'slug';
+        });
+        if (!slugProperty || !ts.isPropertyAssignment(slugProperty)) return [];
+        return (
+          ts.isStringLiteral(slugProperty.initializer) ||
+          ts.isNoSubstitutionTemplateLiteral(slugProperty.initializer)
+        ) ? [slugProperty.initializer.text] : [];
+      });
+    }
+  }
+
+  return [];
+}
+
+function readClientLandingRouteAllowlist() {
+  const landingDataPath = path.resolve(process.cwd(), 'src/seo/landingData.ts');
+  const sourceText = fs.readFileSync(landingDataPath, 'utf8');
+  const sourceFile = ts.createSourceFile(
+    landingDataPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  return {
+    allowedBankSlugs: extractExportedSlugArray(sourceFile, 'LANDING_BANKS'),
+    allowedCategorySlugs: extractExportedSlugArray(sourceFile, 'LANDING_CATEGORIES'),
+    allowedCitySlugs: extractExportedSlugArray(sourceFile, 'LANDING_CITIES'),
+  };
+}
+
 function escapeXml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -104,7 +151,7 @@ async function loadMerchantSeoDocuments() {
         {
           isActive: { $ne: false },
           merchantId: { $exists: true, $type: 'string' },
-          benefitCount: { $gt: 0 },
+          activeBenefitCount: { $gt: 0 },
         },
         {
           projection: {
@@ -114,6 +161,8 @@ async function loadMerchantSeoDocuments() {
             categories: 1,
             banks: 1,
             locations: 1,
+            activeBenefitCount: 1,
+            'searchProfile.benefits.bankName': 1,
           },
         },
       )
@@ -142,6 +191,7 @@ const landingRoutes = buildLandingSeoRoutesFromMerchants(merchantDocuments, {
   maxCityRoutesPerCombination: Number.isFinite(landingMaxCityRoutesPerCombination)
     ? landingMaxCityRoutesPerCombination
     : 5,
+  ...readClientLandingRouteAllowlist(),
 });
 const routes = [...baseRoutes, ...categorySeoRoutes, ...landingRoutes, ...merchantRoutes];
 const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());

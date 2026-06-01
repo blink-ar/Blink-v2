@@ -19,7 +19,7 @@ const DEFAULT_SITE_NAME = 'Blink';
 const DEFAULT_SITE_URL = 'https://www.blinkapp.com.ar';
 const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 const LANDING_PAGE_SIZE = 24;
-const LANDING_FETCH_LIMIT = 500;
+const LANDING_CITY_FETCH_BATCH_SIZE = 500;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -319,7 +319,7 @@ function buildHeadHtml({ title, description, absoluteUrl, structuredData }) {
     `    <meta name="twitter:title" content="${escapedTitle}" />`,
     `    <meta name="twitter:description" content="${escapedDescription}" />`,
     `    <meta name="twitter:image" content="${escapedImage}" />`,
-    `    <script type="application/ld+json" data-blink-landing-seo="structured-data">${escapeJsonForHtml(structuredData)}</script>`,
+    `    <script type="application/ld+json" data-blink-landing-seo="structured-data" data-blink-seo-url="${escapedUrl}">${escapeJsonForHtml(structuredData)}</script>`,
     '    <style data-blink-landing-seo>',
     '      .blink-landing-shell{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1040px;margin:0 auto;padding:32px 20px 56px;color:#111827;background:#fff}',
     '      .blink-landing-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;font-size:14px;margin-bottom:32px;color:#4b5563}.blink-landing-breadcrumb a{color:#111827}',
@@ -339,7 +339,44 @@ function getBankPatterns(bank) {
       compactLandingBankName(bank.name),
       ...(bank.aliases || []),
     ].filter(Boolean))
-  ).map((value) => new RegExp(escapeRegex(value), 'i'));
+  )
+    .filter((value) => normalizeLandingSearchText(value).length >= 2)
+    .map((value) => {
+      const phrasePattern = escapeRegex(String(value).trim()).replace(/\s+/g, '\\s+');
+      return new RegExp(`(^|[^A-Za-z0-9])${phrasePattern}([^A-Za-z0-9]|$)`, 'i');
+    });
+}
+
+function getLandingSort() {
+  return { activeBenefitCount: -1, maxDiscountPercentage: -1, benefitCount: -1, merchantName: 1 };
+}
+
+async function loadCityLandingSeoData({ collection, merchantQuery, projection, city }) {
+  let resultCount = 0;
+  const merchants = [];
+
+  for (let skip = 0; ; skip += LANDING_CITY_FETCH_BATCH_SIZE) {
+    const batch = await collection
+      .find(merchantQuery, { projection })
+      .sort(getLandingSort())
+      .skip(skip)
+      .limit(LANDING_CITY_FETCH_BATCH_SIZE)
+      .toArray();
+
+    if (batch.length === 0) break;
+
+    for (const merchant of batch) {
+      if (!merchantMatchesCity(merchant, city)) continue;
+      resultCount += 1;
+      if (merchants.length < LANDING_PAGE_SIZE) {
+        merchants.push(merchant);
+      }
+    }
+
+    if (batch.length < LANDING_CITY_FETCH_BATCH_SIZE) break;
+  }
+
+  return { resultCount, merchants };
 }
 
 export async function loadLandingSeoData({ db, merchantCollectionName, bank, category, city }) {
@@ -347,9 +384,9 @@ export async function loadLandingSeoData({ db, merchantCollectionName, bank, cat
   const merchantQuery = {
     isActive: { $ne: false },
     merchantId: { $exists: true, $type: 'string' },
-    benefitCount: { $gt: 0 },
+    activeBenefitCount: { $gt: 0 },
     categories: { $in: categoryValues },
-    banks: { $in: getBankPatterns(bank) },
+    'searchProfile.benefits.bankName': { $in: getBankPatterns(bank) },
   };
   const projection = {
     _id: 0,
@@ -364,18 +401,28 @@ export async function loadLandingSeoData({ db, merchantCollectionName, bank, cat
     searchProfile: 1,
   };
   const collection = db.collection(merchantCollectionName);
-  const baseCountPromise = city ? null : collection.countDocuments(merchantQuery);
-  const merchants = await collection
-    .find(merchantQuery, { projection })
-    .sort({ activeBenefitCount: -1, maxDiscountPercentage: -1, benefitCount: -1, merchantName: 1 })
-    .limit(city ? LANDING_FETCH_LIMIT : LANDING_PAGE_SIZE)
-    .toArray();
-  const filteredMerchants = city ? merchants.filter((merchant) => merchantMatchesCity(merchant, city)) : merchants;
-  const resultCount = city ? filteredMerchants.length : await baseCountPromise;
+
+  if (city) {
+    return loadCityLandingSeoData({
+      collection,
+      merchantQuery,
+      projection,
+      city,
+    });
+  }
+
+  const [resultCount, merchants] = await Promise.all([
+    collection.countDocuments(merchantQuery),
+    collection
+      .find(merchantQuery, { projection })
+      .sort(getLandingSort())
+      .limit(LANDING_PAGE_SIZE)
+      .toArray(),
+  ]);
 
   return {
     resultCount,
-    merchants: filteredMerchants.slice(0, LANDING_PAGE_SIZE),
+    merchants,
   };
 }
 
