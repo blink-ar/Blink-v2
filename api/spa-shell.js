@@ -3,18 +3,33 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveCanonicalSiteUrl } from './canonical-site.js';
 
-const VALID_LANDING_BANKS = new Set(['galicia', 'santander', 'bbva', 'macro', 'nacion', 'icbc']);
-const VALID_LANDING_CATEGORIES = new Set(['gastronomia', 'moda', 'shopping', 'hogar', 'deportes', 'belleza']);
-const VALID_LANDING_CITIES = new Set([
-  'buenos-aires',
-  'caba',
-  'cordoba',
-  'rosario',
-  'mendoza',
-  'la-plata',
-  'mar-del-plata',
-  'tucuman',
-]);
+const LANDING_BANKS = [
+  { slug: 'galicia', aliases: ['galicia'] },
+  { slug: 'santander', aliases: ['santander', 'rio'] },
+  { slug: 'bbva', aliases: ['bbva', 'frances', 'banco frances'] },
+  { slug: 'macro', aliases: ['macro'] },
+  { slug: 'nacion', aliases: ['nacion', 'bna', 'banco nacion'] },
+  { slug: 'icbc', aliases: ['icbc'] },
+];
+const LANDING_CATEGORIES = [
+  { slug: 'gastronomia' },
+  { slug: 'moda' },
+  { slug: 'shopping' },
+  { slug: 'hogar' },
+  { slug: 'deportes' },
+  { slug: 'belleza' },
+];
+const LANDING_CITIES = [
+  { slug: 'buenos-aires', aliases: ['buenos aires', 'provincia de buenos aires'] },
+  { slug: 'caba', aliases: ['caba', 'ciudad autonoma de buenos aires', 'cdad autonoma de buenos aires', 'capital federal'] },
+  { slug: 'cordoba', aliases: ['cordoba', 'cordoba capital'] },
+  { slug: 'rosario', aliases: ['rosario', 'santa fe'] },
+  { slug: 'mendoza', aliases: ['mendoza'] },
+  { slug: 'la-plata', aliases: ['la plata'] },
+  { slug: 'mar-del-plata', aliases: ['mar del plata'] },
+  { slug: 'tucuman', aliases: ['tucuman', 'san miguel de tucuman'] },
+];
+const MALFORMED_PATH = '/__blink_malformed_path__';
 
 let cachedAppShell = null;
 
@@ -62,26 +77,53 @@ function getRequestedPath(url) {
   const rawPath = url.searchParams.get('path');
   if (!rawPath) return '/';
 
-  const normalized = `/${rawPath
-    .split('/')
-    .map((segment) => decodeURIComponent(segment))
-    .filter(Boolean)
-    .join('/')}`;
+  const decodedSegments = [];
+  for (const segment of rawPath.split('/')) {
+    try {
+      decodedSegments.push(decodeURIComponent(segment));
+    } catch {
+      return MALFORMED_PATH;
+    }
+  }
+
+  const normalized = `/${decodedSegments.join('/')}`;
 
   return normalized === '/' ? '/' : normalized.replace(/\/+$/, '');
 }
 
+function normalizeLandingToken(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveLandingDefinition(definitions, slug) {
+  if (!slug) return null;
+  const normalizedSlug = normalizeLandingToken(slug);
+  return definitions.find((definition) => {
+    return definition.slug === slug || definition.aliases?.some((alias) => {
+      return normalizeLandingToken(alias) === normalizedSlug;
+    });
+  }) ?? null;
+}
+
 function isValidLandingPath(pathname) {
-  const parts = pathname.split('/').filter(Boolean);
+  const parts = pathname.startsWith('/') ? pathname.slice(1).split('/') : pathname.split('/');
   if (parts[0] !== 'descuentos') return false;
   if (parts.length !== 3 && parts.length !== 4) return false;
+  if (parts.some((part) => !part)) return false;
 
   const [, bank, category, city] = parts;
-  if (!VALID_LANDING_BANKS.has(bank) || !VALID_LANDING_CATEGORIES.has(category)) {
+  if (!resolveLandingDefinition(LANDING_BANKS, bank) || !resolveLandingDefinition(LANDING_CATEGORIES, category)) {
     return false;
   }
 
-  return !city || VALID_LANDING_CITIES.has(city);
+  return !city || Boolean(resolveLandingDefinition(LANDING_CITIES, city));
 }
 
 export function isKnownSpaPath(pathname) {
