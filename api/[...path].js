@@ -24,6 +24,14 @@ import {
   renderCategorySeoHtml,
   resolveSeoCategory
 } from './category-seo.js';
+import {
+  getLandingSeoPath,
+  loadLandingSeoData,
+  renderLandingSeoHtml,
+  resolveLandingBank,
+  resolveLandingCategory,
+  resolveLandingCity
+} from './landing-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
 const ALLOWED_COLLECTIONS = new Set([
@@ -2618,6 +2626,54 @@ async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam
   return html(res, 200, renderedHtml);
 }
 
+async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam, cityParam, options = {}) {
+  const bank = resolveLandingBank(bankParam);
+  const category = resolveLandingCategory(categoryParam);
+  const city = cityParam ? resolveLandingCity(cityParam) : null;
+
+  if (!bank || !category || (cityParam && !city)) {
+    return json(res, 404, {
+      success: false,
+      error: 'Landing page not found',
+      bank: bankParam,
+      category: categoryParam,
+      ...(cityParam && { city: cityParam })
+    });
+  }
+
+  const canonicalPath = getLandingSeoPath(bank, category, city);
+  const requestedPath = cityParam
+    ? `/descuentos/${bankParam}/${categoryParam}/${cityParam}`
+    : `/descuentos/${bankParam}/${categoryParam}`;
+
+  if (requestedPath !== canonicalPath) {
+    setCacheControl(res, CC_CONTENT);
+    return redirect(res, 301, canonicalPath);
+  }
+
+  const data = await loadLandingSeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    bank,
+    category,
+    city
+  });
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderLandingSeoHtml({
+    appShell,
+    bank,
+    category,
+    city,
+    merchants: data.merchants,
+    resultCount: data.resultCount,
+    path: canonicalPath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handlePlaceDetails(req, res) {
   const body = await readJsonBody(req);
   const placeId = body?.placeId;
@@ -2650,6 +2706,7 @@ export {
   handleGetBenefits,
   handleGetBusinesses,
   handleCategorySeoPage,
+  handleLandingSeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
   handleSearch,
@@ -2737,6 +2794,19 @@ export default async function handler(req, res) {
         );
       }
 
+      const landingSeoMatch = path.match(/^\/api\/descuentos\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/);
+      if (landingSeoMatch) {
+        return await handleLandingSeoPage(
+          req,
+          res,
+          url,
+          db,
+          decodeURIComponent(landingSeoMatch[1]),
+          decodeURIComponent(landingSeoMatch[2]),
+          landingSeoMatch[3] ? decodeURIComponent(landingSeoMatch[3]) : undefined
+        );
+      }
+
       const merchantSeoMatch = path.match(/^\/api\/comercios\/([^/]+)$/);
       if (merchantSeoMatch) {
         return await handleMerchantSeoPage(req, res, url, db, decodeURIComponent(merchantSeoMatch[1]));
@@ -2820,6 +2890,8 @@ export default async function handler(req, res) {
         'GET /api/businesses',
         'GET /api/categorias/:category',
         'GET /api/categorias/:category/page/:page',
+        'GET /api/descuentos/:bank/:category',
+        'GET /api/descuentos/:bank/:category/:city',
         'GET /api/comercios/:slugId',
         'GET /api/business/:id',
         'GET /api/search',

@@ -3,6 +3,12 @@ import path from 'node:path';
 import { MongoClient } from 'mongodb';
 import { DEFAULT_CANONICAL_SITE_URL, resolveCanonicalSiteUrl } from '../api/canonical-site.js';
 import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
+import {
+  LANDING_BANK_DEFINITIONS,
+  LANDING_CATEGORY_DEFINITIONS,
+  LANDING_CITY_DEFINITIONS,
+  getLandingSeoPath,
+} from '../api/landing-seo-data.js';
 import { slugify } from '../api/search/normalize.js';
 
 const DEFAULT_SITE_URL = DEFAULT_CANONICAL_SITE_URL;
@@ -55,9 +61,9 @@ const mongoUri = process.env.MONGODB_URI_READ_ONLY || '';
 const databaseName = process.env.DATABASE_NAME || DEFAULT_DATABASE_NAME;
 
 const today = new Date().toISOString().split('T')[0];
-const banks = ['galicia', 'santander', 'bbva', 'macro', 'nacion', 'icbc'];
-const categories = ['gastronomia', 'moda', 'shopping', 'hogar', 'deportes', 'belleza'];
-const cities = ['buenos-aires', 'caba', 'cordoba', 'rosario', 'mendoza'];
+const banks = LANDING_BANK_DEFINITIONS;
+const categories = LANDING_CATEGORY_DEFINITIONS;
+const cities = LANDING_CITY_DEFINITIONS.slice(0, 5);
 
 const baseRoutes = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -130,14 +136,14 @@ const landingRoutes = [];
 for (const bank of banks) {
   for (const category of categories) {
     landingRoutes.push({
-      path: `/descuentos/${bank}/${category}`,
+      path: getLandingSeoPath(bank, category),
       changefreq: 'weekly',
       priority: '0.8',
     });
 
     for (const city of cities) {
       landingRoutes.push({
-        path: `/descuentos/${bank}/${category}/${city}`,
+        path: getLandingSeoPath(bank, category, city),
         changefreq: 'weekly',
         priority: '0.7',
       });

@@ -6,6 +6,7 @@ import {
   handleGetBenefits,
   handleGetBusinesses,
   handleLegacyBusinessRedirect,
+  handleLandingSeoPage,
   handleMerchantSeoPage,
   resolveRequestPath,
   rehydrateBenefitDoc
@@ -74,6 +75,8 @@ describe('merchant-first serverless helpers', () => {
     expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda?path=categorias/moda'))).toBe('/api/categorias/moda');
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
+    expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia?path=descuentos/galicia/gastronomia'))).toBe('/api/descuentos/galicia/gastronomia');
+    expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia/caba?path=descuentos/galicia/gastronomia/caba'))).toBe('/api/descuentos/galicia/gastronomia/caba');
   });
 
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
@@ -710,6 +713,109 @@ describe('merchant-first serverless helpers', () => {
       error: 'Category page not found',
       category: 'moda',
       page: 3
+    });
+  });
+
+  it('handleLandingSeoPage returns crawlable HTML with merchant links', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Descuentos Banco Galicia en Supermercado y shopping | Blink</title>');
+    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Supermercado y shopping</h1>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/galicia/shopping"');
+    expect(res.body).toContain('href="/comercios/coto--merchant_1"');
+    expect(res.body).toContain('Banco Galicia');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(res.body).toContain('https://schema.org');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
+      benefitCount: { $gt: 0 },
+      categories: { $in: ['shopping'] },
+      banks: { $in: expect.arrayContaining([expect.any(RegExp)]) }
+    });
+  });
+
+  it('handleLandingSeoPage redirects aliases to canonical landing paths', async () => {
+    const db = {
+      collection() {
+        throw new Error('Landing alias redirects should not query MongoDB');
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/frances/moda');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'frances', 'moda');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/descuentos/bbva/moda');
+  });
+
+  it('handleLandingSeoPage returns 404 for invalid landing combinations', async () => {
+    const db = {
+      collection() {
+        throw new Error('Invalid landing pages should not query MongoDB');
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/nope/moda');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'nope', 'moda');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'nope',
+      category: 'moda'
     });
   });
 
