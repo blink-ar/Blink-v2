@@ -3,8 +3,13 @@ import { useSEO } from '../../hooks/useSEO';
 import { SEOConfig, SITE_NAME, toAbsoluteUrl } from '../../seo/seo';
 import { resolveSeoCategory } from '../../seo/categoryPages';
 
+function normalizePathname(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
 function RouteSEO() {
   const location = useLocation();
+  const normalizedPathname = normalizePathname(location.pathname);
   const queryParams = new URLSearchParams(location.search);
   const searchTerm = (queryParams.get('q') ?? '').trim();
   const selectedCategory = (queryParams.get('category') ?? '').trim();
@@ -106,11 +111,11 @@ function RouteSEO() {
       path: location.pathname,
       type: 'article',
     };
-  } else if (location.pathname === '/saved' || location.pathname === '/profile') {
+  } else if (normalizedPathname === '/saved' || normalizedPathname === '/profile') {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
-      path: location.pathname,
+      path: normalizedPathname,
       robots: 'noindex, nofollow',
     };
   } else {

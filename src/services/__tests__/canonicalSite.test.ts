@@ -69,7 +69,25 @@ describe('Vercel host redirect config', () => {
           ]),
         }),
         expect.objectContaining({
+          source: '/profile/',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
           source: '/saved',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/saved/',
           headers: expect.arrayContaining([
             {
               key: 'X-Robots-Tag',
