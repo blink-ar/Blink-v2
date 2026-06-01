@@ -96,21 +96,31 @@ function setCanonical(path: string): void {
   canonical.setAttribute('href', toAbsoluteUrl(path));
 }
 
+function getComparableSeoPath(pathOrUrl: string): string {
+  try {
+    const parsed = new URL(pathOrUrl, getSiteUrl());
+    return parsed.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return String(pathOrUrl || '').replace(/\/+$/, '') || '/';
+  }
+}
+
 function getCurrentServerStructuredDataScripts(absoluteUrl: string): HTMLScriptElement[] {
+  const currentPath = getComparableSeoPath(absoluteUrl);
   const serverScripts = Array.from(
     document.querySelectorAll<HTMLScriptElement>(SERVER_STRUCTURED_DATA_SELECTOR)
   );
 
   serverScripts.forEach((script) => {
     const scriptUrl = script.dataset.blinkSeoUrl;
-    if (scriptUrl && scriptUrl !== absoluteUrl) {
+    if (scriptUrl && getComparableSeoPath(scriptUrl) !== currentPath) {
       script.remove();
     }
   });
 
   return serverScripts.filter((script) => {
     const scriptUrl = script.dataset.blinkSeoUrl;
-    return script.isConnected && (!scriptUrl || scriptUrl === absoluteUrl);
+    return script.isConnected && (!scriptUrl || getComparableSeoPath(scriptUrl) === currentPath);
   });
 }
 

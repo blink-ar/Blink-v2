@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { applySEO } from '../seo';
+import { applySEO, toAbsoluteUrl } from '../seo';
 
 function addServerStructuredData(kind: 'merchant' | 'category', url: string, value: unknown): HTMLScriptElement {
   const script = document.createElement('script');
@@ -65,7 +65,7 @@ describe('applySEO structured data handling', () => {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
     expect(scripts).toHaveLength(1);
     expect(scripts[0]).toHaveAttribute('data-blink-seo', 'structured-data');
-    expect(scripts[0]).toHaveAttribute('data-blink-seo-url', 'https://www.blinkapp.com.ar/search');
+    expect(scripts[0]).toHaveAttribute('data-blink-seo-url', toAbsoluteUrl('/search'));
     expect(scripts[0].textContent).toContain('SearchResultsPage');
   });
 
