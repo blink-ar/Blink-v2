@@ -1,9 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
 import { fetchBusinessById } from '../../services/api';
 import { useSEO } from '../../hooks/useSEO';
+
+const TEST_SYSTEM_TIME = new Date('2026-05-15T12:00:00.000Z');
+const EXPIRED_VALID_UNTIL = '2020-01-01';
+const ACTIVE_VALID_UNTIL = '2026-06-30';
+const EARLIER_ACTIVE_VALID_UNTIL = '2026-05-31';
 
 const routerMocks = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
@@ -84,12 +89,18 @@ const mockBusiness: Business = {
 
 describe('BusinessDetailPage', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TEST_SYSTEM_TIME);
     vi.clearAllMocks();
     routerMocks.mockUseParams.mockReturnValue({ id: 'merchant_69a6f741b7ff0ecb9e33cf58' });
     routerMocks.mockUseLocation.mockReturnValue({
       state: null,
       pathname: '/business/merchant_69a6f741b7ff0ecb9e33cf58'
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loads the business by exact merchant id when route state is missing', async () => {
@@ -156,7 +167,7 @@ describe('BusinessDetailPage', () => {
       benefits: [
         {
           ...mockBusiness.benefits[0],
-          validUntil: '2020-01-01',
+          validUntil: EXPIRED_VALID_UNTIL,
         },
       ],
     });
@@ -172,7 +183,7 @@ describe('BusinessDetailPage', () => {
 
     expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
     expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
-    expect(screen.getByText('Venció: 2020-01-01')).toBeInTheDocument();
+    expect(screen.getByText(`Venció: ${EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
   });
 
   it('shows lower-installment rows from the same bank when validity differs', async () => {
@@ -188,7 +199,7 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 12,
           cuando: 'Lunes, Martes',
-          validUntil: '2026-06-30'
+          validUntil: ACTIVE_VALID_UNTIL
         },
         {
           bankName: 'Naranja X',
@@ -199,7 +210,7 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 10,
           cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
-          validUntil: '2026-05-31'
+          validUntil: EARLIER_ACTIVE_VALID_UNTIL
         },
       ],
     });
@@ -225,7 +236,6 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 6,
           cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
-          validUntil: '2026-12-31',
           eligibilities: [
             {
               bank: 'nacion',
