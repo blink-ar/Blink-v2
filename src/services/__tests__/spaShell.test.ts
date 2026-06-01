@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import handler, { isKnownSpaPath } from '../../../api/spa-shell.js';
+import { spaNavigationFallbackAllowlist } from '../../seo/spaNavigationFallback';
 
 function createResponseCapture() {
   return {
@@ -27,10 +28,13 @@ describe('SPA shell route guard', () => {
 
   it('recognizes valid client-side routes', () => {
     expect(isKnownSpaPath('/search')).toBe(true);
+    expect(isKnownSpaPath('/Search')).toBe(true);
     expect(isKnownSpaPath('/benefit/abc/1')).toBe(true);
+    expect(isKnownSpaPath('/Benefit/abc/1')).toBe(true);
     expect(isKnownSpaPath('/descuentos/galicia/gastronomia')).toBe(true);
     expect(isKnownSpaPath('/descuentos/galicia/gastronomia/caba')).toBe(true);
     expect(isKnownSpaPath('/descuentos/rio/gastronomia')).toBe(true);
+    expect(isKnownSpaPath('/Descuentos/Rio/Gastronomia')).toBe(true);
     expect(isKnownSpaPath('/descuentos/galicia/gastronomia/capital-federal')).toBe(true);
   });
 
@@ -103,5 +107,37 @@ describe('SPA shell route guard', () => {
     expect(res.statusCode).toBe(404);
     expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow');
     expect(res.body).toContain('<title>Pagina no encontrada | Blink</title>');
+  });
+
+  it('rejects encoded slashes in rewritten paths before route validation', async () => {
+    const req = {
+      method: 'GET',
+      url: '/api/spa-shell?path=descuentos/galicia%2Fgastronomia',
+      headers: {
+        host: 'www.blinkapp.com.ar',
+        'x-forwarded-proto': 'https',
+      },
+    };
+    const res = createResponseCapture();
+
+    await handler(req as never, res as never);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow');
+    expect(res.body).toContain('<title>Pagina no encontrada | Blink</title>');
+  });
+
+  it('limits the service worker navigation fallback to known SPA routes', () => {
+    const matchesFallback = (pathname: string) => {
+      return spaNavigationFallbackAllowlist.some((pattern) => pattern.test(pathname));
+    };
+
+    expect(matchesFallback('/search')).toBe(true);
+    expect(matchesFallback('/Search')).toBe(true);
+    expect(matchesFallback('/benefit/abc/1')).toBe(true);
+    expect(matchesFallback('/descuentos/rio/gastronomia/capital-federal')).toBe(true);
+    expect(matchesFallback('/no-such-path')).toBe(false);
+    expect(matchesFallback('/descuentos/nope/gastronomia')).toBe(false);
+    expect(matchesFallback('/descuentos/galicia%2Fgastronomia')).toBe(false);
   });
 });

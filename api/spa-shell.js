@@ -73,14 +73,45 @@ function getParsedUrl(req) {
   return new URL(req.url || '/', `${protocol}://${host}`);
 }
 
+function getRawSearchParam(url, name) {
+  const query = url.search.startsWith('?') ? url.search.slice(1) : url.search;
+  if (!query) return null;
+
+  for (const part of query.split('&')) {
+    const separatorIndex = part.indexOf('=');
+    const rawKey = separatorIndex >= 0 ? part.slice(0, separatorIndex) : part;
+    const rawValue = separatorIndex >= 0 ? part.slice(separatorIndex + 1) : '';
+    try {
+      if (decodeURIComponent(rawKey.replace(/\+/g, ' ')) === name) {
+        return rawValue;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function hasEncodedPathSeparator(value) {
+  return /%(?:2f|5c)/i.test(String(value || ''));
+}
+
 function getRequestedPath(url) {
+  const rawPathParam = getRawSearchParam(url, 'path');
+  if (hasEncodedPathSeparator(rawPathParam)) return MALFORMED_PATH;
+
   const rawPath = url.searchParams.get('path');
   if (!rawPath) return '/';
 
   const decodedSegments = [];
   for (const segment of rawPath.split('/')) {
     try {
-      decodedSegments.push(decodeURIComponent(segment));
+      const decodedSegment = decodeURIComponent(segment);
+      if (decodedSegment.includes('/') || decodedSegment.includes('\\')) {
+        return MALFORMED_PATH;
+      }
+      decodedSegments.push(decodedSegment);
     } catch {
       return MALFORMED_PATH;
     }
@@ -127,7 +158,7 @@ function isValidLandingPath(pathname) {
 }
 
 export function isKnownSpaPath(pathname) {
-  const path = String(pathname || '/').replace(/\/+$/, '') || '/';
+  const path = (String(pathname || '/').replace(/\/+$/, '') || '/').toLowerCase();
   if ([
     '/',
     '/home',
