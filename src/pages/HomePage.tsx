@@ -20,6 +20,7 @@ import InstallPWABanner from '../components/InstallPWAPopup';
 import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
+import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -364,6 +365,53 @@ function HomePage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="px-4 -mt-3">
+          <div className="flex flex-col gap-5">
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-blink-ink">Categorias populares</h2>
+                <Link to="/search" className="text-xs font-semibold text-primary">
+                  Ver filtros
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {HOME_CATEGORY_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-white px-3 text-sm font-semibold text-blink-ink active:scale-[0.98] transition-transform"
+                    style={{ border: '1px solid #E8E6E1' }}
+                  >
+                    <span className="truncate">{link.label}</span>
+                    <span className="material-symbols-outlined text-blink-muted shrink-0" style={{ fontSize: 18 }}>
+                      chevron_right
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-3 text-base font-semibold text-blink-ink">Descuentos por banco</h2>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {HOME_DISCOUNT_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-sm font-semibold text-blink-ink active:scale-95 transition-transform"
+                    style={{ border: '1px solid #E8E6E1' }}
+                  >
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 17 }}>
+                      account_balance
+                    </span>
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
