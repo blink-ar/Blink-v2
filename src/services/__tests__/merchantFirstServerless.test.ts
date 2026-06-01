@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   handleCategorySeoPage,
   handleGetBenefitById,
@@ -101,9 +102,37 @@ describe('merchant-first serverless helpers', () => {
     expect(result.merchantSnapshot.merchantId).toBe('merchant_1');
   });
 
+  it('buildBusinessBenefitSummary preserves MODO source metadata for non-MODO ids', () => {
+    const result = buildBusinessBenefitSummary({
+      id: 'confirmed-benefit-1',
+      merchantId: 'merchant_1',
+      sourceCollection: 'MODO_PROMOS_RAW',
+      rawBenefitCollection: 'MODO_PROMOS_RAW',
+      source: 'modo',
+      benefitTitle: '20% en Nutrican',
+      availableDays: ['viernes'],
+      discountPercentage: 20,
+      caps: [{ amount: 6000 }],
+      online: false,
+      validUntil: '2026-07-31',
+      eligibilities: [
+        {
+          providerName: 'Banco Ciudad',
+          cardType: 'visa-credit'
+        }
+      ]
+    }, new Map([['visa-credit', 'Visa crédito']]));
+
+    expect(result.id).toBe('confirmed-benefit-1');
+    expect(result.sourceCollection).toBe('MODO_PROMOS_RAW');
+    expect(result.rawBenefitCollection).toBe('MODO_PROMOS_RAW');
+    expect(result.source).toBe('modo');
+  });
+
   it('handleGetBusinesses paginates merchants before benefit hydration', async () => {
     const merchantQueries: unknown[] = [];
     const benefitQueries: unknown[] = [];
+    const benefitFindOptions: unknown[] = [];
 
     const merchants = [
       {
@@ -175,8 +204,9 @@ describe('merchant-first serverless helpers', () => {
 
         if (name === 'confirmed_benefits') {
           return {
-            find(query: unknown) {
+            find(query: unknown, options: unknown) {
               benefitQueries.push(query);
+              benefitFindOptions.push(options);
               return createCursor(benefits);
             }
           };
@@ -207,6 +237,11 @@ describe('merchant-first serverless helpers', () => {
     expect(payload.businesses[0].benefits).toHaveLength(1);
     expect((merchantQueries[0] as { categories: unknown }).categories).toEqual({ $in: ['shopping'] });
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+    expect((benefitFindOptions[0] as { projection: Record<string, number> }).projection).toMatchObject({
+      sourceCollection: 1,
+      rawBenefitCollection: 1,
+      source: 1
+    });
   });
 
   it('handleGetBusinesses supports exact merchantId lookups without fuzzy search filters', async () => {
