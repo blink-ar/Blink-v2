@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import handler, { isKnownSpaPath } from '../../../api/spa-shell.js';
 
 function createResponseCapture() {
@@ -21,6 +21,10 @@ function createResponseCapture() {
 }
 
 describe('SPA shell route guard', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('recognizes valid client-side routes', () => {
     expect(isKnownSpaPath('/search')).toBe(true);
     expect(isKnownSpaPath('/benefit/abc/1')).toBe(true);
@@ -58,6 +62,29 @@ describe('SPA shell route guard', () => {
     expect(res.body).toContain('<meta name="robots" content="noindex, nofollow" />');
     expect(res.body).toContain('<title>Pagina no encontrada | Blink</title>');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/no-such-path"');
+  });
+
+  it('falls back when a site env value is malformed by literal quotes', async () => {
+    vi.stubEnv('CANONICAL_SITE_URL', '');
+    vi.stubEnv('VITE_CANONICAL_SITE_URL', '');
+    vi.stubEnv('VITE_SITE_URL', '"https://www.blinkapp.com.ar');
+    vi.stubEnv('SITE_URL', '');
+
+    const req = {
+      method: 'GET',
+      url: '/api/spa-shell?path=no-such-path',
+      headers: {
+        host: 'preview.blinkapp.test',
+        'x-forwarded-proto': 'https',
+      },
+    };
+    const res = createResponseCapture();
+
+    await handler(req as never, res as never);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toContain('href="https://preview.blinkapp.test/no-such-path"');
+    expect(res.body).not.toContain('&quot;https');
   });
 
   it('returns a noindex 404 for malformed encoded path segments', async () => {
