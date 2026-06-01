@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BENEFIT_SUMMARY_PROJECTION,
+  buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   handleCategorySeoPage,
   handleGetBenefitById,
@@ -10,6 +12,7 @@ import {
   resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
+import { isModoSourcedBenefit } from '../../utils/benefitDisplay';
 
 const merchantSeoAppShell = [
   '<!doctype html>',
@@ -1100,5 +1103,58 @@ describe('merchant-first serverless helpers', () => {
         }
       }
     });
+  });
+
+  it('BENEFIT_SUMMARY_PROJECTION fetches Modo source metadata fields', () => {
+    expect(BENEFIT_SUMMARY_PROJECTION.sourceCollection).toBe(1);
+    expect(BENEFIT_SUMMARY_PROJECTION.rawBenefitCollection).toBe(1);
+    expect(BENEFIT_SUMMARY_PROJECTION.source).toBe(1);
+  });
+
+  it('buildBusinessBenefitSummary preserves Modo source markers for non-modo-prefixed ids', () => {
+    const benefit = {
+      // A Modo-sourced benefit whose serialized id does NOT start with
+      // `modo-promos-raw-`, so source detection cannot rely on the id alone.
+      id: 'confirmed-benefit-6a0b61c6eaebf0b793d9dd15',
+      merchantId: 'merchant_69a6f56db7ff0ecb9e33be21',
+      benefitTitle: '20% en Nutrican',
+      discountPercentage: 20,
+      caps: [{ amount: 5000 }],
+      availableDays: [],
+      online: false,
+      validUntil: '2026-07-31',
+      sourceCollection: 'MODO_PROMOS_RAW',
+      rawBenefitCollection: 'MODO_PROMOS_RAW',
+      source: 'modo'
+    };
+
+    const summary = buildBusinessBenefitSummary(benefit, new Map());
+
+    expect(summary.sourceCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.rawBenefitCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.source).toBe('modo');
+    // The summarized record must still be detectable as Modo-sourced downstream
+    // even though its id is not enough to identify the source.
+    expect(isModoSourcedBenefit(summary as never)).toBe(true);
+  });
+
+  it('buildBusinessBenefitSummary omits absent Modo source markers', () => {
+    const benefit = {
+      id: 'benefit-1',
+      merchantId: 'merchant_1',
+      benefitTitle: '20% OFF',
+      discountPercentage: 20,
+      caps: [],
+      availableDays: [],
+      online: false,
+      validUntil: '2099-12-31'
+    };
+
+    const summary = buildBusinessBenefitSummary(benefit, new Map());
+
+    expect('sourceCollection' in summary).toBe(false);
+    expect('rawBenefitCollection' in summary).toBe(false);
+    expect('source' in summary).toBe(false);
+    expect(isModoSourcedBenefit(summary as never)).toBe(false);
   });
 });

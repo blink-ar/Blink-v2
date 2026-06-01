@@ -88,7 +88,12 @@ const BENEFIT_SUMMARY_PROJECTION = {
   description: 1,
   termsAndConditions: 1,
   link: 1,
-  validUntil: 1
+  validUntil: 1,
+  // Preserve Modo origin markers so downstream display/dedupe logic can identify
+  // Modo-sourced promos even when the serialized `id` is not enough on its own.
+  sourceCollection: 1,
+  rawBenefitCollection: 1,
+  source: 1
 };
 
 const REQUIRED_PRODUCTION_ENV_VARS = [
@@ -697,7 +702,13 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
-    subscriptionIds: getBenefitSubscriptionIds(benefit)
+    subscriptionIds: getBenefitSubscriptionIds(benefit),
+    // Carry Modo origin markers through the summary so display code and dedupe
+    // logic can reliably flag Modo-sourced promos, including records whose `id`
+    // does not start with `modo-promos-raw-`.
+    ...(benefit?.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
+    ...(benefit?.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
+    ...(benefit?.source ? { source: benefit.source } : {})
   };
 }
 
@@ -2643,6 +2654,7 @@ async function handlePlaceDetails(req, res) {
 }
 
 export {
+  BENEFIT_SUMMARY_PROJECTION,
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   resolveRequestPath,
