@@ -344,4 +344,102 @@ describe('dedupeModoBenefits', () => {
     expect(result).toHaveLength(1);
     expect(result[0].acceptsModo).toBe(true);
   });
+
+  it('recognizes Modo benefits by source metadata even when the id lacks the modo prefix', () => {
+    const bank = makeBenefit({
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+    });
+    const modo = makeBenefit({
+      id: 'confirmed-benefit-abc123',
+      banks: ['galicia'],
+      availableDays: ['lunes'],
+      discountPercentage: 15,
+      installments: 3,
+      ...({ sourceCollection: 'MODO_PROMOS_RAW' } as Partial<BankBenefit>),
+    });
+    const result = dedupeModoBenefits([bank, modo]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(bank.id);
+    expect(result[0].acceptsModo).toBe(true);
+  });
+
+  it('collapses bank-specific Modo rows into a broader Modo row covering the same offer', () => {
+    // Reproduces the Nutrican case (issue #126): a 18-bank "20% en Nutrican" Modo
+    // row plus separate per-bank BUEPP and CIUDAD Modo rows whose ids do not start
+    // with `modo-promos-raw-`. All three describe the same offer and should collapse
+    // into the single broad Modo row.
+    const aggregate = makeModo(['buepp', 'ciudad', 'bbva', 'galicia'], {
+      benefit: '20% en Nutrican',
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-07-31',
+    });
+    const bueppRow = makeBenefit({
+      id: 'confirmed-benefit-buepp',
+      banks: ['buepp'],
+      benefit: '20% en Nutrican',
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-07-31',
+      ...({ rawBenefitCollection: 'MODO_PROMOS_RAW' } as Partial<BankBenefit>),
+    });
+    const ciudadRow = makeBenefit({
+      id: 'confirmed-benefit-ciudad',
+      banks: ['ciudad'],
+      benefit: '20% en Nutrican',
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-07-31',
+      ...({ source: 'modo' } as Partial<BankBenefit>),
+    });
+
+    const result = dedupeModoBenefits([bueppRow, ciudadRow, aggregate]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(aggregate.id);
+    expect(result.some((b) => b.id === 'confirmed-benefit-buepp')).toBe(false);
+    expect(result.some((b) => b.id === 'confirmed-benefit-ciudad')).toBe(false);
+  });
+
+  it('per-bank Modo collapse keeps the longest validUntil of the merged rows', () => {
+    const aggregate = makeModo(['buepp', 'ciudad'], {
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-07-31',
+    });
+    const bueppRow = makeBenefit({
+      id: 'confirmed-benefit-buepp',
+      banks: ['buepp'],
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+      validUntil: '2026-09-30',
+      ...({ source: 'MODO_PROMOS_RAW' } as Partial<BankBenefit>),
+    });
+
+    const result = dedupeModoBenefits([aggregate, bueppRow]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(aggregate.id);
+    expect(result[0].validUntil).toBe('2026-09-30');
+  });
+
+  it('does not collapse Modo rows for different offers even when source metadata matches', () => {
+    const twentyOff = makeModo(['buepp', 'ciudad'], {
+      availableDays: ['lunes'],
+      discountPercentage: 20,
+    });
+    const tenOff = makeBenefit({
+      id: 'confirmed-benefit-buepp',
+      banks: ['buepp'],
+      availableDays: ['lunes'],
+      discountPercentage: 10,
+      ...({ source: 'modo' } as Partial<BankBenefit>),
+    });
+
+    const result = dedupeModoBenefits([twentyOff, tenOff]);
+    expect(result).toHaveLength(2);
+  });
 });

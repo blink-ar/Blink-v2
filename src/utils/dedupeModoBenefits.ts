@@ -1,8 +1,13 @@
 import { BankBenefit } from '../types';
 import { parseDayAvailability, DayAvailability, hasAnyDayAvailable } from './dayAvailabilityParser';
+import { isModoSourcedBenefit } from './benefitDisplay';
 
-const isModoBenefit = (benefit: BankBenefit): boolean =>
-  /^modo-promos-raw-/i.test(benefit.id || '');
+// A benefit is treated as Modo-sourced when any of its source markers reference
+// Modo, not just when its serialized `id` starts with `modo-promos-raw-`. Modo
+// promos can surface (e.g. through /api/businesses summaries) with ids that no
+// longer carry that prefix, so we rely on the shared metadata-aware detection
+// used by the rest of the codebase (api/merchant-seo.js, src/utils/benefitDisplay.ts).
+const isModoBenefit = (benefit: BankBenefit): boolean => isModoSourcedBenefit(benefit);
 
 const COMBINING_MARKS = /[\u0300-\u036f]/g;
 
@@ -134,11 +139,51 @@ export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
   const acceptsModoIndices = new Set<number>();
   const validUntilByIndex = new Map<number, BankBenefit['validUntil']>();
 
-  modoEntries.forEach(({ index: modoIdx, benefit: modo }) => {
+  // Pass 1: collapse bank-specific Modo rows that duplicate a broader Modo row.
+  // Modo promos are emitted once per adhered bank, so a Modo row whose eligible
+  // bank set is a subset of another Modo row covering the same offer (matchKey)
+  // is a duplicate. Process broader rows first so they absorb the narrower ones
+  // (e.g. the 18-bank "20% en Nutrican" row absorbs the per-bank BUEPP/CIUDAD rows).
+  const survivingModo: Array<{ index: number; benefit: BankBenefit }> = [];
+  const modoByBankCountDesc = [...modoEntries].sort(
+    (a, b) => getEligibilityBankKeys(b.benefit).length - getEligibilityBankKeys(a.benefit).length,
+  );
+
+  modoByBankCountDesc.forEach((entry) => {
+    const entryBanks = getEligibilityBankKeys(entry.benefit);
+    if (entryBanks.length === 0) {
+      survivingModo.push(entry);
+      return;
+    }
+
+    const entryKey = benefitMatchKey(entry.benefit);
+    const absorber = survivingModo.find(({ benefit }) => {
+      const banks = getEligibilityBankKeys(benefit);
+      if (banks.length === 0 || !keysEqual(entryKey, benefitMatchKey(benefit))) return false;
+      const bankSet = new Set(banks);
+      return entryBanks.every((bank) => bankSet.has(bank));
+    });
+
+    if (absorber) {
+      dropIndices.add(entry.index);
+      const base = validUntilByIndex.has(absorber.index)
+        ? validUntilByIndex.get(absorber.index)
+        : absorber.benefit.validUntil;
+      validUntilByIndex.set(absorber.index, pickLongerValidUntil(base, entry.benefit.validUntil));
+    } else {
+      survivingModo.push(entry);
+    }
+  });
+
+  // Pass 2: dedupe the surviving Modo rows against standalone bank benefits.
+  survivingModo.forEach(({ index: modoIdx, benefit: modo }) => {
     const modoBanks = getEligibilityBankKeys(modo);
     if (modoBanks.length === 0) return;
 
     const modoKey = benefitMatchKey(modo);
+    const modoValidUntil = validUntilByIndex.has(modoIdx)
+      ? validUntilByIndex.get(modoIdx)
+      : modo.validUntil;
 
     if (modoBanks.length === 1) {
       const modoBank = modoBanks[0];
@@ -153,12 +198,12 @@ export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
         const base = validUntilByIndex.has(match.index)
           ? validUntilByIndex.get(match.index)
           : match.benefit.validUntil;
-        validUntilByIndex.set(match.index, pickLongerValidUntil(base, modo.validUntil));
+        validUntilByIndex.set(match.index, pickLongerValidUntil(base, modoValidUntil));
       }
       return;
     }
 
-    let mergedValidUntil = modo.validUntil;
+    let mergedValidUntil = modoValidUntil;
     let didMerge = false;
     modoBanks.forEach((modoBank) => {
       const match = bankEntries.find(({ index, benefit }) => {
