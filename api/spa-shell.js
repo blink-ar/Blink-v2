@@ -178,6 +178,14 @@ export function isKnownSpaPath(pathname) {
     return true;
   }
 
+  if (/^\/(?:comercios|business)\/[^/]+$/.test(path)) {
+    return true;
+  }
+
+  if (/^\/categorias\/[^/]+(?:\/page\/[^/]+)?$/.test(path)) {
+    return true;
+  }
+
   return isValidLandingPath(path);
 }
 

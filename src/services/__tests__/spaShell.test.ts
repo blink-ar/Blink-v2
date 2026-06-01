@@ -31,6 +31,10 @@ describe('SPA shell route guard', () => {
     expect(isKnownSpaPath('/Search')).toBe(true);
     expect(isKnownSpaPath('/benefit/abc/1')).toBe(true);
     expect(isKnownSpaPath('/Benefit/abc/1')).toBe(true);
+    expect(isKnownSpaPath('/comercios/coto--merchant_1')).toBe(true);
+    expect(isKnownSpaPath('/business/merchant_1')).toBe(true);
+    expect(isKnownSpaPath('/categorias/gastronomia')).toBe(true);
+    expect(isKnownSpaPath('/categorias/gastronomia/page/foo')).toBe(true);
     expect(isKnownSpaPath('/descuentos/galicia/gastronomia')).toBe(true);
     expect(isKnownSpaPath('/descuentos/galicia/gastronomia/caba')).toBe(true);
     expect(isKnownSpaPath('/descuentos/rio/gastronomia')).toBe(true);
@@ -133,10 +137,16 @@ describe('SPA shell route guard', () => {
     };
 
     expect(matchesFallback('/search')).toBe(true);
+    expect(matchesFallback('/search?category=gastronomia')).toBe(true);
     expect(matchesFallback('/Search')).toBe(true);
+    expect(matchesFallback('/auth/callback?code=abc')).toBe(true);
     expect(matchesFallback('/benefit/abc/1')).toBe(true);
+    expect(matchesFallback('/comercios/coto--merchant_1')).toBe(true);
+    expect(matchesFallback('/business/merchant_1')).toBe(true);
+    expect(matchesFallback('/categorias/gastronomia/page/foo')).toBe(true);
     expect(matchesFallback('/descuentos/rio/gastronomia/capital-federal')).toBe(true);
     expect(matchesFallback('/no-such-path')).toBe(false);
+    expect(matchesFallback('/no-such-path?x=1')).toBe(false);
     expect(matchesFallback('/descuentos/nope/gastronomia')).toBe(false);
     expect(matchesFallback('/descuentos/galicia%2Fgastronomia')).toBe(false);
   });

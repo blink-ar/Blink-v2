@@ -33,12 +33,15 @@ const landingCityPattern = [
 ].join('|');
 
 export const spaNavigationFallbackAllowlist: RegExp[] = [
-  /^\/$/i,
-  /^\/(?:home|search|map|saved|profile|notifications|signup|login)\/?$/i,
-  /^\/auth\/callback\/?$/i,
-  /^\/benefit\/[^/]+(?:\/[^/]+)?\/?$/i,
+  /^\/(?:\?.*)?$/i,
+  /^\/(?:home|search|map|saved|profile|notifications|signup|login)\/?(?:\?.*)?$/i,
+  /^\/auth\/callback\/?(?:\?.*)?$/i,
+  /^\/benefit\/[^/?]+(?:\/[^/?]+)?\/?(?:\?.*)?$/i,
+  /^\/comercios\/[^/?]+\/?(?:\?.*)?$/i,
+  /^\/business\/[^/?]+\/?(?:\?.*)?$/i,
+  /^\/categorias\/[^/?]+(?:\/page\/[^/?]+)?\/?(?:\?.*)?$/i,
   new RegExp(
-    `^/descuentos/(?:${landingBankPattern})/(?:${landingCategoryPattern})(?:/(?:${landingCityPattern}))?/?$`,
+    `^/descuentos/(?:${landingBankPattern})/(?:${landingCategoryPattern})(?:/(?:${landingCityPattern}))?/?(?:\\?.*)?$`,
     'i'
   ),
 ];
