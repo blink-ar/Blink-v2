@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
@@ -21,6 +21,13 @@ interface UseBenefitsDataReturn {
     featuredBenefits: RawMongoBenefit[];
     isLoading: boolean;
     isLoadingMore: boolean;
+    /**
+     * True whenever a request for the *current* query (search term + filters +
+     * location) is in flight — including the keepPreviousData window where stale
+     * results are still on screen. Use this to show a "searching" state instead
+     * of a premature "no results" message.
+     */
+    isFetching: boolean;
     error: string | null;
     hasMore: boolean;
     loadMore: () => void;
@@ -46,11 +53,21 @@ export interface BenefitsFilters {
     sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
 
+export interface UseBenefitsDataOptions {
+    /**
+     * Fetch the supplemental "featured benefits" list. Most pages only render
+     * `businesses`, so this defaults to false to avoid a wasted request on
+     * every page load. Pages that actually consume `featuredBenefits` opt in.
+     */
+    includeFeatured?: boolean;
+}
+
 /**
  * Hook for accessing benefits data with React Query
  * Uses /api/search when text query is present, otherwise /api/businesses for listing pagination.
  */
-export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
+export function useBenefitsData(filters?: BenefitsFilters, options?: UseBenefitsDataOptions): UseBenefitsDataReturn {
+    const includeFeatured = options?.includeFeatured ?? false;
     const { position, loading: positionLoading } = useGeolocation();
     const wantsSortByDistance = filters?.sortByDistance ?? false;
     // Only use proximity sort when the filter is active AND we have real coordinates.
@@ -71,6 +88,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
     const {
         data,
         isLoading: isLoadingBusinesses,
+        isFetching: isFetchingBusinesses,
         isFetchingNextPage,
         error: businessesError,
         fetchNextPage,
@@ -107,7 +125,17 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         // back to the geohash/no-location key instead of the 'exact' key, preventing
         // pollution of the proximity-sorted cache entry.
         enabled: !positionLoading,
-        staleTime: 0,
+        // Keep results fresh for a couple of minutes. The query key fully encodes
+        // location (geohash / exact coords) and every active filter, so cached
+        // entries are always correct for the current view. This lets back/forward
+        // and tab navigation render instantly from cache instead of re-fetching
+        // the whole list and flashing skeletons on every mount.
+        staleTime: 2 * 60 * 1000,
+        // While the search term / filters change, keep the previous results on
+        // screen until the new ones arrive instead of blanking to skeletons.
+        // This is what makes search-as-you-type feel smooth rather than
+        // "re-running" on every keystroke.
+        placeholderData: keepPreviousData,
     });
 
     // No need for refetch useEffect - enabled option handles waiting for position
@@ -115,12 +143,13 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
     // Fetch featured benefits
     const {
         data: featuredBenefits = [],
-        isLoading: isLoadingFeatured,
         error: featuredError,
         refetch: refetchFeatured,
     } = useQuery({
         queryKey: queryKeys.featuredBenefits,
         queryFn: () => getRawBenefits({ limit: 10 }),
+        enabled: includeFeatured,
+        staleTime: 5 * 60 * 1000,
     });
 
     // Flatten all pages into a single array of businesses and deduplicate by ID
@@ -138,8 +167,14 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
-    const isLoading = isLoadingBusinesses || isLoadingFeatured;
+    // `isLoading` reflects only the primary businesses list — that's what every
+    // consumer renders. The featured list is supplemental and opt-in, so it must
+    // never hold the page in a skeleton state.
+    const isLoading = isLoadingBusinesses;
     const isLoadingMore = isFetchingNextPage;
+    // Fetching the current query's first page (term/filter/location change), but
+    // not loading another page of the same query.
+    const isFetching = isFetchingBusinesses && !isFetchingNextPage;
 
     const error = businessesError
         ? (businessesError as Error).message
@@ -165,6 +200,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         featuredBenefits,
         isLoading,
         isLoadingMore,
+        isFetching,
         error,
         hasMore: hasNextPage ?? false,
         loadMore,

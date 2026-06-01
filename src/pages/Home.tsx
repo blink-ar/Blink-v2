@@ -100,7 +100,7 @@ function Home() {
     hasInstallments,
     onlineOnly,
     sortByDistance,
-  });
+  }, { includeFeatured: true });
 
   // Track when data has loaded at least once
   useEffect(() => {
