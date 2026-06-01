@@ -2662,7 +2662,7 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     });
   }
 
-  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants);
+  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants, { includeClientDefinitions: true });
   const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants);
   const city = cityParam
     ? resolveLandingCityFromMerchants(cityParam, data.merchants)

@@ -138,6 +138,12 @@ function mergeDefinition(map, definition) {
   });
 }
 
+function seedDefinitionMap(map, definitions) {
+  for (const definition of toArray(definitions)) {
+    mergeDefinition(map, definition);
+  }
+}
+
 export function buildLandingBankDefinition(value) {
   const name = formatLandingName(value);
   if (!name) return null;
@@ -176,6 +182,15 @@ export function buildLandingCityDefinition(value) {
     aliases: createAliases(value, name, slug),
   };
 }
+
+const CLIENT_LANDING_BANK_DEFINITIONS = [
+  { slug: 'galicia', name: 'Banco Galicia', aliases: createAliases('galicia', 'Banco Galicia') },
+  { slug: 'santander', name: 'Banco Santander', aliases: createAliases('santander', 'rio', 'Banco Santander', 'Banco Santander Rio', 'Banco Santander Río') },
+  { slug: 'bbva', name: 'BBVA', aliases: createAliases('bbva', 'frances', 'banco frances', 'Banco Francés') },
+  { slug: 'macro', name: 'Banco Macro', aliases: createAliases('macro', 'Banco Macro') },
+  { slug: 'nacion', name: 'Banco Nacion', aliases: createAliases('nacion', 'bna', 'banco nacion', 'Banco Nación') },
+  { slug: 'icbc', name: 'ICBC', aliases: createAliases('icbc', 'ICBC') },
+];
 
 export function resolveLandingBank(value, definitions = []) {
   return resolveExistingLandingDefinition(value, definitions) || buildLandingBankDefinition(value);
@@ -220,8 +235,9 @@ export function getLandingCityValuesFromMerchant(merchant) {
   return uniqueStrings(values);
 }
 
-export function buildLandingBankDefinitionsFromMerchants(merchants) {
+export function buildLandingBankDefinitionsFromMerchants(merchants, seedDefinitions = []) {
   const map = new Map();
+  seedDefinitionMap(map, seedDefinitions);
   for (const merchant of toArray(merchants)) {
     for (const value of getLandingBankValuesFromMerchant(merchant)) {
       mergeDefinition(map, buildLandingBankDefinition(value));
@@ -230,8 +246,9 @@ export function buildLandingBankDefinitionsFromMerchants(merchants) {
   return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-export function buildLandingCategoryDefinitionsFromMerchants(merchants) {
+export function buildLandingCategoryDefinitionsFromMerchants(merchants, seedDefinitions = []) {
   const map = new Map();
+  seedDefinitionMap(map, seedDefinitions);
   for (const merchant of toArray(merchants)) {
     for (const value of getLandingCategoryValuesFromMerchant(merchant)) {
       mergeDefinition(map, buildLandingCategoryDefinition(value));
@@ -240,8 +257,9 @@ export function buildLandingCategoryDefinitionsFromMerchants(merchants) {
   return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-export function buildLandingCityDefinitionsFromMerchants(merchants) {
+export function buildLandingCityDefinitionsFromMerchants(merchants, seedDefinitions = []) {
   const map = new Map();
+  seedDefinitionMap(map, seedDefinitions);
   for (const merchant of toArray(merchants)) {
     for (const value of getLandingCityValuesFromMerchant(merchant)) {
       mergeDefinition(map, buildLandingCityDefinition(value));
@@ -250,8 +268,9 @@ export function buildLandingCityDefinitionsFromMerchants(merchants) {
   return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-export function resolveLandingBankFromMerchants(value, merchants) {
-  return resolveExistingLandingDefinition(value, buildLandingBankDefinitionsFromMerchants(merchants));
+export function resolveLandingBankFromMerchants(value, merchants, options = {}) {
+  const seedDefinitions = options.includeClientDefinitions ? CLIENT_LANDING_BANK_DEFINITIONS : options.seedDefinitions;
+  return resolveExistingLandingDefinition(value, buildLandingBankDefinitionsFromMerchants(merchants, seedDefinitions));
 }
 
 export function resolveLandingCategoryFromMerchants(value, merchants) {

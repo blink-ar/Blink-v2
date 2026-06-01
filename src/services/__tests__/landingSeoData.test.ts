@@ -29,6 +29,17 @@ describe('landing SEO data helpers', () => {
     expect(resolveLandingBankFromMerchants('a', [merchant])).toBeNull();
   });
 
+  it('can seed client aliases when validating bank names from merchant data', () => {
+    const merchant = {
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Santander Río' }]
+      }
+    };
+
+    expect(resolveLandingBankFromMerchants('santander', [merchant], { includeClientDefinitions: true })?.slug).toBe('santander');
+    expect(resolveLandingBankFromMerchants('rio', [merchant], { includeClientDefinitions: true })?.slug).toBe('santander');
+  });
+
   it('filters generated sitemap landing routes to client-supported slugs', () => {
     const merchants = [
       {

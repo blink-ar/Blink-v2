@@ -808,6 +808,100 @@ describe('merchant-first serverless helpers', () => {
     });
   });
 
+  it('handleLandingSeoPage matches accented bank names with unaccented slugs', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_nacion',
+      merchantName: 'Farmacia',
+      categories: ['shopping'],
+      banks: ['Banco Nación'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Nación' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/nacion/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'nacion', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
+    expect(bankPatterns.some((pattern) => pattern.test('Banco Nación'))).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos Banco Nacion en Shopping | Blink</title>');
+  });
+
+  it('handleLandingSeoPage preserves client bank aliases for Santander Rio merchant data', async () => {
+    const merchant = {
+      merchantId: 'merchant_santander',
+      merchantName: 'Restaurante',
+      categories: ['shopping'],
+      banks: ['Banco Santander Río'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Santander Río' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 30,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/santander/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'santander', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos Banco Santander en Shopping | Blink</title>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/santander/shopping"');
+  });
+
   it('handleLandingSeoPage renders landing pages from merchant data outside the seed list', async () => {
     const merchant = {
       merchantId: 'merchant_2',

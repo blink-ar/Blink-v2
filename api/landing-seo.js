@@ -342,9 +342,29 @@ function getBankPatterns(bank) {
   )
     .filter((value) => normalizeLandingSearchText(value).length >= 2)
     .map((value) => {
-      const phrasePattern = escapeRegex(String(value).trim()).replace(/\s+/g, '\\s+');
+      const phrasePattern = buildAccentInsensitiveRegexSource(value);
       return new RegExp(`(^|[^A-Za-z0-9])${phrasePattern}([^A-Za-z0-9]|$)`, 'i');
     });
+}
+
+function buildAccentInsensitiveRegexSource(value) {
+  const accentClasses = {
+    a: '[aAáÁàÀäÄâÂãÃ]',
+    e: '[eEéÉèÈëËêÊ]',
+    i: '[iIíÍìÌïÏîÎ]',
+    o: '[oOóÓòÒöÖôÔõÕ]',
+    u: '[uUúÚùÙüÜûÛ]',
+    n: '[nNñÑ]',
+    c: '[cCçÇ]',
+  };
+
+  return normalizeLandingSearchText(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => Array.from(word)
+      .map((char) => accentClasses[char] || escapeRegex(char))
+      .join(''))
+    .join('\\s+');
 }
 
 function getLandingSort() {
