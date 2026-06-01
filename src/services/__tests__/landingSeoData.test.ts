@@ -95,4 +95,51 @@ describe('landing SEO data helpers', () => {
     ]));
     expect(routes).toHaveLength(2);
   });
+
+  it('maps merchant aliases to client slugs when allowlisting generated landing routes', () => {
+    const merchants = [
+      {
+        categories: ['shopping'],
+        locations: [{ formattedAddress: 'Ciudad Autónoma de Buenos Aires' }],
+        searchProfile: {
+          benefits: [{ bankName: 'Banco Santander Río' }]
+        }
+      }
+    ];
+
+    const routes = buildLandingSeoRoutesFromMerchants(merchants, {
+      minMerchantCount: 1,
+      allowedBankSlugs: ['santander'],
+      allowedCategorySlugs: ['shopping'],
+      allowedCitySlugs: ['caba'],
+    });
+
+    expect(routes.map((route) => route.path)).toEqual(expect.arrayContaining([
+      '/descuentos/santander/shopping',
+      '/descuentos/santander/shopping/caba',
+    ]));
+    expect(routes).toHaveLength(2);
+  });
+
+  it('honors an explicit zero city route limit when generating landing routes', () => {
+    const merchants = [
+      {
+        categories: ['shopping'],
+        locations: [{ addressComponents: { locality: 'CABA' } }],
+        searchProfile: {
+          benefits: [{ bankName: 'Banco Galicia' }]
+        }
+      }
+    ];
+
+    const routes = buildLandingSeoRoutesFromMerchants(merchants, {
+      minMerchantCount: 1,
+      maxCityRoutesPerCombination: 0,
+      allowedBankSlugs: ['galicia'],
+      allowedCategorySlugs: ['shopping'],
+      allowedCitySlugs: ['caba'],
+    });
+
+    expect(routes.map((route) => route.path)).toEqual(['/descuentos/galicia/shopping']);
+  });
 });

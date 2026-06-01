@@ -387,11 +387,46 @@ function filterDefinitionsByAllowedSlugs(definitions, allowedSlugs) {
   return definitions.filter((definition) => allowedSlugs.has(definition.slug));
 }
 
+function parseIntegerOption(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? fallback), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function resolveClientDefinitionForLandingDefinition(definition, clientDefinitions) {
+  const candidates = uniqueStrings([
+    definition?.slug,
+    definition?.name,
+    definition?.category,
+    ...(definition?.aliases || []),
+  ]);
+
+  for (const candidate of candidates) {
+    const match = resolveExistingLandingDefinition(candidate, clientDefinitions);
+    if (match) return match;
+  }
+
+  return null;
+}
+
+function filterDefinitionsByAllowedClientSlugs(definitions, allowedSlugs, clientDefinitions) {
+  if (!allowedSlugs) return definitions;
+
+  const map = new Map();
+  for (const definition of definitions) {
+    const canonicalDefinition =
+      resolveClientDefinitionForLandingDefinition(definition, clientDefinitions) || definition;
+    if (!allowedSlugs.has(canonicalDefinition.slug)) continue;
+    mergeDefinition(map, canonicalDefinition);
+  }
+
+  return Array.from(map.values());
+}
+
 export function buildLandingSeoRoutesFromMerchants(merchants, options = {}) {
-  const minMerchantCount = Math.max(1, Number.parseInt(String(options.minMerchantCount || 3), 10));
+  const minMerchantCount = Math.max(1, parseIntegerOption(options.minMerchantCount, 3));
   const maxCityRoutesPerCombination = Math.max(
     0,
-    Number.parseInt(String(options.maxCityRoutesPerCombination || 5), 10),
+    parseIntegerOption(options.maxCityRoutesPerCombination, 5),
   );
   const allowedBankSlugs = getAllowedSlugSet(options.allowedBankSlugs);
   const allowedCategorySlugs = getAllowedSlugSet(options.allowedCategorySlugs);
@@ -402,9 +437,17 @@ export function buildLandingSeoRoutesFromMerchants(merchants, options = {}) {
   for (const merchant of toArray(merchants)) {
     const merchantDefinitions = buildDefinitionsForMerchant(merchant);
     const definitions = {
-      banks: filterDefinitionsByAllowedSlugs(merchantDefinitions.banks, allowedBankSlugs),
+      banks: filterDefinitionsByAllowedClientSlugs(
+        merchantDefinitions.banks,
+        allowedBankSlugs,
+        CLIENT_LANDING_BANK_DEFINITIONS
+      ),
       categories: filterDefinitionsByAllowedSlugs(merchantDefinitions.categories, allowedCategorySlugs),
-      cities: filterDefinitionsByAllowedSlugs(merchantDefinitions.cities, allowedCitySlugs),
+      cities: filterDefinitionsByAllowedClientSlugs(
+        merchantDefinitions.cities,
+        allowedCitySlugs,
+        CLIENT_LANDING_CITY_DEFINITIONS
+      ),
     };
     if (definitions.banks.length === 0 || definitions.categories.length === 0) continue;
 
