@@ -86,8 +86,25 @@ function injectBody(shell, bodyHtml) {
   return `${shell}\n<div id="root">${bodyHtml}</div>`;
 }
 
+function getMerchantDisplayBankNames(merchant) {
+  const benefits = Array.isArray(merchant?.searchProfile?.benefits)
+    ? merchant.searchProfile.benefits
+    : [];
+
+  return Array.from(new Set(
+    benefits
+      .flatMap((benefit) => String(benefit?.bankName || '').split(','))
+      .map((bankName) => bankName.trim())
+      .filter(Boolean)
+  ));
+}
+
 function getMerchantBanks(merchant) {
-  const banks = Array.isArray(merchant?.banks) ? merchant.banks : [];
+  const banks = getMerchantDisplayBankNames(merchant);
+  if (banks.length === 0 && Array.isArray(merchant?.banks)) {
+    banks.push(...merchant.banks);
+  }
+
   return banks.filter(Boolean).slice(0, 4).join(', ') || 'bancos participantes';
 }
 

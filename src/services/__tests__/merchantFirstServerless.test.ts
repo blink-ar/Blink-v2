@@ -808,6 +808,57 @@ describe('merchant-first serverless helpers', () => {
     });
   });
 
+  it('handleLandingSeoPage renders display bank names instead of search bank tokens', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['banco galicia', 'galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<small>Banco Galicia · Buenos Aires</small>');
+    expect(res.body).not.toContain('banco galicia, galicia');
+  });
+
   it('handleLandingSeoPage matches accented bank names with unaccented slugs', async () => {
     const merchantQueries: unknown[] = [];
     const merchant = {
