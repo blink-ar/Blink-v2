@@ -113,7 +113,12 @@ function getCurrentServerStructuredDataScripts(absoluteUrl: string): HTMLScriptE
 
   serverScripts.forEach((script) => {
     const scriptUrl = script.dataset.blinkSeoUrl;
-    if (!scriptUrl || getComparableSeoPath(scriptUrl) !== currentPath) {
+    if (!scriptUrl) {
+      script.dataset.blinkSeoUrl = absoluteUrl;
+      return;
+    }
+
+    if (getComparableSeoPath(scriptUrl) !== currentPath) {
       script.remove();
     }
   });

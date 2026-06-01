@@ -75,10 +75,45 @@ describe('applySEO structured data handling', () => {
     expect(scripts[0].textContent).toContain('SearchResultsPage');
   });
 
-  it('removes untagged server-rendered JSON-LD before writing current route schema', () => {
+  it('preserves legacy untagged server-rendered JSON-LD on first hydration', () => {
+    addServerStructuredData('category', undefined, [
+      { '@context': 'https://schema.org', '@type': 'CollectionPage' },
+    ]);
+
+    applySEO({
+      title: 'Comercios de Gastronomia | Blink',
+      description: 'Categoria',
+      path: '/categorias/gastronomia',
+    });
+
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toHaveAttribute('data-blink-category-seo', 'structured-data');
+    expect(scripts[0]).toHaveAttribute(
+      'data-blink-seo-url',
+      toAbsoluteUrl('/categorias/gastronomia')
+    );
+    expect(scripts[0].textContent).toContain('CollectionPage');
+  });
+
+  it('removes legacy untagged server-rendered JSON-LD after route change', () => {
     addServerStructuredData('merchant', undefined, [
       { '@context': 'https://schema.org', '@type': 'LocalBusiness', name: 'Old Merchant' },
     ]);
+
+    applySEO({
+      title: 'Old Merchant | Blink',
+      description: 'Server description',
+      path: '/comercios/old-merchant--merchant_1',
+    });
+
+    const firstHydrationScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    expect(firstHydrationScripts).toHaveLength(1);
+    expect(firstHydrationScripts[0]).toHaveAttribute(
+      'data-blink-seo-url',
+      toAbsoluteUrl('/comercios/old-merchant--merchant_1')
+    );
+    expect(firstHydrationScripts[0].textContent).toContain('Old Merchant');
 
     applySEO({
       title: 'Buscar descuentos | Blink',
