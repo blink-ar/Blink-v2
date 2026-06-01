@@ -1,7 +1,11 @@
 import {
   compactLandingBankName,
+  getLandingCategoryMatchValues,
   getLandingSeoPath,
   normalizeLandingSearchText,
+  resolveLandingBankFromMerchants,
+  resolveLandingCategoryFromMerchants,
+  resolveLandingCityFromMerchants,
   resolveLandingBank,
   resolveLandingCategory,
   resolveLandingCity,
@@ -339,11 +343,12 @@ function getBankPatterns(bank) {
 }
 
 export async function loadLandingSeoData({ db, merchantCollectionName, bank, category, city }) {
+  const categoryValues = getLandingCategoryMatchValues(category);
   const merchantQuery = {
     isActive: { $ne: false },
     merchantId: { $exists: true, $type: 'string' },
     benefitCount: { $gt: 0 },
-    categories: { $in: [category.category || category.slug] },
+    categories: { $in: categoryValues },
     banks: { $in: getBankPatterns(bank) },
   };
   const projection = {
@@ -356,6 +361,7 @@ export async function loadLandingSeoData({ db, merchantCollectionName, bank, cat
     benefitCount: 1,
     activeBenefitCount: 1,
     maxDiscountPercentage: 1,
+    searchProfile: 1,
   };
   const collection = db.collection(merchantCollectionName);
   const baseCountPromise = city ? null : collection.countDocuments(merchantQuery);
@@ -420,6 +426,9 @@ export {
   getLandingSeoPath,
   readViteAppShell,
   resolveLandingBank,
+  resolveLandingBankFromMerchants,
   resolveLandingCategory,
+  resolveLandingCategoryFromMerchants,
   resolveLandingCity,
+  resolveLandingCityFromMerchants,
 };

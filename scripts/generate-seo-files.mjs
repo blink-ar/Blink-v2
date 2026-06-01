@@ -3,12 +3,7 @@ import path from 'node:path';
 import { MongoClient } from 'mongodb';
 import { DEFAULT_CANONICAL_SITE_URL, resolveCanonicalSiteUrl } from '../api/canonical-site.js';
 import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
-import {
-  LANDING_BANK_DEFINITIONS,
-  LANDING_CATEGORY_DEFINITIONS,
-  LANDING_CITY_DEFINITIONS,
-  getLandingSeoPath,
-} from '../api/landing-seo-data.js';
+import { buildLandingSeoRoutesFromMerchants } from '../api/landing-seo-data.js';
 import { slugify } from '../api/search/normalize.js';
 
 const DEFAULT_SITE_URL = DEFAULT_CANONICAL_SITE_URL;
@@ -59,11 +54,13 @@ const hasConfiguredSiteUrl = siteUrlCandidates.some((value) => String(value || '
 const siteUrl = resolveCanonicalSiteUrl(...siteUrlCandidates);
 const mongoUri = process.env.MONGODB_URI_READ_ONLY || '';
 const databaseName = process.env.DATABASE_NAME || DEFAULT_DATABASE_NAME;
+const landingMinMerchantCount = Number.parseInt(process.env.SITEMAP_LANDING_MIN_MERCHANTS || '3', 10);
+const landingMaxCityRoutesPerCombination = Number.parseInt(
+  process.env.SITEMAP_LANDING_MAX_CITY_ROUTES_PER_COMBO || '5',
+  10,
+);
 
 const today = new Date().toISOString().split('T')[0];
-const banks = LANDING_BANK_DEFINITIONS;
-const categories = LANDING_CATEGORY_DEFINITIONS;
-const cities = LANDING_CITY_DEFINITIONS.slice(0, 5);
 
 const baseRoutes = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -92,9 +89,9 @@ function getMerchantSeoPath(merchant) {
   return `/comercios/${merchantSlug}--${encodeURIComponent(merchantId)}`;
 }
 
-async function loadMerchantRoutes() {
+async function loadMerchantSeoDocuments() {
   if (!mongoUri) {
-    console.warn('[seo] MONGODB_URI_READ_ONLY is not set. Skipping merchant sitemap URLs.');
+    console.warn('[seo] MONGODB_URI_READ_ONLY is not set. Skipping dynamic merchant and landing sitemap URLs.');
     return [];
   }
 
@@ -114,44 +111,38 @@ async function loadMerchantRoutes() {
             _id: 0,
             merchantId: 1,
             merchantName: 1,
+            categories: 1,
+            banks: 1,
+            locations: 1,
           },
         },
       )
       .sort({ merchantName: 1 })
       .toArray();
-
-    return merchants
-      .filter((merchant) => String(merchant.merchantId || '').trim())
-      .map((merchant) => ({
-        path: getMerchantSeoPath(merchant),
-        changefreq: 'weekly',
-        priority: '0.8',
-      }));
+    return merchants;
   } finally {
     await client.close();
   }
 }
 
-const landingRoutes = [];
-for (const bank of banks) {
-  for (const category of categories) {
-    landingRoutes.push({
-      path: getLandingSeoPath(bank, category),
+function buildMerchantRoutes(merchants) {
+  return merchants
+    .filter((merchant) => String(merchant.merchantId || '').trim())
+    .map((merchant) => ({
+      path: getMerchantSeoPath(merchant),
       changefreq: 'weekly',
       priority: '0.8',
-    });
-
-    for (const city of cities) {
-      landingRoutes.push({
-        path: getLandingSeoPath(bank, category, city),
-        changefreq: 'weekly',
-        priority: '0.7',
-      });
-    }
-  }
+    }));
 }
 
-const merchantRoutes = await loadMerchantRoutes();
+const merchantDocuments = await loadMerchantSeoDocuments();
+const merchantRoutes = buildMerchantRoutes(merchantDocuments);
+const landingRoutes = buildLandingSeoRoutesFromMerchants(merchantDocuments, {
+  minMerchantCount: Number.isFinite(landingMinMerchantCount) ? landingMinMerchantCount : 3,
+  maxCityRoutesPerCombination: Number.isFinite(landingMaxCityRoutesPerCombination)
+    ? landingMaxCityRoutesPerCombination
+    : 5,
+});
 const routes = [...baseRoutes, ...categorySeoRoutes, ...landingRoutes, ...merchantRoutes];
 const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());
 
@@ -241,5 +232,5 @@ fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
 if (!hasConfiguredSiteUrl) {
   console.warn(`[seo] CANONICAL_SITE_URL/VITE_SITE_URL/SITE_URL is not set. Using ${DEFAULT_SITE_URL} in sitemap and robots.txt.`);
 } else {
-  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${merchantRoutes.length} merchant URLs)`);
+  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${landingRoutes.length} landing URLs, ${merchantRoutes.length} merchant URLs)`);
 }

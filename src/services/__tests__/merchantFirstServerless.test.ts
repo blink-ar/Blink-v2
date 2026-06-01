@@ -764,8 +764,8 @@ describe('merchant-first serverless helpers', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
-    expect(res.body).toContain('<title>Descuentos Banco Galicia en Supermercado y shopping | Blink</title>');
-    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Supermercado y shopping</h1>');
+    expect(res.body).toContain('<title>Descuentos Banco Galicia en Shopping | Blink</title>');
+    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Shopping</h1>');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/galicia/shopping"');
     expect(res.body).toContain('href="/comercios/coto--merchant_1"');
     expect(res.body).toContain('Banco Galicia');
@@ -780,27 +780,118 @@ describe('merchant-first serverless helpers', () => {
     });
   });
 
-  it('handleLandingSeoPage redirects aliases to canonical landing paths', async () => {
+  it('handleLandingSeoPage renders landing pages from merchant data outside the seed list', async () => {
+    const merchant = {
+      merchantId: 'merchant_2',
+      merchantName: 'YPF',
+      categories: ['combustible'],
+      banks: ['naranjax'],
+      searchProfile: {
+        benefits: [{ bankName: 'NaranjaX' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 15,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'San Miguel de Tucuman',
+            adminAreaLevel1: 'Tucuman'
+          }
+        }
+      ]
+    };
     const db = {
-      collection() {
-        throw new Error('Landing alias redirects should not query MongoDB');
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
       }
     };
 
     const req = {};
     const res = createResponseCapture();
-    const url = new URL('https://example.com/api/descuentos/frances/moda');
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/naranjax/combustible/san-miguel-de-tucuman');
 
-    await handleLandingSeoPage(req as never, res as never, url, db as never, 'frances', 'moda');
+    await handleLandingSeoPage(
+      req as never,
+      res as never,
+      url,
+      db as never,
+      'naranjax',
+      'combustible',
+      'san-miguel-de-tucuman',
+      {
+        appShell: merchantSeoAppShell,
+        siteUrl: 'https://www.blinkapp.com.ar'
+      }
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos NaranjaX en Combustible en San Miguel de Tucuman | Blink</title>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/naranjax/combustible/san-miguel-de-tucuman"');
+    expect(res.body).toContain('href="/comercios/ypf--merchant_2"');
+  });
+
+  it('handleLandingSeoPage redirects dynamic aliases to canonical landing paths', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Galicia'],
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/banco-galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'banco-galicia', 'shopping');
 
     expect(res.statusCode).toBe(301);
-    expect(res.headers.Location).toBe('/descuentos/bbva/moda');
+    expect(res.headers.Location).toBe('/descuentos/galicia/shopping');
   });
 
   it('handleLandingSeoPage returns 404 for invalid landing combinations', async () => {
     const db = {
-      collection() {
-        throw new Error('Invalid landing pages should not query MongoDB');
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 0;
+            },
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
       }
     };
 

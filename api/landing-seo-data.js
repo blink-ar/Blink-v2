@@ -1,33 +1,17 @@
-export const LANDING_BANK_DEFINITIONS = [
-  { slug: 'galicia', name: 'Banco Galicia', aliases: ['galicia'] },
-  { slug: 'santander', name: 'Banco Santander', aliases: ['santander', 'rio'] },
-  { slug: 'bbva', name: 'BBVA', aliases: ['bbva', 'frances', 'banco frances'] },
-  { slug: 'macro', name: 'Banco Macro', aliases: ['macro'] },
-  { slug: 'nacion', name: 'Banco Nacion', aliases: ['nacion', 'bna', 'banco nacion'] },
-  { slug: 'icbc', name: 'ICBC', aliases: ['icbc'] },
-];
+const LANDING_STOP_WORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y']);
+const EXCLUDED_CATEGORY_SLUGS = new Set(['all']);
 
-export const LANDING_CATEGORY_DEFINITIONS = [
-  { slug: 'gastronomia', category: 'gastronomia', name: 'Gastronomia' },
-  { slug: 'moda', category: 'moda', name: 'Moda' },
-  { slug: 'shopping', category: 'shopping', name: 'Supermercado y shopping' },
-  { slug: 'hogar', category: 'hogar', name: 'Hogar' },
-  { slug: 'deportes', category: 'deportes', name: 'Deportes' },
-  { slug: 'belleza', category: 'belleza', name: 'Belleza' },
-];
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  return [value];
+}
 
-export const LANDING_CITY_DEFINITIONS = [
-  { slug: 'buenos-aires', name: 'Buenos Aires', aliases: ['buenos aires', 'provincia de buenos aires'] },
-  { slug: 'caba', name: 'CABA', aliases: ['caba', 'ciudad autonoma de buenos aires', 'cdad autonoma de buenos aires', 'capital federal'] },
-  { slug: 'cordoba', name: 'Cordoba', aliases: ['cordoba', 'cordoba capital'] },
-  { slug: 'rosario', name: 'Rosario', aliases: ['rosario', 'santa fe'] },
-  { slug: 'mendoza', name: 'Mendoza', aliases: ['mendoza'] },
-  { slug: 'la-plata', name: 'La Plata', aliases: ['la plata'] },
-  { slug: 'mar-del-plata', name: 'Mar del Plata', aliases: ['mar del plata'] },
-  { slug: 'tucuman', name: 'Tucuman', aliases: ['tucuman', 'san miguel de tucuman'] },
-];
+function uniqueStrings(values) {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+}
 
-function normalizeLandingValue(value) {
+export function normalizeLandingSearchText(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -38,37 +22,253 @@ function normalizeLandingValue(value) {
     .trim();
 }
 
-export function resolveLandingBank(value) {
-  const normalized = normalizeLandingValue(value);
-  if (!normalized) return null;
-
-  return LANDING_BANK_DEFINITIONS.find((bank) => (
-    bank.slug === value ||
-    normalizeLandingValue(bank.slug) === normalized ||
-    bank.aliases.some((alias) => normalizeLandingValue(alias) === normalized)
-  )) || null;
+export function slugifyLandingValue(value) {
+  return normalizeLandingSearchText(value)
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
-export function resolveLandingCategory(value) {
-  const normalized = normalizeLandingValue(value);
-  if (!normalized) return null;
+function formatLandingName(value) {
+  const raw = String(value || '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
 
-  return LANDING_CATEGORY_DEFINITIONS.find((category) => (
-    category.slug === value ||
-    normalizeLandingValue(category.slug) === normalized ||
-    normalizeLandingValue(category.category) === normalized
-  )) || null;
+  return raw.split(' ').map((word, index) => {
+    if (/^[A-Z0-9]{2,}$/.test(word) || /[A-Z][a-z]+[A-Z]/.test(word)) {
+      return word;
+    }
+
+    const lower = word.toLowerCase();
+    if (index > 0 && LANDING_STOP_WORDS.has(lower)) {
+      return lower;
+    }
+
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
 }
 
-export function resolveLandingCity(value) {
-  const normalized = normalizeLandingValue(value);
-  if (!normalized) return null;
+function getInitialsAlias(value) {
+  const initials = normalizeLandingSearchText(value)
+    .split(' ')
+    .filter((word) => word && !LANDING_STOP_WORDS.has(word))
+    .map((word) => word[0])
+    .join('');
 
-  return LANDING_CITY_DEFINITIONS.find((city) => (
-    city.slug === value ||
-    normalizeLandingValue(city.slug) === normalized ||
-    city.aliases.some((alias) => normalizeLandingValue(alias) === normalized)
-  )) || null;
+  return initials.length >= 3 && initials.length <= 6 ? initials : '';
+}
+
+export function compactLandingBankName(bankName) {
+  return String(bankName || '').replace(/^Banco\s+/i, '').trim();
+}
+
+function createAliases(...values) {
+  const aliases = new Set();
+
+  for (const value of values) {
+    const normalized = normalizeLandingSearchText(value);
+    if (normalized) aliases.add(normalized);
+
+    const slug = slugifyLandingValue(value);
+    if (slug) aliases.add(slug);
+
+    const initials = getInitialsAlias(value);
+    if (initials) aliases.add(initials);
+  }
+
+  return Array.from(aliases);
+}
+
+function definitionMatches(definition, value) {
+  const normalized = normalizeLandingSearchText(value);
+  const slug = slugifyLandingValue(value);
+  if (!normalized && !slug) return false;
+
+  const candidates = [
+    definition.slug,
+    definition.name,
+    definition.category,
+    ...(definition.aliases || []),
+  ];
+
+  return candidates.some((candidate) => (
+    normalizeLandingSearchText(candidate) === normalized ||
+    slugifyLandingValue(candidate) === slug
+  ));
+}
+
+function getDefinitionNameScore(name) {
+  const value = String(name || '');
+  let score = 0;
+  if (/^Banco\s/i.test(value)) score += 4;
+  if (/^[A-Z0-9]{2,}$/.test(value.replace(/\s+/g, ''))) score += 3;
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score += 2;
+  if (value.includes(' ')) score += 1;
+  return score;
+}
+
+function mergeDefinition(map, definition) {
+  if (!definition?.slug) return;
+
+  const existing = map.get(definition.slug);
+  if (!existing) {
+    map.set(definition.slug, {
+      ...definition,
+      aliases: uniqueStrings(definition.aliases || []),
+    });
+    return;
+  }
+
+  const existingScore = getDefinitionNameScore(existing.name);
+  const incomingScore = getDefinitionNameScore(definition.name);
+  const name = incomingScore > existingScore ? definition.name : existing.name;
+
+  map.set(definition.slug, {
+    ...existing,
+    name,
+    aliases: uniqueStrings([
+      ...(existing.aliases || []),
+      ...(definition.aliases || []),
+      definition.name,
+    ]),
+  });
+}
+
+export function buildLandingBankDefinition(value) {
+  const name = formatLandingName(value);
+  if (!name) return null;
+
+  const compactName = compactLandingBankName(name);
+  const slug = slugifyLandingValue(compactName || name);
+  if (!slug) return null;
+
+  return {
+    slug,
+    name,
+    aliases: createAliases(value, name, compactName, slug),
+  };
+}
+
+export function buildLandingCategoryDefinition(value) {
+  const category = slugifyLandingValue(value);
+  if (!category || EXCLUDED_CATEGORY_SLUGS.has(category)) return null;
+
+  return {
+    slug: category,
+    category,
+    name: formatLandingName(value),
+    aliases: createAliases(value, category),
+  };
+}
+
+export function buildLandingCityDefinition(value) {
+  const name = formatLandingName(value);
+  const slug = slugifyLandingValue(value);
+  if (!name || !slug) return null;
+
+  return {
+    slug,
+    name,
+    aliases: createAliases(value, name, slug),
+  };
+}
+
+export function resolveLandingBank(value, definitions = []) {
+  if (!normalizeLandingSearchText(value)) return null;
+  return definitions.find((bank) => definitionMatches(bank, value)) || buildLandingBankDefinition(value);
+}
+
+export function resolveLandingCategory(value, definitions = []) {
+  if (!normalizeLandingSearchText(value)) return null;
+  return definitions.find((category) => definitionMatches(category, value)) || buildLandingCategoryDefinition(value);
+}
+
+export function resolveLandingCity(value, definitions = []) {
+  if (!normalizeLandingSearchText(value)) return null;
+  return definitions.find((city) => definitionMatches(city, value)) || buildLandingCityDefinition(value);
+}
+
+function getSearchProfileBankNames(merchant) {
+  return toArray(merchant?.searchProfile?.benefits)
+    .flatMap((benefit) => String(benefit?.bankName || '').split(','))
+    .map((value) => value.trim());
+}
+
+export function getLandingBankValuesFromMerchant(merchant) {
+  return uniqueStrings([
+    ...getSearchProfileBankNames(merchant),
+    ...toArray(merchant?.banks),
+  ]);
+}
+
+export function getLandingCategoryValuesFromMerchant(merchant) {
+  return uniqueStrings(toArray(merchant?.categories))
+    .filter((category) => !EXCLUDED_CATEGORY_SLUGS.has(slugifyLandingValue(category)));
+}
+
+export function getLandingCityValuesFromMerchant(merchant) {
+  const values = [];
+
+  for (const location of toArray(merchant?.locations)) {
+    const components = location?.addressComponents || {};
+    values.push(
+      components.locality,
+      components.sublocality,
+      components.adminAreaLevel2,
+      components.adminAreaLevel1,
+    );
+  }
+
+  return uniqueStrings(values);
+}
+
+export function buildLandingBankDefinitionsFromMerchants(merchants) {
+  const map = new Map();
+  for (const merchant of toArray(merchants)) {
+    for (const value of getLandingBankValuesFromMerchant(merchant)) {
+      mergeDefinition(map, buildLandingBankDefinition(value));
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+export function buildLandingCategoryDefinitionsFromMerchants(merchants) {
+  const map = new Map();
+  for (const merchant of toArray(merchants)) {
+    for (const value of getLandingCategoryValuesFromMerchant(merchant)) {
+      mergeDefinition(map, buildLandingCategoryDefinition(value));
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+export function buildLandingCityDefinitionsFromMerchants(merchants) {
+  const map = new Map();
+  for (const merchant of toArray(merchants)) {
+    for (const value of getLandingCityValuesFromMerchant(merchant)) {
+      mergeDefinition(map, buildLandingCityDefinition(value));
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+export function resolveLandingBankFromMerchants(value, merchants) {
+  return resolveLandingBank(value, buildLandingBankDefinitionsFromMerchants(merchants));
+}
+
+export function resolveLandingCategoryFromMerchants(value, merchants) {
+  return resolveLandingCategory(value, buildLandingCategoryDefinitionsFromMerchants(merchants));
+}
+
+export function resolveLandingCityFromMerchants(value, merchants) {
+  return resolveLandingCity(value, buildLandingCityDefinitionsFromMerchants(merchants));
+}
+
+export function getLandingCategoryMatchValues(category) {
+  return uniqueStrings([
+    category?.category,
+    category?.slug,
+    ...(category?.aliases || []),
+  ]).filter((value) => !EXCLUDED_CATEGORY_SLUGS.has(slugifyLandingValue(value)));
 }
 
 export function getLandingSeoPath(bank, category, city) {
@@ -76,10 +276,96 @@ export function getLandingSeoPath(bank, category, city) {
   return city ? `${basePath}/${city.slug}` : basePath;
 }
 
-export function compactLandingBankName(bankName) {
-  return String(bankName || '').replace(/^Banco\s+/i, '').trim();
+function addRouteCandidate(map, key, route) {
+  const existing = map.get(key);
+  if (existing) {
+    existing.count += 1;
+    return;
+  }
+
+  map.set(key, {
+    ...route,
+    count: 1,
+  });
 }
 
-export function normalizeLandingSearchText(value) {
-  return normalizeLandingValue(value);
+function buildDefinitionsForMerchant(merchant) {
+  const bankMap = new Map();
+  for (const value of getLandingBankValuesFromMerchant(merchant)) {
+    mergeDefinition(bankMap, buildLandingBankDefinition(value));
+  }
+
+  const categoryMap = new Map();
+  for (const value of getLandingCategoryValuesFromMerchant(merchant)) {
+    mergeDefinition(categoryMap, buildLandingCategoryDefinition(value));
+  }
+
+  const cityMap = new Map();
+  for (const value of getLandingCityValuesFromMerchant(merchant)) {
+    mergeDefinition(cityMap, buildLandingCityDefinition(value));
+  }
+
+  return {
+    banks: Array.from(bankMap.values()),
+    categories: Array.from(categoryMap.values()),
+    cities: Array.from(cityMap.values()),
+  };
+}
+
+function routeSort(a, b) {
+  if (b.count !== a.count) return b.count - a.count;
+  return a.path.localeCompare(b.path);
+}
+
+export function buildLandingSeoRoutesFromMerchants(merchants, options = {}) {
+  const minMerchantCount = Math.max(1, Number.parseInt(String(options.minMerchantCount || 3), 10));
+  const maxCityRoutesPerCombination = Math.max(
+    0,
+    Number.parseInt(String(options.maxCityRoutesPerCombination || 5), 10),
+  );
+  const nationalRoutes = new Map();
+  const cityRoutes = new Map();
+
+  for (const merchant of toArray(merchants)) {
+    const definitions = buildDefinitionsForMerchant(merchant);
+    if (definitions.banks.length === 0 || definitions.categories.length === 0) continue;
+
+    for (const bank of definitions.banks) {
+      for (const category of definitions.categories) {
+        const nationalKey = `${bank.slug}:${category.slug}`;
+        addRouteCandidate(nationalRoutes, nationalKey, {
+          path: getLandingSeoPath(bank, category),
+          changefreq: 'weekly',
+          priority: '0.8',
+        });
+
+        for (const city of definitions.cities) {
+          const cityKey = `${bank.slug}:${category.slug}:${city.slug}`;
+          addRouteCandidate(cityRoutes, cityKey, {
+            path: getLandingSeoPath(bank, category, city),
+            changefreq: 'weekly',
+            priority: '0.7',
+            parentKey: nationalKey,
+          });
+        }
+      }
+    }
+  }
+
+  const selectedCityRoutes = [];
+  const cityRoutesByParent = new Map();
+  for (const route of Array.from(cityRoutes.values()).filter((route) => route.count >= minMerchantCount).sort(routeSort)) {
+    const siblings = cityRoutesByParent.get(route.parentKey) || [];
+    if (siblings.length >= maxCityRoutesPerCombination) continue;
+    siblings.push(route);
+    cityRoutesByParent.set(route.parentKey, siblings);
+    selectedCityRoutes.push(route);
+  }
+
+  return [
+    ...Array.from(nationalRoutes.values()).filter((route) => route.count >= minMerchantCount),
+    ...selectedCityRoutes,
+  ]
+    .sort(routeSort)
+    .map(({ parentKey, count, ...route }) => route);
 }

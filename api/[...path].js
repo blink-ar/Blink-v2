@@ -29,8 +29,11 @@ import {
   loadLandingSeoData,
   renderLandingSeoHtml,
   resolveLandingBank,
+  resolveLandingBankFromMerchants,
   resolveLandingCategory,
-  resolveLandingCity
+  resolveLandingCategoryFromMerchants,
+  resolveLandingCity,
+  resolveLandingCityFromMerchants
 } from './landing-seo.js';
 
 const DEFAULT_COLLECTION = 'confirmed_benefits';
@@ -2627,11 +2630,11 @@ async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam
 }
 
 async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam, cityParam, options = {}) {
-  const bank = resolveLandingBank(bankParam);
-  const category = resolveLandingCategory(categoryParam);
-  const city = cityParam ? resolveLandingCity(cityParam) : null;
+  const requestedBank = resolveLandingBank(bankParam);
+  const requestedCategory = resolveLandingCategory(categoryParam);
+  const requestedCity = cityParam ? resolveLandingCity(cityParam) : null;
 
-  if (!bank || !category || (cityParam && !city)) {
+  if (!requestedBank || !requestedCategory || (cityParam && !requestedCity)) {
     return json(res, 404, {
       success: false,
       error: 'Landing page not found',
@@ -2641,6 +2644,29 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     });
   }
 
+  const data = await loadLandingSeoData({
+    db,
+    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
+    bank: requestedBank,
+    category: requestedCategory,
+    city: requestedCity
+  });
+
+  if (data.resultCount <= 0) {
+    return json(res, 404, {
+      success: false,
+      error: 'Landing page not found',
+      bank: bankParam,
+      category: categoryParam,
+      ...(cityParam && { city: cityParam })
+    });
+  }
+
+  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants) || requestedBank;
+  const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants) || requestedCategory;
+  const city = cityParam
+    ? (resolveLandingCityFromMerchants(cityParam, data.merchants) || requestedCity)
+    : null;
   const canonicalPath = getLandingSeoPath(bank, category, city);
   const requestedPath = cityParam
     ? `/descuentos/${bankParam}/${categoryParam}/${cityParam}`
@@ -2651,13 +2677,6 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     return redirect(res, 301, canonicalPath);
   }
 
-  const data = await loadLandingSeoData({
-    db,
-    merchantCollectionName: MERCHANT_ASSETS_COLLECTION,
-    bank,
-    category,
-    city
-  });
   const appShell = options.appShell || readViteAppShell();
   const renderedHtml = renderLandingSeoHtml({
     appShell,
