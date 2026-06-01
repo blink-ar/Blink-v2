@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applySEO, toAbsoluteUrl } from '../seo';
 
-function addServerStructuredData(kind: 'merchant' | 'category', url: string, value: unknown): HTMLScriptElement {
+function addServerStructuredData(
+  kind: 'merchant' | 'category',
+  url: string | undefined,
+  value: unknown
+): HTMLScriptElement {
   const script = document.createElement('script');
   script.type = 'application/ld+json';
   if (kind === 'merchant') {
@@ -9,7 +13,9 @@ function addServerStructuredData(kind: 'merchant' | 'category', url: string, val
   } else {
     script.dataset.blinkCategorySeo = 'structured-data';
   }
-  script.dataset.blinkSeoUrl = url;
+  if (url) {
+    script.dataset.blinkSeoUrl = url;
+  }
   script.textContent = JSON.stringify(value);
   document.head.appendChild(script);
   return script;
@@ -67,6 +73,30 @@ describe('applySEO structured data handling', () => {
     expect(scripts[0]).toHaveAttribute('data-blink-seo', 'structured-data');
     expect(scripts[0]).toHaveAttribute('data-blink-seo-url', toAbsoluteUrl('/search'));
     expect(scripts[0].textContent).toContain('SearchResultsPage');
+  });
+
+  it('removes untagged server-rendered JSON-LD before writing current route schema', () => {
+    addServerStructuredData('merchant', undefined, [
+      { '@context': 'https://schema.org', '@type': 'LocalBusiness', name: 'Old Merchant' },
+    ]);
+
+    applySEO({
+      title: 'Buscar descuentos | Blink',
+      description: 'Busca descuentos',
+      path: '/search',
+      structuredData: {
+        '@context': 'https://schema.org',
+        '@type': 'SearchResultsPage',
+        name: 'Buscar descuentos',
+      },
+    });
+
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toHaveAttribute('data-blink-seo', 'structured-data');
+    expect(scripts[0]).toHaveAttribute('data-blink-seo-url', toAbsoluteUrl('/search'));
+    expect(scripts[0].textContent).toContain('SearchResultsPage');
+    expect(scripts[0].textContent).not.toContain('Old Merchant');
   });
 
   it('keeps matching server-rendered JSON-LD when the hydrated route has no client schema', () => {

@@ -113,14 +113,14 @@ function getCurrentServerStructuredDataScripts(absoluteUrl: string): HTMLScriptE
 
   serverScripts.forEach((script) => {
     const scriptUrl = script.dataset.blinkSeoUrl;
-    if (scriptUrl && getComparableSeoPath(scriptUrl) !== currentPath) {
+    if (!scriptUrl || getComparableSeoPath(scriptUrl) !== currentPath) {
       script.remove();
     }
   });
 
   return serverScripts.filter((script) => {
     const scriptUrl = script.dataset.blinkSeoUrl;
-    return script.isConnected && (!scriptUrl || getComparableSeoPath(scriptUrl) === currentPath);
+    return Boolean(scriptUrl) && script.isConnected && getComparableSeoPath(scriptUrl) === currentPath;
   });
 }
 
