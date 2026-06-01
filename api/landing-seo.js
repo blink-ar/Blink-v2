@@ -9,6 +9,9 @@ import {
   resolveLandingBank,
   resolveLandingCategory,
   resolveLandingCity,
+  resolveClientLandingBank,
+  resolveClientLandingCategory,
+  resolveClientLandingCity,
 } from './landing-seo-data.js';
 import {
   getMerchantSeoPathFromMerchant,
@@ -498,4 +501,7 @@ export {
   resolveLandingCategoryFromMerchants,
   resolveLandingCity,
   resolveLandingCityFromMerchants,
+  resolveClientLandingBank,
+  resolveClientLandingCategory,
+  resolveClientLandingCity,
 };

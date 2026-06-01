@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLandingSeoRoutesFromMerchants,
+  getLandingCityValuesFromMerchant,
   getLandingBankValuesFromMerchant,
+  resolveClientLandingBank,
+  resolveClientLandingCategory,
+  resolveClientLandingCity,
   resolveLandingBankFromMerchants,
 } from '../../../api/landing-seo-data.js';
 
@@ -38,6 +42,26 @@ describe('landing SEO data helpers', () => {
 
     expect(resolveLandingBankFromMerchants('santander', [merchant], { includeClientDefinitions: true })?.slug).toBe('santander');
     expect(resolveLandingBankFromMerchants('rio', [merchant], { includeClientDefinitions: true })?.slug).toBe('santander');
+  });
+
+  it('resolves only client-supported landing routes for live pages', () => {
+    expect(resolveClientLandingBank('frances')?.slug).toBe('bbva');
+    expect(resolveClientLandingBank('naranjax')).toBeNull();
+    expect(resolveClientLandingCategory('shopping')?.name).toBe('Supermercado y shopping');
+    expect(resolveClientLandingCategory('combustible')).toBeNull();
+    expect(resolveClientLandingCity('capital-federal')?.slug).toBe('caba');
+    expect(resolveClientLandingCity('san-miguel-de-tucuman')?.slug).toBe('tucuman');
+  });
+
+  it('uses formatted location text when deriving landing city definitions', () => {
+    const merchant = {
+      locations: [{ formattedAddress: 'Mar del Plata', name: 'Sucursal Centro' }]
+    };
+
+    expect(getLandingCityValuesFromMerchant(merchant)).toEqual([
+      'Mar del Plata',
+      'Sucursal Centro',
+    ]);
   });
 
   it('filters generated sitemap landing routes to client-supported slugs', () => {

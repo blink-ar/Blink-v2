@@ -192,6 +192,26 @@ const CLIENT_LANDING_BANK_DEFINITIONS = [
   { slug: 'icbc', name: 'ICBC', aliases: createAliases('icbc', 'ICBC') },
 ];
 
+const CLIENT_LANDING_CATEGORY_DEFINITIONS = [
+  { slug: 'gastronomia', category: 'gastronomia', name: 'Gastronomia', aliases: createAliases('gastronomia') },
+  { slug: 'moda', category: 'moda', name: 'Moda', aliases: createAliases('moda') },
+  { slug: 'shopping', category: 'shopping', name: 'Supermercado y shopping', aliases: createAliases('shopping') },
+  { slug: 'hogar', category: 'hogar', name: 'Hogar', aliases: createAliases('hogar') },
+  { slug: 'deportes', category: 'deportes', name: 'Deportes', aliases: createAliases('deportes') },
+  { slug: 'belleza', category: 'belleza', name: 'Belleza', aliases: createAliases('belleza') },
+];
+
+const CLIENT_LANDING_CITY_DEFINITIONS = [
+  { slug: 'buenos-aires', name: 'Buenos Aires', aliases: createAliases('buenos aires', 'provincia de buenos aires') },
+  { slug: 'caba', name: 'CABA', aliases: createAliases('caba', 'ciudad autonoma de buenos aires', 'cdad autonoma de buenos aires', 'capital federal') },
+  { slug: 'cordoba', name: 'Cordoba', aliases: createAliases('cordoba', 'cordoba capital') },
+  { slug: 'rosario', name: 'Rosario', aliases: createAliases('rosario', 'santa fe') },
+  { slug: 'mendoza', name: 'Mendoza', aliases: createAliases('mendoza') },
+  { slug: 'la-plata', name: 'La Plata', aliases: createAliases('la plata') },
+  { slug: 'mar-del-plata', name: 'Mar del Plata', aliases: createAliases('mar del plata') },
+  { slug: 'tucuman', name: 'Tucuman', aliases: createAliases('tucuman', 'san miguel de tucuman') },
+];
+
 export function resolveLandingBank(value, definitions = []) {
   return resolveExistingLandingDefinition(value, definitions) || buildLandingBankDefinition(value);
 }
@@ -202,6 +222,18 @@ export function resolveLandingCategory(value, definitions = []) {
 
 export function resolveLandingCity(value, definitions = []) {
   return resolveExistingLandingDefinition(value, definitions) || buildLandingCityDefinition(value);
+}
+
+export function resolveClientLandingBank(value) {
+  return resolveExistingLandingDefinition(value, CLIENT_LANDING_BANK_DEFINITIONS);
+}
+
+export function resolveClientLandingCategory(value) {
+  return resolveExistingLandingDefinition(value, CLIENT_LANDING_CATEGORY_DEFINITIONS);
+}
+
+export function resolveClientLandingCity(value) {
+  return resolveExistingLandingDefinition(value, CLIENT_LANDING_CITY_DEFINITIONS);
 }
 
 function getSearchProfileBankNames(merchant) {
@@ -225,11 +257,18 @@ export function getLandingCityValuesFromMerchant(merchant) {
   for (const location of toArray(merchant?.locations)) {
     const components = location?.addressComponents || {};
     values.push(
+      location?.formattedAddress,
+      location?.name,
+    );
+    values.push(
       components.locality,
       components.sublocality,
       components.adminAreaLevel2,
       components.adminAreaLevel1,
     );
+    if (typeof location?.raw === 'string') {
+      values.push(location.raw);
+    }
   }
 
   return uniqueStrings(values);
@@ -273,12 +312,14 @@ export function resolveLandingBankFromMerchants(value, merchants, options = {}) 
   return resolveExistingLandingDefinition(value, buildLandingBankDefinitionsFromMerchants(merchants, seedDefinitions));
 }
 
-export function resolveLandingCategoryFromMerchants(value, merchants) {
-  return resolveExistingLandingDefinition(value, buildLandingCategoryDefinitionsFromMerchants(merchants));
+export function resolveLandingCategoryFromMerchants(value, merchants, options = {}) {
+  const seedDefinitions = options.includeClientDefinitions ? CLIENT_LANDING_CATEGORY_DEFINITIONS : options.seedDefinitions;
+  return resolveExistingLandingDefinition(value, buildLandingCategoryDefinitionsFromMerchants(merchants, seedDefinitions));
 }
 
-export function resolveLandingCityFromMerchants(value, merchants) {
-  return resolveExistingLandingDefinition(value, buildLandingCityDefinitionsFromMerchants(merchants));
+export function resolveLandingCityFromMerchants(value, merchants, options = {}) {
+  const seedDefinitions = options.includeClientDefinitions ? CLIENT_LANDING_CITY_DEFINITIONS : options.seedDefinitions;
+  return resolveExistingLandingDefinition(value, buildLandingCityDefinitionsFromMerchants(merchants, seedDefinitions));
 }
 
 export function getLandingCategoryMatchValues(category) {

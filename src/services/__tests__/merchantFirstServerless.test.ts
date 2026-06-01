@@ -792,8 +792,8 @@ describe('merchant-first serverless helpers', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
-    expect(res.body).toContain('<title>Descuentos Banco Galicia en Shopping | Blink</title>');
-    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Shopping</h1>');
+    expect(res.body).toContain('<title>Descuentos Banco Galicia en Supermercado y shopping | Blink</title>');
+    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Supermercado y shopping</h1>');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/galicia/shopping"');
     expect(res.body).toContain('href="/comercios/coto--merchant_1"');
     expect(res.body).toContain('Banco Galicia');
@@ -854,7 +854,7 @@ describe('merchant-first serverless helpers', () => {
     const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
     expect(bankPatterns.some((pattern) => pattern.test('Banco Nación'))).toBe(true);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('<title>Descuentos Banco Nacion en Shopping | Blink</title>');
+    expect(res.body).toContain('<title>Descuentos Banco Nacion en Supermercado y shopping | Blink</title>');
   });
 
   it('handleLandingSeoPage preserves client bank aliases for Santander Rio merchant data', async () => {
@@ -898,11 +898,108 @@ describe('merchant-first serverless helpers', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('<title>Descuentos Banco Santander en Shopping | Blink</title>');
+    expect(res.body).toContain('<title>Descuentos Banco Santander en Supermercado y shopping | Blink</title>');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/santander/shopping"');
   });
 
-  it('handleLandingSeoPage renders landing pages from merchant data outside the seed list', async () => {
+  it('handleLandingSeoPage seeds client bank aliases before loading landing data', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_frances',
+      merchantName: 'Super Frances',
+      categories: ['shopping'],
+      banks: ['Banco Francés'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Francés' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/bbva/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'bbva', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
+    expect(bankPatterns.some((pattern) => pattern.test('Banco Francés'))).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos BBVA en Supermercado y shopping | Blink</title>');
+  });
+
+  it('handleLandingSeoPage seeds client city aliases before loading landing data', async () => {
+    const merchant = {
+      merchantId: 'merchant_caba',
+      merchantName: 'Coto CABA',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: [
+        {
+          formattedAddress: 'Ciudad Autónoma de Buenos Aires'
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              throw new Error('City landing pages should count by scanning all matching merchants');
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping/capital-federal');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', 'capital-federal', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/descuentos/galicia/shopping/caba');
+  });
+
+  it('handleLandingSeoPage rejects landing pages outside the client route set', async () => {
     const merchant = {
       merchantId: 'merchant_2',
       merchantName: 'YPF',
@@ -955,10 +1052,14 @@ describe('merchant-first serverless helpers', () => {
       }
     );
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('<title>Descuentos NaranjaX en Combustible en San Miguel de Tucuman | Blink</title>');
-    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/naranjax/combustible/san-miguel-de-tucuman"');
-    expect(res.body).toContain('href="/comercios/ypf--merchant_2"');
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'naranjax',
+      category: 'combustible',
+      city: 'san-miguel-de-tucuman'
+    });
   });
 
   it('handleLandingSeoPage scans city matches beyond the first merchant fetch window', async () => {

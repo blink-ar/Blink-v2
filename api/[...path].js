@@ -28,11 +28,11 @@ import {
   getLandingSeoPath,
   loadLandingSeoData,
   renderLandingSeoHtml,
-  resolveLandingBank,
+  resolveClientLandingBank,
+  resolveClientLandingCategory,
+  resolveClientLandingCity,
   resolveLandingBankFromMerchants,
-  resolveLandingCategory,
   resolveLandingCategoryFromMerchants,
-  resolveLandingCity,
   resolveLandingCityFromMerchants
 } from './landing-seo.js';
 
@@ -2630,9 +2630,9 @@ async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam
 }
 
 async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam, cityParam, options = {}) {
-  const requestedBank = resolveLandingBank(bankParam);
-  const requestedCategory = resolveLandingCategory(categoryParam);
-  const requestedCity = cityParam ? resolveLandingCity(cityParam) : null;
+  const requestedBank = resolveClientLandingBank(bankParam);
+  const requestedCategory = resolveClientLandingCategory(categoryParam);
+  const requestedCity = cityParam ? resolveClientLandingCity(cityParam) : null;
 
   if (!requestedBank || !requestedCategory || (cityParam && !requestedCity)) {
     return json(res, 404, {
@@ -2662,10 +2662,10 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     });
   }
 
-  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants, { includeClientDefinitions: true });
-  const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants);
+  const bank = resolveLandingBankFromMerchants(bankParam, data.merchants, { seedDefinitions: [requestedBank] });
+  const category = resolveLandingCategoryFromMerchants(categoryParam, data.merchants, { seedDefinitions: [requestedCategory] });
   const city = cityParam
-    ? resolveLandingCityFromMerchants(cityParam, data.merchants)
+    ? resolveLandingCityFromMerchants(cityParam, data.merchants, { seedDefinitions: [requestedCity] })
     : null;
 
   if (!bank || !category || (cityParam && !city)) {
