@@ -17,7 +17,6 @@ import { buildBenefitPath } from '../utils/benefitIdentity';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
 import InstallPWABanner from '../components/InstallPWAPopup';
-import { NotificationBanner } from '../components/NotificationBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
@@ -300,8 +299,6 @@ function HomePage() {
           />
         </form>
       </div>
-
-      <NotificationBanner />
 
       <main className="flex-1 flex flex-col gap-8 pb-32">
         {/* Hero Section */}
