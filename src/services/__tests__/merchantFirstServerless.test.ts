@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   handleCategorySeoPage,
   handleGetBenefitById,
@@ -321,6 +322,131 @@ describe('merchant-first serverless helpers', () => {
     expect(merchantQueries[0]).not.toHaveProperty('$or');
     expect(merchantQueries[1]).not.toHaveProperty('$or');
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+  });
+
+  it('handleGetBusinesses preserves Modo source markers in summarized benefits', async () => {
+    const benefitFindOptions: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Nutrican',
+      merchantKey: 'nutrican',
+      categories: ['mascotas'],
+      locations: [],
+      banks: ['Buepp', 'Ciudad'],
+      searchProfile: { description: 'Pet shop' },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: true,
+      imageUrl: null,
+      logoUrl: null,
+      coverUrl: null
+    };
+    const benefits = [
+      {
+        id: 'raw-6a0b61c6eaebf0b793d9dd15',
+        merchantId: 'merchant_1',
+        sourceCollection: 'MODO_PROMOS_RAW',
+        rawBenefitCollection: 'MODO_PROMOS_RAW',
+        source: 'modo',
+        eligibilities: [
+          {
+            bank: 'buepp',
+            bankDisplayName: 'Buepp',
+            cardTypes: [],
+            cardResolutionStatus: 'not_required',
+            subscription: null,
+            subscriptionResolutionStatus: 'not_required'
+          },
+          {
+            bank: 'ciudad',
+            bankDisplayName: 'Ciudad',
+            cardTypes: [],
+            cardResolutionStatus: 'not_required',
+            subscription: null,
+            subscriptionResolutionStatus: 'not_required'
+          }
+        ],
+        benefitTitle: '20% en Nutrican',
+        availableDays: ['Viernes'],
+        discountPercentage: 20,
+        caps: [{ amount: 8000, resetsEvery: 'PER_MONTH' }],
+        online: true,
+        validUntil: '2026-07-31'
+      }
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(_query: unknown, options: unknown) {
+              benefitFindOptions.push(options);
+              return createCursor(benefits);
+            }
+          };
+        }
+
+        if (name === 'bank_cards') {
+          return {
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?collection=confirmed_benefits&merchantId=merchant_1&limit=1&offset=0');
+
+    await handleGetBusinesses(req as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    const summary = payload.businesses[0].benefits[0];
+    const projection = (benefitFindOptions[0] as { projection: Record<string, number> }).projection;
+
+    expect(projection.sourceCollection).toBe(1);
+    expect(projection.rawBenefitCollection).toBe(1);
+    expect(projection.source).toBe(1);
+    expect(summary.id).toBe('raw-6a0b61c6eaebf0b793d9dd15');
+    expect(summary.sourceCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.rawBenefitCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.source).toBe('modo');
+  });
+
+  it('buildBusinessBenefitSummary keeps source markers for id-ambiguous Modo promos', () => {
+    const summary = buildBusinessBenefitSummary(
+      {
+        id: 'raw-6a0b61c6eaebf0b793d9dd15',
+        sourceCollection: 'MODO_PROMOS_RAW',
+        rawBenefitCollection: 'MODO_PROMOS_RAW',
+        source: 'modo',
+        eligibilities: [],
+        benefitTitle: '20% en Nutrican',
+        discountPercentage: 20,
+        validUntil: '2026-07-31'
+      },
+      new Map()
+    );
+
+    expect(summary.id).toBe('raw-6a0b61c6eaebf0b793d9dd15');
+    expect(summary.sourceCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.rawBenefitCollection).toBe('MODO_PROMOS_RAW');
+    expect(summary.source).toBe('modo');
   });
 
   it('handleLegacyBusinessRedirect returns a 301 canonical merchant URL', async () => {

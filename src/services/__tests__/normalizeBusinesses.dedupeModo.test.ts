@@ -92,6 +92,53 @@ describe('normalizeBusinesses Modo dedup activity bucketing', () => {
     expect(bankSurvived?.acceptsModo).toBe(true);
   });
 
+  it('collapses Nutrican-style bank-specific rows under the active multi-bank Modo promo', () => {
+    const makeEligibility = (bank: string) => ({
+      bank,
+      bankDisplayName: bank,
+      cardTypes: ['credit'],
+      cardResolutionStatus: 'resolved',
+      subscriptionResolutionStatus: 'not_required',
+    });
+    const raw = makeRawBusiness([
+      makeRawBenefit({
+        id: 'modo-promos-raw-6a0b61c6eaebf0b793d9dd15',
+        eligibilities: [makeEligibility('buepp'), makeEligibility('ciudad')],
+        bankName: 'Buepp, Ciudad',
+        discountPercentage: 20,
+        rewardRate: '20%',
+        installments: null,
+        cuando: 'Viernes',
+        validUntil: '2026-07-31',
+      }),
+      makeRawBenefit({
+        id: 'buepp-69f8def3cbb2cbde285d6458',
+        eligibilities: [makeEligibility('buepp')],
+        bankName: 'Buepp',
+        discountPercentage: 20,
+        rewardRate: '20%',
+        installments: 0,
+        cuando: 'Viernes',
+        validUntil: null,
+      }),
+      makeRawBenefit({
+        id: 'ciudad-69f8dec4cbb2cbde285d61d9',
+        eligibilities: [makeEligibility('ciudad')],
+        bankName: 'Ciudad',
+        discountPercentage: 20,
+        rewardRate: '20%',
+        installments: 0,
+        cuando: 'Viernes',
+        validUntil: null,
+      }),
+    ]);
+
+    const [business] = normalizeBusinesses([raw]);
+
+    expect(business.benefits).toHaveLength(1);
+    expect(business.benefits[0].id).toBe('modo-promos-raw-6a0b61c6eaebf0b793d9dd15');
+  });
+
   it('omits expired benefits entirely when includeExpired is false', () => {
     const raw = makeRawBusiness([
       makeRawBenefit({
