@@ -13,7 +13,7 @@ export const KNOWN_BANKS: BankDescriptor[] = [
   { token: 'icbc', code: 'ICBC', label: 'ICBC' },
   { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
   { token: 'amex', code: 'AMEX', label: 'AMEX' },
-  { token: 'naranja', code: 'NX', label: 'NARANJA X' },
+  { token: 'naranjax', code: 'NX', label: 'NARANJA X' },
   { token: 'nacion', code: 'BNA', label: 'NACION' },
   { token: 'ciudad', code: 'CIUD', label: 'CIUDAD' },
   { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
@@ -68,7 +68,7 @@ const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
   if (normalized.includes('icbc')) return KNOWN_BANKS[5];
   if (normalized.includes('hsbc')) return KNOWN_BANKS[6];
   if (normalized.includes('amex') || normalized.includes('american express')) return KNOWN_BANKS[7];
-  if (normalized.includes('naranja x') || normalized.includes('naranjax') || normalized === 'nx') return KNOWN_BANKS[8];
+  if (normalized.includes('naranja') || normalized === 'nx') return KNOWN_BANKS[8];
   if (normalized.includes('nacion')) return KNOWN_BANKS[9];
   if (normalized.includes('ciudad')) return KNOWN_BANKS[10];
   if (normalized.includes('patagonia')) return KNOWN_BANKS[11];
