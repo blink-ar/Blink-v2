@@ -240,8 +240,6 @@ ${sitemapEntries}
 
 const robotsContent = `User-agent: *
 Allow: /
-Disallow: /profile
-Disallow: /saved
 
 Sitemap: ${siteUrl}/sitemap.xml
 `;
