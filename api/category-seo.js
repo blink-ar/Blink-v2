@@ -246,7 +246,7 @@ function buildHeadHtml({ title, description, absoluteUrl, structuredData, previo
     '    <meta name="twitter:card" content="summary_large_image" />',
     `    <meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `    <meta name="twitter:description" content="${escapeHtml(description)}" />`,
-    `    <script type="application/ld+json" data-blink-category-seo="structured-data">${escapeJsonForHtml(structuredData)}</script>`,
+    `    <script type="application/ld+json" data-blink-category-seo="structured-data" data-blink-seo-url="${escapeHtml(absoluteUrl)}">${escapeJsonForHtml(structuredData)}</script>`,
     '    <style data-blink-category-seo>',
     '      .blink-category-shell{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1040px;margin:0 auto;padding:32px 20px 56px;color:#111827;background:#fff}',
     '      .blink-category-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;font-size:14px;margin-bottom:32px;color:#4b5563}.blink-category-breadcrumb a{color:#111827}',

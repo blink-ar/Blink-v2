@@ -474,7 +474,7 @@ function buildHeadHtml({ title, description, absoluteUrl, imageUrl, structuredDa
     `    <meta name="twitter:title" content="${escapedTitle}" />`,
     `    <meta name="twitter:description" content="${escapedDescription}" />`,
     `    <meta name="twitter:image" content="${escapedImage}" />`,
-    `    <script type="application/ld+json" data-blink-merchant-seo="structured-data">${escapeJsonForHtml(structuredData)}</script>`,
+    `    <script type="application/ld+json" data-blink-merchant-seo="structured-data" data-blink-seo-url="${escapedUrl}">${escapeJsonForHtml(structuredData)}</script>`,
     '    <style data-blink-merchant-seo>',
     '      .blink-seo-shell{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:960px;margin:0 auto;padding:32px 20px 56px;color:#111827;background:#fff}',
     '      .blink-seo-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;font-size:14px;margin-bottom:32px;color:#4b5563}.blink-seo-breadcrumb a{color:#111827}',

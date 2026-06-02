@@ -39,6 +39,12 @@ export function normalizeBlinkSiteUrl(value: string | undefined): string {
 const CONFIGURED_SITE_URL = normalizeBlinkSiteUrl(
   import.meta.env.VITE_CANONICAL_SITE_URL ?? import.meta.env.VITE_SITE_URL
 );
+const CLIENT_STRUCTURED_DATA_SELECTOR = 'script[data-blink-seo="structured-data"]';
+const SERVER_STRUCTURED_DATA_SELECTOR = [
+  'script[type="application/ld+json"][data-blink-category-seo="structured-data"]',
+  'script[type="application/ld+json"][data-blink-merchant-seo="structured-data"]',
+  'script[type="application/ld+json"][data-blink-landing-seo="structured-data"]',
+].join(', ');
 
 function getSiteUrl(): string {
   if (CONFIGURED_SITE_URL) {
@@ -90,9 +96,47 @@ function setCanonical(path: string): void {
   canonical.setAttribute('href', toAbsoluteUrl(path));
 }
 
-function setStructuredData(structuredData: SEOConfig['structuredData']): void {
-  const previousScripts = document.querySelectorAll<HTMLScriptElement>('script[data-blink-seo="structured-data"]');
+function getComparableSeoPath(pathOrUrl: string): string {
+  try {
+    const parsed = new URL(pathOrUrl, getSiteUrl());
+    return parsed.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return String(pathOrUrl || '').replace(/\/+$/, '') || '/';
+  }
+}
+
+function getCurrentServerStructuredDataScripts(absoluteUrl: string): HTMLScriptElement[] {
+  const currentPath = getComparableSeoPath(absoluteUrl);
+  const serverScripts = Array.from(
+    document.querySelectorAll<HTMLScriptElement>(SERVER_STRUCTURED_DATA_SELECTOR)
+  );
+
+  serverScripts.forEach((script) => {
+    const scriptUrl = script.dataset.blinkSeoUrl;
+    if (!scriptUrl) {
+      script.dataset.blinkSeoUrl = absoluteUrl;
+      return;
+    }
+
+    if (getComparableSeoPath(scriptUrl) !== currentPath) {
+      script.remove();
+    }
+  });
+
+  return serverScripts.filter((script) => {
+    const scriptUrl = script.dataset.blinkSeoUrl;
+    return Boolean(scriptUrl) && script.isConnected && getComparableSeoPath(scriptUrl) === currentPath;
+  });
+}
+
+function setStructuredData(structuredData: SEOConfig['structuredData'], canonicalPath: string): void {
+  const absoluteUrl = toAbsoluteUrl(canonicalPath);
+  const previousScripts = document.querySelectorAll<HTMLScriptElement>(CLIENT_STRUCTURED_DATA_SELECTOR);
   previousScripts.forEach((script) => script.remove());
+
+  if (getCurrentServerStructuredDataScripts(absoluteUrl).length > 0) {
+    return;
+  }
 
   if (!structuredData) {
     return;
@@ -103,6 +147,7 @@ function setStructuredData(structuredData: SEOConfig['structuredData']): void {
     const script = document.createElement('script');
     script.type = 'application/ld+json';
     script.dataset.blinkSeo = 'structured-data';
+    script.dataset.blinkSeoUrl = absoluteUrl;
     script.textContent = JSON.stringify(item);
     document.head.appendChild(script);
   });
@@ -146,5 +191,5 @@ export function applySEO(config: SEOConfig): void {
   setMetaTag('name', 'twitter:description', config.description);
   setMetaTag('name', 'twitter:image', ogImage);
 
-  setStructuredData(config.structuredData);
+  setStructuredData(config.structuredData, canonicalPath);
 }
