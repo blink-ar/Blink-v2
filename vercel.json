@@ -3,6 +3,9 @@
   "functions": {
     "api/[...path].js": {
       "includeFiles": "dist/index.html"
+    },
+    "api/spa-shell.js": {
+      "includeFiles": "dist/index.html"
     }
   },
   "redirects": [
@@ -16,6 +19,44 @@
       ],
       "destination": "https://www.blinkapp.com.ar/:path*",
       "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/profile",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/profile/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/saved",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/saved/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
     }
   ],
   "routes": [
@@ -36,6 +77,14 @@
       "dest": "/api/[...path]?path=categorias/$1"
     },
     {
+      "src": "/descuentos/([^/]+)/([^/]+)/([^/]+)",
+      "dest": "/api/[...path]?path=descuentos/$1/$2/$3"
+    },
+    {
+      "src": "/descuentos/([^/]+)/([^/]+)",
+      "dest": "/api/[...path]?path=descuentos/$1/$2"
+    },
+    {
       "src": "/comercios/([^/]+)",
       "dest": "/api/[...path]?path=comercios/$1"
     },
@@ -43,8 +92,8 @@
       "handle": "filesystem"
     },
     {
-      "src": "/.*",
-      "dest": "/index.html"
+      "src": "/(.*)",
+      "dest": "/api/spa-shell?path=$1"
     }
   ]
 }

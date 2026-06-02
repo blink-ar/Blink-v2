@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /profile
-Disallow: /saved
 
 Sitemap: https://www.blinkapp.com.ar/sitemap.xml

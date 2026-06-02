@@ -27,6 +27,16 @@ describe('canonical site URL normalization', () => {
   it('falls back to the production canonical origin when no candidate is configured', () => {
     expect(resolveCanonicalSiteUrl('', undefined)).toBe(DEFAULT_CANONICAL_SITE_URL);
   });
+
+  it('ignores malformed quoted site URL values', () => {
+    expect(normalizeSiteUrl('"https://www.blinkapp.com.ar"')).toBe(
+      'https://www.blinkapp.com.ar'
+    );
+    expect(normalizeSiteUrl('"https://www.blinkapp.com.ar')).toBe('');
+    expect(resolveCanonicalSiteUrl('"https://broken', 'https://blink-v2-preview.vercel.app')).toBe(
+      'https://blink-v2-preview.vercel.app'
+    );
+  });
 });
 
 describe('Vercel host redirect config', () => {
@@ -50,5 +60,63 @@ describe('Vercel host redirect config', () => {
         }),
       ])
     );
+  });
+
+  it('sends noindex headers for private app routes', () => {
+    const vercelConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
+    );
+
+    expect(vercelConfig.headers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: '/profile',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/profile/',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/saved',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/saved/',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+      ])
+    );
+  });
+});
+
+describe('robots.txt', () => {
+  it('allows crawlers to fetch private routes so noindex can be seen', () => {
+    const robots = fs.readFileSync(path.resolve(process.cwd(), 'public/robots.txt'), 'utf8');
+
+    expect(robots).toContain('Allow: /');
+    expect(robots).not.toContain('Disallow: /profile');
+    expect(robots).not.toContain('Disallow: /saved');
+    expect(robots).toContain('Sitemap: https://www.blinkapp.com.ar/sitemap.xml');
   });
 });

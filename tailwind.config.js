@@ -5,14 +5,14 @@ export default {
     extend: {
       colors: {
         // Minimalist Bento Grid palette
-        primary: '#6366F1',          // Soft indigo - primary accent
+        primary: '#4338CA',          // Accessible indigo - primary accent
         'blink-bg': '#F7F6F4',       // Warm off-white background
         'blink-ink': '#1C1C1E',      // Soft deep (not pure black)
-        'blink-accent': '#6366F1',   // Indigo accent
-        'blink-positive': '#10B981', // Emerald for discounts/savings
+        'blink-accent': '#4338CA',   // Indigo accent
+        'blink-positive': '#047857', // Emerald for discounts/savings
         'blink-warning': '#F59E0B',  // Warm amber (replaces harsh yellow)
         'blink-surface': '#FFFFFF',
-        'blink-muted': '#9CA3AF',
+        'blink-muted': '#6B7280',
         'blink-border': '#E8E6E1',   // Soft warm border
         // Soft category colors for color-coding
         'cat-food': '#FEF3C7',
@@ -79,8 +79,8 @@ export default {
       },
       backgroundImage: {
         'gradient-subtle': 'linear-gradient(135deg, #F7F6F4 0%, #FFFFFF 100%)',
-        'gradient-indigo': 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-        'gradient-emerald': 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+        'gradient-indigo': 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)',
+        'gradient-emerald': 'linear-gradient(135deg, #047857 0%, #10B981 100%)',
         'gradient-amber': 'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
         'gradient-card': 'linear-gradient(145deg, #FFFFFF 0%, #F7F6F4 100%)',
       },

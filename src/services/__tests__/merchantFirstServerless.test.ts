@@ -6,6 +6,7 @@ import {
   handleGetBenefits,
   handleGetBusinesses,
   handleLegacyBusinessRedirect,
+  handleLandingSeoPage,
   handleMerchantSeoPage,
   resolveRequestPath,
   rehydrateBenefitDoc
@@ -56,6 +57,28 @@ function createCursor<T>(data: T[]) {
   return cursor;
 }
 
+function createPaginatedCursor<T>(data: T[]) {
+  let offset = 0;
+  let count = data.length;
+  const cursor = {
+    sort() {
+      return cursor;
+    },
+    skip(value: number) {
+      offset = value;
+      return cursor;
+    },
+    limit(value: number) {
+      count = value;
+      return cursor;
+    },
+    async toArray() {
+      return data.slice(offset, offset + count);
+    }
+  };
+  return cursor;
+}
+
 function createAggregateCursor<T>(data: T[]) {
   return {
     async toArray() {
@@ -74,6 +97,8 @@ describe('merchant-first serverless helpers', () => {
     expect(resolveRequestPath(new URL('https://example.com/business/merchant_1?path=business/merchant_1'))).toBe('/api/business/merchant_1');
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda?path=categorias/moda'))).toBe('/api/categorias/moda');
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
+    expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia?path=descuentos/galicia/gastronomia'))).toBe('/api/descuentos/galicia/gastronomia');
+    expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia/caba?path=descuentos/galicia/gastronomia/caba'))).toBe('/api/descuentos/galicia/gastronomia/caba');
   });
 
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
@@ -569,6 +594,9 @@ describe('merchant-first serverless helpers', () => {
       merchantName: 'Coto',
       categories: ['shopping'],
       banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
       activeBenefitCount: 2,
       benefitCount: 4,
       maxDiscountPercentage: 25,
@@ -710,6 +738,569 @@ describe('merchant-first serverless helpers', () => {
       error: 'Category page not found',
       category: 'moda',
       page: 3
+    });
+  });
+
+  it('handleLandingSeoPage returns crawlable HTML with merchant links', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Descuentos Banco Galicia en Supermercado y shopping | Blink</title>');
+    expect(res.body).toContain('<h1>Descuentos Banco Galicia en Supermercado y shopping</h1>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/galicia/shopping"');
+    expect(res.body).toContain('href="/comercios/coto--merchant_1"');
+    expect(res.body).toContain('Banco Galicia');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(res.body).toContain('https://schema.org');
+    expect(merchantQueries[0]).toEqual({
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
+      activeBenefitCount: { $gt: 0 },
+      categories: { $in: ['shopping'] },
+      'searchProfile.benefits.bankName': { $in: expect.arrayContaining([expect.any(RegExp)]) }
+    });
+  });
+
+  it('handleLandingSeoPage renders display bank names instead of search bank tokens', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['banco galicia', 'galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<small>Banco Galicia · Buenos Aires</small>');
+    expect(res.body).not.toContain('banco galicia, galicia');
+  });
+
+  it('handleLandingSeoPage matches accented bank names with unaccented slugs', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_nacion',
+      merchantName: 'Farmacia',
+      categories: ['shopping'],
+      banks: ['Banco Nación'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Nación' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/nacion/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'nacion', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
+    expect(bankPatterns.some((pattern) => pattern.test('Banco Nación'))).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos Banco Nacion en Supermercado y shopping | Blink</title>');
+  });
+
+  it('handleLandingSeoPage preserves client bank aliases for Santander Rio merchant data', async () => {
+    const merchant = {
+      merchantId: 'merchant_santander',
+      merchantName: 'Restaurante',
+      categories: ['shopping'],
+      banks: ['Banco Santander Río'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Santander Río' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 30,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/santander/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'santander', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos Banco Santander en Supermercado y shopping | Blink</title>');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/descuentos/santander/shopping"');
+  });
+
+  it('handleLandingSeoPage seeds client bank aliases before loading landing data', async () => {
+    const merchantQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_frances',
+      merchantName: 'Super Frances',
+      categories: ['shopping'],
+      banks: ['Banco Francés'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Francés' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return 1;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/bbva/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'bbva', 'shopping', undefined, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
+    expect(bankPatterns.some((pattern) => pattern.test('Banco Francés'))).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Descuentos BBVA en Supermercado y shopping | Blink</title>');
+  });
+
+  it('handleLandingSeoPage seeds client city aliases before loading landing data', async () => {
+    const merchant = {
+      merchantId: 'merchant_caba',
+      merchantName: 'Coto CABA',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 20,
+      locations: [
+        {
+          formattedAddress: 'Ciudad Autónoma de Buenos Aires'
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              throw new Error('City landing pages should count by scanning all matching merchants');
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping/capital-federal');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', 'capital-federal', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/descuentos/galicia/shopping/caba');
+  });
+
+  it('handleLandingSeoPage rejects landing pages outside the client route set', async () => {
+    const merchant = {
+      merchantId: 'merchant_2',
+      merchantName: 'YPF',
+      categories: ['combustible'],
+      banks: ['naranjax'],
+      searchProfile: {
+        benefits: [{ bankName: 'NaranjaX' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 15,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'San Miguel de Tucuman',
+            adminAreaLevel1: 'Tucuman'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/naranjax/combustible/san-miguel-de-tucuman');
+
+    await handleLandingSeoPage(
+      req as never,
+      res as never,
+      url,
+      db as never,
+      'naranjax',
+      'combustible',
+      'san-miguel-de-tucuman',
+      {
+        appShell: merchantSeoAppShell,
+        siteUrl: 'https://www.blinkapp.com.ar'
+      }
+    );
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'naranjax',
+      category: 'combustible',
+      city: 'san-miguel-de-tucuman'
+    });
+  });
+
+  it('handleLandingSeoPage scans city matches beyond the first merchant fetch window', async () => {
+    const nonMatchingMerchants = Array.from({ length: 500 }, (_, index) => ({
+      merchantId: `merchant_other_${index}`,
+      merchantName: `Other ${index}`,
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      maxDiscountPercentage: 10,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Cordoba'
+          }
+        }
+      ]
+    }));
+    const matchingMerchant = {
+      merchantId: 'merchant_match',
+      merchantName: 'Coto Buenos Aires',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 2,
+      maxDiscountPercentage: 25,
+      locations: [
+        {
+          addressComponents: {
+            locality: 'Buenos Aires'
+          }
+        }
+      ]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              throw new Error('City landing pages should count by scanning all matching merchants');
+            },
+            find() {
+              return createPaginatedCursor([...nonMatchingMerchants, matchingMerchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/api/descuentos/galicia/shopping/buenos-aires');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'galicia', 'shopping', 'buenos-aires', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('1 comercios encontrados');
+    expect(res.body).toContain('Coto Buenos Aires');
+    expect(res.body).not.toContain('Other 0');
+  });
+
+  it('handleLandingSeoPage redirects dynamic aliases to canonical landing paths', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/banco-galicia/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'banco-galicia', 'shopping');
+
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/descuentos/galicia/shopping');
+  });
+
+  it('handleLandingSeoPage rejects unknown bank slugs not backed by canonical merchant banks', async () => {
+    const merchant = {
+      merchantId: 'merchant_1',
+      merchantName: 'Coto',
+      categories: ['shopping'],
+      banks: ['Banco Galicia'],
+      searchProfile: {
+        benefits: [{ bankName: 'Banco Galicia' }]
+      },
+      activeBenefitCount: 2,
+      benefitCount: 4,
+      maxDiscountPercentage: 25,
+      locations: []
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 1;
+            },
+            find() {
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/a/shopping');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'a', 'shopping');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'a',
+      category: 'shopping'
+    });
+  });
+
+  it('handleLandingSeoPage returns 404 for invalid landing combinations', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return 0;
+            },
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/descuentos/nope/moda');
+
+    await handleLandingSeoPage(req as never, res as never, url, db as never, 'nope', 'moda');
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body || '{}')).toEqual({
+      success: false,
+      error: 'Landing page not found',
+      bank: 'nope',
+      category: 'moda'
     });
   });
 

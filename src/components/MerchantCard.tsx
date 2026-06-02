@@ -15,7 +15,7 @@ interface MerchantCardProps {
 }
 
 const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
-  gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
+  gastronomia: { bg: '#EEF2FF', color: '#4338CA' },
   moda:        { bg: '#EDE9FE', color: '#7C3AED' },
   viajes:      { bg: '#E0F2FE', color: '#0284C7' },
 };
@@ -131,15 +131,15 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
         {/* Discount / installments */}
         {maxDiscount > 0 ? (
           <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-            <span className="text-[7px] font-bold text-emerald-500 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
+            <span className="text-[7px] font-bold text-emerald-700 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
             <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
-            <span className="text-[8px] font-bold text-emerald-500 leading-none mt-[2px] tracking-wide">OFF</span>
+            <span className="text-[8px] font-bold text-emerald-700 leading-none mt-[2px] tracking-wide">OFF</span>
           </div>
         ) : maxInstallments > 0 ? (
           <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-            <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#818CF8' }}>hasta</span>
+            <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#4338CA' }}>hasta</span>
             <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
-            <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#818CF8' }}>cuotas</span>
+            <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#4338CA' }}>cuotas</span>
           </div>
         ) : (
           <div className="shrink-0" style={{ minWidth: 38 }} />

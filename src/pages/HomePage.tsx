@@ -19,6 +19,7 @@ import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking'
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
+import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -485,6 +486,53 @@ function HomePage() {
 
         {/* Coming Soon Banks */}
         <ComingSoonSection />
+
+        <section className="px-4">
+          <div className="border-t border-blink-border pt-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-blink-ink">Explorar descuentos</h2>
+              <Link to="/search" className="text-xs font-semibold text-primary hover:text-primary/70 transition-colors">
+                Ver buscador
+              </Link>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
+                  Categorías
+                </p>
+                <nav aria-label="Categorías de descuentos" className="flex flex-wrap gap-x-4 gap-y-2">
+                  {HOME_CATEGORY_LINKS.map((link) => (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      className="text-sm font-medium leading-6 text-blink-muted underline-offset-4 hover:text-blink-ink hover:underline active:text-primary"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
+                  Bancos y rubros
+                </p>
+                <nav aria-label="Descuentos por banco y rubro" className="flex flex-wrap gap-x-4 gap-y-2">
+                  {HOME_DISCOUNT_LINKS.map((link) => (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      className="text-sm font-medium leading-6 text-blink-muted underline-offset-4 hover:text-blink-ink hover:underline active:text-primary"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            </div>
+          </div>
+        </section>
 
       </main>
 
