@@ -13,7 +13,7 @@ export interface CategoryFilterService {
     addCategoryConfig(config: CategoryConfig): void;
 }
 
-// Default category configuration based on current Home.tsx logic
+// Default category configuration based on current HomePage logic
 const defaultCategoryConfigs: CategoryConfig[] = [
     {
         value: 'all',
