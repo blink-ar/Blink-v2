@@ -27,6 +27,16 @@ describe('canonical site URL normalization', () => {
   it('falls back to the production canonical origin when no candidate is configured', () => {
     expect(resolveCanonicalSiteUrl('', undefined)).toBe(DEFAULT_CANONICAL_SITE_URL);
   });
+
+  it('ignores malformed quoted site URL values', () => {
+    expect(normalizeSiteUrl('"https://www.blinkapp.com.ar"')).toBe(
+      'https://www.blinkapp.com.ar'
+    );
+    expect(normalizeSiteUrl('"https://www.blinkapp.com.ar')).toBe('');
+    expect(resolveCanonicalSiteUrl('"https://broken', 'https://blink-v2-preview.vercel.app')).toBe(
+      'https://blink-v2-preview.vercel.app'
+    );
+  });
 });
 
 describe('Vercel host redirect config', () => {

@@ -3,6 +3,9 @@
   "functions": {
     "api/[...path].js": {
       "includeFiles": "dist/index.html"
+    },
+    "api/spa-shell.js": {
+      "includeFiles": "dist/index.html"
     }
   },
   "redirects": [
@@ -51,8 +54,8 @@
       "handle": "filesystem"
     },
     {
-      "src": "/.*",
-      "dest": "/index.html"
+      "src": "/(.*)",
+      "dest": "/api/spa-shell?path=$1"
     }
   ]
 }
