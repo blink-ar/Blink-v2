@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
+import ts from 'typescript';
 import { DEFAULT_CANONICAL_SITE_URL, resolveCanonicalSiteUrl } from '../api/canonical-site.js';
 import { SEO_CATEGORY_DEFINITIONS } from '../api/category-seo-data.js';
+import { buildLandingSeoRoutesFromMerchants } from '../api/landing-seo-data.js';
 import { slugify } from '../api/search/normalize.js';
 
 const DEFAULT_SITE_URL = DEFAULT_CANONICAL_SITE_URL;
@@ -53,11 +55,13 @@ const hasConfiguredSiteUrl = siteUrlCandidates.some((value) => String(value || '
 const siteUrl = resolveCanonicalSiteUrl(...siteUrlCandidates);
 const mongoUri = process.env.MONGODB_URI_READ_ONLY || '';
 const databaseName = process.env.DATABASE_NAME || DEFAULT_DATABASE_NAME;
+const landingMinMerchantCount = Number.parseInt(process.env.SITEMAP_LANDING_MIN_MERCHANTS || '3', 10);
+const landingMaxCityRoutesPerCombination = Number.parseInt(
+  process.env.SITEMAP_LANDING_MAX_CITY_ROUTES_PER_COMBO || '5',
+  10,
+);
 
 const today = new Date().toISOString().split('T')[0];
-const banks = ['galicia', 'santander', 'bbva', 'macro', 'nacion', 'icbc'];
-const categories = ['gastronomia', 'moda', 'shopping', 'hogar', 'deportes', 'belleza'];
-const cities = ['buenos-aires', 'caba', 'cordoba', 'rosario', 'mendoza'];
 
 const baseRoutes = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -70,6 +74,52 @@ const categorySeoRoutes = SEO_CATEGORY_DEFINITIONS.map((category) => ({
   changefreq: 'weekly',
   priority: '0.8',
 }));
+
+function extractExportedSlugArray(sourceFile, exportName) {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== exportName) continue;
+      if (!declaration.initializer || !ts.isArrayLiteralExpression(declaration.initializer)) return [];
+
+      return declaration.initializer.elements.flatMap((element) => {
+        if (!ts.isObjectLiteralExpression(element)) return [];
+        const slugProperty = element.properties.find((property) => {
+          return ts.isPropertyAssignment(property) &&
+            ts.isIdentifier(property.name) &&
+            property.name.text === 'slug';
+        });
+        if (!slugProperty || !ts.isPropertyAssignment(slugProperty)) return [];
+        return (
+          ts.isStringLiteral(slugProperty.initializer) ||
+          ts.isNoSubstitutionTemplateLiteral(slugProperty.initializer)
+        ) ? [slugProperty.initializer.text] : [];
+      });
+    }
+  }
+
+  return [];
+}
+
+function readClientLandingRouteAllowlist() {
+  const landingDataPath = path.resolve(process.cwd(), 'src/seo/landingData.ts');
+  const sourceText = fs.readFileSync(landingDataPath, 'utf8');
+  const sourceFile = ts.createSourceFile(
+    landingDataPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  return {
+    allowedBankSlugs: extractExportedSlugArray(sourceFile, 'LANDING_BANKS'),
+    allowedCategorySlugs: extractExportedSlugArray(sourceFile, 'LANDING_CATEGORIES'),
+    allowedCitySlugs: extractExportedSlugArray(sourceFile, 'LANDING_CITIES'),
+  };
+}
 
 function escapeXml(value) {
   return String(value)
@@ -86,9 +136,9 @@ function getMerchantSeoPath(merchant) {
   return `/comercios/${merchantSlug}--${encodeURIComponent(merchantId)}`;
 }
 
-async function loadMerchantRoutes() {
+async function loadMerchantSeoDocuments() {
   if (!mongoUri) {
-    console.warn('[seo] MONGODB_URI_READ_ONLY is not set. Skipping merchant sitemap URLs.');
+    console.warn('[seo] MONGODB_URI_READ_ONLY is not set. Skipping dynamic merchant and landing sitemap URLs.');
     return [];
   }
 
@@ -108,44 +158,45 @@ async function loadMerchantRoutes() {
             _id: 0,
             merchantId: 1,
             merchantName: 1,
+            categories: 1,
+            banks: 1,
+            locations: 1,
+            benefitCount: 1,
+            activeBenefitCount: 1,
+            'searchProfile.benefits.bankName': 1,
           },
         },
       )
       .sort({ merchantName: 1 })
       .toArray();
-
-    return merchants
-      .filter((merchant) => String(merchant.merchantId || '').trim())
-      .map((merchant) => ({
-        path: getMerchantSeoPath(merchant),
-        changefreq: 'weekly',
-        priority: '0.8',
-      }));
+    return merchants;
   } finally {
     await client.close();
   }
 }
 
-const landingRoutes = [];
-for (const bank of banks) {
-  for (const category of categories) {
-    landingRoutes.push({
-      path: `/descuentos/${bank}/${category}`,
+function buildMerchantRoutes(merchants) {
+  return merchants
+    .filter((merchant) => String(merchant.merchantId || '').trim())
+    .map((merchant) => ({
+      path: getMerchantSeoPath(merchant),
       changefreq: 'weekly',
       priority: '0.8',
-    });
-
-    for (const city of cities) {
-      landingRoutes.push({
-        path: `/descuentos/${bank}/${category}/${city}`,
-        changefreq: 'weekly',
-        priority: '0.7',
-      });
-    }
-  }
+    }));
 }
 
-const merchantRoutes = await loadMerchantRoutes();
+const merchantDocuments = await loadMerchantSeoDocuments();
+const merchantRoutes = buildMerchantRoutes(merchantDocuments);
+const landingMerchantDocuments = merchantDocuments.filter((merchant) => {
+  return Number(merchant?.activeBenefitCount || 0) > 0;
+});
+const landingRoutes = buildLandingSeoRoutesFromMerchants(landingMerchantDocuments, {
+  minMerchantCount: Number.isFinite(landingMinMerchantCount) ? landingMinMerchantCount : 3,
+  maxCityRoutesPerCombination: Number.isFinite(landingMaxCityRoutesPerCombination)
+    ? landingMaxCityRoutesPerCombination
+    : 5,
+  ...readClientLandingRouteAllowlist(),
+});
 const routes = [...baseRoutes, ...categorySeoRoutes, ...landingRoutes, ...merchantRoutes];
 const uniqueRoutes = Array.from(new Map(routes.map((route) => [route.path, route])).values());
 
@@ -235,5 +286,5 @@ fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsContent, 'utf8');
 if (!hasConfiguredSiteUrl) {
   console.warn(`[seo] CANONICAL_SITE_URL/VITE_SITE_URL/SITE_URL is not set. Using ${DEFAULT_SITE_URL} in sitemap and robots.txt.`);
 } else {
-  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${merchantRoutes.length} merchant URLs)`);
+  console.log(`[seo] Generated sitemap.xml and robots.txt for ${siteUrl} (${uniqueRoutes.length} URLs, ${categorySeoRoutes.length} category URLs, ${landingRoutes.length} landing URLs, ${merchantRoutes.length} merchant URLs)`);
 }

@@ -36,6 +36,14 @@
       "dest": "/api/[...path]?path=categorias/$1"
     },
     {
+      "src": "/descuentos/([^/]+)/([^/]+)/([^/]+)",
+      "dest": "/api/[...path]?path=descuentos/$1/$2/$3"
+    },
+    {
+      "src": "/descuentos/([^/]+)/([^/]+)",
+      "dest": "/api/[...path]?path=descuentos/$1/$2"
+    },
+    {
       "src": "/comercios/([^/]+)",
       "dest": "/api/[...path]?path=comercios/$1"
     },
