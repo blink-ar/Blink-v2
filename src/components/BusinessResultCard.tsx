@@ -125,7 +125,7 @@ function BusinessResultCard({
 
         <div className="flex items-center gap-1 overflow-hidden">
           {visibleBadges.map((token) => (
-            <BankLogo key={`${business.id}-${token}`} bankName={token} size={22} />
+            <BankLogo key={`${business.id}-${token}`} bankName={token} size={32} />
           ))}
           {remaining > 0 && (
             <span
@@ -136,7 +136,7 @@ function BusinessResultCard({
             </span>
           )}
         </div>
-        <span className="block text-[10px] text-blink-muted mt-[3px]">
+        <span className="block text-[10px] text-blink-muted mt-[7px]">
           {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
         </span>
       </div>
