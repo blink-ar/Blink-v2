@@ -762,6 +762,25 @@ function isFiniteDistanceKm(value) {
   return Number.isFinite(value);
 }
 
+// Scoring reasons that indicate the hit matches what the user explicitly typed
+// (the merchant name itself or one of its aliases), as opposed to a weaker
+// category/intent/product-tag expansion match. Hits with one of these reasons
+// must never be removed by the distance guardrail: if you search a business by
+// name it should appear even when its closest location is far away.
+const NAME_MATCH_REASONS = new Set([
+  'merchant_exact',
+  'merchant_name_variant',
+  'merchant_name_tokens_exact',
+  'merchant_prefix',
+  'alias_exact',
+  'manual_alias_exact'
+]);
+
+function isExplicitNameMatch(hit) {
+  const reasons = Array.isArray(hit?.reasons) ? hit.reasons : [];
+  return reasons.some((reason) => NAME_MATCH_REASONS.has(reason));
+}
+
 function applyLocalDistanceGuardrail(merchantHits, filters) {
   if (!Number.isFinite(filters?.lat) || !Number.isFinite(filters?.lng)) {
     return merchantHits;
@@ -778,6 +797,9 @@ function applyLocalDistanceGuardrail(merchantHits, filters) {
   return merchantHits.filter((hit) => {
     const distance = hit?.business?.distance;
     if (!isFiniteDistanceKm(distance)) return true;
+    // Keep explicit name/alias matches regardless of how far away they are —
+    // these are exactly what the user searched for by name.
+    if (isExplicitNameMatch(hit)) return true;
     return distance <= DISTANT_RESULT_CUTOFF_KM;
   });
 }
@@ -2729,6 +2751,7 @@ async function handlePlaceDetails(req, res) {
 }
 
 export {
+  applyLocalDistanceGuardrail,
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   resolveRequestPath,
