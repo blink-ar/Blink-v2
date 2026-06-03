@@ -112,14 +112,26 @@ export const useGeolocation = () => {
         if (result.state === 'denied') {
           localStorage.setItem(STORAGE_KEYS.permission, 'denied');
           setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
-        } else {
-          // 'granted' or 'prompt': always request. The 24h cache above prevents spam —
-          // this code only runs when cache is expired or absent (i.e. first visit or stale).
+        } else if (result.state === 'granted') {
+          // Browser confirms the grant — fetch silently, no dialog will appear.
           requestLocation();
+        } else {
+          // 'prompt': the browser will show the native permission dialog if we call
+          // getCurrentPosition(). On iOS this state can reappear after inactivity or
+          // a Settings change even though the user already granted before.
+          // If localStorage records a prior grant, skip the auto-request so we don't
+          // annoy the user with a repeated dialog on every cold start; the dialog will
+          // fire naturally when they explicitly tap the location button instead.
+          const stored = localStorage.getItem(STORAGE_KEYS.permission);
+          if (stored === 'granted') {
+            setState({ position: null, error: null, loading: false, permissionDenied: false });
+          } else {
+            requestLocation();
+          }
         }
       });
     } else {
-      // Fallback for browsers without Permissions API
+      // Fallback for browsers without Permissions API (iOS < 16.4)
       const stored = localStorage.getItem(STORAGE_KEYS.permission);
       if (stored === 'denied') {
         setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
