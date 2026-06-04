@@ -763,16 +763,24 @@ function isFiniteDistanceKm(value) {
 }
 
 // Scoring reasons that indicate the hit matches what the user explicitly typed
-// (the merchant name itself or one of its aliases), as opposed to a weaker
-// category/intent/product-tag expansion match. Hits with one of these reasons
+// (the full merchant name, a phrase variant of it, or a curated manual alias),
+// as opposed to a weaker partial/recall match. Hits with one of these reasons
 // must never be removed by the distance guardrail: if you search a business by
 // name it should appear even when its closest location is far away.
+//
+// Deliberately excluded:
+//   - merchant_prefix: a startsWith match, so a short query like "ca" would
+//     exempt every distant merchant starting with those letters.
+//   - alias_exact: hit.aliases includes generated recall aliases (name tokens,
+//     compacted name, a 4-char prefix; see resolveMerchantAliases in
+//     api/search/entities.js), so generic tokens like "cafe" or generated
+//     prefixes like "star" would exempt unrelated distant merchants.
+// Both would re-introduce far-away results outranking nearby ones for broad
+// queries, which is exactly what the guardrail exists to prevent.
 const NAME_MATCH_REASONS = new Set([
   'merchant_exact',
   'merchant_name_variant',
   'merchant_name_tokens_exact',
-  'merchant_prefix',
-  'alias_exact',
   'manual_alias_exact'
 ]);
 
