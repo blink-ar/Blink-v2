@@ -14,6 +14,7 @@ import {
 } from './search/normalize.js';
 import {
   getMerchantSeoPathFromMerchant,
+  isMerchantBenefitActive,
   parseMerchantSeoSlugId,
   readViteAppShell,
   renderMerchantSeoHtml
@@ -2556,18 +2557,98 @@ async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
     .toArray();
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefits = rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup));
+  const now = options.now || new Date();
+  const hasActiveBenefits = benefits.some((benefit) => isMerchantBenefitActive(benefit, now));
+  const relatedActiveMerchants = hasActiveBenefits
+    ? []
+    : await loadRelatedActiveMerchantAlternatives(db, merchant);
   const appShell = options.appShell || readViteAppShell();
   const renderedHtml = renderMerchantSeoHtml({
     appShell,
     merchant,
     benefits,
+    relatedActiveMerchants,
     path: canonicalPath,
     siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
-    now: options.now || new Date()
+    now
   });
 
   setCacheControl(res, CC_CONTENT);
   return html(res, 200, renderedHtml);
+}
+
+function getMerchantAlternativeCategories(merchant) {
+  return Array.isArray(merchant?.categories)
+    ? merchant.categories.map((category) => String(category || '').trim()).filter(Boolean)
+    : [];
+}
+
+function getMerchantAlternativeBanks(merchant) {
+  return Array.isArray(merchant?.banks)
+    ? merchant.banks.map((bank) => String(bank || '').trim()).filter(Boolean)
+    : [];
+}
+
+function getMerchantAlternativeCity(merchant) {
+  const location = Array.isArray(merchant?.locations) ? merchant.locations.find(Boolean) : null;
+  const components = location?.addressComponents || {};
+  return (
+    components.locality ||
+    components.sublocality ||
+    components.adminAreaLevel2 ||
+    components.adminAreaLevel1 ||
+    ''
+  );
+}
+
+function serializeRelatedActiveMerchant(merchant) {
+  return {
+    merchantId: merchant?.merchantId,
+    merchantName: merchant?.merchantName,
+    path: getMerchantSeoPathFromMerchant(merchant),
+    category: getMerchantAlternativeCategories(merchant)[0] || '',
+    city: getMerchantAlternativeCity(merchant),
+    banks: getMerchantAlternativeBanks(merchant),
+    activeBenefitCount: Number(merchant?.activeBenefitCount || 0),
+    maxDiscountPercentage: Number(merchant?.maxDiscountPercentage || 0)
+  };
+}
+
+async function loadRelatedActiveMerchantAlternatives(db, merchant) {
+  const merchantId = String(merchant?.merchantId || '').trim();
+  const categories = getMerchantAlternativeCategories(merchant);
+  const banks = getMerchantAlternativeBanks(merchant);
+  const relatedClauses = [];
+
+  if (categories.length > 0) {
+    relatedClauses.push({ categories: { $in: categories } });
+  }
+
+  if (banks.length > 0) {
+    relatedClauses.push({ banks: { $in: banks } });
+  }
+
+  if (!merchantId || relatedClauses.length === 0) {
+    return [];
+  }
+
+  const alternatives = await db.collection(MERCHANT_ASSETS_COLLECTION)
+    .find(
+      {
+        isActive: { $ne: false },
+        merchantId: { $exists: true, $type: 'string', $ne: merchantId },
+        activeBenefitCount: { $gt: 0 },
+        $or: relatedClauses
+      },
+      {
+        projection: MERCHANT_SEO_PROJECTION
+      }
+    )
+    .sort({ activeBenefitCount: -1, maxDiscountPercentage: -1, merchantName: 1 })
+    .limit(4)
+    .toArray();
+
+  return alternatives.map(serializeRelatedActiveMerchant);
 }
 
 async function handleLegacyBusinessRedirect(req, res, url, db, merchantId) {
