@@ -398,6 +398,60 @@ function renderBenefitList(benefits, emptyText, isPast = false) {
   return `<ul class="blink-seo-benefits">${items}</ul>`;
 }
 
+function getRelatedMerchantPath(merchant) {
+  const path = String(merchant?.path || '').trim();
+  if (path) return path;
+  if (!merchant?.merchantId) return '';
+  return getMerchantSeoPathFromMerchant(merchant);
+}
+
+function getRelatedMerchantOfferText(merchant) {
+  if (Number.isFinite(Number(merchant?.maxDiscountPercentage)) && Number(merchant.maxDiscountPercentage) > 0) {
+    return `Hasta ${Number(merchant.maxDiscountPercentage)}% OFF`;
+  }
+
+  if (Number.isFinite(Number(merchant?.activeBenefitCount)) && Number(merchant.activeBenefitCount) > 0) {
+    return `${Number(merchant.activeBenefitCount)} promos activas`;
+  }
+
+  return 'Promos activas';
+}
+
+function renderRelatedActiveMerchants(relatedActiveMerchants) {
+  const relatedMerchants = (relatedActiveMerchants || [])
+    .map((merchant) => ({
+      name: getMerchantName(merchant),
+      path: getRelatedMerchantPath(merchant),
+      category: merchant?.category || getPrimaryCategory(merchant),
+      city: merchant?.city || getPrimaryCity(merchant),
+      offerText: getRelatedMerchantOfferText(merchant)
+    }))
+    .filter((merchant) => merchant.name && merchant.path)
+    .slice(0, 4);
+
+  if (relatedMerchants.length === 0) return '';
+
+  const items = relatedMerchants.map((merchant) => {
+    const detail = formatList([merchant.category, merchant.city].filter(Boolean), 'Comercio relacionado');
+    return [
+      '<li class="blink-seo-related-item">',
+      `  <a href="${escapeHtml(merchant.path)}">`,
+      `    <strong>${escapeHtml(merchant.name)}</strong>`,
+      `    <span>${escapeHtml(merchant.offerText)}</span>`,
+      `    <small>${escapeHtml(detail)}</small>`,
+      '  </a>',
+      '</li>'
+    ].join('');
+  }).join('');
+
+  return [
+    '  <section class="blink-seo-section">',
+    '    <h2>Comercios relacionados con promos activas</h2>',
+    `    <ul class="blink-seo-related-list">${items}</ul>`,
+    '  </section>'
+  ].join('\n');
+}
+
 function renderFaq(faqItems) {
   return faqItems.map((item) => [
     '<article class="blink-seo-faq-item">',
@@ -407,7 +461,7 @@ function renderFaq(faqItems) {
   ].join('')).join('');
 }
 
-function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, faqItems }) {
+function buildBodyHtml({ merchant, activeBenefits, pastBenefits, relatedActiveMerchants, description, faqItems }) {
   const name = getMerchantName(merchant);
   const category = getPrimaryCategory(merchant);
   const city = getPrimaryCity(merchant) || 'Argentina';
@@ -444,6 +498,7 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     '    <h2>Beneficios anteriores</h2>',
     renderBenefitList(pastBenefits, 'No hay beneficios anteriores publicados.', true),
     '  </section>',
+    renderRelatedActiveMerchants(relatedActiveMerchants),
     '  <section class="blink-seo-section blink-seo-faq">',
     '    <h2>Preguntas frecuentes</h2>',
     renderFaq(faqItems),
@@ -481,6 +536,7 @@ function buildHeadHtml({ title, description, absoluteUrl, imageUrl, structuredDa
     '      .blink-seo-kicker{text-transform:uppercase;font-size:12px;letter-spacing:.08em;font-weight:700;color:#4f46e5}.blink-seo-hero h1{font-size:40px;line-height:1.05;margin:8px 0 12px}.blink-seo-hero p{font-size:18px;line-height:1.55;color:#374151}',
     '      .blink-seo-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:24px 0;padding:0}.blink-seo-facts div,.blink-seo-benefit,.blink-seo-faq-item{border:1px solid #e5e7eb;border-radius:8px;padding:14px;background:#fafafa}.blink-seo-facts dt{font-size:12px;text-transform:uppercase;color:#6b7280}.blink-seo-facts dd{margin:4px 0 0;font-weight:700}',
     '      .blink-seo-section{margin-top:36px}.blink-seo-section h2{font-size:24px;margin:0 0 14px}.blink-seo-benefits{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;list-style:none;margin:0;padding:0}.blink-seo-benefit strong{display:block;font-size:20px}.blink-seo-benefit span{display:block;color:#4b5563;margin-top:4px}.blink-seo-benefit p{margin:8px 0;color:#111827}.blink-seo-benefit small{color:#6b7280}.blink-seo-empty{color:#6b7280}',
+    '      .blink-seo-related-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;list-style:none;margin:0;padding:0}.blink-seo-related-item a{display:block;border:1px solid #e5e7eb;border-radius:8px;padding:14px;background:#fff;color:#111827;text-decoration:none}.blink-seo-related-item strong,.blink-seo-related-item span,.blink-seo-related-item small{display:block}.blink-seo-related-item span{margin-top:6px;font-weight:700}.blink-seo-related-item small{margin-top:6px;color:#6b7280}',
     '      .blink-seo-faq{display:grid;gap:12px}.blink-seo-faq h2{grid-column:1/-1}.blink-seo-faq-item h3{font-size:18px;margin:0 0 8px}.blink-seo-faq-item p{margin:0;color:#374151;line-height:1.5}',
     '      @media (max-width:640px){.blink-seo-shell{padding:24px 16px 48px}.blink-seo-hero h1{font-size:32px}}',
     '    </style>'
@@ -603,6 +659,7 @@ export function renderMerchantSeoHtml({
   appShell,
   merchant,
   benefits = [],
+  relatedActiveMerchants = [],
   path: merchantPath,
   siteUrl,
   now = new Date()
@@ -633,6 +690,7 @@ export function renderMerchantSeoHtml({
     merchant,
     activeBenefits,
     pastBenefits,
+    relatedActiveMerchants,
     description,
     faqItems
   });
