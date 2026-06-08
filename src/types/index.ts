@@ -37,6 +37,14 @@ export interface BankBenefit {
   // Subscription reference (ID from bank_subscriptions collection)
   subscription?: string | null;
   subscriptionIds?: string[];
+  minumumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
+  minimumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
 }
 
 export interface Business {
@@ -147,6 +155,14 @@ export interface Benefit {
   purchaseMethod: string;
   howToRedeem: string;
   limits: string;
+  minumumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
+  minimumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
 }
 
 export interface BenefitsResponse {

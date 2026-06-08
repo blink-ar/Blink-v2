@@ -187,13 +187,19 @@ export class DataTransformationService extends AbstractBaseService {
                 benefit.details.beneficio.subtitulo ||
                 'Benefit available';
 
+            const rawBenefit = benefit.beneficios?.[0] as any;
+            const minumumPurchaseAmount = rawBenefit?.minumumPurchaseAmount || (benefit as any).minumumPurchaseAmount;
+            const minimumPurchaseAmount = rawBenefit?.minimumPurchaseAmount || (benefit as any).minimumPurchaseAmount;
+
             const bankBenefit: BankBenefit = {
                 bankName,
                 cardName: this.generateCardName(bankName),
                 benefit: this.sanitizeText(benefitDescription) || fallbackValues.benefit,
                 rewardRate: this.sanitizeText(rewardRate) || fallbackValues.rewardRate,
                 color: this.assignConsistentColor(bankName),
-                icon: 'CreditCard'
+                icon: 'CreditCard',
+                minumumPurchaseAmount,
+                minimumPurchaseAmount
             };
 
             return {

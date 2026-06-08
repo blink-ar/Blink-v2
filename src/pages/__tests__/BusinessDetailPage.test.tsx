@@ -188,7 +188,7 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 12,
           cuando: 'Lunes, Martes',
-          validUntil: '2026-06-30'
+          validUntil: '2026-08-31'
         },
         {
           bankName: 'Naranja X',
@@ -199,7 +199,7 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 10,
           cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
-          validUntil: '2026-05-31'
+          validUntil: '2026-08-31'
         },
       ],
     });

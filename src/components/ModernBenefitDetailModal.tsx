@@ -61,6 +61,9 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
   // Get installments from benefit
   const installments = benefit.installments;
 
+  // Extract minimum purchase amount
+  const minPurchaseAmount = benefit.minumumPurchaseAmount?.amount ?? benefit.minimumPurchaseAmount?.amount ?? null;
+
   // Process all fields
   const processedValue = processTextField(benefit.valor);
   const processedLimit = processTextField(benefit.tope);
@@ -173,7 +176,7 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
               <DaysOfWeek benefit={benefit} />
 
               {/* Discount and Limits */}
-              {(displayValue || processedLimit) && (
+              {(displayValue || processedLimit || minPurchaseAmount !== null) && (
                 <section className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
@@ -193,10 +196,18 @@ const ModernBenefitDetailModal: React.FC<ModernBenefitDetailModalProps> = ({
                       </div>
                     )}
                     {processedLimit && (
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                      <div className={`flex items-center justify-between pt-2 ${displayValue ? 'border-t border-gray-200' : ''}`}>
                         <span className="text-sm text-gray-600">Tope de reintegro</span>
                         <span className="text-base font-semibold text-gray-900">
                           ${processedLimit}
+                        </span>
+                      </div>
+                    )}
+                    {minPurchaseAmount !== null && (
+                      <div className={`flex items-center justify-between pt-2 ${(displayValue || processedLimit) ? 'border-t border-gray-200' : ''}`}>
+                        <span className="text-sm text-gray-600">Compra mínima requerida</span>
+                        <span className="text-base font-semibold text-gray-900">
+                          ${minPurchaseAmount.toLocaleString('es-CO')}
                         </span>
                       </div>
                     )}

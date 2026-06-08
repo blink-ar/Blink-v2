@@ -37,7 +37,11 @@ export const mockBusinesses: Business[] = [
           "Cafeterías",
           "Delivery de comida"
         ],
-        textoAplicacion: "Beneficio aplicado automáticamente al momento de la compra. Puntos acreditados en el próximo resumen."
+        textoAplicacion: "Beneficio aplicado automáticamente al momento de la compra. Puntos acreditados en el próximo resumen.",
+        minumumPurchaseAmount: {
+          amount: 2500,
+          currency: "ARS"
+        }
       },
       {
         bankName: "Capital One",
@@ -427,7 +431,10 @@ export const mockBusinesses: Business[] = [
           "Zara online con tarjeta BBVA",
           "Otras tiendas de moda participantes"
         ],
-        textoAplicacion: "Descuento aplicado automáticamente en caja. Válido sábados y domingos únicamente."
+        textoAplicacion: "Descuento aplicado automáticamente en caja. Válido sábados y domingos únicamente.",
+        minumumPurchaseAmount: {
+          amount: 5000
+        }
       },
       {
         bankName: "Banco Ciudad",
@@ -451,7 +458,10 @@ export const mockBusinesses: Business[] = [
           "Delivery de comida",
           "Cafeterías"
         ],
-        textoAplicacion: "Presentar tarjeta antes del pago. Válido exclusivamente los martes."
+        textoAplicacion: "Presentar tarjeta antes del pago. Válido exclusivamente los martes.",
+        minimumPurchaseAmount: {
+          amount: 10000
+        }
       },
       {
         bankName: "Santander",
