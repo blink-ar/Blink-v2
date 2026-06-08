@@ -2632,7 +2632,12 @@ async function loadRelatedActiveMerchantAlternatives(db, merchant) {
     return [];
   }
 
-  const alternatives = await db.collection(MERCHANT_ASSETS_COLLECTION)
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  if (typeof merchantCollection?.find !== 'function') {
+    return [];
+  }
+
+  const alternatives = await merchantCollection
     .find(
       {
         isActive: { $ne: false },
