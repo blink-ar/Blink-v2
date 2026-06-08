@@ -1,27 +1,35 @@
 export interface BankDescriptor {
+  // Searchable value sent to the API in `bank=`. The server matches it against
+  // stored bank text with `new RegExp(escapeRegex(token), 'i')` and does NOT
+  // strip whitespace, so the token must stay a space-free substring of the
+  // stored display name (e.g. `naranja` matches `Naranja X`, `personal` matches
+  // `Personal Pay`). The visual logo/brand key is tracked separately in `logoKey`.
   token: string;
   code: string;
   label: string;
+  // Key into the bank logo manifest / brand color maps. Differs from `token`
+  // when the brand's display name contains a space (e.g. Naranja X, Personal Pay).
+  logoKey: string;
 }
 
 export const KNOWN_BANKS: BankDescriptor[] = [
-  { token: 'galicia', code: 'GAL', label: 'GALICIA' },
-  { token: 'santander', code: 'SAN', label: 'SANTANDER' },
-  { token: 'bbva', code: 'BBVA', label: 'BBVA' },
-  { token: 'macro', code: 'MAC', label: 'MACRO' },
-  { token: 'modo', code: 'MODO', label: 'MODO' },
-  { token: 'icbc', code: 'ICBC', label: 'ICBC' },
-  { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
-  { token: 'amex', code: 'AMEX', label: 'AMEX' },
-  { token: 'naranjax', code: 'NX', label: 'NARANJA X' },
-  { token: 'nacion', code: 'BNA', label: 'NACION' },
-  { token: 'ciudad', code: 'CIUD', label: 'CIUDAD' },
-  { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
-  { token: 'visa', code: 'VISA', label: 'VISA' },
-  { token: 'mastercard', code: 'MC', label: 'MASTERCARD' },
-  { token: 'lagaceta', code: 'LAGA', label: 'LA GACETA' },
-  { token: 'buepp', code: 'BUEPP', label: 'BUEPP' },
-  { token: 'personalpay', code: 'PP', label: 'PERSONAL PAY' },
+  { token: 'galicia', code: 'GAL', label: 'GALICIA', logoKey: 'galicia' },
+  { token: 'santander', code: 'SAN', label: 'SANTANDER', logoKey: 'santander' },
+  { token: 'bbva', code: 'BBVA', label: 'BBVA', logoKey: 'bbva' },
+  { token: 'macro', code: 'MAC', label: 'MACRO', logoKey: 'macro' },
+  { token: 'modo', code: 'MODO', label: 'MODO', logoKey: 'modo' },
+  { token: 'icbc', code: 'ICBC', label: 'ICBC', logoKey: 'icbc' },
+  { token: 'hsbc', code: 'HSBC', label: 'HSBC', logoKey: 'hsbc' },
+  { token: 'amex', code: 'AMEX', label: 'AMEX', logoKey: 'amex' },
+  { token: 'naranja', code: 'NX', label: 'NARANJA X', logoKey: 'naranjax' },
+  { token: 'nacion', code: 'BNA', label: 'NACION', logoKey: 'nacion' },
+  { token: 'ciudad', code: 'CIUD', label: 'CIUDAD', logoKey: 'ciudad' },
+  { token: 'patagonia', code: 'PAT', label: 'PATAGONIA', logoKey: 'patagonia' },
+  { token: 'visa', code: 'VISA', label: 'VISA', logoKey: 'visa' },
+  { token: 'mastercard', code: 'MC', label: 'MASTERCARD', logoKey: 'mastercard' },
+  { token: 'lagaceta', code: 'LAGA', label: 'LA GACETA', logoKey: 'lagaceta' },
+  { token: 'buepp', code: 'BUEPP', label: 'BUEPP', logoKey: 'buepp' },
+  { token: 'personal', code: 'PP', label: 'PERSONAL PAY', logoKey: 'personalpay' },
 ];
 
 const asBankText = (value: unknown): string => {
@@ -87,6 +95,7 @@ export const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
       token: 'bank',
       code: 'BANK',
       label: 'BANCO',
+      logoKey: 'bank',
     };
   }
 
@@ -102,6 +111,7 @@ export const toBankDescriptor = (bankValue: unknown): BankDescriptor => {
     token,
     code,
     label: sanitized.toUpperCase().slice(0, 18),
+    logoKey: token,
   };
 };
 

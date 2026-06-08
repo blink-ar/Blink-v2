@@ -30,7 +30,7 @@ const lookupManifestEntry = (bankName: string) => {
   }
 
   const descriptor = toBankDescriptor(bankName);
-  return bankLogosManifest[descriptor.token] ?? null;
+  return bankLogosManifest[descriptor.logoKey] ?? null;
 };
 
 const BankLogo: React.FC<BankLogoProps> = ({ bankName, size = 28, className = '' }) => {

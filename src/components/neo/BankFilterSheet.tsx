@@ -5,9 +5,10 @@ export interface BankFilterOption {
   token: string;
   code: string;
   label: string;
+  logoKey: string;
 }
 
-// Brand colors keyed by token
+// Brand colors keyed by logoKey (matches the bank logo manifest keys)
 const BANK_BRAND: Record<string, { bg: string; color: string }> = {
   galicia:    { bg: '#FFF0F0', color: '#E31837' },
   santander:  { bg: '#FFF0F0', color: '#EC0000' },
@@ -28,8 +29,8 @@ const BANK_BRAND: Record<string, { bg: string; color: string }> = {
   personalpay: { bg: '#F3E8FF', color: '#7C3AED' },
 };
 
-const getBrand = (token: string) =>
-  BANK_BRAND[token] ?? { bg: '#F7F6F4', color: '#374151' };
+const getBrand = (logoKey: string) =>
+  BANK_BRAND[logoKey] ?? { bg: '#F7F6F4', color: '#374151' };
 
 interface BankFilterSheetProps {
   isOpen: boolean;
@@ -154,7 +155,7 @@ const BankFilterSheet = ({
           <div className="grid grid-cols-3 gap-2.5">
             {filteredOptions.map((option) => {
               const isSelected = draftTokens.includes(option.token);
-              const brand = getBrand(option.token);
+              const brand = getBrand(option.logoKey);
               return (
                 <button
                   key={option.token}
@@ -169,7 +170,7 @@ const BankFilterSheet = ({
                     border: `1px solid ${brand.color}25`,
                   }}
                 >
-                  <BankLogo bankName={option.token} size={40} />
+                  <BankLogo bankName={option.logoKey} size={40} />
                   <span
                     className="text-[10px] font-medium mt-1.5 text-center leading-tight"
                     style={{ color: isSelected ? brand.color : `${brand.color}CC` }}
