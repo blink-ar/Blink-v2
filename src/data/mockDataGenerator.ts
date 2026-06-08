@@ -144,14 +144,21 @@ export class MockDataGenerator {
             const businessId = this.generateBusinessId(data.name);
 
             // Create bank benefits with consistent colors
-            const benefits: BankBenefit[] = data.bankBenefits.map(bankBenefit => ({
-                bankName: bankBenefit.bankName,
-                cardName: this.generateCardName(bankBenefit.bankName),
-                benefit: bankBenefit.benefit,
-                rewardRate: bankBenefit.rewardRate,
-                color: this.transformationService.assignConsistentColor(bankBenefit.bankName),
-                icon: 'CreditCard'
-            }));
+            const benefits: BankBenefit[] = data.bankBenefits.map(bankBenefit => {
+                const benefitHash = bankBenefit.benefit.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                const hasMinPurchase = benefitHash % 3 === 0;
+                const minAmount = hasMinPurchase ? ((benefitHash % 5) + 1) * 1000 : undefined;
+
+                return {
+                    bankName: bankBenefit.bankName,
+                    cardName: this.generateCardName(bankBenefit.bankName),
+                    benefit: bankBenefit.benefit,
+                    rewardRate: bankBenefit.rewardRate,
+                    color: this.transformationService.assignConsistentColor(bankBenefit.bankName),
+                    icon: 'CreditCard',
+                    ...(hasMinPurchase ? { minumumPurchaseAmount: { amount: minAmount! } } : {})
+                };
+            });
 
             // Create business with all required fields
             const business: Business = {
