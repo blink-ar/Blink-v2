@@ -151,7 +151,7 @@ async function loadMerchantSeoDocuments() {
         {
           isActive: { $ne: false },
           merchantId: { $exists: true, $type: 'string' },
-          benefitCount: { $gt: 0 },
+          activeBenefitCount: { $gt: 0 },
         },
         {
           projection: {
@@ -187,10 +187,7 @@ function buildMerchantRoutes(merchants) {
 
 const merchantDocuments = await loadMerchantSeoDocuments();
 const merchantRoutes = buildMerchantRoutes(merchantDocuments);
-const landingMerchantDocuments = merchantDocuments.filter((merchant) => {
-  return Number(merchant?.activeBenefitCount || 0) > 0;
-});
-const landingRoutes = buildLandingSeoRoutesFromMerchants(landingMerchantDocuments, {
+const landingRoutes = buildLandingSeoRoutesFromMerchants(merchantDocuments, {
   minMerchantCount: Number.isFinite(landingMinMerchantCount) ? landingMinMerchantCount : 3,
   maxCityRoutesPerCombination: Number.isFinite(landingMaxCityRoutesPerCombination)
     ? landingMaxCityRoutesPerCombination
