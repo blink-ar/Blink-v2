@@ -31,3 +31,7 @@ dist-ssr
 .kiro/*
 .vercel
 .meili_data/
+
+# Codex automation local memory
+automation-memory/
+tmp/
