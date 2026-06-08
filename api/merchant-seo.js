@@ -218,11 +218,13 @@ function buildMerchantTitle(merchant, activeBenefits) {
   const benefitValue = formatBenefitValue(topActiveBenefit);
   const bankName = getBenefitBankName(topActiveBenefit);
 
-  if (benefitValue && bankName) {
+  if (benefitValue && bankName && normalizeText(bankName) !== 'proveedor') {
     return `${name}: ${benefitValue} con ${bankName} | ${DEFAULT_SITE_NAME}`;
   }
 
-  return `${name}: promociones activas | ${DEFAULT_SITE_NAME}`;
+  return benefitValue
+    ? `${name}: ${benefitValue} | ${DEFAULT_SITE_NAME}`
+    : `${name}: promociones activas | ${DEFAULT_SITE_NAME}`;
 }
 
 function buildMerchantDescription(merchant, benefits, activeBenefits = benefits) {
@@ -242,10 +244,14 @@ function buildMerchantDescription(merchant, benefits, activeBenefits = benefits)
 
   if (activeBenefits.length > 0) {
     const topActiveBenefit = activeBenefits[0];
+    const topProvider = getBenefitBankName(topActiveBenefit);
+    const topProviderText = normalizeText(topProvider) === 'proveedor'
+      ? ''
+      : ` con ${topProvider}`;
     const activeText = activeBenefits.length === 1
       ? '1 promo activa'
       : `${activeBenefits.length} promos activas`;
-    return `${name}: ${activeText} ${locationText} en ${category}. Destacado: ${formatBenefitValue(topActiveBenefit)} con ${getBenefitBankName(topActiveBenefit)}. Consulta dias, tope, tarjetas y vigencia en Blink.`;
+    return `${name}: ${activeText} ${locationText} en ${category}. Destacado: ${formatBenefitValue(topActiveBenefit)}${topProviderText}. Consulta dias, tope, tarjetas y vigencia en Blink.`;
   }
 
   return `${name}: descuentos y promociones ${locationText} en ${category} con ${bankText}. Consulta ${discountText}, beneficios activos y promociones anteriores en Blink.`;

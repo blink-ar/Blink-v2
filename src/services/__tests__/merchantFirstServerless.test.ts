@@ -453,7 +453,8 @@ describe('merchant-first serverless helpers', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
-    expect(res.body).toContain('<title>Coto descuentos y promociones | Blink</title>');
+    expect(res.body).toContain('<title>Coto: 25% OFF | Blink</title>');
+    expect(res.body).toContain('Destacado: 25% OFF.');
     expect(res.body).toContain('<h1>Coto descuentos y promociones</h1>');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/comercios/coto--merchant_1"');
     expect(res.body).toContain('src="/assets/index-test.js"');
