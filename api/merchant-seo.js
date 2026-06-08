@@ -207,7 +207,25 @@ function formatBenefitValue(benefit) {
   return String(benefit?.rewardRate || benefit?.valor || getBenefitTitle(benefit)).trim();
 }
 
-function buildMerchantDescription(merchant, benefits) {
+function buildMerchantTitle(merchant, activeBenefits) {
+  const name = getMerchantName(merchant);
+  const topActiveBenefit = activeBenefits[0];
+
+  if (!topActiveBenefit) {
+    return `${name} descuentos y promociones | ${DEFAULT_SITE_NAME}`;
+  }
+
+  const benefitValue = formatBenefitValue(topActiveBenefit);
+  const bankName = getBenefitBankName(topActiveBenefit);
+
+  if (benefitValue && bankName) {
+    return `${name}: ${benefitValue} con ${bankName} | ${DEFAULT_SITE_NAME}`;
+  }
+
+  return `${name}: promociones activas | ${DEFAULT_SITE_NAME}`;
+}
+
+function buildMerchantDescription(merchant, benefits, activeBenefits = benefits) {
   const name = getMerchantName(merchant);
   const category = getPrimaryCategory(merchant);
   const city = getPrimaryCity(merchant);
@@ -221,6 +239,14 @@ function buildMerchantDescription(merchant, benefits) {
   const discountText = maxDiscount
     ? `hasta ${maxDiscount}% OFF`
     : 'promociones bancarias';
+
+  if (activeBenefits.length > 0) {
+    const topActiveBenefit = activeBenefits[0];
+    const activeText = activeBenefits.length === 1
+      ? '1 promo activa'
+      : `${activeBenefits.length} promos activas`;
+    return `${name}: ${activeText} ${locationText} en ${category}. Destacado: ${formatBenefitValue(topActiveBenefit)} con ${getBenefitBankName(topActiveBenefit)}. Consulta dias, tope, tarjetas y vigencia en Blink.`;
+  }
 
   return `${name}: descuentos y promociones ${locationText} en ${category} con ${bankText}. Consulta ${discountText}, beneficios activos y promociones anteriores en Blink.`;
 }
@@ -317,7 +343,7 @@ function buildStructuredData({ merchant, activeBenefits, pastBenefits, faqItems,
     name,
     image: toAbsoluteUrl(new URL(absoluteUrl).origin, image),
     url: absoluteUrl,
-    description: buildMerchantDescription(merchant, [...activeBenefits, ...pastBenefits]),
+    description: buildMerchantDescription(merchant, [...activeBenefits, ...pastBenefits], activeBenefits),
     address: buildAddressSchema(merchant)
   };
 
@@ -611,8 +637,8 @@ export function renderMerchantSeoHtml({
   const absoluteUrl = toAbsoluteUrl(siteUrl, canonicalPath);
   const allBenefits = sortBenefitsForSeo(benefits);
   const { activeBenefits, pastBenefits } = splitMerchantSeoBenefits(allBenefits, now);
-  const title = `${getMerchantName(merchant)} descuentos y promociones | ${DEFAULT_SITE_NAME}`;
-  const description = buildMerchantDescription(merchant, allBenefits);
+  const title = buildMerchantTitle(merchant, activeBenefits);
+  const description = buildMerchantDescription(merchant, allBenefits, activeBenefits);
   const faqItems = buildFaqItems(merchant, activeBenefits, pastBenefits, description);
   const imageUrl = toAbsoluteUrl(siteUrl, getMerchantImage(merchant));
   const structuredData = buildStructuredData({
