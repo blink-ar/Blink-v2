@@ -558,7 +558,7 @@ function BusinessDetailPage() {
                     const activeDays = !allDays ? getActiveDays(benefit.cuando) : new Set<string>();
                     const benefitIdx = business.benefits.indexOf(benefit);
                     const providerSummary = getBenefitProviderSummary(benefit);
-                    const minPurchase = benefit.minumumPurchaseAmount?.amount ?? benefit.minimumPurchaseAmount?.amount ?? null;
+                    const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
 
                     return (
                       <div

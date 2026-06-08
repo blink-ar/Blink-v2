@@ -156,7 +156,7 @@ export class MockDataGenerator {
                     rewardRate: bankBenefit.rewardRate,
                     color: this.transformationService.assignConsistentColor(bankBenefit.bankName),
                     icon: 'CreditCard',
-                    ...(hasMinPurchase ? { minumumPurchaseAmount: { amount: minAmount! } } : {})
+                    ...(hasMinPurchase ? { minimumPurchaseAmount: { amount: minAmount! } } : {})
                 };
             });
 

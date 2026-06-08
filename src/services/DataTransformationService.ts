@@ -188,7 +188,6 @@ export class DataTransformationService extends AbstractBaseService {
                 'Benefit available';
 
             const rawBenefit = benefit.beneficios?.[0] as any;
-            const minumumPurchaseAmount = rawBenefit?.minumumPurchaseAmount || (benefit as any).minumumPurchaseAmount;
             const minimumPurchaseAmount = rawBenefit?.minimumPurchaseAmount || (benefit as any).minimumPurchaseAmount;
 
             const bankBenefit: BankBenefit = {
@@ -198,7 +197,6 @@ export class DataTransformationService extends AbstractBaseService {
                 rewardRate: this.sanitizeText(rewardRate) || fallbackValues.rewardRate,
                 color: this.assignConsistentColor(bankName),
                 icon: 'CreditCard',
-                minumumPurchaseAmount,
                 minimumPurchaseAmount
             };
 

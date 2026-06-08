@@ -38,7 +38,7 @@ export const mockBusinesses: Business[] = [
           "Delivery de comida"
         ],
         textoAplicacion: "Beneficio aplicado automáticamente al momento de la compra. Puntos acreditados en el próximo resumen.",
-        minumumPurchaseAmount: {
+        minimumPurchaseAmount: {
           amount: 2500,
           currency: "ARS"
         }
@@ -432,7 +432,7 @@ export const mockBusinesses: Business[] = [
           "Otras tiendas de moda participantes"
         ],
         textoAplicacion: "Descuento aplicado automáticamente en caja. Válido sábados y domingos únicamente.",
-        minumumPurchaseAmount: {
+        minimumPurchaseAmount: {
           amount: 5000
         }
       },

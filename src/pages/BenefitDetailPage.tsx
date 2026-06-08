@@ -408,7 +408,7 @@ function BenefitDetailPage() {
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
-  const minPurchaseAmount = benefit.minumumPurchaseAmount?.amount ?? benefit.minimumPurchaseAmount?.amount ?? null;
+  const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
