@@ -2627,7 +2627,12 @@ async function loadRelatedActiveMerchants(db, merchant) {
     return [];
   }
 
-  const relatedMerchants = await db.collection(MERCHANT_ASSETS_COLLECTION)
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  if (typeof merchantCollection?.find !== 'function') {
+    return [];
+  }
+
+  const relatedMerchants = await merchantCollection
     .find(
       {
         isActive: { $ne: false },
