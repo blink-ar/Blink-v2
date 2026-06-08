@@ -62,7 +62,7 @@ describe('Vercel host redirect config', () => {
     );
   });
 
-  it('sends noindex headers for private app routes', () => {
+  it('sends noindex headers for private and low-value SEO app routes', () => {
     const vercelConfig = JSON.parse(
       fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
     );
@@ -102,6 +102,24 @@ describe('Vercel host redirect config', () => {
             {
               key: 'X-Robots-Tag',
               value: 'noindex, nofollow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/map',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, follow',
+            },
+          ]),
+        }),
+        expect.objectContaining({
+          source: '/map/',
+          headers: expect.arrayContaining([
+            {
+              key: 'X-Robots-Tag',
+              value: 'noindex, follow',
             },
           ]),
         }),

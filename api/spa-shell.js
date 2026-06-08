@@ -221,6 +221,15 @@ function sendHtml(res, statusCode, payload, extraHeaders = {}) {
   res.send(payload);
 }
 
+function getKnownSpaRouteHeaders(pathname) {
+  const normalizedPath = (String(pathname || '/').replace(/\/+$/, '') || '/').toLowerCase();
+  if (normalizedPath === '/map') {
+    return { 'X-Robots-Tag': 'noindex, follow' };
+  }
+
+  return {};
+}
+
 export default async function handler(req, res) {
   const url = getParsedUrl(req);
   const pathname = getRequestedPath(url);
@@ -248,5 +257,5 @@ export default async function handler(req, res) {
     );
   }
 
-  return sendHtml(res, 200, readAppShell());
+  return sendHtml(res, 200, readAppShell(), getKnownSpaRouteHeaders(pathname));
 }

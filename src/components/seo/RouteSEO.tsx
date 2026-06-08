@@ -73,11 +73,12 @@ function RouteSEO() {
         inLanguage: 'es-AR',
       },
     };
-  } else if (location.pathname === '/map') {
+  } else if (normalizedPathname === '/map') {
     seoConfig = {
       title: `Mapa de descuentos bancarios cercanos | ${SITE_NAME}`,
       description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicacion.',
       path: '/map',
+      robots: 'noindex, follow',
     };
   } else if (location.pathname.startsWith('/descuentos/')) {
     seoConfig = {
