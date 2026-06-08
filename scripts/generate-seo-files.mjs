@@ -66,7 +66,6 @@ const today = new Date().toISOString().split('T')[0];
 const baseRoutes = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
   { path: '/search', changefreq: 'daily', priority: '0.9' },
-  { path: '/map', changefreq: 'daily', priority: '0.8' },
 ];
 
 const categorySeoRoutes = SEO_CATEGORY_DEFINITIONS.map((category) => ({

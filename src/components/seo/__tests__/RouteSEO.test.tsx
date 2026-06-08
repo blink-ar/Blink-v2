@@ -31,4 +31,15 @@ describe('RouteSEO', () => {
       })
     );
   });
+
+  it.each(['/map', '/map/'])('marks map route %s as noindex follow', (pathname) => {
+    renderRouteSEO(pathname);
+
+    expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/map',
+        robots: 'noindex, follow',
+      })
+    );
+  });
 });

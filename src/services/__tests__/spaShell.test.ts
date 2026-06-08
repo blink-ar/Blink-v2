@@ -72,6 +72,25 @@ describe('SPA shell route guard', () => {
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/no-such-path"');
   });
 
+  it('returns the SPA shell with noindex follow headers for the map route', async () => {
+    const req = {
+      method: 'GET',
+      url: '/api/spa-shell?path=map',
+      headers: {
+        host: 'www.blinkapp.com.ar',
+        'x-forwarded-proto': 'https',
+      },
+    };
+    const res = createResponseCapture();
+
+    await handler(req as never, res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.headers['X-Robots-Tag']).toBe('noindex, follow');
+    expect(res.body).toContain('<div id="root"></div>');
+  });
+
   it('falls back when a site env value is malformed by literal quotes', async () => {
     vi.stubEnv('CANONICAL_SITE_URL', '');
     vi.stubEnv('VITE_CANONICAL_SITE_URL', '');

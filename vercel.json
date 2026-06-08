@@ -57,6 +57,24 @@
           "value": "noindex, nofollow"
         }
       ]
+    },
+    {
+      "source": "/map",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/map/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
     }
   ],
   "routes": [
