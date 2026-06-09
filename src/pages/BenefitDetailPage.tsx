@@ -36,6 +36,8 @@ import {
   isModoSourcedBenefit,
 } from '../utils/benefitDisplay';
 import { getOptimizedImageUrl } from '../utils/images';
+import { hasInAppHistory } from '../utils/navigation';
+import { getMerchantSeoPath } from '../seo/merchantUrls';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -346,6 +348,21 @@ function BenefitDetailPage() {
     }
   };
 
+  const handleBack = () => {
+    if (hasInAppHistory()) {
+      navigate(-1);
+      return;
+    }
+    // Direct/deep link: go up to the merchant's business page instead of
+    // leaving the app. Replace keeps history idx at 0 so the business page
+    // back arrow continues up to /search.
+    if (business) {
+      navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { replace: true, state: { business } });
+    } else {
+      navigate('/search', { replace: true });
+    }
+  };
+
   const handleOpenMap = () => {
     if (!business) return;
     trackStartNavigation({ source: 'benefit_detail_page', destinationBusinessId: business.id, provider: 'in_app_map' });
@@ -388,7 +405,7 @@ function BenefitDetailPage() {
           <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 32 }}>search_off</span>
         </div>
         <p className="font-semibold text-blink-ink">{error || 'No encontrado'}</p>
-        <button onClick={() => navigate(-1)} className="text-primary font-medium text-sm">← Volver</button>
+        <button onClick={handleBack} className="text-primary font-medium text-sm">← Volver</button>
       </div>
     );
   }
@@ -468,7 +485,7 @@ function BenefitDetailPage() {
           {/* Floating nav */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{ background: 'rgba(0,0,0,0.07)', border: `1px solid ${bankAccent.border}` }}
             >
