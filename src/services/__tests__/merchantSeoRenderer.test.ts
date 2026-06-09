@@ -107,6 +107,58 @@ describe('merchant SEO renderer', () => {
     expect(html).toContain('promociones bancarias');
   });
 
+  it('keeps inactive merchant pages useful with recent promos and active alternatives', () => {
+    const html = renderMerchantSeoHtml({
+      appShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      path: '/comercios/tienda-inactiva--merchant_2',
+      now: new Date('2026-05-11T12:00:00.000Z'),
+      merchant: {
+        merchantId: 'merchant_2',
+        merchantName: 'Tienda Inactiva',
+        categories: ['indumentaria'],
+        banks: ['Banco Galicia'],
+      },
+      benefits: [
+        {
+          bankName: 'Banco Galicia',
+          cardName: 'Visa',
+          benefit: '25% OFF',
+          rewardRate: '25%',
+          validUntil: '2026-04-15',
+        },
+        {
+          bankName: 'BBVA',
+          cardName: 'Mastercard',
+          benefit: '10% OFF antiguo',
+          rewardRate: '10%',
+          validUntil: '2025-01-01',
+        },
+      ],
+      relatedActiveMerchants: [
+        {
+          merchantId: 'merchant_3',
+          merchantName: 'Tienda Activa',
+          path: '/comercios/tienda-activa--merchant_3',
+          category: 'indumentaria',
+          city: 'Buenos Aires',
+          activeBenefitCount: 2,
+          maxDiscountPercentage: 40,
+        },
+      ],
+    });
+
+    expect(html).toContain('No hay promos activas :(');
+    expect(html).toContain('Promos recientes anteriores');
+    expect(html).toContain('25% OFF');
+    expect(html).not.toContain('10% OFF antiguo');
+    expect(html).toContain('Alternativas con promos activas');
+    expect(html).toContain('Tienda Activa');
+    expect(html).toContain('href="/comercios/tienda-activa--merchant_3"');
+    expect(html).toContain('Hasta 40% OFF');
+    expect(html).toContain('<meta name="robots" content="index, follow" />');
+  });
+
   it('renders multi-bank MODO benefits with compact provider text', () => {
     const longBankName = 'Banco Nación, Galicia, NaranjaX';
     const html = renderMerchantSeoHtml({

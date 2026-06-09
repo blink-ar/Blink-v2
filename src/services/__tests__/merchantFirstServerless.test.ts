@@ -685,7 +685,7 @@ describe('merchant-first serverless helpers', () => {
                   bank: 'BBVA',
                   benefitTitle: '20% OFF',
                   discountPercentage: 20,
-                  validUntil: '2020-01-01'
+                  validUntil: '2026-04-01'
                 }
               ]);
             }
@@ -707,8 +707,8 @@ describe('merchant-first serverless helpers', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('No hay descuentos activos ahora');
-    expect(res.body).toContain('Beneficios anteriores');
+    expect(res.body).toContain('No hay promos activas :(');
+    expect(res.body).toContain('Promos recientes anteriores');
     expect(res.body).toContain('20% OFF');
     expect(res.body).toContain('https://schema.org/Discontinued');
   });
