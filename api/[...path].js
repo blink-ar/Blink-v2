@@ -99,7 +99,10 @@ const BENEFIT_SUMMARY_PROJECTION = {
   description: 1,
   termsAndConditions: 1,
   link: 1,
-  validUntil: 1
+  validUntil: 1,
+  sourceCollection: 1,
+  rawBenefitCollection: 1,
+  source: 1
 };
 
 const REQUIRED_PRODUCTION_ENV_VARS = [
@@ -708,7 +711,10 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
-    subscriptionIds: getBenefitSubscriptionIds(benefit)
+    subscriptionIds: getBenefitSubscriptionIds(benefit),
+    ...(benefit?.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
+    ...(benefit?.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
+    ...(benefit?.source ? { source: benefit.source } : {})
   };
 }
 
