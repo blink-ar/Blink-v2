@@ -17,13 +17,15 @@ const BANK_BRAND: Record<string, { bg: string; color: string }> = {
   icbc:       { bg: '#FFF0F0', color: '#C8102E' },
   hsbc:       { bg: '#FFF0F0', color: '#DB0011' },
   amex:       { bg: '#EBF4FF', color: '#007BC1' },
-  naranja:    { bg: '#FFF3E8', color: '#EA580C' },
-  nacion:     { bg: '#EBF4FF', color: '#1A5E96' },
-  ciudad:     { bg: '#EBF4FF', color: '#0070B9' },
-  patagonia:  { bg: '#FFF8E8', color: '#D97706' },
-  visa:       { bg: '#EBF4FF', color: '#1A1F71' },
-  mastercard: { bg: '#FFF3E8', color: '#EB001B' },
-  lagaceta:   { bg: '#EBF4FF', color: '#0E5FA0' },
+  naranjax:    { bg: '#FFF3E8', color: '#EA580C' },
+  nacion:      { bg: '#EBF4FF', color: '#1A5E96' },
+  ciudad:      { bg: '#EBF4FF', color: '#0070B9' },
+  patagonia:   { bg: '#FFF8E8', color: '#D97706' },
+  visa:        { bg: '#EBF4FF', color: '#1A1F71' },
+  mastercard:  { bg: '#FFF3E8', color: '#EB001B' },
+  lagaceta:    { bg: '#EBF4FF', color: '#0E5FA0' },
+  buepp:       { bg: '#FEF9C3', color: '#A16207' },
+  personalpay: { bg: '#F3E8FF', color: '#7C3AED' },
 };
 
 const getBrand = (token: string) =>

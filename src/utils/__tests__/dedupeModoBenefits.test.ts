@@ -146,6 +146,36 @@ describe('dedupeModoBenefits', () => {
     expect(result.find((b) => b.acceptsModo)).toBeUndefined();
   });
 
+  it('multi-eligibility Modo: detects source-backed rows when the id is not a Modo raw id', () => {
+    const bankA = makeBenefit({
+      banks: ['buepp'],
+      availableDays: ['viernes'],
+      discountPercentage: 20,
+      installments: 0,
+    });
+    const bankB = makeBenefit({
+      banks: ['ciudad'],
+      availableDays: ['viernes'],
+      discountPercentage: 20,
+      installments: 0,
+    });
+    const modo = makeBenefit({
+      id: 'raw-6a0b61c6eaebf0b793d9dd15',
+      sourceCollection: 'MODO_PROMOS_RAW',
+      banks: ['buepp', 'ciudad'],
+      availableDays: ['viernes'],
+      discountPercentage: 20,
+      installments: null,
+    });
+
+    const result = dedupeModoBenefits([bankA, bankB, modo]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('raw-6a0b61c6eaebf0b793d9dd15');
+    expect(result[0].sourceCollection).toBe('MODO_PROMOS_RAW');
+    expect(result[0].acceptsModo).toBeUndefined();
+  });
+
   it('treats availableDays as a set (order and duplicates do not matter)', () => {
     const bank = makeBenefit({
       banks: ['galicia'],

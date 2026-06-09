@@ -1,15 +1,26 @@
 import { BankBenefit } from '../types';
 import { parseDayAvailability, DayAvailability, hasAnyDayAvailable } from './dayAvailabilityParser';
 
-const isModoBenefit = (benefit: BankBenefit): boolean =>
-  /^modo-promos-raw-/i.test(benefit.id || '');
-
 const COMBINING_MARKS = /[\u0300-\u036f]/g;
+const MODO_ID_PREFIX_PATTERN = /^modo-promos-raw-/i;
 
 const normalizeText = (value: unknown): string =>
   typeof value === 'string'
     ? value.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase().trim()
     : '';
+
+const hasModoSourceMarker = (value: unknown): boolean => normalizeText(value).includes('modo');
+
+const isModoBenefit = (benefit: BankBenefit): boolean => {
+  if (MODO_ID_PREFIX_PATTERN.test(benefit.id || '')) return true;
+
+  const benefitRecord = benefit as BankBenefit & Record<string, unknown>;
+  return [
+    benefitRecord.sourceCollection,
+    benefitRecord.rawBenefitCollection,
+    benefitRecord.source,
+  ].some(hasModoSourceMarker);
+};
 
 const DAY_NAME_TO_ABBR: Record<string, string> = {
   lunes: 'L', monday: 'L',
@@ -60,7 +71,8 @@ const getAvailableDaysKey = (benefit: BankBenefit): string => {
 
 const getInstallments = (benefit: BankBenefit): number | typeof UNKNOWN_INSTALLMENTS => {
   const value = benefit.installments;
-  return typeof value === 'number' && Number.isFinite(value) ? value : UNKNOWN_INSTALLMENTS;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return UNKNOWN_INSTALLMENTS;
+  return value;
 };
 
 const getDiscountPercentage = (benefit: BankBenefit): number => {

@@ -269,7 +269,7 @@ describe('BusinessDetailPage', () => {
     render(<BusinessDetailPage />);
 
     expect(await screen.findByText('hasta 6 cuotas sin interés')).toBeInTheDocument();
-    expect(screen.getAllByText('MODO').length).toBeGreaterThan(0);
+    expect(screen.getAllByAltText('Modo').length).toBeGreaterThan(0);
     expect(screen.getByText('3 bancos adheridos')).toBeInTheDocument();
     expect(screen.queryByText(longBankName)).not.toBeInTheDocument();
   });

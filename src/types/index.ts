@@ -34,6 +34,9 @@ export interface BankBenefit {
   installments?: number | null;
   validUntil?: string | null;
   id?: string;
+  sourceCollection?: string | null;
+  rawBenefitCollection?: string | null;
+  source?: string | null;
   // Subscription reference (ID from bank_subscriptions collection)
   subscription?: string | null;
   subscriptionIds?: string[];
