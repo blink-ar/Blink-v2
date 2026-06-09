@@ -40,6 +40,7 @@ const DAY_SHORT_LABEL: Record<string, string> = {
   D: 'Dom',
 };
 const DAY_TEXT_MAX_LENGTH = 24;
+const RECENT_PAST_BENEFIT_WINDOW_DAYS = 180;
 
 const isAllDays = (cuando?: string): boolean => {
   if (!cuando) return true;
@@ -75,6 +76,26 @@ const isBenefitAvailableToday = (b: BankBenefit): boolean =>
 const hasPercentDiscount = (benefit: BankBenefit): boolean => {
   const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
   return !!(discount && parseInt(discount) > 0);
+};
+
+const getBenefitValidUntilTime = (benefit: BankBenefit): number | null => {
+  const validUntil = String(benefit.validUntil || '').trim();
+  if (!validUntil) return null;
+
+  const parsedTime = /^\d{4}-\d{2}-\d{2}$/.test(validUntil)
+    ? Date.parse(`${validUntil}T23:59:59.999Z`)
+    : Date.parse(validUntil);
+
+  return Number.isFinite(parsedTime) ? parsedTime : null;
+};
+
+const isRecentPastBenefit = (benefit: BankBenefit, now: Date): boolean => {
+  const validUntilTime = getBenefitValidUntilTime(benefit);
+  if (validUntilTime === null) return true;
+
+  const nowTime = now.getTime();
+  const earliestRecentTime = nowTime - RECENT_PAST_BENEFIT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return validUntilTime < nowTime && validUntilTime >= earliestRecentTime;
 };
 
 const normalizeValidityDate = (validUntil?: string | null): string => {
@@ -174,7 +195,11 @@ function BusinessDetailPage() {
   }, [sortedBenefits]);
 
   const activeBenefitCount = activeBenefits.length;
-  const pastBenefitCount = pastBenefits.length;
+  const displayPastBenefits = useMemo(() => {
+    if (activeBenefitCount > 0) return pastBenefits;
+    const now = new Date();
+    return pastBenefits.filter((benefit) => isRecentPastBenefit(benefit, now));
+  }, [activeBenefitCount, pastBenefits]);
 
   const topInstallmentGroupsByBank = useMemo(() => {
     const byBank = new Map<string, BankBenefit[]>();
@@ -812,22 +837,24 @@ function BusinessDetailPage() {
           </div>
         )}
 
-        {viewMode !== 'sucursal' && activeBenefitCount === 0 && pastBenefitCount > 0 && (
+        {viewMode !== 'sucursal' && activeBenefitCount === 0 && displayPastBenefits.length > 0 && (
           <section
             className="mx-4 mt-3 bg-white rounded-2xl p-4"
             style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
           >
-            <p className="text-sm font-semibold text-blink-ink">No hay descuentos activos ahora</p>
+            <p className="text-sm font-semibold text-blink-ink">No hay promos activas :(</p>
             <p className="text-xs text-blink-muted mt-1">
-              Igual puedes revisar promociones anteriores de {business.name}.
+              Igual puedes revisar promos recientes anteriores de {business.name}.
             </p>
           </section>
         )}
 
-        {viewMode !== 'sucursal' && pastBenefits.length > 0 && (
+        {viewMode !== 'sucursal' && displayPastBenefits.length > 0 && (
           <section className="space-y-2 pt-3 px-4">
-            <h2 className="font-semibold text-base text-gray-400">Beneficios anteriores</h2>
-            {pastBenefits.map((benefit, idx) => {
+            <h2 className="font-semibold text-base text-gray-400">
+              {activeBenefitCount > 0 ? 'Beneficios anteriores' : 'Promos recientes anteriores'}
+            </h2>
+            {displayPastBenefits.map((benefit, idx) => {
               const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
               const hasDiscount = !!(discount && parseInt(discount) > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;

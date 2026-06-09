@@ -6,7 +6,8 @@ import { fetchBusinessById } from '../../services/api';
 import { useSEO } from '../../hooks/useSEO';
 
 const TEST_SYSTEM_TIME = new Date('2026-05-15T12:00:00.000Z');
-const EXPIRED_VALID_UNTIL = '2020-01-01';
+const RECENT_EXPIRED_VALID_UNTIL = '2026-04-01';
+const STALE_EXPIRED_VALID_UNTIL = '2020-01-01';
 const ACTIVE_VALID_UNTIL = '2026-06-30';
 const EARLIER_ACTIVE_VALID_UNTIL = '2026-05-31';
 
@@ -167,7 +168,13 @@ describe('BusinessDetailPage', () => {
       benefits: [
         {
           ...mockBusiness.benefits[0],
-          validUntil: EXPIRED_VALID_UNTIL,
+          benefit: '20% OFF reciente',
+          validUntil: RECENT_EXPIRED_VALID_UNTIL,
+        },
+        {
+          ...mockBusiness.benefits[0],
+          benefit: '20% OFF viejo',
+          validUntil: STALE_EXPIRED_VALID_UNTIL,
         },
       ],
     });
@@ -181,9 +188,11 @@ describe('BusinessDetailPage', () => {
 
     render(<BusinessDetailPage />);
 
-    expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
-    expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
-    expect(screen.getByText(`Venció: ${EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
+    expect(await screen.findByText('No hay promos activas :(')).toBeInTheDocument();
+    expect(screen.getByText('Promos recientes anteriores')).toBeInTheDocument();
+    expect(screen.getByText('20% OFF reciente')).toBeInTheDocument();
+    expect(screen.getByText(`Venció: ${RECENT_EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
+    expect(screen.queryByText('20% OFF viejo')).not.toBeInTheDocument();
   });
 
   it('shows lower-installment rows from the same bank when validity differs', async () => {
