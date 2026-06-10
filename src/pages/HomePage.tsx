@@ -20,6 +20,7 @@ import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
+import BankLogo from '../components/BankLogos/BankLogo';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -34,6 +35,58 @@ function isIOSBrowser(): boolean {
   return !standalone;
 }
 
+const DESKTOP_CATEGORY_CARDS = [
+  {
+    token: 'gastronomia',
+    label: 'Gastronomía',
+    icon: 'restaurant',
+    description: 'Restaurantes, cafeterías y bares con beneficios activos.',
+    tone: { bg: '#EEF2FF', color: '#4338CA', border: '#C7D2FE' },
+  },
+  {
+    token: 'moda',
+    label: 'Moda',
+    icon: 'checkroom',
+    description: 'Indumentaria, calzado y accesorios para renovar sin pagar de más.',
+    tone: { bg: '#FCE7F3', color: '#9D174D', border: '#FBCFE8' },
+  },
+  {
+    token: 'shopping',
+    label: 'Supermercado',
+    icon: 'shopping_cart',
+    description: 'Ahorros cotidianos en compras grandes y reposición semanal.',
+    tone: { bg: '#F0FDF4', color: '#14532D', border: '#BBF7D0' },
+  },
+  {
+    token: 'viajes',
+    label: 'Viajes',
+    icon: 'flight',
+    description: 'Escapadas, pasajes, alojamiento y experiencias para planificar.',
+    tone: { bg: '#DBEAFE', color: '#1E40AF', border: '#BFDBFE' },
+  },
+  {
+    token: 'hogar',
+    label: 'Hogar',
+    icon: 'home',
+    description: 'Equipamiento, decoración y mejoras para la casa.',
+    tone: { bg: '#ECFDF5', color: '#064E3B', border: '#A7F3D0' },
+  },
+  {
+    token: 'electro',
+    label: 'Electro',
+    icon: 'devices',
+    description: 'Tecnología, electrodomésticos y cuotas para compras grandes.',
+    tone: { bg: '#F8FAFC', color: '#334155', border: '#CBD5E1' },
+  },
+];
+
+const DESKTOP_QUICK_FILTERS = [
+  { label: 'Cerca tuyo', icon: 'near_me', path: '/search?nearby=1', filterType: 'distance', filterValue: 'nearby' },
+  { label: '20%+ OFF', icon: 'percent', path: '/search?discount=20', filterType: 'discount', filterValue: '20' },
+  { label: 'Cuotas sin interés', icon: 'credit_card', path: '/search?installments=1', filterType: 'installments', filterValue: 'true' },
+  { label: 'Online', icon: 'language', path: '/search?online=1', filterType: 'channel', filterValue: 'online' },
+];
+
 function HomePage() {
   const navigate = useNavigate();
   const { isSupported, isSubscribed } = usePushNotifications();
@@ -42,6 +95,7 @@ function HomePage() {
   const { user } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [homeSearchTerm, setHomeSearchTerm] = useState('');
+  const [desktopSearchTerm, setDesktopSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
@@ -103,6 +157,39 @@ function HomePage() {
   const handleHomeSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     confirmHomeSearch();
+  };
+
+  const handleDesktopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const confirmedSearch = desktopSearchTerm.trim();
+
+    if (!confirmedSearch) {
+      navigate('/search');
+      return;
+    }
+
+    const params = new URLSearchParams({ q: confirmedSearch });
+    navigate(`/search?${params.toString()}`);
+  };
+
+  const handleDesktopCategoryClick = (categoryToken: string) => {
+    trackFilterApply({
+      source: 'home_desktop_category',
+      filterType: 'category',
+      filterValue: categoryToken,
+      activeFilterCount: 1,
+    });
+    navigate(`/search?category=${categoryToken}`);
+  };
+
+  const handleDesktopQuickFilterClick = (filter: (typeof DESKTOP_QUICK_FILTERS)[number]) => {
+    trackFilterApply({
+      source: 'home_desktop_quick_filter',
+      filterType: filter.filterType,
+      filterValue: filter.filterValue,
+      activeFilterCount: 1,
+    });
+    navigate(filter.path);
   };
 
   useEffect(() => {
@@ -196,7 +283,7 @@ function HomePage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
       {/* Sticky Header */}
       <header
-        className="sticky top-0 z-50 w-full flex flex-col"
+        className="sticky top-0 z-50 flex w-full flex-col lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -300,7 +387,7 @@ function HomePage() {
         </form>
       </div>
 
-      <main className="flex-1 flex flex-col gap-8 pb-32">
+      <main className="flex-1 flex flex-col gap-8 pb-32 lg:hidden">
         {/* Hero Section */}
         <section className="px-4 pt-6">
           <h1 className="text-[2rem] font-bold leading-tight text-blink-ink text-center mb-2">
@@ -534,6 +621,328 @@ function HomePage() {
           </div>
         </section>
 
+      </main>
+
+      <main className="hidden flex-1 lg:block">
+        <section className="border-b border-blink-border bg-white">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] gap-10 px-8 py-10">
+            <div className="flex min-w-0 flex-col justify-center">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase text-primary">
+                  Beta activa
+                </span>
+                <span className="text-sm font-medium text-blink-muted">
+                  {activeBenefitsCount.toLocaleString('es-AR')} beneficios indexados
+                </span>
+              </div>
+
+              <h1 className="max-w-4xl text-6xl font-black leading-[1.02] text-blink-ink">
+                Encontrá el mejor beneficio antes de pagar.
+              </h1>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-blink-muted">
+                Blink cruza comercios, bancos, billeteras, días de vigencia y topes para que puedas decidir rápido dónde comprar.
+              </p>
+
+              <form
+                role="search"
+                onSubmit={handleDesktopSearchSubmit}
+                className="mt-8 flex h-16 max-w-3xl items-center gap-3 rounded-2xl border border-blink-border bg-blink-bg px-4 shadow-soft"
+              >
+                <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 24 }}>search</span>
+                <input
+                  value={desktopSearchTerm}
+                  onChange={(event) => setDesktopSearchTerm(event.target.value)}
+                  className="min-w-0 flex-1 appearance-none bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
+                  placeholder="Buscar una marca, rubro o beneficio"
+                  type="search"
+                  autoComplete="off"
+                />
+                {desktopSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setDesktopSearchTerm('')}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-blink-muted transition-colors hover:bg-white hover:text-blink-ink"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white transition-all hover:bg-primary/90 active:scale-[0.98]"
+                >
+                  Buscar
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
+                </button>
+              </form>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {DESKTOP_QUICK_FILTERS.map((filter) => (
+                  <button
+                    key={filter.path}
+                    type="button"
+                    onClick={() => handleDesktopQuickFilterClick(filter)}
+                    className="flex h-10 items-center gap-2 rounded-xl border border-blink-border bg-white px-3 text-sm font-semibold text-blink-ink transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 18 }}>
+                      {filter.icon}
+                    </span>
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 self-start">
+              <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
+                <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>sell</span>
+                <p className="mt-4 text-3xl font-black text-blink-ink">
+                  {activeBenefitsCount.toLocaleString('es-AR')}
+                </p>
+                <p className="mt-1 text-sm font-medium text-blink-muted">Beneficios activos</p>
+              </div>
+              <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
+                <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>account_balance</span>
+                <p className="mt-4 text-3xl font-black text-blink-ink">{indexedEntities.length}</p>
+                <p className="mt-1 text-sm font-medium text-blink-muted">Emisores disponibles</p>
+              </div>
+              <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
+                <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>category</span>
+                <p className="mt-4 text-3xl font-black text-blink-ink">{DESKTOP_CATEGORY_CARDS.length}</p>
+                <p className="mt-1 text-sm font-medium text-blink-muted">Rubros destacados</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/map')}
+                className="rounded-2xl border border-primary/20 bg-primary p-5 text-left text-white transition-all hover:bg-primary/90 active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 24 }}>map</span>
+                <p className="mt-4 text-xl font-black">Explorar mapa</p>
+                <p className="mt-1 text-sm font-medium text-white/75">Ver comercios por zona</p>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] gap-8 px-8 py-8">
+          <div className="self-start">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase text-blink-muted">Emisores</p>
+                <h2 className="mt-1 text-2xl font-black text-blink-ink">Ya disponibles</h2>
+              </div>
+              <Link to="/search" className="text-sm font-bold text-primary hover:text-primary/70">
+                Ver todos
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-blink-border bg-white p-4 shadow-soft">
+              {isBanksLoading ? (
+                <SkeletonAvailableBanks />
+              ) : indexedEntities.length === 0 ? (
+                <div className="rounded-xl bg-blink-bg px-4 py-8 text-center text-sm font-medium text-blink-muted">
+                  Cargando emisores disponibles.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {indexedEntities.slice(0, 12).map((entity) => (
+                    <button
+                      key={entity.token}
+                      type="button"
+                      onClick={() => handleEntityClick(entity)}
+                      className="flex min-h-[68px] items-center gap-3 rounded-xl border border-blink-border bg-blink-bg px-3 text-left transition-colors hover:border-primary/30 hover:bg-primary/5"
+                    >
+                      <BankLogo bankName={entity.token} size={34} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-blink-ink">{entity.label}</p>
+                        <p className="text-xs font-semibold text-blink-muted">{entity.code}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase text-blink-muted">Ranking diario</p>
+                <h2 className="mt-1 text-2xl font-black text-blink-ink">Mejores oportunidades de hoy</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/search?discount=20')}
+                className="text-sm font-bold text-primary hover:text-primary/70"
+              >
+                Ver beneficios
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-44 rounded-2xl border border-blink-border bg-white animate-pulse" />
+                ))}
+              </div>
+            ) : top5.length === 0 ? (
+              <div className="rounded-2xl border border-blink-border bg-white px-6 py-14 text-center shadow-soft">
+                <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 40 }}>search_off</span>
+                <p className="mt-3 text-sm font-semibold text-blink-muted">No hay beneficios destacados para mostrar.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-3">
+                {top5[0] && (
+                  <article
+                    onClick={() => handleTopBenefitClick(
+                      top5[0].business.id,
+                      top5[0].business.category,
+                      1,
+                      top5[0].benefitIndex,
+                      top5[0].benefit,
+                      top5[0].business,
+                    )}
+                    className="group min-h-[360px] cursor-pointer overflow-hidden rounded-2xl border border-blink-border bg-white shadow-soft transition-all hover:-translate-y-1 hover:shadow-soft-md"
+                  >
+                    <div className="relative h-48 overflow-hidden bg-primary">
+                      {top5[0].business.image && (
+                        <img
+                          alt={top5[0].business.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                          src={getOptimizedImageUrl(top5[0].business.image, { width: 720 })}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/55" />
+                      <span className="absolute left-4 top-4 rounded-xl bg-white/90 px-3 py-1 text-xs font-black text-primary shadow-soft">
+                        #1 hoy
+                      </span>
+                      <div className="absolute bottom-4 left-4 flex items-end gap-1 text-white">
+                        <span className="text-6xl font-black leading-none">{top5[0].discount}</span>
+                        <span className="mb-1 text-lg font-black">% OFF</span>
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      <h3 className="text-xl font-black text-blink-ink">{top5[0].business.name}</h3>
+                      <p className="mt-2 text-sm font-medium text-blink-muted">
+                        {getBenefitProviderDisplayName(top5[0].benefit)} · {top5[0].benefit.cardName}
+                      </p>
+                      <div className="mt-5 flex items-center justify-between border-t border-blink-border pt-4">
+                        <span className="text-sm font-semibold text-blink-muted">
+                          {top5[0].benefit.cuando ? String(top5[0].benefit.cuando).substring(0, 26) : 'Disponible hoy'}
+                        </span>
+                        <span className="material-symbols-outlined text-primary" style={{ fontSize: 22 }}>arrow_forward</span>
+                      </div>
+                    </div>
+                  </article>
+                )}
+
+                <div className="grid grid-rows-4 gap-3">
+                  {top5.slice(1, 5).map((item, index) => (
+                    <button
+                      key={`${item.business.id}-${item.benefitIndex}`}
+                      type="button"
+                      onClick={() => handleTopBenefitClick(
+                        item.business.id,
+                        item.business.category,
+                        index + 2,
+                        item.benefitIndex,
+                        item.benefit,
+                        item.business,
+                      )}
+                      className="flex items-center gap-3 rounded-2xl border border-blink-border bg-white p-3 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-md active:scale-[0.99]"
+                    >
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-black text-primary">
+                        {item.discount}%
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-md bg-blink-bg px-1.5 py-0.5 text-[10px] font-black text-blink-muted">
+                            #{index + 2}
+                          </span>
+                          <h3 className="truncate text-sm font-black text-blink-ink">{item.business.name}</h3>
+                        </div>
+                        <p className="mt-1 truncate text-xs font-medium text-blink-muted">
+                          {getBenefitProviderDisplayName(item.benefit)} · {item.benefit.cardName}
+                        </p>
+                      </div>
+                      <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>chevron_right</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="border-y border-blink-border bg-white">
+          <div className="mx-auto w-full max-w-7xl px-8 py-8">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase text-blink-muted">Explorar por rubro</p>
+                <h2 className="mt-1 text-2xl font-black text-blink-ink">Atajos para comprar mejor</h2>
+              </div>
+              <Link to="/search" className="text-sm font-bold text-primary hover:text-primary/70">
+                Abrir buscador
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {DESKTOP_CATEGORY_CARDS.map((category) => (
+                <button
+                  key={category.token}
+                  type="button"
+                  onClick={() => handleDesktopCategoryClick(category.token)}
+                  className="group min-h-[154px] rounded-2xl border bg-blink-bg p-5 text-left transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-soft-md active:scale-[0.99]"
+                  style={{ borderColor: category.tone.border }}
+                >
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                    style={{ background: category.tone.bg, color: category.tone.color }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{category.icon}</span>
+                  </span>
+                  <h3 className="mt-4 text-base font-black text-blink-ink">{category.label}</h3>
+                  <p className="mt-2 text-sm leading-6 text-blink-muted">{category.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 px-8 py-8">
+          <div>
+            <p className="text-xs font-bold uppercase text-blink-muted">Categorías indexadas</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {HOME_CATEGORY_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="rounded-xl border border-blink-border bg-white px-3 py-2 text-sm font-semibold text-blink-muted transition-colors hover:border-primary/30 hover:text-blink-ink"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase text-blink-muted">Bancos y rubros populares</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {HOME_DISCOUNT_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="rounded-xl border border-blink-border bg-white px-3 py-2 text-sm font-semibold text-blink-muted transition-colors hover:border-primary/30 hover:text-blink-ink"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <BottomNav />
