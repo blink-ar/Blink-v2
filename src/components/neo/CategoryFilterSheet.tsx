@@ -60,14 +60,14 @@ const CategoryFilterSheet = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
       {/* Backdrop */}
       <button aria-label="Cerrar selector de categorías" className="absolute inset-0" onClick={() => onApply(draft)} />
 
       {/* Sheet */}
       <div
-        className="w-full h-[85vh] bg-white flex flex-col relative"
-        style={{ borderRadius: '24px 24px 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }}
+        className="relative flex h-[85vh] w-full flex-col rounded-t-[24px] bg-white lg:h-auto lg:max-h-[82vh] lg:max-w-2xl lg:rounded-2xl"
+        style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">
