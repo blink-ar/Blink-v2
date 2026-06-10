@@ -77,7 +77,7 @@ export default function NotificationsPage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
       {/* Header */}
       <header
-        className="sticky top-0 z-50 w-full"
+        className="sticky top-0 z-50 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -97,7 +97,11 @@ export default function NotificationsPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col pb-32">
+      <main className="flex-1 flex flex-col pb-32 lg:mx-auto lg:w-full lg:max-w-4xl lg:px-8 lg:py-8 lg:pb-12">
+        <div className="mb-6 hidden lg:block">
+          <h1 className="text-3xl font-black tracking-tight text-blink-ink">Notificaciones</h1>
+          <p className="mt-1 text-sm text-blink-muted">Historial y preferencias de avisos.</p>
+        </div>
         {/* Subscribe banner */}
         {showBanner && (
           <div className="mx-4 mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 flex gap-3 items-start">

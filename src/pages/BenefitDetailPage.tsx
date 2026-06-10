@@ -19,6 +19,7 @@ import {
 import { getBankAccent } from '../utils/bankColors';
 import BankLogo from '../components/BankLogos/BankLogo';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useResponsive } from '../hooks/useResponsive';
 import { calculateDistance } from '../utils/distance';
 import {
   buildBenefitPath,
@@ -174,6 +175,7 @@ function BenefitDetailPage() {
   const { id, benefitIndex } = useParams<{ id: string; benefitIndex?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDesktop } = useResponsive();
   const passedBusiness = (location.state as { business?: Business } | null)?.business;
   const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
@@ -450,17 +452,17 @@ function BenefitDetailPage() {
 
   return (
     <>
-    <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
-      <main className="flex-1 overflow-y-auto pb-32">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-blink-bg font-body text-blink-ink">
+      <main className="flex-1 overflow-y-auto pb-32 lg:mx-auto lg:grid lg:w-full lg:max-w-7xl lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:py-8 lg:pb-12">
 
         {/* Hero — bank accent color, sticky */}
         <div
-          className="relative"
+          className="relative lg:sticky lg:self-start lg:overflow-hidden lg:rounded-2xl lg:shadow-soft"
           style={{
             background: bankAccent.bg,
             minHeight: 220,
             position: 'sticky',
-            top: 0,
+            top: isDesktop ? 96 : 0,
             zIndex: 50,
             boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
           }}
@@ -554,10 +556,28 @@ function BenefitDetailPage() {
                 </span>
               )}
             </div>
+
+            <div className="mt-6 hidden w-full max-w-xs flex-col gap-2 lg:flex">
+              <button
+                onClick={handleOpenMap}
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
+                Ver ubicacion
+              </button>
+              <button
+                onClick={() => void handleShare()}
+                className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-blink-border bg-white/70 text-sm font-semibold transition-all active:scale-[0.98]"
+                style={{ color: bankAccent.text }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>share</span>
+                Compartir beneficio
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="space-y-3 p-4 lg:min-w-0 lg:p-0">
 
           {/* ── Expired notice ── */}
           {isExpired && (
@@ -974,7 +994,7 @@ function BenefitDetailPage() {
 
       {/* Fixed bottom CTA */}
       <div
-        className="fixed bottom-0 left-0 right-0 p-4 flex gap-3 z-20"
+        className="fixed bottom-0 left-0 right-0 z-20 flex gap-3 p-4 lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.95)',
           backdropFilter: 'blur(12px)',
@@ -1001,12 +1021,12 @@ function BenefitDetailPage() {
     {/* ── Locations popup — portal to escape any stacking context ── */}
     {showLocationPopup && createPortal(
       <div
-        className="fixed inset-0 z-[200] bg-black/50"
+        className="fixed inset-0 z-[200] bg-black/50 lg:flex lg:items-center lg:justify-center lg:p-6"
         onClick={() => setShowLocationPopup(false)}
       >
         <div
-          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
-          style={{ borderRadius: '20px 20px 0 0', maxHeight: '65vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          className="absolute bottom-0 left-0 right-0 flex max-h-[65vh] flex-col rounded-t-[20px] bg-white lg:relative lg:bottom-auto lg:left-auto lg:right-auto lg:w-full lg:max-w-2xl lg:rounded-2xl"
+          style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Drag handle */}
@@ -1147,15 +1167,15 @@ function BenefitDetailPage() {
     {/* ── Eligible Banks bottom-sheet popup ── */}
     {showAllEligibleBanks && createPortal(
       <div
-        className="fixed inset-0 z-[200] bg-black/50"
+        className="fixed inset-0 z-[200] bg-black/50 lg:flex lg:items-center lg:justify-center lg:p-6"
         onClick={() => {
           setShowAllEligibleBanks(false);
           setBankSearchQuery('');
         }}
       >
         <div
-          className="absolute bottom-0 left-0 right-0 bg-white flex flex-col animate-slide-up"
-          style={{ borderRadius: '20px 20px 0 0', maxHeight: '75vh', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
+          className="absolute bottom-0 left-0 right-0 flex max-h-[75vh] flex-col rounded-t-[20px] bg-white animate-slide-up lg:relative lg:bottom-auto lg:left-auto lg:right-auto lg:w-full lg:max-w-2xl lg:rounded-2xl"
+          style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Drag handle */}

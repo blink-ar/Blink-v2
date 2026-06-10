@@ -13,6 +13,7 @@ interface BusinessResultCardProps {
   onClick?: () => void;
   className?: string;
   showDistance?: boolean;
+  variant?: 'list' | 'card' | 'desktop-card';
 }
 
 const getCategoryStyle = (category: string) => {
@@ -71,6 +72,7 @@ function BusinessResultCard({
   onClick,
   className = '',
   showDistance = true,
+  variant = 'list',
 }: BusinessResultCardProps) {
   const bankBadges = getBusinessBankBadges(badgeSource ?? business);
   const visibleBadges = bankBadges.slice(0, 3);
@@ -79,13 +81,15 @@ function BusinessResultCard({
   const maxInstallments = getBusinessMaxInstallments(business);
   const categoryStyle = getCategoryStyle(business.category);
   const imageSrc = getOptimizedImageUrl(business.image, { width: 96 });
-  const baseClassName = `w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex text-left ${className}`;
+  const baseClassName = `w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-soft-md overflow-hidden text-left ${
+    variant === 'card' ? 'flex flex-col' : variant === 'desktop-card' ? 'flex lg:flex-col' : 'flex'
+  } ${className}`;
   const style = {
     border: '1px solid #E8E6E1',
     boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)',
   };
 
-  const content = (
+  const listContent = (
     <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
       <div
         className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
@@ -163,17 +167,100 @@ function BusinessResultCard({
     </div>
   );
 
+  const cardContent = (
+    <>
+      <div
+        className="relative h-32 w-full overflow-hidden"
+        style={{ background: imageSrc ? '#F7F6F4' : categoryStyle.bg }}
+      >
+        {imageSrc ? (
+          <img
+            alt=""
+            className="h-full w-full object-cover"
+            src={getOptimizedImageUrl(business.image, { width: 520 })}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="font-black text-4xl leading-none" style={{ color: categoryStyle.color }}>
+              {business.name?.charAt(0)}
+            </span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/0 to-black/35" />
+        {maxDiscount > 0 ? (
+          <div className="absolute left-3 top-3 rounded-xl bg-white/90 px-2.5 py-1 text-sm font-black text-emerald-600 shadow-soft">
+            {maxDiscount}% OFF
+          </div>
+        ) : maxInstallments > 0 ? (
+          <div className="absolute left-3 top-3 rounded-xl bg-white/90 px-2.5 py-1 text-sm font-black text-primary shadow-soft">
+            {maxInstallments} cuotas
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="min-w-0">
+          <h2 className="flex min-w-0 items-center gap-1 text-base font-bold leading-snug text-blink-ink">
+            <span className="truncate">{business.name}</span>
+            {showDistance && (business.distanceText || business.distance !== undefined) && (
+              <>
+                <span className="shrink-0 font-normal text-blink-muted">·</span>
+                <span className="shrink-0 text-xs font-normal text-blink-muted">
+                  {business.distanceText || formatDistance(business.distance!)}
+                </span>
+              </>
+            )}
+          </h2>
+          <p className="mt-1 text-sm text-blink-muted">
+            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 overflow-hidden">
+          {visibleBadges.map((token) => (
+            <BankLogo key={`${business.id}-${token}`} bankName={token} size={32} />
+          ))}
+          {remaining > 0 && (
+            <span
+              className="shrink-0 rounded-md px-1.5 py-[3px] text-[10px] font-bold leading-none"
+              style={{ background: '#F1F5F9', color: '#94A3B8' }}
+            >
+              +{remaining}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-auto flex items-center justify-between border-t border-blink-border pt-3">
+          <span className="text-xs font-semibold text-blink-muted">Ver beneficios</span>
+          <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>
+            arrow_forward
+          </span>
+        </div>
+      </div>
+    </>
+  );
+
+  const responsiveContent = variant === 'desktop-card' ? (
+    <>
+      <div className="contents lg:hidden">{listContent}</div>
+      <div className="hidden flex-1 flex-col lg:flex">{cardContent}</div>
+    </>
+  ) : variant === 'card' ? cardContent : listContent;
+
   if (to) {
     return (
       <Link to={to} onClick={onClick} className={baseClassName} style={style}>
-        {content}
+        {responsiveContent}
       </Link>
     );
   }
 
   return (
     <button type="button" onClick={onClick} className={baseClassName} style={style}>
-      {content}
+      {responsiveContent}
     </button>
   );
 }

@@ -34,7 +34,7 @@ const BottomNav: React.FC = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 w-full z-50 pb-safe"
+      className="fixed bottom-0 left-0 z-50 w-full pb-safe lg:hidden"
       style={{
         background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(16px)',

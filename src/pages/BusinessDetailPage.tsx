@@ -409,10 +409,11 @@ function BusinessDetailPage() {
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body flex flex-col" style={{ height: '100dvh' }}>
+    <div className="flex h-[100dvh] flex-col bg-blink-bg font-body text-blink-ink lg:h-auto lg:min-h-[calc(100dvh-64px)]">
+      <div className="flex min-h-0 flex-1 flex-col lg:mx-auto lg:grid lg:w-full lg:max-w-7xl lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:py-8">
 
       {/* ── Header ── */}
-      <header className="bg-white flex-shrink-0" style={{ borderBottom: '1px solid #E8E6E1' }}>
+      <header className="flex-shrink-0 bg-white lg:sticky lg:top-24 lg:self-start lg:overflow-hidden lg:rounded-2xl lg:border lg:border-blink-border lg:shadow-soft" style={{ borderBottom: '1px solid #E8E6E1' }}>
 
         {/* Top row */}
         <div className="flex items-center gap-3 px-4 py-4">
@@ -521,7 +522,7 @@ function BusinessDetailPage() {
 {/* ── Content ── */}
       <main
         ref={containerRef}
-        className="flex-1 pb-4"
+        className="flex-1 pb-4 lg:min-w-0 lg:overflow-visible lg:pb-0"
         style={{ overflowY: 'auto', overscrollBehavior: 'contain' }}
       >
 
@@ -900,6 +901,7 @@ function BusinessDetailPage() {
         )}
 
       </main>
+      </div>
     </div>
   );
 }
