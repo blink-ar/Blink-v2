@@ -39,7 +39,7 @@ function SavedPage() {
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
       <header
-        className="sticky top-0 z-50 w-full"
+        className="sticky top-0 z-50 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -52,7 +52,11 @@ function SavedPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col pb-28">
+      <main className="flex-1 flex flex-col pb-28 lg:mx-auto lg:w-full lg:max-w-5xl lg:px-8 lg:py-8 lg:pb-12">
+        <div className="mb-6 hidden lg:block">
+          <h1 className="text-3xl font-black tracking-tight text-blink-ink">Guardados</h1>
+          <p className="mt-1 text-sm text-blink-muted">Tus comercios favoritos y beneficios activos.</p>
+        </div>
         {!isAuthenticated ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 py-16">
             <div
@@ -114,7 +118,7 @@ function SavedPage() {
             </button>
           </div>
         ) : (
-          <div className="px-4 pt-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 px-4 pt-4 lg:px-0 lg:pt-0">
             <p className="text-xs font-medium text-blink-muted px-1">
               {visibleFavorites.length} guardado{visibleFavorites.length !== 1 ? 's' : ''}
             </p>

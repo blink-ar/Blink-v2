@@ -54,8 +54,8 @@ function CategoryPageContent({ category, page }: { category: SeoCategoryLink; pa
   const hasMore = Boolean(data?.pagination?.hasMore);
 
   return (
-    <div className="min-h-screen bg-blink-bg text-blink-ink font-body pb-28">
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-blink-border">
+    <div className="min-h-screen bg-blink-bg text-blink-ink font-body pb-28 lg:pb-12">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-blink-border lg:hidden">
         <div className="h-14 px-4 flex items-center justify-between">
           <Link to="/" className="font-bold text-lg tracking-tight">Blink</Link>
           <Link
@@ -67,8 +67,8 @@ function CategoryPageContent({ category, page }: { category: SeoCategoryLink; pa
         </div>
       </header>
 
-      <main className="px-4 pt-6 flex flex-col gap-6">
-        <section className="rounded-[24px] bg-white border border-blink-border p-5 shadow-sm">
+      <main className="flex flex-col gap-6 px-4 pt-6 lg:mx-auto lg:w-full lg:max-w-7xl lg:px-8 lg:py-8">
+        <section className="rounded-[24px] bg-white border border-blink-border p-5 shadow-sm lg:p-8">
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-primary mb-2">
             Comercios por categoria
           </p>
@@ -103,7 +103,7 @@ function CategoryPageContent({ category, page }: { category: SeoCategoryLink; pa
               ))}
             </div>
           ) : (
-            <ol className="grid grid-cols-1 gap-3 list-none p-0 m-0">
+            <ol className="grid grid-cols-1 gap-3 list-none p-0 m-0 lg:grid-cols-2 xl:grid-cols-3">
               {businesses.map((business) => (
                 <li key={business.id}>
                   <Link

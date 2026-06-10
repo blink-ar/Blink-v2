@@ -3,8 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import AnalyticsTracker from './components/analytics/AnalyticsTracker';
 import RouteSEO from './components/seo/RouteSEO';
 import UpdatePrompt from './components/UpdatePrompt';
-import { useResponsive } from './hooks/useResponsive';
-import PhoneMirror from './components/PhoneMirror';
+import DesktopTopNav from './components/desktop/DesktopTopNav';
 import { AuthProvider } from './contexts/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 
@@ -54,10 +53,12 @@ export function HomeRedirect() {
 }
 
 function AppContent() {
-  const { isDesktop } = useResponsive();
+  const location = useLocation();
+  const hideDesktopNav = location.pathname.startsWith('/auth/callback');
 
-  const mobileContent = (
+  return (
     <>
+      {!hideDesktopNav && <DesktopTopNav />}
       <ScrollToTop />
       <AnalyticsTracker />
       <RouteSEO />
@@ -85,12 +86,6 @@ function AppContent() {
       </Suspense>
     </>
   );
-
-  if (isDesktop) {
-    return <PhoneMirror>{mobileContent}</PhoneMirror>;
-  }
-
-  return mobileContent;
 }
 
 function App() {

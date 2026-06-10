@@ -161,7 +161,7 @@ function LoginPage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col">
       {/* Header */}
       <header
-        className="sticky top-0 z-50 w-full"
+        className="sticky top-0 z-50 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -183,7 +183,7 @@ function LoginPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center px-4 py-8 gap-6">
+      <main className="flex-1 flex flex-col items-center gap-6 px-4 py-8 lg:mx-auto lg:w-full lg:max-w-3xl lg:py-12">
         {step === 'email' ? (
           <>
             <div

@@ -6,7 +6,11 @@ import BusinessResultCard from '../components/BusinessResultCard';
 import { SkeletonCard } from '../components/skeletons';
 import BankFilterSheet, { BankFilterOption } from '../components/neo/BankFilterSheet';
 import CategoryFilterSheet, { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
-import UnifiedFilterSheet, { type UnifiedFilterValues } from '../components/neo/UnifiedFilterSheet';
+import UnifiedFilterSheet, {
+  DAY_OPTIONS,
+  DISCOUNT_OPTIONS,
+  type UnifiedFilterValues,
+} from '../components/neo/UnifiedFilterSheet';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { useFallbackSearch } from '../hooks/useFallbackSearch';
@@ -51,6 +55,226 @@ interface QuickFilterPill {
 }
 
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
+
+interface DesktopSearchFiltersProps {
+  bankOptions: BankFilterOption[];
+  selectedBanks: string[];
+  selectedCategory: string;
+  minDiscount: number | undefined;
+  availableDay: string | undefined;
+  cardMode: 'credit' | 'debit' | undefined;
+  onlineOnly: boolean;
+  hasInstallments: boolean | undefined;
+  sortByDistance: boolean;
+  activeFilterCount: number;
+  permissionDenied: boolean;
+  onBanksChange: (tokens: string[]) => void;
+  onCategoryChange: (category: string) => void;
+  onMinDiscountChange: (value: number | undefined) => void;
+  onAvailableDayChange: (value: string | undefined) => void;
+  onCardModeChange: (value: 'credit' | 'debit' | undefined) => void;
+  onOnlineOnlyChange: (value: boolean) => void;
+  onHasInstallmentsChange: (value: boolean | undefined) => void;
+  onSortByDistanceChange: (value: boolean) => void;
+  onRequestPermission: () => void;
+  onClearAll: () => void;
+}
+
+function DesktopSearchFilters({
+  bankOptions,
+  selectedBanks,
+  selectedCategory,
+  minDiscount,
+  availableDay,
+  cardMode,
+  onlineOnly,
+  hasInstallments,
+  sortByDistance,
+  activeFilterCount,
+  permissionDenied,
+  onBanksChange,
+  onCategoryChange,
+  onMinDiscountChange,
+  onAvailableDayChange,
+  onCardModeChange,
+  onOnlineOnlyChange,
+  onHasInstallmentsChange,
+  onSortByDistanceChange,
+  onRequestPermission,
+  onClearAll,
+}: DesktopSearchFiltersProps) {
+  const toggleBank = (token: string) => {
+    onBanksChange(
+      selectedBanks.includes(token)
+        ? selectedBanks.filter((value) => value !== token)
+        : [...selectedBanks, token],
+    );
+  };
+
+  const handleDistanceToggle = () => {
+    if (permissionDenied) onRequestPermission();
+    onSortByDistanceChange(!sortByDistance);
+  };
+
+  const Toggle = ({
+    active,
+    onClick,
+    children,
+  }: {
+    active: boolean;
+    onClick: () => void;
+    children: ReactNode;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all active:scale-95 ${
+        active
+          ? 'bg-primary text-white'
+          : 'border border-blink-border bg-white text-blink-ink hover:border-primary/30 hover:bg-primary/5'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const SectionLabel = ({ icon, label }: { icon: string; label: string }) => (
+    <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blink-muted">
+      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+        {icon}
+      </span>
+      {label}
+    </h2>
+  );
+
+  return (
+    <aside className="hidden lg:block">
+      <div className="sticky top-24 rounded-2xl border border-blink-border bg-white p-4 shadow-soft">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-base font-bold text-blink-ink">Filtros</p>
+            <p className="text-xs text-blink-muted">
+              {activeFilterCount > 0 ? `${activeFilterCount} activos` : 'Refina tus resultados'}
+            </p>
+          </div>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="text-sm font-semibold text-primary hover:text-primary/70"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <section>
+            <SectionLabel icon="account_balance" label="Bancos" />
+            <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+              {bankOptions.map((option) => {
+                const selected = selectedBanks.includes(option.token);
+                return (
+                  <button
+                    key={option.token}
+                    type="button"
+                    onClick={() => toggleBank(option.token)}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                      selected
+                        ? 'bg-primary/10 font-semibold text-primary'
+                        : 'text-blink-ink hover:bg-blink-bg'
+                    }`}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    <span className="text-xs font-black tracking-wide">{option.code}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <SectionLabel icon="category" label="Categoria" />
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORY_OPTIONS.slice(0, 10).map((option) => (
+                <Toggle
+                  key={option.token}
+                  active={selectedCategory === option.token}
+                  onClick={() => onCategoryChange(selectedCategory === option.token ? '' : option.token)}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>{option.emoji}</span>
+                    <span className="truncate">{option.label}</span>
+                  </span>
+                </Toggle>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <SectionLabel icon="percent" label="Descuento" />
+            <div className="flex flex-wrap gap-2">
+              {DISCOUNT_OPTIONS.map((option) => (
+                <Toggle
+                  key={option.value}
+                  active={minDiscount === option.value}
+                  onClick={() => onMinDiscountChange(minDiscount === option.value ? undefined : option.value)}
+                >
+                  {option.label}
+                </Toggle>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <SectionLabel icon="calendar_today" label="Disponibilidad" />
+            <div className="flex flex-wrap gap-2">
+              {DAY_OPTIONS.map((option) => (
+                <Toggle
+                  key={option.value}
+                  active={availableDay === option.value}
+                  onClick={() => onAvailableDayChange(availableDay === option.value ? undefined : option.value)}
+                >
+                  {option.label}
+                </Toggle>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <SectionLabel icon="tune" label="Opciones" />
+            <div className="flex flex-wrap gap-2">
+              <Toggle active={sortByDistance} onClick={handleDistanceToggle}>
+                Cerca
+              </Toggle>
+              <Toggle active={onlineOnly} onClick={() => onOnlineOnlyChange(!onlineOnly)}>
+                Online
+              </Toggle>
+              <Toggle
+                active={hasInstallments === true}
+                onClick={() => onHasInstallmentsChange(hasInstallments === true ? undefined : true)}
+              >
+                Cuotas
+              </Toggle>
+              <Toggle
+                active={cardMode === 'credit'}
+                onClick={() => onCardModeChange(cardMode === 'credit' ? undefined : 'credit')}
+              >
+                Credito
+              </Toggle>
+              <Toggle
+                active={cardMode === 'debit'}
+                onClick={() => onCardModeChange(cardMode === 'debit' ? undefined : 'debit')}
+              >
+                Debito
+              </Toggle>
+            </div>
+          </section>
+        </div>
+      </div>
+    </aside>
+  );
+}
 
 const readStoredBanks = (): string[] => {
   if (typeof window === 'undefined') return [];
@@ -287,6 +511,17 @@ function SearchPage() {
     hasInstallments === true,
     sortByDistance,
   ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setSelectedBanks([]);
+    setSelectedCategory('');
+    setMinDiscount(undefined);
+    setAvailableDay(undefined);
+    setCardMode(undefined);
+    setOnlineOnly(false);
+    setHasInstallments(undefined);
+    setSortByDistance(false);
+  };
 
   const currentFilterState = useMemo<SearchFilterState>(() => ({
     selectedBanksKey: selectedBanks.join(','),
@@ -697,7 +932,7 @@ function SearchPage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
       <header
-        className="sticky top-0 z-40 w-full"
+        className="sticky top-0 z-40 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -956,7 +1191,59 @@ function SearchPage() {
       </header>
 
       {/* Results */}
-      <main className="flex-1 px-4 py-5 space-y-3 pb-28">
+      <main className="flex-1 space-y-3 px-4 py-5 pb-28 lg:mx-auto lg:grid lg:w-full lg:max-w-7xl lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8 lg:space-y-0 lg:px-8 lg:py-8 lg:pb-12">
+        <DesktopSearchFilters
+          bankOptions={bankOptions}
+          selectedBanks={selectedBanks}
+          selectedCategory={selectedCategory}
+          minDiscount={minDiscount}
+          availableDay={availableDay}
+          cardMode={cardMode}
+          onlineOnly={onlineOnly}
+          hasInstallments={hasInstallments}
+          sortByDistance={sortByDistance}
+          activeFilterCount={activeFilterCount}
+          permissionDenied={permissionDenied}
+          onBanksChange={setSelectedBanks}
+          onCategoryChange={setSelectedCategory}
+          onMinDiscountChange={setMinDiscount}
+          onAvailableDayChange={setAvailableDay}
+          onCardModeChange={setCardMode}
+          onOnlineOnlyChange={setOnlineOnly}
+          onHasInstallmentsChange={setHasInstallments}
+          onSortByDistanceChange={setSortByDistance}
+          onRequestPermission={requestPermission}
+          onClearAll={clearAllFilters}
+        />
+
+        <section className="space-y-3 lg:space-y-5">
+          <div className="hidden items-start justify-between gap-6 lg:flex">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-black tracking-tight text-blink-ink">Buscar beneficios</h1>
+              <p className="mt-1 text-sm text-blink-muted">Explora comercios, bancos y descuentos disponibles.</p>
+            </div>
+            <form
+              role="search"
+              onSubmit={submitSearch}
+              className="flex h-12 w-full max-w-md items-center gap-2 rounded-2xl border border-blink-border bg-white px-4 shadow-soft"
+            >
+              <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 20 }}>search</span>
+              <input
+                ref={searchInputRef}
+                className="min-w-0 flex-1 appearance-none bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+                placeholder="Buscar tiendas y beneficios..."
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+              {searchTerm && (
+                <button type="button" onClick={clearSearch} className="text-blink-muted hover:text-blink-ink">
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                </button>
+              )}
+            </form>
+          </div>
+
         {/* Location-unavailable banner — shown when "Más cercanos" is active but GPS is denied */}
         {proximityUnavailable && (
           <div
@@ -979,9 +1266,11 @@ function SearchPage() {
         </div>
 
         {isLoading && !enrichedBusinesses.length ? (
-          Array.from({ length: 5 }).map((_, index) => (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
             <SkeletonCard key={index} />
-          ))
+            ))}
+          </div>
         ) : showOtherBanksFallback ? (
           /* ── CASE 1: Selected banks have no match, but other banks do ── */
           <div>
@@ -1183,14 +1472,18 @@ function SearchPage() {
             <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
           </div>
         ) : (
-          strictMatches.map((business, index) => (
-            <BusinessResultCard
-              key={business.id}
-              business={business}
-              badgeSource={fullBusinessesMap.get(business.id) ?? business}
-              onClick={() => handleBusinessSelect(business, index + 1)}
-            />
-          ))
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {strictMatches.map((business, index) => (
+              <BusinessResultCard
+                key={business.id}
+                business={business}
+                badgeSource={fullBusinessesMap.get(business.id) ?? business}
+                onClick={() => handleBusinessSelect(business, index + 1)}
+                variant="desktop-card"
+                className="lg:h-full"
+              />
+            ))}
+          </div>
         )}
 
         {/* Infinite scroll sentinel — triggers loadMore when entering viewport */}
@@ -1342,6 +1635,7 @@ function SearchPage() {
             )}
           </div>
         )}
+        </section>
       </main>
 
       <BankFilterSheet

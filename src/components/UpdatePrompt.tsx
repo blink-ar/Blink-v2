@@ -11,7 +11,7 @@ const UpdatePrompt: React.FC = () => {
   if (!needRefresh) return null;
 
   return (
-    <div className="fixed bottom-20 left-0 right-0 z-[90] flex justify-center px-4 pointer-events-none">
+    <div className="pointer-events-none fixed bottom-20 left-0 right-0 z-[90] flex justify-center px-4 lg:bottom-6">
       <div
         className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white pointer-events-auto w-full max-w-sm"
         style={{
