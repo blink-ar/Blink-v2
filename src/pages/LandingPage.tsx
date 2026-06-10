@@ -215,7 +215,7 @@ function LandingPage() {
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col relative overflow-x-hidden">
       <header
-        className="sticky top-0 z-40 w-full"
+        className="sticky top-0 z-40 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -273,9 +273,9 @@ function LandingPage() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-5 space-y-4 pb-24">
+      <main className="flex-1 space-y-4 px-4 py-5 pb-24 lg:mx-auto lg:w-full lg:max-w-7xl lg:px-8 lg:py-8 lg:pb-12">
         <section
-          className="bg-white rounded-2xl p-4"
+          className="bg-white rounded-2xl p-4 lg:p-8"
           style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
         >
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary mb-2">
@@ -345,14 +345,18 @@ function LandingPage() {
               </span>
             </div>
 
-            {visibleBusinesses.map((business) => (
-              <BusinessResultCard
-                key={business.id}
-                business={business}
-                showDistance={false}
-                to={getMerchantSeoPath({ id: business.id, name: business.name })}
-              />
-            ))}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {visibleBusinesses.map((business) => (
+                <BusinessResultCard
+                  key={business.id}
+                  business={business}
+                  showDistance={false}
+                  to={getMerchantSeoPath({ id: business.id, name: business.name })}
+                  variant="desktop-card"
+                  className="lg:h-full"
+                />
+              ))}
+            </div>
 
             {resultCount > visibleBusinesses.length && (
               <Link

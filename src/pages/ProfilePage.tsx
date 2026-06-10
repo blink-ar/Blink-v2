@@ -10,7 +10,7 @@ function ProfilePage() {
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
       {/* Header */}
       <header
-        className="sticky top-0 z-50 w-full"
+        className="sticky top-0 z-50 w-full lg:hidden"
         style={{
           background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
@@ -30,7 +30,7 @@ function ProfilePage() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center pb-28 px-4 pt-8 gap-6">
+      <main className="flex-1 flex flex-col items-center gap-6 px-4 pt-8 pb-28 lg:mx-auto lg:w-full lg:max-w-3xl lg:px-8 lg:py-10 lg:pb-12">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <div
