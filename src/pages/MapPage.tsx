@@ -1,7 +1,9 @@
 import { type FormEvent, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getGoogleMaps } from '../services/googleMapsLoader';
+import L, { type Layer, type Map as LeafletMap } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useResponsive } from '../hooks/useResponsive';
 import { useBenefitsData, BenefitsFilters } from '../hooks/useBenefitsData';
 import { useEnrichedBusinesses } from '../hooks/useEnrichedBusinesses';
 import { Business } from '../types';
@@ -22,19 +24,6 @@ const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
 const KM5_IN_LAT = 0.045;
 const km5InLng = (lat: number) => 0.045 / Math.cos((lat * Math.PI) / 180);
 const UI_FONT_STACK = "'Space Grotesk',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-
-// Soft, minimal map style — light roads, no clutter
-const MAP_STYLE = [
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f7f6f4' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e8e6e1' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#ecfdf5' }] },
-  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-];
 
 const CATEGORY_CHIPS = [
   { id: 'nearby', label: '📍 Cerca tuyo' },
@@ -60,6 +49,14 @@ interface MarkerCluster {
 }
 
 const getMarkerKey = (marker: MapMarker) => `${marker.business.id}:${marker.lat.toFixed(6)}:${marker.lng.toFixed(6)}`;
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 
 function clusterMapMarkers(markers: MapMarker[], zoom: number): MarkerCluster[] {
   // At street level, always show individual markers so co-located businesses are never stuck
@@ -93,6 +90,7 @@ interface MapFilterState {
 function MapPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isDesktop } = useResponsive();
   const focusBusinessId = searchParams.get('business');
 
   const { position } = useGeolocation();
@@ -140,14 +138,14 @@ function MapPage() {
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const mapRef = useRef<any>(null);
-  const overlaysRef = useRef<any[]>([]);
-  const userOverlayRef = useRef<any>(null);
-  const googleRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const overlaysRef = useRef<Layer[]>([]);
+  const userOverlayRef = useRef<Layer | null>(null);
+  const hasFitInitialBoundsRef = useRef(false);
   const selectedBusinessRef = useRef<Business | null>(null);
   const selectedMarkerIdxRef = useRef<number | null>(null);
   const selectedMarkerKeyRef = useRef<string | null>(null);
-  const buildOverlaysRef = useRef<((google: any, map: any, selected: Business | null) => void) | null>(null);
+  const buildOverlaysRef = useRef<((map: LeafletMap, selected: Business | null) => void) | null>(null);
 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedMarkerIdx, setSelectedMarkerIdx] = useState<number | null>(null);
@@ -319,205 +317,103 @@ function MapPage() {
     trackNoResults({ source: isSingleBusinessMode ? 'map_page_single_business' : 'map_page', searchTerm: normalizedSearch, activeFilterCount, category: currentFilterState.activeChip !== 'nearby' ? currentFilterState.activeChip : undefined });
   }, [activeFilterCount, currentFilterState.activeChip, debouncedSearch, isLoading, isSingleBusinessMode, mapMarkers.length]);
 
-  const getMaxDiscount = (biz: Business) => {
+  const getMaxDiscount = useCallback((biz: Business) => {
     let max = 0;
     biz.benefits.forEach((b) => {
       const m = b.rewardRate.match(/(\d+)%/);
       if (m) max = Math.max(max, parseInt(m[1]));
     });
     return max;
-  };
+  }, []);
 
-  const getBestBenefitLabel = (biz: Business) => {
+  const getBestBenefitLabel = useCallback((biz: Business) => {
     const max = getMaxDiscount(biz);
     if (max > 0) return `Hasta ${max}% OFF`;
     const withInstallments = biz.benefits.find((b) => b.installments && b.installments > 0);
     if (withInstallments) return `${withInstallments.installments} cuotas s/int.`;
     return `${biz.benefits.length} beneficios`;
-  };
+  }, [getMaxDiscount]);
 
-  const getShortBenefitForTooltip = (biz: Business) => {
+  const getShortBenefitForTooltip = useCallback((biz: Business) => {
     const max = getMaxDiscount(biz);
     const bank = biz.benefits[0]?.bankName?.replace(/banco\s*/i, '').substring(0, 8) || '';
     if (max > 0) return `${max}% OFF${bank ? ` · ${bank}` : ''}`;
     const withInstallments = biz.benefits.find((b) => b.installments && b.installments > 0);
     if (withInstallments) return `${withInstallments.installments} cuotas${bank ? ` · ${bank}` : ''}`;
     return bank || 'Ver beneficios';
-  };
+  }, [getMaxDiscount]);
 
   // ─── Overlays ──────────────────────────────────────────────────
 
   const clearOverlays = useCallback(() => {
-    overlaysRef.current.forEach((o) => o.setMap(null));
+    overlaysRef.current.forEach((layer) => layer.remove());
     overlaysRef.current = [];
   }, []);
 
-  const buildOverlays = useCallback((google: any, map: any, selected: Business | null) => {
-    clearOverlays();
-    const zoom = map.getZoom() ?? 15;
+  const createBusinessIcon = useCallback((biz: Business, isSelected: boolean) => {
+    const size = isSelected ? 52 : 42;
+    const imgSize = isSelected ? 34 : 26;
+    const imageUrl = getOptimizedImageUrl(biz.image, { width: 96 });
+    const benefitText = escapeHtml(getShortBenefitForTooltip(biz));
+    const businessName = escapeHtml(biz.name || '');
+    const initial = escapeHtml(biz.name?.charAt(0) || '?');
+    const ringStyle = isSelected
+      ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
+      : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;';
 
-    class BusinessOverlay extends google.maps.OverlayView {
-      private pos: any;
-      private div: HTMLDivElement | null = null;
-      private biz: Business;
-      private isSelected: boolean;
-      private imgSrc: string;
-      private onSelect: () => void;
-
-      constructor(pos: any, biz: Business, isSelected: boolean, imgSrc: string, onSelect: () => void) {
-        super();
-        this.pos = pos;
-        this.biz = biz;
-        this.isSelected = isSelected;
-        this.imgSrc = imgSrc;
-        this.onSelect = onSelect;
-      }
-
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
-        this.div.style.cursor = 'pointer';
-        this.div.style.zIndex = this.isSelected ? '100' : '10';
-        this.div.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onSelect();
-        });
-        this.render();
-        const panes = this.getPanes();
-        panes.overlayMouseTarget.appendChild(this.div);
-      }
-
-      render() {
-        if (!this.div) return;
-        const size = this.isSelected ? 52 : 42;
-        const imgSize = this.isSelected ? 34 : 26;
-
-        let html = '';
-
-        if (this.isSelected) {
-          const benefitText = getShortBenefitForTooltip(this.biz);
-          html += `
-            <div style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:10px;white-space:nowrap;
+    return L.divIcon({
+      className: `blink-leaflet-marker ${isSelected ? 'blink-leaflet-marker-selected' : ''}`,
+      iconSize: [size, size + 16],
+      iconAnchor: [size / 2, size + 4],
+      html: `
+        <div style="position:relative;width:${size}px;display:flex;flex-direction:column;align-items:center;">
+          ${isSelected ? `
+            <div style="position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);white-space:nowrap;
               background:rgba(255,255,255,0.96);border-radius:12px;
               box-shadow:0 4px 20px rgba(99,102,241,0.18),0 1px 4px rgba(0,0,0,0.08);
               padding:7px 12px;display:flex;flex-direction:column;align-items:center;
               z-index:200;pointer-events:none;border:1px solid rgba(199,210,254,0.8);">
-              <span style="color:#1C1C1E;font-family:${UI_FONT_STACK};font-size:12px;font-weight:600;line-height:1.3;">${this.biz.name}</span>
+              <span style="color:#1C1C1E;font-family:${UI_FONT_STACK};font-size:12px;font-weight:600;line-height:1.3;">${businessName}</span>
               <span style="color:#6366F1;font-family:${UI_FONT_STACK};font-size:11px;font-weight:500;margin-top:1px;">${benefitText}</span>
               <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:rgba(255,255,255,0.96);border-right:1px solid rgba(199,210,254,0.8);border-bottom:1px solid rgba(199,210,254,0.8);"></div>
-            </div>`;
-        }
-
-        const ringStyle = this.isSelected
-          ? 'box-shadow:0 0 0 3px rgba(99,102,241,0.35),0 4px 16px rgba(99,102,241,0.25),0 2px 6px rgba(0,0,0,0.10);border:2px solid #6366F1;background:#ffffff;'
-          : 'box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);border:1.5px solid #E8E6E1;background:#ffffff;';
-
-        html += `
+            </div>` : ''}
           <div style="width:${size}px;height:${size}px;border-radius:50%;${ringStyle}
             display:flex;align-items:center;justify-content:center;position:relative;z-index:20;
             transition:all 0.15s;">
-            ${this.imgSrc
-              ? `<img src="${this.imgSrc}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${this.isSelected ? '' : 'opacity:0.75;'}" />`
-              : `<span style="font-family:${UI_FONT_STACK};font-size:${this.isSelected ? 18 : 14}px;font-weight:700;color:${this.isSelected ? '#6366F1' : '#6B7280'};">${this.biz.name?.charAt(0) || '?'}</span>`
+            ${imageUrl
+              ? `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:50%;${isSelected ? '' : 'opacity:0.75;'}" />`
+              : `<span style="font-family:${UI_FONT_STACK};font-size:${isSelected ? 18 : 14}px;font-weight:700;color:${isSelected ? '#6366F1' : '#6B7280'};">${initial}</span>`
             }
-          </div>`;
-
-        html += `<div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
-
-        this.div.innerHTML = html;
-      }
-
-      draw() {
-        if (!this.div) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        const px = proj.fromLatLngToDivPixel(this.pos);
-        if (px) {
-          const size = this.isSelected ? 52 : 42;
-          this.div.style.left = (px.x - size / 2) + 'px';
-          this.div.style.top = (px.y - size - 4) + 'px';
-        }
-      }
-
-      onRemove() {
-        if (this.div && this.div.parentNode) {
-          this.div.parentNode.removeChild(this.div);
-          this.div = null;
-        }
-      }
-
-      updateSelection(isSelected: boolean) {
-        this.isSelected = isSelected;
-        if (this.div) this.div.style.zIndex = isSelected ? '100' : '10';
-        this.render();
-        this.draw();
-      }
-    }
-
-    // ── ClusterOverlay ───────────────────────────────────────────
-    class ClusterOverlay extends google.maps.OverlayView {
-      private pos: any;
-      private div: HTMLDivElement | null = null;
-      private count: number;
-      private onTap: () => void;
-
-      constructor(pos: any, count: number, onTap: () => void) {
-        super();
-        this.pos = pos;
-        this.count = count;
-        this.onTap = onTap;
-      }
-
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
-        this.div.style.cursor = 'pointer';
-        this.div.style.zIndex = '15';
-        this.div.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onTap();
-        });
-        this.render();
-        this.getPanes().overlayMouseTarget.appendChild(this.div);
-      }
-
-      render() {
-        if (!this.div) return;
-        const n = this.count;
-        const size = n < 5 ? 44 : n < 10 ? 50 : 58;
-        const fontSize = n < 10 ? 15 : n < 100 ? 13 : 11;
-        this.div.innerHTML = `
-          <div style="width:${size}px;height:${size}px;border-radius:50%;
-            background:linear-gradient(135deg,#6366F1 0%,#818CF8 100%);
-            display:flex;align-items:center;justify-content:center;
-            box-shadow:0 4px 16px rgba(99,102,241,0.40),0 2px 6px rgba(0,0,0,0.10);
-            border:2.5px solid #ffffff;position:relative;z-index:20;">
-            <span style="color:#ffffff;font-size:${fontSize}px;font-weight:700;
-              font-family:${UI_FONT_STACK};line-height:1;">${n}</span>
           </div>
-          <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`;
-      }
+          <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>
+        </div>`,
+    });
+  }, [getShortBenefitForTooltip]);
 
-      draw() {
-        if (!this.div) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        const px = proj.fromLatLngToDivPixel(this.pos);
-        if (px) {
-          const n = this.count;
-          const size = n < 5 ? 44 : n < 10 ? 50 : 58;
-          this.div.style.left = (px.x - size / 2) + 'px';
-          this.div.style.top = (px.y - size - 4) + 'px';
-        }
-      }
+  const createClusterIcon = useCallback((count: number) => {
+    const size = count < 5 ? 44 : count < 10 ? 50 : 58;
+    const fontSize = count < 10 ? 15 : count < 100 ? 13 : 11;
 
-      onRemove() {
-        if (this.div && this.div.parentNode) {
-          this.div.parentNode.removeChild(this.div);
-          this.div = null;
-        }
-      }
-    }
+    return L.divIcon({
+      className: 'blink-leaflet-cluster',
+      iconSize: [size, size + 16],
+      iconAnchor: [size / 2, size + 4],
+      html: `
+        <div style="width:${size}px;height:${size}px;border-radius:50%;
+          background:linear-gradient(135deg,#6366F1 0%,#818CF8 100%);
+          display:flex;align-items:center;justify-content:center;
+          box-shadow:0 4px 16px rgba(99,102,241,0.40),0 2px 6px rgba(0,0,0,0.10);
+          border:2.5px solid #ffffff;position:relative;z-index:20;">
+          <span style="color:#ffffff;font-size:${fontSize}px;font-weight:700;
+            font-family:${UI_FONT_STACK};line-height:1;">${count}</span>
+        </div>
+        <div style="width:12px;height:4px;background:rgba(0,0,0,0.10);border-radius:50%;margin:2px auto 0;filter:blur(1px);"></div>`,
+    });
+  }, []);
+
+  const buildOverlays = useCallback((map: LeafletMap, selected: Business | null) => {
+    clearOverlays();
+    const zoom = map.getZoom() ?? 15;
 
     // ── Single-business mode: no clustering ──────────────────────
     if (isSingleBusinessMode) {
@@ -526,19 +422,20 @@ function MapPage() {
         const isSelected =
           selected?.id === biz.id &&
           (currentSelectedIdx === null ? idx === 0 : idx === currentSelectedIdx);
-        const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
+        const markerKey = getMarkerKey({ business: biz, lat, lng, address: '' });
+        const overlay = L.marker([lat, lng], {
+          icon: createBusinessIcon(biz, isSelected),
+          keyboard: true,
+          riseOnHover: true,
+          zIndexOffset: isSelected ? 1000 : 0,
+        }).on('click', () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
           setSelectedMarkerIdx(idx);
-          setSelectedMarkerKey(getMarkerKey({ business: biz, lat, lng, address: '' }));
-          map.panTo(pos);
-        });
-        overlay.setMap(map);
-        (overlay as any).__businessId = biz.id;
-        (overlay as any).__markerIdx = idx;
-        (overlay as any).__markerKey = getMarkerKey({ business: biz, lat, lng, address: '' });
+          setSelectedMarkerKey(markerKey);
+          map.panTo([lat, lng]);
+        }).addTo(map);
         overlaysRef.current.push(overlay);
       });
       return;
@@ -564,200 +461,179 @@ function MapPage() {
         const isSelected = currentSelectedKey
           ? markerKey === currentSelectedKey
           : selected?.id === biz.id && (currentSelectedIdx === null || idx === currentSelectedIdx);
-        const pos = new google.maps.LatLng(lat, lng);
-        const overlay = new BusinessOverlay(pos, biz, isSelected, getOptimizedImageUrl(biz.image, { width: 96 }), () => {
+        const overlay = L.marker([lat, lng], {
+          icon: createBusinessIcon(biz, isSelected),
+          keyboard: true,
+          riseOnHover: true,
+          zIndexOffset: isSelected ? 1000 : 0,
+        }).on('click', () => {
           trackMapInteractionThrottled('marker_click', { businessId: biz.id, zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
           trackSelectBusiness({ source: 'map_marker', businessId: biz.id, category: biz.category });
           setSelectedBusiness(biz);
           setSelectedMarkerIdx(idx);
           setSelectedMarkerKey(markerKey);
-          map.panTo(pos);
-        });
-        overlay.setMap(map);
-        (overlay as any).__businessId = biz.id;
-        (overlay as any).__markerIdx = idx;
-        (overlay as any).__markerKey = markerKey;
+          map.panTo([lat, lng]);
+        }).addTo(map);
         overlaysRef.current.push(overlay);
       } else {
-        const pos = new google.maps.LatLng(cluster.lat, cluster.lng);
-        const clusterOverlay = new ClusterOverlay(pos, cluster.markers.length, () => {
+        const clusterOverlay = L.marker([cluster.lat, cluster.lng], {
+          icon: createClusterIcon(cluster.markers.length),
+          keyboard: true,
+        }).on('click', () => {
           trackMapInteractionThrottled('cluster_tap', { zoomLevel: map.getZoom() || undefined, minIntervalMs: 400 });
-          const bounds = new google.maps.LatLngBounds();
-          cluster.markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
-          const sw = bounds.getSouthWest();
-          const ne = bounds.getNorthEast();
-          const sameSpot = Math.abs(ne.lat() - sw.lat()) < 0.0001 && Math.abs(ne.lng() - sw.lng()) < 0.0001;
+          const bounds = L.latLngBounds(cluster.markers.map((m) => [m.lat, m.lng]));
+          const southWest = bounds.getSouthWest();
+          const northEast = bounds.getNorthEast();
+          const sameSpot = Math.abs(northEast.lat - southWest.lat) < 0.0001 && Math.abs(northEast.lng - southWest.lng) < 0.0001;
           if (sameSpot) {
-            map.setCenter({ lat: cluster.lat, lng: cluster.lng });
-            map.setZoom(17);
+            map.setView([cluster.lat, cluster.lng], 17);
           } else {
-            map.fitBounds(bounds, 80);
+            map.fitBounds(bounds, { padding: [80, 80] });
           }
-        });
-        clusterOverlay.setMap(map);
+        }).addTo(map);
         overlaysRef.current.push(clusterOverlay);
       }
     });
-  }, [mapMarkers, clearOverlays, isSingleBusinessMode, trackMapInteractionThrottled]);
+  }, [mapMarkers, clearOverlays, createBusinessIcon, createClusterIcon, isSingleBusinessMode, trackMapInteractionThrottled]);
 
-  // Keep ref current so the zoom_changed listener always calls the latest version
+  // Keep ref current so the zoom listener always calls the latest version
   useEffect(() => { buildOverlaysRef.current = buildOverlays; }, [buildOverlays]);
 
   // ─── User location overlay ────────────────────────────────────
 
-  const createUserLocationOverlay = useCallback((google: any, map: any, lat: number, lng: number) => {
-    if (userOverlayRef.current) userOverlayRef.current.setMap(null);
+  const createUserLocationOverlay = useCallback((map: LeafletMap, lat: number, lng: number) => {
+    if (userOverlayRef.current) userOverlayRef.current.remove();
 
-    class UserLocationOverlay extends google.maps.OverlayView {
-      private pos: any;
-      private div: HTMLDivElement | null = null;
-      constructor(pos: any) { super(); this.pos = pos; }
-
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
-        this.div.style.zIndex = '5';
-        this.div.style.pointerEvents = 'none';
-        // Soft indigo pulse dot instead of harsh pink
-        this.div.innerHTML = `
+    const overlay = L.marker([lat, lng], {
+      interactive: false,
+      keyboard: false,
+      icon: L.divIcon({
+        className: 'blink-leaflet-user-location',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+        html: `
           <div style="position:relative;width:22px;height:22px;">
             <div style="position:absolute;inset:0;background:rgba(99,102,241,0.20);border-radius:50%;animation:blink-ping 1.8s cubic-bezier(0,0,0.2,1) infinite;"></div>
             <div style="position:absolute;inset:4px;background:#6366F1;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.40);"></div>
           </div>
-        `;
-        this.getPanes().overlayLayer.appendChild(this.div);
-      }
-
-      draw() {
-        if (!this.div) return;
-        const proj = this.getProjection();
-        if (!proj) return;
-        const px = proj.fromLatLngToDivPixel(this.pos);
-        if (px) {
-          this.div.style.left = (px.x - 11) + 'px';
-          this.div.style.top = (px.y - 11) + 'px';
-        }
-      }
-
-      onRemove() {
-        if (this.div && this.div.parentNode) {
-          this.div.parentNode.removeChild(this.div);
-          this.div = null;
-        }
-      }
-    }
-
-    const overlay = new UserLocationOverlay(new google.maps.LatLng(lat, lng));
-    overlay.setMap(map);
+        `,
+      }),
+    }).addTo(map);
     userOverlayRef.current = overlay;
   }, []);
 
   // ─── Map init ──────────────────────────────────────────────────
 
-  const initMap = useCallback(async () => {
+  const initMap = useCallback(() => {
     if (!mapContainerRef.current) return;
     try {
-      const google = (await getGoogleMaps()) as any;
-      if (!mapContainerRef.current) return;
-      googleRef.current = google;
-
       const center = position
-        ? { lat: position.latitude, lng: position.longitude }
-        : DEFAULT_CENTER;
+        ? [position.latitude, position.longitude] as [number, number]
+        : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng] as [number, number];
 
       if (!mapRef.current) {
-        mapRef.current = new google.maps.Map(mapContainerRef.current, {
+        mapRef.current = L.map(mapContainerRef.current, {
           center,
           zoom: 15,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false,
           zoomControl: false,
-          clickableIcons: false,
-          disableDefaultUI: true,
-          gestureHandling: 'greedy',
-          styles: MAP_STYLE,
+          attributionControl: false,
+          preferCanvas: true,
+          worldCopyJump: true,
         });
 
-        mapRef.current.addListener('click', () => {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          crossOrigin: true,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(mapRef.current);
+
+        mapRef.current.on('click', () => {
           setSelectedBusiness(null);
           setSelectedMarkerIdx(null);
           setSelectedMarkerKey(null);
           trackMapInteractionThrottled('map_click', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
         });
+
+        setTimeout(() => mapRef.current?.invalidateSize(), 0);
       }
 
       if (!(mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached) {
-        mapRef.current.addListener('dragend', () => {
+        mapRef.current.on('dragend', () => {
           trackMapInteractionThrottled('pan', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 1500 });
         });
-        mapRef.current.addListener('zoom_changed', () => {
+        mapRef.current.on('zoomend', () => {
           const zoomLevel = mapRef.current?.getZoom() || undefined;
           trackMapInteractionThrottled('zoom', { zoomLevel, minIntervalMs: 800 });
-          if (googleRef.current && mapRef.current) {
-            buildOverlaysRef.current?.(googleRef.current, mapRef.current, selectedBusinessRef.current);
+          if (mapRef.current) {
+            buildOverlaysRef.current?.(mapRef.current, selectedBusinessRef.current);
           }
         });
         (mapRef.current as { __intentListenersAttached?: boolean }).__intentListenersAttached = true;
       }
 
       if (position) {
-        createUserLocationOverlay(google, mapRef.current, position.latitude, position.longitude);
+        createUserLocationOverlay(mapRef.current, position.latitude, position.longitude);
       }
 
-      buildOverlays(google, mapRef.current, selectedBusiness);
+      buildOverlays(mapRef.current, selectedBusinessRef.current);
 
-      if (isSingleBusinessMode) {
+      if (isSingleBusinessMode && !hasFitInitialBoundsRef.current) {
         if (mapMarkers.length > 0) {
-          const bounds = new google.maps.LatLngBounds();
-          mapMarkers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+          const bounds = L.latLngBounds(mapMarkers.map((m) => [m.lat, m.lng]));
           if (mapMarkers.length === 1) {
-            mapRef.current.setCenter({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
-            mapRef.current.setZoom(16);
+            mapRef.current.setView([mapMarkers[0].lat, mapMarkers[0].lng], 16);
           } else {
-            mapRef.current.fitBounds(bounds);
+            mapRef.current.fitBounds(bounds, { padding: [64, 64] });
           }
           if (focusedBusiness) {
             setSelectedBusiness(focusedBusiness);
             setSelectedMarkerIdx(0);
             setSelectedMarkerKey(getMarkerKey(mapMarkers[0]));
-            mapRef.current.panTo({ lat: mapMarkers[0].lat, lng: mapMarkers[0].lng });
+            mapRef.current.panTo([mapMarkers[0].lat, mapMarkers[0].lng]);
           }
+          hasFitInitialBoundsRef.current = true;
         }
-      } else if (position) {
+      } else if (position && !hasFitInitialBoundsRef.current) {
         const lat = position.latitude;
         const lng = position.longitude;
         const lngOff = km5InLng(lat);
-        const bounds = new google.maps.LatLngBounds(
-          { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
-          { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
+        const bounds = L.latLngBounds(
+          [lat - KM5_IN_LAT, lng - lngOff],
+          [lat + KM5_IN_LAT, lng + lngOff],
         );
-        mapRef.current.fitBounds(bounds);
+        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+        hasFitInitialBoundsRef.current = true;
+      } else if (!position && !isSingleBusinessMode && mapMarkers.length > 0 && !hasFitInitialBoundsRef.current) {
+        const bounds = L.latLngBounds(mapMarkers.map((m) => [m.lat, m.lng]));
+        mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 13 });
+        hasFitInitialBoundsRef.current = true;
       }
 
       setMapError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Map init failed', err);
-      setMapError(err.message || 'No se pudo cargar el mapa');
+      setMapError(err instanceof Error ? err.message : 'No se pudo cargar el mapa');
     }
   }, [position, mapMarkers, isSingleBusinessMode, focusedBusiness, buildOverlays, createUserLocationOverlay, trackMapInteractionThrottled]);
 
   useEffect(() => {
-    if (!isLoading && rawBusinesses.length > 0) initMap();
+    hasFitInitialBoundsRef.current = false;
+  }, [activeChip, debouncedSearch, isSingleBusinessMode, maxDistance, minDiscount, onlineOnly, availableDay, cardMode, network, hasInstallments, position]);
+
+  useEffect(() => {
+    if (!isLoading) initMap();
   }, [isLoading, rawBusinesses.length, initMap]);
 
   useEffect(() => {
-    overlaysRef.current.forEach((o: any) => {
-      if (typeof o.updateSelection === 'function') {
-        // Always match both business ID and exact marker index so only the
-        // clicked pin is highlighted, even when a business has multiple locations.
-        const isSelected = selectedMarkerKey
-          ? selectedMarkerKey === o.__markerKey
-          : selectedBusiness?.id === o.__businessId && selectedMarkerIdx === o.__markerIdx;
-        o.updateSelection(isSelected);
-      }
-    });
+    if (mapRef.current) buildOverlaysRef.current?.(mapRef.current, selectedBusiness);
   }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey]);
+
+  useEffect(() => () => {
+    clearOverlays();
+    userOverlayRef.current?.remove();
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, [clearOverlays]);
 
   useEffect(() => {
     if (selectedBusiness && listRef.current) {
@@ -776,10 +652,10 @@ function MapPage() {
   }, [selectedBusiness, selectedMarkerIdx, selectedMarkerKey, isSingleBusinessMode]);
 
   return (
-    <div className="bg-blink-bg text-blink-ink font-body h-[100dvh] flex flex-col overflow-hidden relative">
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-blink-bg font-body text-blink-ink lg:h-[calc(100dvh-64px)]">
 
       {/* ─── Floating Header ─── */}
-      <header className="absolute top-0 left-0 w-full z-30 px-4 pt-4 pointer-events-none">
+      <header className="pointer-events-none absolute left-0 top-0 z-[900] w-full px-4 pt-4 lg:hidden">
         <div className="pointer-events-auto flex items-center gap-2.5">
           {/* Back */}
           <button
@@ -883,11 +759,11 @@ function MapPage() {
       </header>
 
       {/* ─── Map ─── */}
-      <div ref={mapContainerRef} className="flex-1 w-full" />
+      <div ref={mapContainerRef} className="relative z-0 flex-1 w-full" />
 
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10">
+        <div className="absolute inset-0 z-[920] flex items-center justify-center bg-white/70 backdrop-blur-sm">
           <div className="w-10 h-10 rounded-full border-2 border-blink-border border-t-primary animate-spin" />
         </div>
       )}
@@ -895,7 +771,7 @@ function MapPage() {
       {/* Error */}
       {mapError && (
         <div
-          className="absolute inset-x-4 top-28 z-30 bg-white rounded-2xl p-4 text-center"
+          className="absolute inset-x-4 top-28 z-[950] rounded-2xl bg-white p-4 text-center"
           style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.10)', border: '1px solid #E8E6E1' }}
         >
           <span className="material-symbols-outlined text-blink-muted block mb-2" style={{ fontSize: 28 }}>map_off</span>
@@ -903,24 +779,205 @@ function MapPage() {
         </div>
       )}
 
+      <aside className="absolute bottom-6 left-6 top-6 z-[900] hidden w-[390px] flex-col overflow-hidden rounded-2xl border border-blink-border bg-white/95 shadow-soft-lg backdrop-blur-xl lg:flex">
+        <div className="border-b border-blink-border p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-black text-blink-ink">
+                {isSingleBusinessMode ? 'Sucursales' : 'Mapa de beneficios'}
+              </h1>
+              <p className="text-xs text-blink-muted">
+                {mapMarkers.length} {isSingleBusinessMode ? 'sucursales' : 'lugares'} disponibles
+              </p>
+            </div>
+            <button
+              onClick={() => navigate(-1)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-blink-bg text-blink-muted transition-colors hover:bg-gray-100"
+              aria-label="Volver"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+            </button>
+          </div>
+
+          {!isSingleBusinessMode && (
+            <>
+              <form
+                role="search"
+                onSubmit={submitSearch}
+                className="mb-3 flex h-11 items-center gap-2 rounded-xl border border-blink-border bg-blink-bg px-3"
+              >
+                <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>search</span>
+                <input
+                  ref={searchInputRef}
+                  className="min-w-0 flex-1 appearance-none bg-transparent text-sm text-blink-ink placeholder-blink-muted focus:outline-none"
+                  placeholder="Buscar tiendas..."
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button type="button" onClick={clearSearch} className="text-blink-muted hover:text-blink-ink">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                )}
+              </form>
+
+              <div className="mb-3 flex flex-wrap gap-2">
+                {CATEGORY_CHIPS.map((chip) => {
+                  const isActive = activeChip === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      onClick={() => setActiveChip(chip.id)}
+                      className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                        isActive ? 'bg-primary text-white' : 'border border-blink-border bg-white text-blink-muted hover:text-blink-ink'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowFilters(true)}
+                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                    activeFilterCount > 0 ? 'bg-primary text-white' : 'border border-blink-border bg-white text-blink-ink'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>tune</span>
+                  Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+                <button
+                  onClick={() => setOnlineOnly(!onlineOnly)}
+                  className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                    onlineOnly ? 'bg-primary text-white' : 'border border-blink-border bg-white text-blink-ink'
+                  }`}
+                >
+                  Online
+                </button>
+                <button
+                  onClick={() => setMinDiscount(minDiscount === 20 ? undefined : 20)}
+                  className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                    minDiscount === 20 ? 'bg-primary text-white' : 'border border-blink-border bg-white text-blink-ink'
+                  }`}
+                >
+                  20%+
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto bg-blink-bg p-3">
+          {mapMarkers.length === 0 && !isLoading && (
+            <div className="py-14 text-center">
+              <span className="material-symbols-outlined mb-2 block text-blink-muted" style={{ fontSize: 36 }}>search_off</span>
+              <p className="text-sm text-blink-muted">Sin resultados en esta zona</p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {mapMarkers.map(({ business: biz, lat, lng, address }, idx) => {
+              const markerKey = getMarkerKey({ business: biz, lat, lng, address });
+              const isSelected = isSingleBusinessMode
+                ? selectedBusiness?.id === biz.id && selectedMarkerIdx === idx
+                : selectedMarkerKey ? selectedMarkerKey === markerKey : selectedBusiness?.id === biz.id;
+              const maxDiscount = getMaxDiscount(biz);
+
+              return (
+                <div
+                  key={`desktop-${biz.id}-${idx}`}
+                  data-biz-id={biz.id}
+                  data-marker-idx={idx}
+                  data-marker-key={markerKey}
+                  onClick={() => {
+                    trackMapInteractionThrottled('desktop_list_select', { businessId: biz.id, zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 300 });
+                    trackSelectBusiness({ source: 'map_desktop_list', businessId: biz.id, category: biz.category, position: idx + 1 });
+                    setSelectedBusiness(biz);
+                    setSelectedMarkerIdx(idx);
+                    setSelectedMarkerKey(markerKey);
+                    mapRef.current?.panTo([lat, lng]);
+                    if ((mapRef.current?.getZoom() || 0) < 17) mapRef.current?.setZoom(17);
+                  }}
+                  className="relative flex cursor-pointer items-center gap-3 rounded-2xl p-3 transition-all duration-150 active:scale-[0.98]"
+                  style={isSelected ? {
+                    background: '#ffffff',
+                    border: '1.5px solid #C7D2FE',
+                    boxShadow: '0 2px 12px rgba(99,102,241,0.12)',
+                  } : {
+                    background: '#ffffff',
+                    border: '1px solid #E8E6E1',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl"
+                    style={{ background: '#F7F6F4', border: '1px solid #E8E6E1' }}
+                  >
+                    {biz.image ? (
+                      <img
+                        alt={biz.name}
+                        className="h-full w-full object-cover"
+                        src={getOptimizedImageUrl(biz.image, { width: 112 })}
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="text-lg font-bold text-blink-muted">{biz.name?.charAt(0)}</span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-sm font-semibold text-blink-ink">{biz.name}</h4>
+                    <p className="mt-0.5 truncate text-xs text-blink-muted">
+                      {address}{biz.distanceText ? ` · ${biz.distanceText}` : ''}
+                    </p>
+                    <span
+                      className="mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={maxDiscount > 0 ? { background: '#D1FAE5', color: '#065F46' } : { background: '#EEF2FF', color: '#4338CA' }}
+                    >
+                      {maxDiscount > 0 ? `Hasta ${maxDiscount}% OFF` : getBestBenefitLabel(biz)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      trackSelectBusiness({ source: 'map_desktop_open_business', businessId: biz.id, category: biz.category, position: idx + 1 });
+                      navigate(getMerchantSeoPath({ id: biz.id, name: biz.name }), { state: { business: biz } });
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+
       {/* ─── My Location button ─── */}
       {position && (
         <button
           onClick={() => {
-            if (!mapRef.current || !googleRef.current) return;
+            if (!mapRef.current) return;
             trackMapInteractionThrottled('recenter_user_location', { zoomLevel: mapRef.current?.getZoom() || undefined, minIntervalMs: 500 });
             const lat = position.latitude;
             const lng = position.longitude;
             const lngOff = km5InLng(lat);
-            const bounds = new googleRef.current.maps.LatLngBounds(
-              { lat: lat - KM5_IN_LAT, lng: lng - lngOff },
-              { lat: lat + KM5_IN_LAT, lng: lng + lngOff },
+            const bounds = L.latLngBounds(
+              [lat - KM5_IN_LAT, lng - lngOff],
+              [lat + KM5_IN_LAT, lng + lngOff],
             );
-            mapRef.current.fitBounds(bounds);
+            mapRef.current.fitBounds(bounds, { padding: [40, 40] });
           }}
-          className="absolute right-4 z-20 w-11 h-11 flex items-center justify-center rounded-2xl active:scale-95 transition-all"
+          className="absolute right-4 z-[910] flex h-11 w-11 items-center justify-center rounded-2xl transition-all active:scale-95"
           style={{
-            bottom: sheetExpanded ? 'calc(45vh - 64px + 16px)' : 'calc(64px + 56px + 12px)',
+            bottom: isDesktop ? '24px' : sheetExpanded ? 'calc(45vh - 64px + 16px)' : 'calc(64px + 56px + 12px)',
             background: 'rgba(255,255,255,0.92)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
@@ -934,7 +991,7 @@ function MapPage() {
 
       {/* ─── Bottom Sheet ─── */}
       <div
-        className="absolute left-0 w-full z-30 flex flex-col transition-all duration-300"
+        className="absolute left-0 z-[900] flex w-full flex-col transition-all duration-300 lg:hidden"
         style={{
           bottom: 64,
           maxHeight: sheetExpanded ? 'calc(45vh - 64px)' : '56px',
@@ -1009,7 +1066,7 @@ function MapPage() {
                     setSelectedBusiness(biz);
                     setSelectedMarkerIdx(idx);
                     setSelectedMarkerKey(markerKey);
-                    mapRef.current?.panTo({ lat, lng });
+                    mapRef.current?.panTo([lat, lng]);
                     // Cross the cluster threshold (zoom >= 17) so the selected
                     // business renders as a singleton overlay we can highlight.
                     if ((mapRef.current?.getZoom() || 0) < 17) mapRef.current?.setZoom(17);
@@ -1125,6 +1182,16 @@ function MapPage() {
       <style>{`
         @keyframes blink-ping {
           75%, 100% { transform: scale(2.8); opacity: 0; }
+        }
+        .leaflet-container {
+          background: #f7f6f4;
+          font-family: ${UI_FONT_STACK};
+        }
+        .blink-leaflet-marker,
+        .blink-leaflet-cluster,
+        .blink-leaflet-user-location {
+          background: transparent;
+          border: 0;
         }
       `}</style>
     </div>
