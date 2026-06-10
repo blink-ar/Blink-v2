@@ -87,6 +87,54 @@ const DESKTOP_QUICK_FILTERS = [
   { label: 'Online', icon: 'language', path: '/search?online=1', filterType: 'channel', filterValue: 'online' },
 ];
 
+function DesktopTopBenefitsSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Cargando mejores oportunidades"
+      className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-3"
+    >
+      <article className="min-h-[360px] overflow-hidden rounded-2xl border border-blink-border bg-white shadow-soft">
+        <div className="relative h-48 overflow-hidden bg-gray-100">
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100" />
+          <div className="absolute left-4 top-4 h-7 w-16 animate-pulse rounded-xl bg-white/80" />
+          <div className="absolute bottom-5 left-4 h-14 w-36 animate-pulse rounded-xl bg-white/70" />
+        </div>
+        <div className="p-5">
+          <div className="h-6 w-48 animate-pulse rounded-lg bg-gray-200" />
+          <div className="mt-3 h-4 w-64 max-w-full animate-pulse rounded-lg bg-gray-100" />
+          <div className="mt-6 flex items-center justify-between border-t border-blink-border pt-5">
+            <div className="h-4 w-44 animate-pulse rounded-lg bg-gray-100" />
+            <div className="h-6 w-6 animate-pulse rounded-full bg-primary/15" />
+          </div>
+        </div>
+      </article>
+
+      <div className="grid grid-rows-4 gap-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-3 rounded-2xl border border-blink-border bg-white p-3 shadow-soft"
+          >
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              <div className="h-5 w-8 animate-pulse rounded-md bg-primary/20" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-8 animate-pulse rounded-md bg-gray-100" />
+                <div className="h-4 w-32 animate-pulse rounded-md bg-gray-200" />
+              </div>
+              <div className="mt-2 h-3 w-48 max-w-full animate-pulse rounded-md bg-gray-100" />
+            </div>
+            <div className="h-5 w-5 shrink-0 animate-pulse rounded-full bg-gray-100" />
+          </div>
+        ))}
+      </div>
+      <span className="sr-only">Cargando mejores oportunidades</span>
+    </div>
+  );
+}
+
 function HomePage() {
   const navigate = useNavigate();
   const { isSupported, isSubscribed } = usePushNotifications();
@@ -780,11 +828,7 @@ function HomePage() {
             </div>
 
             {isLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-44 rounded-2xl border border-blink-border bg-white animate-pulse" />
-                ))}
-              </div>
+              <DesktopTopBenefitsSkeleton />
             ) : top5.length === 0 ? (
               <div className="rounded-2xl border border-blink-border bg-white px-6 py-14 text-center shadow-soft">
                 <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 40 }}>search_off</span>
