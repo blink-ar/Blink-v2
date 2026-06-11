@@ -711,6 +711,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
+    minimumPurchaseAmount: benefit?.minimumPurchaseAmount || null,
     subscriptionIds: getBenefitSubscriptionIds(benefit),
     ...(benefit?.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
     ...(benefit?.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
