@@ -119,7 +119,7 @@ describe("Benefit detail page content", () => {
     render(<BenefitDetailPage />);
 
     await waitFor(() => {
-      expect(fetchBusinessById).toHaveBeenCalledWith("test-business");
+      expect(fetchBusinessById).toHaveBeenCalledWith("test-business", { includeExpired: true });
     });
 
     expect(await screen.findByText("Test Business")).toBeInTheDocument();
