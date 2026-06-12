@@ -94,11 +94,8 @@ describe('posthogAnalytics', () => {
     });
   });
 
-  it('identifies with only the stable user id and resets only after an identified user exists', async () => {
-    const { identifyPostHogUser, resetPostHogUser } = await import('../posthogAnalytics');
-
-    resetPostHogUser();
-    expect(posthogMock.reset).not.toHaveBeenCalled();
+  it('identifies with only the stable user id', async () => {
+    const { identifyPostHogUser } = await import('../posthogAnalytics');
 
     identifyPostHogUser(' auth0|user-1 ');
     identifyPostHogUser('auth0|user-1');
@@ -106,11 +103,29 @@ describe('posthogAnalytics', () => {
     expect(posthogMock.identify).toHaveBeenCalledTimes(1);
     expect(posthogMock.identify).toHaveBeenCalledWith('auth0|user-1');
     expect(posthogMock.identify.mock.calls[0]).toHaveLength(1);
+  });
 
-    resetPostHogUser();
-    resetPostHogUser();
+  it('resets before identifying a different user in the same session', async () => {
+    const { identifyPostHogUser } = await import('../posthogAnalytics');
+
+    identifyPostHogUser('auth0|user-1');
+    identifyPostHogUser('auth0|user-2');
 
     expect(posthogMock.reset).toHaveBeenCalledTimes(1);
+    expect(posthogMock.identify).toHaveBeenNthCalledWith(1, 'auth0|user-1');
+    expect(posthogMock.identify).toHaveBeenNthCalledWith(2, 'auth0|user-2');
+    expect(posthogMock.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      posthogMock.identify.mock.invocationCallOrder[1],
+    );
+  });
+
+  it('resets persisted identity even when no user was identified in this JS session', async () => {
+    const { resetPostHogUser } = await import('../posthogAnalytics');
+
+    resetPostHogUser();
+    resetPostHogUser();
+
+    expect(posthogMock.reset).toHaveBeenCalledTimes(2);
   });
 
   it('falls back for feature flags when PostHog is disabled', async () => {

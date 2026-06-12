@@ -77,6 +77,11 @@ export function identifyPostHogUser(userId: string | undefined): void {
   }
 
   try {
+    if (identifiedUserId && identifiedUserId !== normalizedUserId) {
+      client.reset();
+      identifiedUserId = null;
+    }
+
     client.identify(normalizedUserId);
     identifiedUserId = normalizedUserId;
   } catch {
@@ -85,10 +90,6 @@ export function identifyPostHogUser(userId: string | undefined): void {
 }
 
 export function resetPostHogUser(): void {
-  if (!identifiedUserId) {
-    return;
-  }
-
   const client = initializePostHog();
   if (!client) {
     identifiedUserId = null;
@@ -97,9 +98,10 @@ export function resetPostHogUser(): void {
 
   try {
     client.reset();
-    identifiedUserId = null;
   } catch {
     // Analytics must never break logout flows.
+  } finally {
+    identifiedUserId = null;
   }
 }
 
