@@ -22,6 +22,7 @@ export const KNOWN_BANKS: BankDescriptor[] = [
   { token: 'lagaceta', code: 'LAGA', label: 'LA GACETA' },
   { token: 'buepp', code: 'BUEPP', label: 'BUEPP' },
   { token: 'personalpay', code: 'PP', label: 'PERSONAL PAY' },
+  { token: 'mercadopago', code: 'MP', label: 'MERCADO PAGO' },
 ];
 
 const asBankText = (value: unknown): string => {
@@ -77,6 +78,7 @@ const getKnownDescriptor = (normalized: string): BankDescriptor | null => {
   if (normalized.includes('gaceta')) return KNOWN_BANKS[14];
   if (normalized.includes('buepp')) return KNOWN_BANKS[15];
   if (normalized.includes('personal')) return KNOWN_BANKS[16];
+  if (normalized.includes('mercado pago') || normalized.includes('mercadopago')) return KNOWN_BANKS[17];
   return null;
 };
 
