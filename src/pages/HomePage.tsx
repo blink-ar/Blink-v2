@@ -479,7 +479,7 @@ function HomePage() {
             }}
           >
             <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
-              Estamos en Beta! Estos son los emisores disponibles hoy en Blink.
+              Estos son los emisores disponibles hoy en Blink.
             </p>
             {isBanksLoading ? (
               <SkeletonAvailableBanks />
@@ -676,9 +676,6 @@ function HomePage() {
           <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] gap-10 px-8 py-10">
             <div className="flex min-w-0 flex-col justify-center">
               <div className="mb-5 flex items-center gap-3">
-                <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase text-primary">
-                  Beta activa
-                </span>
                 <span className="text-sm font-medium text-blink-muted">
                   {activeBenefitsCount.toLocaleString('es-AR')} beneficios indexados
                 </span>
