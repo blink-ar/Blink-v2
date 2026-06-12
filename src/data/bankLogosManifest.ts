@@ -81,6 +81,10 @@ export const bankLogosManifest: Record<string, BankLogoEntry> = {
     "file": "macro.png",
     "name": "Macro"
   },
+  "mercado": {
+    "file": "mercadopago.png",
+    "name": "Mercado Pago"
+  },
   "mercadopago": {
     "file": "mercadopago.png",
     "name": "Mercado Pago"
