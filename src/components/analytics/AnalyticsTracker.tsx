@@ -5,15 +5,36 @@ import {
   setupGlobalEventTracking,
   trackPageView,
 } from '../../analytics/googleAnalytics';
+import {
+  identifyPostHogUser,
+  initializePostHog,
+  resetPostHogUser,
+} from '../../analytics/posthogAnalytics';
+import { useAuth } from '../../contexts/AuthContext';
 
 function AnalyticsTracker() {
   const location = useLocation();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   useEffect(() => {
     initializeGoogleAnalytics();
+    initializePostHog();
     const cleanup = setupGlobalEventTracking();
     return cleanup;
   }, []);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    if (isAuthenticated && user?.id) {
+      identifyPostHogUser(user.id);
+      return;
+    }
+
+    resetPostHogUser();
+  }, [isAuthenticated, isLoading, user?.id]);
 
   useEffect(() => {
     const path = `${location.pathname}${location.search}${location.hash}`;
