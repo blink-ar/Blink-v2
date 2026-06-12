@@ -106,14 +106,14 @@ const resolveBenefitSelection = (
 
 const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null> => {
   try {
-    const exactBusiness = await fetchBusinessById(routeId);
+    const exactBusiness = await fetchBusinessById(routeId, { includeExpired: true });
     if (exactBusiness) return exactBusiness;
   } catch (error) {
     console.error('[BenefitDetailPage] exact merchant lookup failed:', error);
   }
 
   const searchName = routeId.replace(/-/g, ' ');
-  const response = await fetchBusinessesPaginated({ search: searchName, limit: 1 });
+  const response = await fetchBusinessesPaginated({ search: searchName, limit: 1, includeExpired: true });
 
   if (Array.isArray(response)) {
     return response[0] || null;
