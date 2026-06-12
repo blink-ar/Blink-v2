@@ -1,3 +1,8 @@
+import {
+  capturePostHogEvent,
+  initializePostHog,
+} from './posthogAnalytics';
+
 type AnalyticsParamValue = string | number | boolean;
 type AnalyticsParams = Record<string, AnalyticsParamValue | undefined>;
 
@@ -308,14 +313,19 @@ export function initializeGoogleAnalytics(): boolean {
 }
 
 export function trackEvent(eventName: string, params: AnalyticsParams = {}): void {
-  if (!initializeGoogleAnalytics() || !window.gtag) {
-    return;
-  }
+  refreshAttributionFromUrl();
 
-  window.gtag('event', normalizeEventName(eventName), cleanParams({
+  const normalizedEventName = normalizeEventName(eventName);
+  const cleanedParams = cleanParams({
     ...params,
     ...attributionParams,
-  }));
+  });
+
+  capturePostHogEvent(normalizedEventName, cleanedParams);
+
+  if (initializeGoogleAnalytics() && window.gtag) {
+    window.gtag('event', normalizedEventName, cleanedParams);
+  }
 }
 
 export function trackPageView(path: string, title?: string): void {
@@ -334,7 +344,10 @@ export function trackPageView(path: string, title?: string): void {
 }
 
 export function setupGlobalEventTracking(): () => void {
-  if (!initializeGoogleAnalytics()) {
+  const hasGoogleAnalytics = initializeGoogleAnalytics();
+  const hasPostHog = initializePostHog() !== null;
+
+  if (!hasGoogleAnalytics && !hasPostHog) {
     return () => {};
   }
 
