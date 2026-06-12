@@ -1,18 +1,44 @@
-# GA Event Dictionary
+# Analytics Event Dictionary
 
-Last updated: 2026-02-18
+Last updated: 2026-06-11
 
 Maintenance rule:
 - Any change to analytics event names or params in `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/googleAnalytics.ts` or `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/intentTracking.ts` must update this file in the same PR.
 
 ## Configuration
-- Measurement ID env var: `VITE_GA_MEASUREMENT_ID`
+- GA4 measurement ID env var: `VITE_GA_MEASUREMENT_ID`
+- PostHog env vars:
+  - `VITE_POSTHOG_PROJECT_TOKEN`
+  - `VITE_POSTHOG_HOST` (default example: `https://us.i.posthog.com`)
 - Init point: `/Users/tomas/Dev/Blink/Blink-v2/src/components/analytics/AnalyticsTracker.tsx`
-- Router page view tracking: `trackPageView(path)`
+- Root PostHog provider/error boundary: `/Users/tomas/Dev/Blink/Blink-v2/src/main.tsx`
+- Router page view tracking:
+  - Existing custom `page_view` events are sent through `trackPageView(path)`.
+  - PostHog also captures native SPA `$pageview` and `$pageleave` events via `capture_pageview: 'history_change'`.
 - Attribution persistence:
   - Query params captured when present: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `gclid`, `wbraid`, `gbraid`, `msclkid`
   - Persisted in localStorage key: `blink.analytics.attribution`
   - Appended to all events when available
+- Provider behavior:
+  - GA4 and PostHog are independent; a missing env var for one provider must not block the other.
+  - Existing normalized app events fan out to both providers when both are configured.
+  - PostHog uses ID-only identification from the app auth user id. Email and name are not sent as PostHog person properties.
+  - Web/PostHog integration scope only; Expo mobile analytics are not covered here.
+
+## PostHog Product Features
+- Session replay:
+  - SDK support is installed with default PostHog web privacy behavior.
+  - Automatic recording is controlled by PostHog project settings, including domain allowlists, sampling, trigger rules, and ingestion settings.
+  - App-side replay masking/blocking is not customized beyond PostHog defaults.
+- Autocapture, heatmaps, dead clicks, rage clicks, surveys, and web vitals:
+  - The SDK keeps `/flags` and remote config enabled so these can be controlled from PostHog project settings.
+  - Dashboard surveys are supported; the app does not add a custom feedback button or survey UI.
+- Error tracking:
+  - PostHog exception autocapture is enabled for unhandled errors and unhandled promise rejections.
+  - React render errors are captured through `PostHogErrorBoundary`.
+  - Production source map upload is not automated in this repo yet; configure it in deployment if de-minified PostHog stack traces are required.
+- Feature flags:
+  - Use local helpers from `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/featureFlags.ts` instead of importing `@posthog/react` throughout feature code.
 
 ## Global Events (Auto)
 

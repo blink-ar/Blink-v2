@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Auth0Provider } from '@auth0/auth0-react';
 import App from './App.tsx';
+import PostHogShell from './components/analytics/PostHogShell';
 import '@fontsource/space-grotesk/latin-400.css';
 import '@fontsource/space-grotesk/latin-500.css';
 import '@fontsource/space-grotesk/latin-600.css';
@@ -26,16 +27,18 @@ const AUTH0_CLIENT_ID = import.meta.env.VITE_AUTH0_CLIENT_ID;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Auth0Provider
-      domain={AUTH0_DOMAIN}
-      clientId={AUTH0_CLIENT_ID}
-      authorizationParams={{ redirect_uri: `${window.location.origin}/auth/callback` }}
-      cacheLocation="localstorage"
-    >
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </Auth0Provider>
+    <PostHogShell>
+      <Auth0Provider
+        domain={AUTH0_DOMAIN}
+        clientId={AUTH0_CLIENT_ID}
+        authorizationParams={{ redirect_uri: `${window.location.origin}/auth/callback` }}
+        cacheLocation="localstorage"
+      >
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </Auth0Provider>
+    </PostHogShell>
   </StrictMode>
 );
 
