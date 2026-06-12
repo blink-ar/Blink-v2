@@ -104,7 +104,10 @@ describe('BenefitDetailPage', () => {
     render(<BenefitDetailPage />);
 
     await waitFor(() => {
-      expect(fetchBusinessById).toHaveBeenCalledWith('merchant_69a6f51cb7ff0ecb9e33bdf3');
+      expect(fetchBusinessById).toHaveBeenCalledWith(
+        'merchant_69a6f51cb7ff0ecb9e33bdf3',
+        { includeExpired: true },
+      );
     });
     expect(fetchBusinessesPaginated).not.toHaveBeenCalled();
     expect(await screen.findByText("McDonald's")).toBeInTheDocument();
@@ -226,10 +229,67 @@ describe('BenefitDetailPage', () => {
     await waitFor(() => {
       expect(fetchBusinessesPaginated).toHaveBeenCalledWith({
         search: 'legacy merchant',
-        limit: 1
+        limit: 1,
+        includeExpired: true
       });
     });
     expect(await screen.findByText('Legacy Merchant')).toBeInTheDocument();
+  });
+
+  it('renders an expired benefit when the direct URL uses its stable benefit id', async () => {
+    routerMocks.mockUseParams.mockReturnValue({
+      id: 'merchant_6a1ef9c6059b06602e18f939',
+      benefitIndex: 'modo-promos-raw-6a1ef7690313fbce935b147b'
+    });
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({
+      id: 'merchant_6a1ef9c6059b06602e18f939',
+      name: 'Modo Merchant',
+      benefits: [
+        {
+          id: 'modo-promos-raw-6a1ef7690313fbce935b147b',
+          bankName: 'Banco Nación, Galicia',
+          cardName: 'Tarjeta de credito',
+          benefit: '6 cuotas sin interés',
+          rewardRate: '6 cuotas s/int',
+          color: '#000000',
+          icon: 'credit_card',
+          installments: 6,
+          validUntil: '2000-01-01',
+          rawBenefitCollection: 'MODO_PROMOS_RAW',
+          eligibilities: [
+            {
+              bank: 'nacion',
+              bankDisplayName: 'Banco Nación',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            },
+            {
+              bank: 'galicia',
+              bankDisplayName: 'Galicia',
+              cardTypes: [],
+              cardResolutionStatus: 'not_required',
+              subscription: null,
+              subscriptionResolutionStatus: 'not_required'
+            }
+          ]
+        }
+      ]
+    }));
+
+    render(<BenefitDetailPage />);
+
+    await waitFor(() => {
+      expect(fetchBusinessById).toHaveBeenCalledWith(
+        'merchant_6a1ef9c6059b06602e18f939',
+        { includeExpired: true },
+      );
+    });
+    expect(await screen.findByText('Modo Merchant')).toBeInTheDocument();
+    expect(screen.getByText('Este beneficio ya venció')).toBeInTheDocument();
+    expect(screen.getByText('Venció 01/01/2000')).toBeInTheDocument();
+    expect(screen.queryByText('Beneficio no encontrado')).not.toBeInTheDocument();
   });
 
   it('shows multi-bank MODO benefits without rendering the full bank list as the provider', async () => {

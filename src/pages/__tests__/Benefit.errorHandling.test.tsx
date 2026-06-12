@@ -107,6 +107,7 @@ describe("Benefit detail page error handling", () => {
       expect(fetchBusinessesPaginated).toHaveBeenCalledWith({
         search: "test business",
         limit: 1,
+        includeExpired: true,
       });
     });
     expect(await screen.findByText("Legacy Business")).toBeInTheDocument();
