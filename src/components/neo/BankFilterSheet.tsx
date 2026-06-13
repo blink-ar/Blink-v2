@@ -26,6 +26,7 @@ const BANK_BRAND: Record<string, { bg: string; color: string }> = {
   lagaceta:    { bg: '#EBF4FF', color: '#0E5FA0' },
   buepp:       { bg: '#FEF9C3', color: '#A16207' },
   personalpay: { bg: '#F3E8FF', color: '#7C3AED' },
+  mercado:     { bg: '#E0F2FE', color: '#0369A1' },
 };
 
 const getBrand = (token: string) =>
