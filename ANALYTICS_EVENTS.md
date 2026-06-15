@@ -1,6 +1,6 @@
 # Analytics Event Dictionary
 
-Last updated: 2026-06-11
+Last updated: 2026-06-15
 
 Maintenance rule:
 - Any change to analytics event names or params in `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/googleAnalytics.ts` or `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/intentTracking.ts` must update this file in the same PR.
@@ -308,6 +308,20 @@ Current sources:
 - `search_page`
 - `map_page`
 - `map_page_single_business`
+
+### `search_error`
+Params:
+- `source`
+- `search_term`
+- `search_term_state` (`provided` | `empty`)
+- `active_filter_count`
+- `has_filters_state` (`filters_applied` | `no_filters`)
+- `category` (normalized token)
+- `category_raw`
+- `error_message`
+
+Current sources:
+- `search_page`
 
 ## Normalization Rules (applies to all events)
 - Event names are normalized to snake_case.

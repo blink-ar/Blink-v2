@@ -20,8 +20,10 @@ interface UseBenefitsDataReturn {
     businesses: Business[];
     featuredBenefits: RawMongoBenefit[];
     isLoading: boolean;
+    isPrimarySearchLoading: boolean;
     isLoadingMore: boolean;
     error: string | null;
+    primarySearchError: string | null;
     hasMore: boolean;
     loadMore: () => void;
     refreshData: () => Promise<void>;
@@ -138,11 +140,14 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
-    const isLoading = isLoadingBusinesses || isLoadingFeatured;
+    const isPrimarySearchLoading = positionLoading || isLoadingBusinesses;
+    const isLoading = isPrimarySearchLoading || isLoadingFeatured;
     const isLoadingMore = isFetchingNextPage;
 
-    const error = businessesError
-        ? (businessesError as Error).message
+    const primarySearchError = businessesError ? (businessesError as Error).message : null;
+
+    const error = primarySearchError
+        ? primarySearchError
         : featuredError
             ? (featuredError as Error).message
             : null;
@@ -164,8 +169,10 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         businesses,
         featuredBenefits,
         isLoading,
+        isPrimarySearchLoading,
         isLoadingMore,
         error,
+        primarySearchError,
         hasMore: hasNextPage ?? false,
         loadMore,
         refreshData,
