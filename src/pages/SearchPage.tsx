@@ -67,7 +67,7 @@ interface DesktopSearchFiltersProps {
   hasInstallments: boolean | undefined;
   sortByDistance: boolean;
   activeFilterCount: number;
-  permissionDenied: boolean;
+  hasPosition: boolean;
   onBanksChange: (tokens: string[]) => void;
   onCategoryChange: (category: string) => void;
   onMinDiscountChange: (value: number | undefined) => void;
@@ -91,7 +91,7 @@ function DesktopSearchFilters({
   hasInstallments,
   sortByDistance,
   activeFilterCount,
-  permissionDenied,
+  hasPosition,
   onBanksChange,
   onCategoryChange,
   onMinDiscountChange,
@@ -112,8 +112,11 @@ function DesktopSearchFilters({
   };
 
   const handleDistanceToggle = () => {
-    if (permissionDenied) onRequestPermission();
-    onSortByDistanceChange(!sortByDistance);
+    const next = !sortByDistance;
+    onSortByDistanceChange(next);
+    // Request location only on this explicit gesture, and only if we don't
+    // already have a position.
+    if (next && !hasPosition) onRequestPermission();
   };
 
   const Toggle = ({
@@ -384,7 +387,20 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position, permissionDenied, requestPermission } = useGeolocation();
+  const { position, requestPermission } = useGeolocation();
+
+  // Honor an explicit proximity intent that arrives before we have a position:
+  // either a `nearby=1` deeplink (e.g. the "Cerca tuyo" pill on Home) or a
+  // previously granted permission whose location hasn't resolved yet. Fires
+  // once; for already-granted users this never shows a prompt.
+  const proximityRequested = useRef(false);
+  useEffect(() => {
+    if (proximityRequested.current) return;
+    if (sortByDistance && !position) {
+      proximityRequested.current = true;
+      requestPermission();
+    }
+  }, [sortByDistance, position, requestPermission]);
 
   const {
     businesses,
@@ -1063,12 +1079,11 @@ function SearchPage() {
                 <button
                   key="proximity"
                   onClick={() => {
-                    if (permissionDenied) {
-                      requestPermission();
-                      setSortByDistance(true);
-                    } else {
-                      setSortByDistance(!sortByDistance);
-                    }
+                    const next = !sortByDistance;
+                    setSortByDistance(next);
+                    // Request location only now, on this explicit gesture, and
+                    // only if we don't already have a position.
+                    if (next && !position) requestPermission();
                   }}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                     sortByDistance
@@ -1203,7 +1218,7 @@ function SearchPage() {
           hasInstallments={hasInstallments}
           sortByDistance={sortByDistance}
           activeFilterCount={activeFilterCount}
-          permissionDenied={permissionDenied}
+          hasPosition={position !== null}
           onBanksChange={setSelectedBanks}
           onCategoryChange={setSelectedCategory}
           onMinDiscountChange={setMinDiscount}

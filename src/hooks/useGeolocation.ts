@@ -39,7 +39,20 @@ const getCachedPosition = (): Coordinates | null => {
   return JSON.parse(cached);
 };
 
-export const useGeolocation = () => {
+interface UseGeolocationOptions {
+  /**
+   * When true, actively prompts the user for location on mount if permission
+   * hasn't been decided yet ('prompt' state). When false (default), we never
+   * trigger the browser permission prompt automatically — we only reuse a
+   * previously granted permission silently. The actual prompt is then deferred
+   * to an explicit user gesture via `requestPermission()` (e.g. the "Cerca"
+   * pill in search). This avoids the invasive "ask on first load" pattern.
+   */
+  autoRequest?: boolean;
+}
+
+export const useGeolocation = (options: UseGeolocationOptions = {}) => {
+  const { autoRequest = false } = options;
   const [state, setState] = useState<GeolocationState>({
     position: null,
     error: null,
@@ -107,15 +120,26 @@ export const useGeolocation = () => {
     const requestLocation = () =>
       navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
 
+    // Idle state used when we intentionally don't request location (no prompt,
+    // no error, not denied) — consumers see position=null and can offer a gesture.
+    const setIdle = () =>
+      setState({ position: null, error: null, loading: false, permissionDenied: false });
+
     if ('permissions' in navigator) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'denied') {
           localStorage.setItem(STORAGE_KEYS.permission, 'denied');
           setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
-        } else {
-          // 'granted' or 'prompt': always request. The 24h cache above prevents spam —
-          // this code only runs when cache is expired or absent (i.e. first visit or stale).
+        } else if (result.state === 'granted') {
+          // Already granted in a previous session: reuse it silently. querying
+          // permission state never shows a prompt, and getCurrentPosition won't
+          // either once granted, so this is safe and non-invasive.
           requestLocation();
+        } else {
+          // 'prompt': permission undecided. Only ask if the caller explicitly
+          // opted in (autoRequest). Otherwise stay idle until a user gesture.
+          if (autoRequest) requestLocation();
+          else setIdle();
         }
       });
     } else {
@@ -123,11 +147,15 @@ export const useGeolocation = () => {
       const stored = localStorage.getItem(STORAGE_KEYS.permission);
       if (stored === 'denied') {
         setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
-      } else {
+      } else if (stored === 'granted') {
         requestLocation();
+      } else if (autoRequest) {
+        requestLocation();
+      } else {
+        setIdle();
       }
     }
-  }, []);
+  }, [autoRequest]);
 
   const requestPermission = () => {
     setState((prev) => ({ ...prev, loading: true }));

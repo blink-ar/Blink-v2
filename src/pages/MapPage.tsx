@@ -93,7 +93,10 @@ function MapPage() {
   const { isDesktop } = useResponsive();
   const focusBusinessId = searchParams.get('business');
 
-  const { position } = useGeolocation();
+  // The map is centered on the user's location, so entering it is a clear
+  // intent — prompt for permission here (unlike Home/Search/Detail, which only
+  // reuse a previously granted permission).
+  const { position } = useGeolocation({ autoRequest: true });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
