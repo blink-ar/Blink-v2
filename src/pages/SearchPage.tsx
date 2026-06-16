@@ -843,7 +843,7 @@ function SearchPage() {
       selectedCategory,
       currentFilterState.selectedBanksKey,
       activeFilterCount,
-      enrichedBusinesses.length,
+      strictMatches.length,
     ].join('|');
 
     if (searchIntentSignatureRef.current === signature) return;
@@ -852,7 +852,7 @@ function SearchPage() {
     trackSearchIntent({
       source: 'search_page',
       searchTerm: normalizedSearch,
-      resultsCount: enrichedBusinesses.length,
+      resultsCount: strictMatches.length,
       hasFilters,
       activeFilterCount,
       category: selectedCategory || undefined,
@@ -861,10 +861,10 @@ function SearchPage() {
     activeFilterCount,
     currentFilterState.selectedBanksKey,
     debouncedSearch,
-    enrichedBusinesses.length,
     isPrimarySearchLoading,
     selectedCategory,
     showPrimarySearchError,
+    strictMatches.length,
   ]);
 
   useEffect(() => {

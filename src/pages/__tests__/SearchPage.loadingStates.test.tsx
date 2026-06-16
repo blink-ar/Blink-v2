@@ -5,7 +5,7 @@ import SearchPage from '../SearchPage';
 import { useBenefitsData } from '../../hooks/useBenefitsData';
 import { useFallbackSearch } from '../../hooks/useFallbackSearch';
 import { useEnrichedBusinesses } from '../../hooks/useEnrichedBusinesses';
-import { trackSearchError } from '../../analytics/intentTracking';
+import { trackNoResults, trackSearchError, trackSearchIntent } from '../../analytics/intentTracking';
 import { type Business } from '../../types';
 
 const queryMocks = vi.hoisted(() => ({
@@ -105,6 +105,13 @@ const mockBusiness: Business = {
   ],
 };
 
+const nonStrictMatchBusiness: Business = {
+  ...mockBusiness,
+  id: 'merchant_2',
+  name: 'Cafe Market',
+  aliases: ['coffee shop'],
+};
+
 describe('SearchPage loading states', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -184,6 +191,50 @@ describe('SearchPage loading states', () => {
 
     expect(screen.queryByRole('status', { name: 'Cargando resultados' })).not.toBeInTheDocument();
     expect(screen.getByText('No encontramos "prune"')).toBeInTheDocument();
+  });
+
+  it('tracks search results using the visible strict-match count', async () => {
+    vi.mocked(useBenefitsData).mockReturnValue({
+      businesses: [nonStrictMatchBusiness],
+      featuredBenefits: [],
+      isLoading: false,
+      isPrimarySearchLoading: false,
+      isLoadingMore: false,
+      error: null,
+      primarySearchError: null,
+      hasMore: false,
+      loadMore: vi.fn(),
+      refreshData: vi.fn(),
+      totalBusinesses: 1,
+      proximityUnavailable: false,
+    });
+    vi.mocked(useEnrichedBusinesses).mockReturnValue([nonStrictMatchBusiness]);
+    vi.mocked(useFallbackSearch).mockReturnValue({
+      otherBanksBusinesses: [],
+      resolvedTotalOtherBanks: 0,
+      isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
+      relativeBusinesses: [],
+      isRelativeLoading: false,
+      isRelativeSearchLoading: false,
+      isFallbackSearchLoading: false,
+    });
+
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(vi.mocked(trackSearchIntent)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchTerm: 'prune',
+          resultsCount: 0,
+        }),
+      );
+    });
+    expect(vi.mocked(trackNoResults)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchTerm: 'prune',
+      }),
+    );
   });
 
   it('does not block the terminal state on unrelated featured-benefits loading', () => {

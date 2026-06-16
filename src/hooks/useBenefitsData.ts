@@ -49,8 +49,11 @@ export interface BenefitsFilters {
     sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
 
-const requireSuccessfulBusinessesResponse = (response: BusinessesApiResponse): BusinessesApiResponse => {
-    if (!response.success) {
+const requireSuccessfulBusinessesResponse = (
+    response: BusinessesApiResponse,
+    shouldThrowOnFailure = true,
+): BusinessesApiResponse => {
+    if (!response.success && shouldThrowOnFailure) {
         throw new Error(BUSINESS_SEARCH_ERROR_MESSAGE);
     }
 
@@ -92,9 +95,10 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
             : [...queryKeys.businesses, geohash, filtersKey],
         queryFn: async ({ pageParam = 0 }) => {
+            const offset = Number(pageParam) || 0;
             const response = await fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
-                offset: pageParam,
+                offset,
                 ...(sortByDistance && position
                     ? { lat: position.latitude, lng: position.longitude }
                     : geohash ? { geohash } : {}),
@@ -104,9 +108,13 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
                 ...(filters?.subscription && { subscription: filters.subscription }),
                 ...(filters?.onlineOnly && { online: true }),
             });
-            return requireSuccessfulBusinessesResponse(response);
+            return requireSuccessfulBusinessesResponse(response, offset === 0);
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (!lastPage.success) {
+                return undefined;
+            }
+
             if (lastPage.pagination.hasMore) {
                 return lastPage.pagination.offset + lastPage.pagination.limit;
             }
