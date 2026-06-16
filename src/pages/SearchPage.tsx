@@ -472,9 +472,10 @@ function SearchPage() {
     otherBanksBusinesses,
     resolvedTotalOtherBanks,
     isOtherBanksLoading,
+    isOtherBanksSearchLoading,
     relativeBusinesses,
     isRelativeLoading,
-    isFallbackSearchLoading,
+    isRelativeSearchLoading,
   } = useFallbackSearch({
     shouldFetchOtherBanks: primaryResultsEmpty,
     shouldFetchRelative: primaryResultsEmpty || showPrimarySearchError,
@@ -488,21 +489,33 @@ function SearchPage() {
     searchIntentSignature,
   });
 
+  const hasOtherBanksFallback =
+    primaryResultsEmpty &&
+    hasSelectedBanks &&
+    otherBanksBusinesses.length > 0;
+
+  const shouldWaitForFallbackDecision =
+    primaryResultsEmpty &&
+    (
+      (hasSelectedBanks && isOtherBanksSearchLoading) ||
+      (!hasOtherBanksFallback && isRelativeSearchLoading)
+    );
+
   const shouldShowResultsLoader =
     (isPrimarySearchLoading && !businesses.length) ||
-    (primaryResultsEmpty && isFallbackSearchLoading);
+    shouldWaitForFallbackDecision;
 
   // Case 1: bank filter active + empty primary + other-bank results exist
   const showOtherBanksFallback =
     primaryResultsEmpty &&
     !showPrimarySearchError &&
-    !isFallbackSearchLoading &&
+    !isOtherBanksSearchLoading &&
     hasSelectedBanks &&
     otherBanksBusinesses.length > 0;
   // Case 2: still empty (no banks narrowing things down, or banks also failed)
   const showRelativesFallback =
     primaryResultsEmpty &&
-    !isFallbackSearchLoading &&
+    !shouldWaitForFallbackDecision &&
     !showOtherBanksFallback;
 
   const resultsStatusLabel = showPrimarySearchError
@@ -887,7 +900,7 @@ function SearchPage() {
   ]);
 
   useEffect(() => {
-    if (isPrimarySearchLoading || isFallbackSearchLoading || showPrimarySearchError) return;
+    if (isPrimarySearchLoading || shouldWaitForFallbackDecision || showPrimarySearchError) return;
     if (showOtherBanksFallback) return;
     if (strictMatches.length > 0) return;
 
@@ -915,11 +928,11 @@ function SearchPage() {
     activeFilterCount,
     currentFilterState.selectedBanksKey,
     debouncedSearch,
-    isFallbackSearchLoading,
     isPrimarySearchLoading,
     selectedCategory,
     showOtherBanksFallback,
     showPrimarySearchError,
+    shouldWaitForFallbackDecision,
     strictMatches.length,
   ]);
 

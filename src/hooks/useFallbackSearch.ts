@@ -87,16 +87,18 @@ export function useFallbackSearch({
     staleTime: 1000 * 60 * 10,
   });
 
-  const isFallbackSearchLoading =
-    (otherBanksEnabled && !isOtherBanksFetched && !isOtherBanksError) ||
-    (relativeEnabled && !isRelativeFetched && !isRelativeError);
+  const isOtherBanksSearchLoading = otherBanksEnabled && !isOtherBanksFetched && !isOtherBanksError;
+  const isRelativeSearchLoading = relativeEnabled && !isRelativeFetched && !isRelativeError;
+  const isFallbackSearchLoading = isOtherBanksSearchLoading || isRelativeSearchLoading;
 
   return {
     otherBanksBusinesses: otherBanksData?.businesses ?? [],
     resolvedTotalOtherBanks: otherBanksData?.pagination.total ?? 0,
     isOtherBanksLoading,
+    isOtherBanksSearchLoading,
     relativeBusinesses: relativeData?.businesses ?? [],
     isRelativeLoading,
+    isRelativeSearchLoading,
     isFallbackSearchLoading,
   };
 }

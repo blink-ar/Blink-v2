@@ -6,6 +6,7 @@ import { useBenefitsData } from '../../hooks/useBenefitsData';
 import { useFallbackSearch } from '../../hooks/useFallbackSearch';
 import { useEnrichedBusinesses } from '../../hooks/useEnrichedBusinesses';
 import { trackSearchError } from '../../analytics/intentTracking';
+import { type Business } from '../../types';
 
 const queryMocks = vi.hoisted(() => ({
   useQuery: vi.fn(),
@@ -77,12 +78,32 @@ vi.mock('../../analytics/intentTracking', () => ({
   trackSelectBusiness: vi.fn(),
 }));
 
-const renderSearchPage = () =>
+const renderSearchPage = (initialEntry = '/buscar?q=prune') =>
   render(
-    <MemoryRouter initialEntries={['/buscar?q=prune']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <SearchPage />
     </MemoryRouter>,
   );
+
+const mockBusiness: Business = {
+  id: 'merchant_1',
+  name: 'Prune Market',
+  category: 'gastronomia',
+  description: 'Market',
+  rating: 4.5,
+  location: [],
+  image: '',
+  benefits: [
+    {
+      bankName: 'Galicia',
+      cardName: 'Visa',
+      benefit: '20% OFF',
+      rewardRate: '20%',
+      color: '#000',
+      icon: 'credit_card',
+    },
+  ],
+};
 
 describe('SearchPage loading states', () => {
   beforeEach(() => {
@@ -133,8 +154,10 @@ describe('SearchPage loading states', () => {
       otherBanksBusinesses: [],
       resolvedTotalOtherBanks: 0,
       isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
       relativeBusinesses: [],
       isRelativeLoading: true,
+      isRelativeSearchLoading: true,
       isFallbackSearchLoading: true,
     });
 
@@ -150,8 +173,10 @@ describe('SearchPage loading states', () => {
       otherBanksBusinesses: [],
       resolvedTotalOtherBanks: 0,
       isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
       relativeBusinesses: [],
       isRelativeLoading: false,
+      isRelativeSearchLoading: false,
       isFallbackSearchLoading: false,
     });
 
@@ -180,8 +205,10 @@ describe('SearchPage loading states', () => {
       otherBanksBusinesses: [],
       resolvedTotalOtherBanks: 0,
       isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
       relativeBusinesses: [],
       isRelativeLoading: false,
+      isRelativeSearchLoading: false,
       isFallbackSearchLoading: false,
     });
 
@@ -211,8 +238,10 @@ describe('SearchPage loading states', () => {
       otherBanksBusinesses: [],
       resolvedTotalOtherBanks: 0,
       isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
       relativeBusinesses: [],
       isRelativeLoading: true,
+      isRelativeSearchLoading: true,
       isFallbackSearchLoading: true,
     });
 
@@ -236,5 +265,25 @@ describe('SearchPage loading states', () => {
         errorMessage: 'Search failed',
       });
     });
+  });
+
+  it('shows other-bank results without waiting for popular fallback suggestions', () => {
+    vi.mocked(useFallbackSearch).mockReturnValue({
+      otherBanksBusinesses: [mockBusiness],
+      resolvedTotalOtherBanks: 1,
+      isOtherBanksLoading: false,
+      isOtherBanksSearchLoading: false,
+      relativeBusinesses: [],
+      isRelativeLoading: true,
+      isRelativeSearchLoading: true,
+      isFallbackSearchLoading: true,
+    });
+
+    renderSearchPage('/buscar?q=prune&bank=bbva');
+
+    expect(screen.queryByRole('status', { name: 'Cargando resultados' })).not.toBeInTheDocument();
+    expect(screen.getByText('No hay resultados para tus bancos')).toBeInTheDocument();
+    expect(screen.getByText('1 opción')).toBeInTheDocument();
+    expect(screen.queryByText(/No encontramos/)).not.toBeInTheDocument();
   });
 });
