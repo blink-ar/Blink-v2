@@ -15,6 +15,7 @@ export const queryKeys = {
 };
 
 const ITEMS_PER_PAGE = 20;
+const BUSINESS_SEARCH_ERROR_MESSAGE = 'Business search failed';
 
 interface UseBenefitsDataReturn {
     businesses: Business[];
@@ -47,6 +48,14 @@ export interface BenefitsFilters {
     onlineOnly?: boolean; // Filter for businesses with online benefits (server-side)
     sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
+
+const requireSuccessfulBusinessesResponse = (response: BusinessesApiResponse): BusinessesApiResponse => {
+    if (!response.success) {
+        throw new Error(BUSINESS_SEARCH_ERROR_MESSAGE);
+    }
+
+    return response;
+};
 
 /**
  * Hook for accessing benefits data with React Query
@@ -83,7 +92,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
             : [...queryKeys.businesses, geohash, filtersKey],
         queryFn: async ({ pageParam = 0 }) => {
-            return fetchBusinessesPaginated({
+            const response = await fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset: pageParam,
                 ...(sortByDistance && position
@@ -95,6 +104,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
                 ...(filters?.subscription && { subscription: filters.subscription }),
                 ...(filters?.onlineOnly && { online: true }),
             });
+            return requireSuccessfulBusinessesResponse(response);
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
             if (lastPage.pagination.hasMore) {
