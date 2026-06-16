@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { resetPostHogUser } from '../analytics/posthogAnalytics';
 
 interface AuthUser {
   id: string;
@@ -118,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setOtpUser(null);
+    resetPostHogUser();
     if (sdkAuth) {
       auth0Logout({ logoutParams: { returnTo: LOGOUT_URL } });
     }

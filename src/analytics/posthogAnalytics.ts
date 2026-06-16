@@ -5,10 +5,43 @@ type AnalyticsProperties = Record<string, AnalyticsParamValue>;
 
 const POSTHOG_PROJECT_TOKEN = (import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ?? '').trim();
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com').trim() || 'https://us.i.posthog.com';
+const POSTHOG_IDENTIFIED_USER_STORAGE_KEY = 'blink.analytics.posthog.identified_user_id';
 
 let isInitialized = false;
 let isUnavailable = false;
 let identifiedUserId: string | null = null;
+
+function getStoredIdentifiedUserId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(POSTHOG_IDENTIFIED_USER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeIdentifiedUserId(userId: string): void {
+  try {
+    window.localStorage.setItem(POSTHOG_IDENTIFIED_USER_STORAGE_KEY, userId);
+  } catch {
+    // Analytics persistence should not affect product flows.
+  }
+}
+
+function clearStoredIdentifiedUserId(): void {
+  try {
+    window.localStorage.removeItem(POSTHOG_IDENTIFIED_USER_STORAGE_KEY);
+  } catch {
+    // Analytics persistence should not affect product flows.
+  }
+}
+
+function getKnownIdentifiedUserId(): string | null {
+  return identifiedUserId ?? getStoredIdentifiedUserId();
+}
 
 export function isPostHogConfigured(): boolean {
   return POSTHOG_PROJECT_TOKEN.length > 0;
@@ -77,22 +110,31 @@ export function identifyPostHogUser(userId: string | undefined): void {
   }
 
   try {
-    if (identifiedUserId && identifiedUserId !== normalizedUserId) {
+    const knownIdentifiedUserId = getKnownIdentifiedUserId();
+
+    if (knownIdentifiedUserId && knownIdentifiedUserId !== normalizedUserId) {
       client.reset();
       identifiedUserId = null;
+      clearStoredIdentifiedUserId();
     }
 
     client.identify(normalizedUserId);
     identifiedUserId = normalizedUserId;
+    storeIdentifiedUserId(normalizedUserId);
   } catch {
     // Analytics must never break auth flows.
   }
 }
 
 export function resetPostHogUser(): void {
+  if (!getKnownIdentifiedUserId()) {
+    return;
+  }
+
   const client = initializePostHog();
   if (!client) {
     identifiedUserId = null;
+    clearStoredIdentifiedUserId();
     return;
   }
 
@@ -102,6 +144,7 @@ export function resetPostHogUser(): void {
     // Analytics must never break logout flows.
   } finally {
     identifiedUserId = null;
+    clearStoredIdentifiedUserId();
   }
 }
 

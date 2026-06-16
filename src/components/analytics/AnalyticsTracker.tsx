@@ -8,7 +8,6 @@ import {
 import {
   identifyPostHogUser,
   initializePostHog,
-  resetPostHogUser,
 } from '../../analytics/posthogAnalytics';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -30,10 +29,7 @@ function AnalyticsTracker() {
 
     if (isAuthenticated && user?.id) {
       identifyPostHogUser(user.id);
-      return;
     }
-
-    resetPostHogUser();
   }, [isAuthenticated, isLoading, user?.id]);
 
   useEffect(() => {
