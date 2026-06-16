@@ -5,12 +5,18 @@ import { encodeGeohash } from '../utils/geohash';
 import { BenefitsFilters, queryKeys } from './useBenefitsData';
 
 interface FallbackSearchParams {
-  primaryResultsEmpty: boolean;
+  shouldFetchOtherBanks: boolean;
+  shouldFetchRelative: boolean;
   filters: BenefitsFilters;
   searchIntentSignature: string;
 }
 
-export function useFallbackSearch({ primaryResultsEmpty, filters, searchIntentSignature }: FallbackSearchParams) {
+export function useFallbackSearch({
+  shouldFetchOtherBanks,
+  shouldFetchRelative,
+  filters,
+  searchIntentSignature,
+}: FallbackSearchParams) {
   const { position, loading: positionLoading } = useGeolocation();
 
   const hasSelectedBanks = !!filters.bank;
@@ -26,10 +32,15 @@ export function useFallbackSearch({ primaryResultsEmpty, filters, searchIntentSi
     ? ['exact', position!.latitude, position!.longitude]
     : [geohash];
 
+  const otherBanksEnabled = !!(shouldFetchOtherBanks && hasSelectedBanks && !positionLoading);
+  const relativeEnabled = !!(shouldFetchRelative && hasSearchTerm && !positionLoading);
+
   // Case 1: Same search without bank filter — are there results in other banks?
   const {
     data: otherBanksData,
     isLoading: isOtherBanksLoading,
+    isFetched: isOtherBanksFetched,
+    isError: isOtherBanksError,
   } = useQuery({
     queryKey: [
       ...queryKeys.businesses,
@@ -48,7 +59,7 @@ export function useFallbackSearch({ primaryResultsEmpty, filters, searchIntentSi
           : geohash ? { geohash } : {}),
         online: filters.onlineOnly,
       }),
-    enabled: !!(primaryResultsEmpty && hasSelectedBanks && !positionLoading),
+    enabled: otherBanksEnabled,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -56,6 +67,8 @@ export function useFallbackSearch({ primaryResultsEmpty, filters, searchIntentSi
   const {
     data: relativeData,
     isLoading: isRelativeLoading,
+    isFetched: isRelativeFetched,
+    isError: isRelativeError,
   } = useQuery({
     queryKey: [
       ...queryKeys.businesses,
@@ -70,15 +83,22 @@ export function useFallbackSearch({ primaryResultsEmpty, filters, searchIntentSi
           ? { lat: position.latitude, lng: position.longitude }
           : geohash ? { geohash } : {}),
       }),
-    enabled: !!(primaryResultsEmpty && hasSearchTerm && !positionLoading),
+    enabled: relativeEnabled,
     staleTime: 1000 * 60 * 10,
   });
+
+  const isOtherBanksSearchLoading = otherBanksEnabled && !isOtherBanksFetched && !isOtherBanksError;
+  const isRelativeSearchLoading = relativeEnabled && !isRelativeFetched && !isRelativeError;
+  const isFallbackSearchLoading = isOtherBanksSearchLoading || isRelativeSearchLoading;
 
   return {
     otherBanksBusinesses: otherBanksData?.businesses ?? [],
     resolvedTotalOtherBanks: otherBanksData?.pagination.total ?? 0,
     isOtherBanksLoading,
+    isOtherBanksSearchLoading,
     relativeBusinesses: relativeData?.businesses ?? [],
     isRelativeLoading,
+    isRelativeSearchLoading,
+    isFallbackSearchLoading,
   };
 }

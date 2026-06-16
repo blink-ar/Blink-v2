@@ -61,10 +61,19 @@ interface NoResultsParams extends BaseIntentParams {
   category?: string;
 }
 
+interface SearchErrorParams extends NoResultsParams {
+  errorMessage: string;
+}
+
 const normalizeText = (value: string | undefined): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed || undefined;
+};
+
+const normalizeErrorMessage = (value: string): string => {
+  const normalized = normalizeText(value) ?? 'unknown';
+  return normalized.slice(0, 120);
 };
 
 const normalizeFilterValue = (value: string | number | boolean | undefined): string | number | boolean | undefined => {
@@ -141,7 +150,11 @@ const formatFilterValue = (
     return `${normalizedType}_${normalizedValue}`;
   }
 
-  return `${normalizedType}_${toSlug(normalizedValue)}`;
+  if (typeof normalizedValue === 'string') {
+    return `${normalizedType}_${toSlug(normalizedValue)}`;
+  }
+
+  return `${normalizedType}_none`;
 };
 
 export function trackSearchIntent(params: SearchIntentParams): void {
@@ -252,5 +265,21 @@ export function trackNoResults(params: NoResultsParams): void {
     has_filters_state: params.activeFilterCount > 0 ? 'filters_applied' : 'no_filters',
     category: category.token,
     category_raw: category.raw,
+  });
+}
+
+export function trackSearchError(params: SearchErrorParams): void {
+  const category = normalizeCategory(params.category);
+  const searchTerm = normalizeText(params.searchTerm);
+
+  trackEvent('search_error', {
+    source: normalizeEnum(params.source),
+    search_term: searchTerm,
+    search_term_state: searchTerm ? 'provided' : 'empty',
+    active_filter_count: params.activeFilterCount,
+    has_filters_state: params.activeFilterCount > 0 ? 'filters_applied' : 'no_filters',
+    category: category.token,
+    category_raw: category.raw,
+    error_message: normalizeErrorMessage(params.errorMessage),
   });
 }

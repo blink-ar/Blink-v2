@@ -15,13 +15,16 @@ export const queryKeys = {
 };
 
 const ITEMS_PER_PAGE = 20;
+const BUSINESS_SEARCH_ERROR_MESSAGE = 'Business search failed';
 
 interface UseBenefitsDataReturn {
     businesses: Business[];
     featuredBenefits: RawMongoBenefit[];
     isLoading: boolean;
+    isPrimarySearchLoading: boolean;
     isLoadingMore: boolean;
     error: string | null;
+    primarySearchError: string | null;
     hasMore: boolean;
     loadMore: () => void;
     refreshData: () => Promise<void>;
@@ -45,6 +48,17 @@ export interface BenefitsFilters {
     onlineOnly?: boolean; // Filter for businesses with online benefits (server-side)
     sortByDistance?: boolean; // Send exact coords to server for precise distance sort (bypasses CDN)
 }
+
+const requireSuccessfulBusinessesResponse = (
+    response: BusinessesApiResponse,
+    shouldThrowOnFailure = true,
+): BusinessesApiResponse => {
+    if (!response.success && shouldThrowOnFailure) {
+        throw new Error(BUSINESS_SEARCH_ERROR_MESSAGE);
+    }
+
+    return response;
+};
 
 /**
  * Hook for accessing benefits data with React Query
@@ -81,9 +95,10 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
             ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
             : [...queryKeys.businesses, geohash, filtersKey],
         queryFn: async ({ pageParam = 0 }) => {
-            return fetchBusinessesPaginated({
+            const offset = Number(pageParam) || 0;
+            const response = await fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
-                offset: pageParam,
+                offset,
                 ...(sortByDistance && position
                     ? { lat: position.latitude, lng: position.longitude }
                     : geohash ? { geohash } : {}),
@@ -93,8 +108,13 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
                 ...(filters?.subscription && { subscription: filters.subscription }),
                 ...(filters?.onlineOnly && { online: true }),
             });
+            return requireSuccessfulBusinessesResponse(response, offset === 0);
         },
         getNextPageParam: (lastPage: BusinessesApiResponse) => {
+            if (!lastPage.success) {
+                return undefined;
+            }
+
             if (lastPage.pagination.hasMore) {
                 return lastPage.pagination.offset + lastPage.pagination.limit;
             }
@@ -138,11 +158,14 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
-    const isLoading = isLoadingBusinesses || isLoadingFeatured;
+    const isPrimarySearchLoading = positionLoading || isLoadingBusinesses;
+    const isLoading = isPrimarySearchLoading || isLoadingFeatured;
     const isLoadingMore = isFetchingNextPage;
 
-    const error = businessesError
-        ? (businessesError as Error).message
+    const primarySearchError = businessesError ? (businessesError as Error).message : null;
+
+    const error = primarySearchError
+        ? primarySearchError
         : featuredError
             ? (featuredError as Error).message
             : null;
@@ -164,8 +187,10 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         businesses,
         featuredBenefits,
         isLoading,
+        isPrimarySearchLoading,
         isLoadingMore,
         error,
+        primarySearchError,
         hasMore: hasNextPage ?? false,
         loadMore,
         refreshData,
