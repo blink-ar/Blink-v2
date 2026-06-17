@@ -585,9 +585,15 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('<h1>Descuentos bancarios en Argentina</h1>');
     expect(res.body).toContain('150 beneficios');
     expect(res.body).toContain('12 comercios activos');
+    expect(res.body).toContain('Blink es un buscador argentino para encontrar y comparar promociones');
+    expect(res.body).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
+    expect(res.body).not.toContain('Blink Home Monitor');
     expect(res.body).toContain('data-blink-core-seo="structured-data"');
     expect(res.body).toContain('SearchAction');
     expect(res.body).toContain('Organization');
+    expect(res.body).toContain('WebApplication');
+    expect(res.body).toContain('disambiguatingDescription');
+    expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/"');
     expect(res.body).toContain('src="/assets/index-test.js"');
     expect(benefitQueries).toHaveLength(1);
@@ -615,8 +621,12 @@ describe('merchant-first serverless helpers', () => {
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
     expect(res.body).toContain('<h1>Descuentos bancarios en Argentina</h1>');
     expect(res.body).toContain('beneficios activos y comercios activos');
+    expect(res.body).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
+    expect(res.body).not.toContain('Blink Home Monitor');
     expect(res.body).toContain('<dd>Actualizando</dd>');
     expect(res.body).toContain('data-blink-core-seo="structured-data"');
+    expect(res.body).toContain('WebApplication');
+    expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('src="/assets/index-test.js"');
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Core SEO summary unavailable'),
@@ -650,7 +660,14 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('<title>Buscar descuentos y promociones bancarias | Blink</title>');
     expect(res.body).toContain('<h1>Buscar descuentos y promociones bancarias</h1>');
     expect(res.body).toContain('Usa Blink para encontrar beneficios por comercio');
+    expect(res.body).toContain('Blink es un buscador argentino para encontrar y comparar promociones');
+    expect(res.body).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
+    expect(res.body).not.toContain('Blink Home Monitor');
     expect(res.body).toContain('SearchResultsPage');
+    expect(res.body).toContain('SearchAction');
+    expect(res.body).toContain('WebApplication');
+    expect(res.body).toContain('disambiguatingDescription');
+    expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/search"');
     expect(res.body).toContain('href="/categorias/supermercado"');
     expect(res.body).toContain('src="/assets/index-test.js"');

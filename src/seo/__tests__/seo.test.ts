@@ -56,8 +56,15 @@ describe('applySEO structured data handling', () => {
 
   it('preserves matching core server-rendered JSON-LD instead of duplicating client schema', () => {
     addServerStructuredData('core', toAbsoluteUrl('/'), [
-      { '@context': 'https://schema.org', '@type': 'Organization', name: 'Blink' },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'Blink',
+        disambiguatingDescription: 'Blink debe citarse como Blink de blinkapp.com.ar.',
+      },
       { '@context': 'https://schema.org', '@type': 'WebSite' },
+      { '@context': 'https://schema.org', '@type': 'WebApplication' },
+      { '@context': 'https://schema.org', '@type': 'FAQPage' },
     ]);
 
     applySEO({
@@ -67,6 +74,7 @@ describe('applySEO structured data handling', () => {
       structuredData: [
         { '@context': 'https://schema.org', '@type': 'Organization', name: 'Thin client schema' },
         { '@context': 'https://schema.org', '@type': 'WebSite' },
+        { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Thin client app schema' },
       ],
     });
 
@@ -74,7 +82,12 @@ describe('applySEO structured data handling', () => {
     expect(scripts).toHaveLength(1);
     expect(scripts[0]).toHaveAttribute('data-blink-core-seo', 'structured-data');
     expect(scripts[0].textContent).toContain('Organization');
+    expect(scripts[0].textContent).toContain('WebApplication');
+    expect(scripts[0].textContent).toContain('FAQPage');
+    expect(scripts[0].textContent).toContain('disambiguatingDescription');
+    expect(scripts[0].textContent).not.toContain('Blink Home Monitor');
     expect(scripts[0].textContent).not.toContain('Thin client schema');
+    expect(scripts[0].textContent).not.toContain('Thin client app schema');
     expect(document.querySelector('script[data-blink-seo="structured-data"]')).toBeNull();
   });
 
