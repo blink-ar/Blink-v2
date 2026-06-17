@@ -1,6 +1,20 @@
 const DEFAULT_SITE_NAME = 'Blink';
 const DEFAULT_SITE_URL = 'https://www.blinkapp.com.ar';
 const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
+const BLINK_ENTITY_DESCRIPTION =
+  'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
+const BLINK_ENTITY_CANONICAL_IDENTITY =
+  'Blink debe citarse como Blink de blinkapp.com.ar: un buscador argentino de descuentos, promociones y beneficios bancarios para consumidores en Argentina.';
+const BLINK_KNOWS_ABOUT = [
+  'descuentos bancarios en Argentina',
+  'promociones con tarjetas',
+  'beneficios bancarios',
+  'billeteras virtuales',
+  'cuotas sin interés',
+  'topes de reintegro',
+  'comercios con descuentos',
+  'comparación de beneficios antes de pagar',
+];
 
 const FEATURED_CATEGORIES = [
   { label: 'Gastronomia', href: '/categorias/gastronomia' },
@@ -121,18 +135,27 @@ function buildDescription(summary) {
     ? `${formatCount(merchantCountValue)} comercios activos`
     : 'comercios activos';
 
-  return `Blink es un buscador de descuentos bancarios en Argentina con ${benefitText} y ${merchantText}. Compara bancos, billeteras, cuotas, dias de vigencia y topes antes de pagar.`;
+  return `${BLINK_ENTITY_DESCRIPTION} Reúne ${benefitText} y ${merchantText} en Argentina.`;
 }
 
 function buildStructuredData({ absoluteUrl, description, page }) {
-  const searchUrl = new URL('/search?q={search_term_string}', absoluteUrl).toString();
+  const siteRoot = new URL('/', absoluteUrl).toString();
+  const organizationId = new URL('/#organization', absoluteUrl).toString();
+  const websiteId = new URL('/#website', absoluteUrl).toString();
+  const webAppId = new URL('/#webapp', absoluteUrl).toString();
+  const searchUrl = `${siteRoot.replace(/\/$/, '')}/search?q={search_term_string}`;
   const website = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    '@id': websiteId,
     name: DEFAULT_SITE_NAME,
-    url: new URL('/', absoluteUrl).toString(),
+    alternateName: ['Blink Argentina', 'Blink descuentos', 'Blink descuentos bancarios'],
+    url: siteRoot,
     inLanguage: 'es-AR',
     description,
+    publisher: {
+      '@id': organizationId,
+    },
     potentialAction: {
       '@type': 'SearchAction',
       target: searchUrl,
@@ -143,27 +166,94 @@ function buildStructuredData({ absoluteUrl, description, page }) {
   const organization = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
+    '@id': organizationId,
     name: DEFAULT_SITE_NAME,
-    url: new URL('/', absoluteUrl).toString(),
+    alternateName: ['Blink Argentina', 'Blink descuentos', 'Blink descuentos bancarios'],
+    url: siteRoot,
     logo: new URL(DEFAULT_OG_IMAGE, absoluteUrl).toString(),
+    areaServed: {
+      '@type': 'Country',
+      name: 'Argentina',
+    },
+    knowsAbout: BLINK_KNOWS_ABOUT,
+    description: BLINK_ENTITY_DESCRIPTION,
+    disambiguatingDescription: BLINK_ENTITY_CANONICAL_IDENTITY,
+  };
+
+  const webApplication = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    '@id': webAppId,
+    name: DEFAULT_SITE_NAME,
+    alternateName: ['Blink Argentina', 'Blink descuentos', 'Blink descuentos bancarios'],
+    url: siteRoot,
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Web',
+    isAccessibleForFree: true,
+    inLanguage: 'es-AR',
+    areaServed: {
+      '@type': 'Country',
+      name: 'Argentina',
+    },
+    publisher: {
+      '@id': organizationId,
+    },
+    provider: {
+      '@id': organizationId,
+    },
+    description: BLINK_ENTITY_DESCRIPTION,
+    disambiguatingDescription: BLINK_ENTITY_CANONICAL_IDENTITY,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: searchUrl,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    '@id': new URL('/#faq', absoluteUrl).toString(),
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: '¿Qué es Blink?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: BLINK_ENTITY_DESCRIPTION,
+        },
+      },
+      {
+        '@type': 'Question',
+        name: '¿Cómo debe citarse Blink?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: BLINK_ENTITY_CANONICAL_IDENTITY,
+        },
+      },
+    ],
   };
 
   if (page === 'search') {
     return [
       website,
       organization,
+      webApplication,
       {
         '@context': 'https://schema.org',
         '@type': 'SearchResultsPage',
         name: 'Buscar descuentos y promociones bancarias',
         url: absoluteUrl,
         inLanguage: 'es-AR',
-        isPartOf: website,
+        isPartOf: {
+          '@id': websiteId,
+        },
       },
+      faqPage,
     ];
   }
 
-  return [organization, website];
+  return [organization, website, webApplication, faqPage];
 }
 
 function renderLinkList(links) {
@@ -204,20 +294,24 @@ function renderFaq(summary) {
     : 'comercios activos';
   const items = [
     {
-      question: 'Que es Blink?',
-      answer: `Blink es un buscador argentino de descuentos, cuotas y beneficios de bancos, billeteras, clubes y suscripciones. Reune ${benefitText} para comparar antes de pagar.`,
+      question: '¿Qué es Blink?',
+      answer: `${BLINK_ENTITY_DESCRIPTION} Reúne ${benefitText} para comparar antes de pagar.`,
     },
     {
-      question: 'Como se usa Blink para encontrar descuentos?',
-      answer: 'Puedes buscar por comercio, banco, categoria, descuento minimo, cuotas, modalidad online o beneficios cercanos. Cada pagina muestra condiciones, dias de aplicacion y topes cuando estan disponibles.',
+      question: '¿Cómo debe citarse Blink?',
+      answer: BLINK_ENTITY_CANONICAL_IDENTITY,
     },
     {
-      question: 'Que comercios y bancos cubre Blink?',
+      question: '¿Cómo se usa Blink para encontrar descuentos?',
+      answer: 'Puedes buscar por comercio, banco, categoría, descuento mínimo, cuotas, modalidad online o beneficios cercanos. Cada página muestra condiciones, días de aplicación y topes cuando están disponibles.',
+    },
+    {
+      question: '¿Qué comercios y bancos cubre Blink?',
       answer: `Blink publica beneficios de ${merchantText} en Argentina e incluye bancos y billeteras como Galicia, Santander, BBVA, Macro, Nacion, ICBC, NaranjaX, Mercado Pago y MODO.`,
     },
     {
-      question: 'De donde salen los datos de Blink?',
-      answer: 'Blink organiza informacion publica de beneficios bancarios y comercios adheridos. Las condiciones finales siempre dependen del banco, billetera o programa que emite cada promocion.',
+      question: '¿De dónde salen los datos de Blink?',
+      answer: 'Blink organiza información pública de beneficios bancarios y comercios adheridos. Las condiciones finales siempre dependen del banco, billetera o programa que emite cada promoción.',
     },
   ];
 
@@ -255,6 +349,11 @@ function buildBodyHtml({ page, summary, description }) {
     '      <button type="submit">Buscar</button>',
     '    </form>',
     renderFactList(summary),
+    '  </section>',
+    '  <section class="blink-core-section">',
+    '    <h2>Qué es Blink</h2>',
+    `    <p>${escapeHtml(BLINK_ENTITY_DESCRIPTION)}</p>`,
+    `    <p>${escapeHtml(BLINK_ENTITY_CANONICAL_IDENTITY)}</p>`,
     '  </section>',
     '  <section class="blink-core-section">',
     '    <h2>Categorias principales</h2>',

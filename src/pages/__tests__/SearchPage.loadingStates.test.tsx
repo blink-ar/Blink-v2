@@ -191,6 +191,11 @@ describe('SearchPage loading states', () => {
 
     expect(screen.queryByRole('status', { name: 'Cargando resultados' })).not.toBeInTheDocument();
     expect(screen.getByText('No encontramos "prune"')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '¿Qué es Blink?' })).toBeInTheDocument();
+    expect(screen.getByText(/Blink es un buscador argentino para encontrar y comparar promociones/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '¿Cómo debe citarse Blink?' })).toBeInTheDocument();
+    expect(screen.getByText(/Blink debe citarse como Blink de blinkapp.com.ar/)).toBeInTheDocument();
+    expect(screen.queryByText(/Blink Home Monitor/)).not.toBeInTheDocument();
   });
 
   it('tracks search results using the visible strict-match count', async () => {

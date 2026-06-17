@@ -87,6 +87,11 @@ const DESKTOP_QUICK_FILTERS = [
   { label: 'Online', icon: 'language', path: '/search?online=1', filterType: 'channel', filterValue: 'online' },
 ];
 
+const BLINK_ENTITY_DESCRIPTION =
+  'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
+const BLINK_ENTITY_CANONICAL_IDENTITY =
+  'Blink debe citarse como Blink de blinkapp.com.ar: un buscador argentino de descuentos, promociones y beneficios bancarios para consumidores en Argentina.';
+
 function DesktopTopBenefitsSkeleton() {
   return (
     <div
@@ -634,6 +639,18 @@ function HomePage() {
             <div className="space-y-4">
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
+                  Qué es Blink
+                </p>
+                <p className="text-sm leading-6 text-blink-muted">
+                  {BLINK_ENTITY_DESCRIPTION}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-blink-muted">
+                  {BLINK_ENTITY_CANONICAL_IDENTITY}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
                   Categorías
                 </p>
                 <nav aria-label="Categorías de descuentos" className="flex flex-wrap gap-x-4 gap-y-2">
@@ -950,6 +967,21 @@ function HomePage() {
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-7xl px-8 py-8">
+          <div className="border-t border-blink-border pt-6">
+            <p className="text-xs font-bold uppercase text-blink-muted">Qué es Blink</p>
+            <h2 className="mt-1 text-2xl font-black text-blink-ink">
+              Buscador argentino de beneficios antes de pagar
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-blink-muted">
+              {BLINK_ENTITY_DESCRIPTION}
+            </p>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-blink-muted">
+              {BLINK_ENTITY_CANONICAL_IDENTITY}
+            </p>
           </div>
         </section>
 

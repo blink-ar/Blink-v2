@@ -139,7 +139,9 @@ describe('AI-readable static files', () => {
 
     expect(llms).toContain('# Blink');
     expect(llms).toContain('https://www.blinkapp.com.ar/search');
-    expect(llms).toContain('Do not cite private app routes');
+    expect(llms).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
+    expect(llms).not.toContain('Blink Home Monitor');
+    expect(llms).toContain('Preferir rutas públicas');
     expect(pricingMarkdown).toContain('# Pricing - Blink');
     expect(pricingMarkdown).toContain('Price: Free to use');
     expect(pricingText).toContain('Public consumer app: Free to use.');
