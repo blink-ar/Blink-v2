@@ -103,6 +103,10 @@ describe('posthogAnalytics', () => {
     expect(posthogMock.identify).toHaveBeenCalledTimes(1);
     expect(posthogMock.identify).toHaveBeenCalledWith('auth0|user-1');
     expect(posthogMock.identify.mock.calls[0]).toHaveLength(1);
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(
+      'blink.analytics.posthog.identified_user_id',
+      'auth0|user-1',
+    );
   });
 
   it('resets before identifying a different user in the same session', async () => {
@@ -119,13 +123,46 @@ describe('posthogAnalytics', () => {
     );
   });
 
-  it('resets persisted identity even when no user was identified in this JS session', async () => {
+  it('does not reset anonymous visitors', async () => {
+    const { resetPostHogUser } = await import('../posthogAnalytics');
+
+    resetPostHogUser();
+
+    expect(posthogMock.reset).not.toHaveBeenCalled();
+  });
+
+  it('resets known identified state once', async () => {
+    const { identifyPostHogUser, resetPostHogUser } = await import('../posthogAnalytics');
+
+    identifyPostHogUser('auth0|user-1');
+    posthogMock.reset.mockClear();
+
+    resetPostHogUser();
+    resetPostHogUser();
+
+    expect(posthogMock.reset).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.removeItem).toHaveBeenCalledWith(
+      'blink.analytics.posthog.identified_user_id',
+    );
+  });
+
+  it('resets persisted identified state even when no user was identified in this JS session', async () => {
+    const storageKey = 'blink.analytics.posthog.identified_user_id';
+    let storedUserId: string | null = 'auth0|stored-user';
+    vi.mocked(window.localStorage.getItem).mockImplementation((key) => (
+      key === storageKey ? storedUserId : null
+    ));
+    vi.mocked(window.localStorage.removeItem).mockImplementation((key) => {
+      if (key === storageKey) {
+        storedUserId = null;
+      }
+    });
     const { resetPostHogUser } = await import('../posthogAnalytics');
 
     resetPostHogUser();
     resetPostHogUser();
 
-    expect(posthogMock.reset).toHaveBeenCalledTimes(2);
+    expect(posthogMock.reset).toHaveBeenCalledTimes(1);
   });
 
   it('falls back for feature flags when PostHog is disabled', async () => {

@@ -97,6 +97,10 @@
       "handle": "filesystem"
     },
     {
+      "src": "/(?:.*\\.(?:txt|md|ya?ml)|okf(?:/.*)?)",
+      "dest": "/api/[...path]?path=__not_found"
+    },
+    {
       "src": "/.*",
       "dest": "/index.html"
     }

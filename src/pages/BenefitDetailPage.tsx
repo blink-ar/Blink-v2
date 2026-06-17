@@ -427,6 +427,7 @@ function BenefitDetailPage() {
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
+  const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -670,6 +671,14 @@ function BenefitDetailPage() {
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
                     <span className="text-sm font-semibold text-blink-ink">{benefit.tope}</span>
+                  </div>
+                )}
+
+                {/* Compra mínima requerida */}
+                {minPurchaseAmount !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Compra mínima requerida</span>
+                    <span className="text-sm font-semibold text-blink-ink">{formatArgentinePeso(minPurchaseAmount)}</span>
                   </div>
                 )}
 

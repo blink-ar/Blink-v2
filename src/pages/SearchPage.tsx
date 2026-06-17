@@ -21,6 +21,7 @@ import { buildBankOptions, toBankDescriptor } from '../utils/banks';
 import {
   trackFilterApply,
   trackNoResults,
+  trackSearchError,
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
@@ -388,10 +389,12 @@ function SearchPage() {
 
   const {
     businesses,
-    isLoading,
+    isPrimarySearchLoading,
     isLoadingMore,
+    primarySearchError,
     hasMore,
     loadMore,
+    refreshData,
     totalBusinesses,
     proximityUnavailable,
   } = useBenefitsData({
@@ -447,7 +450,16 @@ function SearchPage() {
     });
     return () => { cancelled = true; };
   }, [enrichedIds, hasSelectedBanks]);
-  const primaryResultsEmpty = !isLoading && strictMatches.length === 0 && hasSearchTerm;
+  const showPrimarySearchError =
+    !isPrimarySearchLoading &&
+    !!primarySearchError &&
+    businesses.length === 0;
+
+  const primaryResultsEmpty =
+    !isPrimarySearchLoading &&
+    !showPrimarySearchError &&
+    strictMatches.length === 0 &&
+    hasSearchTerm;
 
   // Stable signature to re-trigger fallback queries when intent changes
   const searchIntentSignature = [
@@ -460,10 +472,13 @@ function SearchPage() {
     otherBanksBusinesses,
     resolvedTotalOtherBanks,
     isOtherBanksLoading,
+    isOtherBanksSearchLoading,
     relativeBusinesses,
     isRelativeLoading,
+    isRelativeSearchLoading,
   } = useFallbackSearch({
-    primaryResultsEmpty,
+    shouldFetchOtherBanks: primaryResultsEmpty,
+    shouldFetchRelative: primaryResultsEmpty || showPrimarySearchError,
     filters: {
       search: debouncedSearch.trim() || undefined,
       category: selectedCategory && selectedCategory !== 'all' ? selectedCategory : undefined,
@@ -474,10 +489,38 @@ function SearchPage() {
     searchIntentSignature,
   });
 
+  const hasOtherBanksFallback =
+    primaryResultsEmpty &&
+    hasSelectedBanks &&
+    otherBanksBusinesses.length > 0;
+
+  const shouldWaitForFallbackDecision =
+    primaryResultsEmpty &&
+    (
+      (hasSelectedBanks && isOtherBanksSearchLoading) ||
+      (!hasOtherBanksFallback && isRelativeSearchLoading)
+    );
+
+  const shouldShowResultsLoader =
+    (isPrimarySearchLoading && !businesses.length) ||
+    shouldWaitForFallbackDecision;
+
   // Case 1: bank filter active + empty primary + other-bank results exist
-  const showOtherBanksFallback = primaryResultsEmpty && hasSelectedBanks && otherBanksBusinesses.length > 0;
+  const showOtherBanksFallback =
+    primaryResultsEmpty &&
+    !showPrimarySearchError &&
+    !isOtherBanksSearchLoading &&
+    hasSelectedBanks &&
+    otherBanksBusinesses.length > 0;
   // Case 2: still empty (no banks narrowing things down, or banks also failed)
-  const showRelativesFallback = primaryResultsEmpty && !showOtherBanksFallback;
+  const showRelativesFallback =
+    primaryResultsEmpty &&
+    !shouldWaitForFallbackDecision &&
+    !showOtherBanksFallback;
+
+  const resultsStatusLabel = showPrimarySearchError
+    ? 'No disponible'
+    : shouldShowResultsLoader ? 'Buscando...' : `${totalBusinesses} resultados`;
 
   // Label for the relatives section
   const relativesLabel = (() => {
@@ -547,6 +590,7 @@ function SearchPage() {
   const hasInitializedFiltersRef = useRef(false);
   const searchIntentSignatureRef = useRef('');
   const noResultsSignatureRef = useRef('');
+  const searchErrorSignatureRef = useRef('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Infinite scroll sentinel — primary results
@@ -581,7 +625,7 @@ function SearchPage() {
   // Derives the category from the first search result and fetches more businesses
   // from that category so the list never feels empty.
   const firstEnrichedBusiness = enrichedBusinesses[0] as BusinessWithCategories | undefined;
-  const matchedCategory = hasSearchTerm && !isLoading && firstEnrichedBusiness
+  const matchedCategory = hasSearchTerm && !isPrimarySearchLoading && !showPrimarySearchError && firstEnrichedBusiness
     ? (firstEnrichedBusiness.category || firstEnrichedBusiness.categories?.[0])?.toLowerCase()
     : undefined;
 
@@ -680,12 +724,12 @@ function SearchPage() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && pendingScrollRef.current !== null) {
+    if (!isPrimarySearchLoading && pendingScrollRef.current !== null) {
       const y = pendingScrollRef.current;
       pendingScrollRef.current = null;
       window.scrollTo({ top: y, behavior: 'instant' });
     }
-  }, [isLoading]);
+  }, [isPrimarySearchLoading]);
 
   useEffect(() => {
     if (!hasInitializedFiltersRef.current) {
@@ -788,7 +832,7 @@ function SearchPage() {
   }, [activeFilterCount, currentFilterState]);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isPrimarySearchLoading || showPrimarySearchError) return;
 
     const normalizedSearch = debouncedSearch.trim();
     const hasFilters = activeFilterCount > 0;
@@ -799,7 +843,7 @@ function SearchPage() {
       selectedCategory,
       currentFilterState.selectedBanksKey,
       activeFilterCount,
-      enrichedBusinesses.length,
+      strictMatches.length,
     ].join('|');
 
     if (searchIntentSignatureRef.current === signature) return;
@@ -808,7 +852,7 @@ function SearchPage() {
     trackSearchIntent({
       source: 'search_page',
       searchTerm: normalizedSearch,
-      resultsCount: enrichedBusinesses.length,
+      resultsCount: strictMatches.length,
       hasFilters,
       activeFilterCount,
       category: selectedCategory || undefined,
@@ -817,14 +861,48 @@ function SearchPage() {
     activeFilterCount,
     currentFilterState.selectedBanksKey,
     debouncedSearch,
-    enrichedBusinesses.length,
-    isLoading,
+    isPrimarySearchLoading,
     selectedCategory,
+    showPrimarySearchError,
+    strictMatches.length,
   ]);
 
   useEffect(() => {
-    if (isLoading) return;
-    if (enrichedBusinesses.length > 0) return;
+    if (!showPrimarySearchError || !primarySearchError) return;
+
+    const normalizedSearch = debouncedSearch.trim();
+
+    const signature = [
+      normalizedSearch,
+      selectedCategory,
+      currentFilterState.selectedBanksKey,
+      activeFilterCount,
+      primarySearchError,
+    ].join('|');
+
+    if (searchErrorSignatureRef.current === signature) return;
+    searchErrorSignatureRef.current = signature;
+
+    trackSearchError({
+      source: 'search_page',
+      searchTerm: normalizedSearch,
+      activeFilterCount,
+      category: selectedCategory || undefined,
+      errorMessage: primarySearchError,
+    });
+  }, [
+    activeFilterCount,
+    currentFilterState.selectedBanksKey,
+    debouncedSearch,
+    primarySearchError,
+    selectedCategory,
+    showPrimarySearchError,
+  ]);
+
+  useEffect(() => {
+    if (isPrimarySearchLoading || shouldWaitForFallbackDecision || showPrimarySearchError) return;
+    if (showOtherBanksFallback) return;
+    if (strictMatches.length > 0) return;
 
     const normalizedSearch = debouncedSearch.trim();
     if (!normalizedSearch && activeFilterCount === 0) return;
@@ -850,9 +928,12 @@ function SearchPage() {
     activeFilterCount,
     currentFilterState.selectedBanksKey,
     debouncedSearch,
-    enrichedBusinesses.length,
-    isLoading,
+    isPrimarySearchLoading,
     selectedCategory,
+    showOtherBanksFallback,
+    showPrimarySearchError,
+    shouldWaitForFallbackDecision,
+    strictMatches.length,
   ]);
 
   // Get max discount for a business
@@ -926,6 +1007,33 @@ function SearchPage() {
       position,
     });
     navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
+  };
+
+  const renderNeutralSuggestions = () => {
+    if (!isRelativeLoading && relativeBusinesses.length === 0) return null;
+
+    return (
+      <>
+        <div className="flex items-center gap-2 mb-3 px-0.5">
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#6366F1' }}>auto_awesome</span>
+          <p className="font-semibold text-sm text-blink-ink">{relativesLabel}</p>
+        </div>
+        <div className="space-y-3">
+          {relativeItems.map((business, index) => (
+            business ? (
+              <BusinessResultCard
+                key={`suggestion-${business.id}`}
+                business={business}
+                badgeSource={fullBusinessesMap.get(business.id) ?? business}
+                onClick={() => handleBusinessSelect(business, index + 1)}
+              />
+            ) : (
+              <SkeletonCard key={`suggestion-skeleton-${index}`} />
+            )
+          ))}
+        </div>
+      </>
+    );
   };
 
   return (
@@ -1261,15 +1369,41 @@ function SearchPage() {
             className="text-xs font-semibold px-2.5 py-1 rounded-full"
             style={{ background: '#EEF2FF', color: '#4338CA' }}
           >
-            {totalBusinesses} resultados
+            {resultsStatusLabel}
           </span>
         </div>
 
-        {isLoading && !enrichedBusinesses.length ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {shouldShowResultsLoader ? (
+          <div
+            role="status"
+            aria-label="Cargando resultados"
+            className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3"
+          >
             {Array.from({ length: 6 }).map((_, index) => (
-            <SkeletonCard key={index} />
+              <SkeletonCard key={index} />
             ))}
+          </div>
+        ) : showPrimarySearchError ? (
+          <div>
+            <div className="text-center pt-8 pb-6">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                style={{ background: '#FEE2E2' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#DC2626' }}>error</span>
+              </div>
+              <p className="font-semibold text-lg text-blink-ink">No pudimos buscar ahora</p>
+              <p className="text-sm text-blink-muted mt-1">Reintentá en unos segundos</p>
+              <button
+                type="button"
+                onClick={() => void refreshData()}
+                className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white transition-all active:scale-95"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+                Reintentar
+              </button>
+            </div>
+            {renderNeutralSuggestions()}
           </div>
         ) : showOtherBanksFallback ? (
           /* ── CASE 1: Selected banks have no match, but other banks do ── */
@@ -1497,7 +1631,7 @@ function SearchPage() {
         )}
 
         {/* Related by category - show when we have results or when starting to load them */}
-        {!isLoading && (isRelatedLoading || relatedBusinesses.length > 0) && (
+        {!isPrimarySearchLoading && !showPrimarySearchError && (isRelatedLoading || relatedBusinesses.length > 0) && (
           <div className="mt-8 pt-10 border-t border-blink-border">
             <h2 className="mb-4 font-bold text-lg text-blink-ink">
               {relatedCategoryLabel ? `Más en ${relatedCategoryLabel}` : 'Más opciones relacionadas'}

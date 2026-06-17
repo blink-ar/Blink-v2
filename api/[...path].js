@@ -104,6 +104,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   termsAndConditions: 1,
   link: 1,
   validUntil: 1,
+  minimumPurchaseAmount: 1,
   sourceCollection: 1,
   rawBenefitCollection: 1,
   source: 1
@@ -314,6 +315,12 @@ function redirect(res, statusCode, location) {
 function html(res, statusCode, payload) {
   res.status(statusCode);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(payload);
+}
+
+function text(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.send(payload);
 }
 
@@ -715,6 +722,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
+    minimumPurchaseAmount: benefit?.minimumPurchaseAmount || null,
     subscriptionIds: getBenefitSubscriptionIds(benefit),
     ...(benefit?.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
     ...(benefit?.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
@@ -2860,6 +2868,13 @@ async function handlePlaceDetails(req, res) {
   });
 }
 
+function handleStaticNotFound(req, res, url) {
+  const requestedPath = url?.pathname || '/';
+  setCacheControl(res, 'public, max-age=60');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  return text(res, 404, `Not found: ${requestedPath}\n`);
+}
+
 export {
   applyLocalDistanceGuardrail,
   buildBusinessBenefitSummary,
@@ -2873,6 +2888,7 @@ export {
   handleLandingSeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
+  handleStaticNotFound,
   handleSearchSeoPage,
   handleSearch,
   rehydrateBenefitDoc
@@ -2932,6 +2948,10 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (isReadMethod(req) && path === '/api/__not_found') {
+      return handleStaticNotFound(req, res, url);
+    }
+
     if (isReadMethod(req) && (path === '/api/__page/home' || path === '/api/__page/search')) {
       let coreSeoDb = null;
       try {
