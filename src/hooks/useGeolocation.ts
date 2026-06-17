@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Coordinates {
   latitude: number;
@@ -19,11 +19,20 @@ const STORAGE_KEYS = {
   permission: 'locationPermission',
 } as const;
 
-// Module-level listeners so all hook instances stay in sync when any one
-// instance successfully obtains or loses location.
+const POSITION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 10000,
+  maximumAge: CACHE_DURATION,
+};
+
+// Module-level listeners so all hook instances stay in sync. Any instance that
+// starts/finishes a location request broadcasts here, so siblings (e.g. the
+// separate useGeolocation() inside useBenefitsData) reflect the same state.
 type LocationUpdate =
   | { type: 'position'; coordinates: Coordinates }
-  | { type: 'denied' };
+  | { type: 'denied' }
+  | { type: 'pending' }
+  | { type: 'error'; message: string };
 
 const locationListeners = new Set<(update: LocationUpdate) => void>();
 
@@ -31,12 +40,53 @@ const notifyListeners = (update: LocationUpdate) => {
   locationListeners.forEach((fn) => fn(update));
 };
 
+// Shared across all hook instances: true while a browser geolocation request is
+// pending. Lets sibling instances avoid idling out (loading:false) mid-request.
+let requestInFlight = false;
+
 const getCachedPosition = (): Coordinates | null => {
   const cached = localStorage.getItem(STORAGE_KEYS.position);
   const timestamp = localStorage.getItem(STORAGE_KEYS.timestamp);
   if (!cached || !timestamp) return null;
   if (Date.now() - parseInt(timestamp) > CACHE_DURATION) return null;
   return JSON.parse(cached);
+};
+
+// Marks the permission as denied and broadcasts it to every instance.
+const resolveDenied = () => {
+  requestInFlight = false;
+  localStorage.setItem(STORAGE_KEYS.permission, 'denied');
+  notifyListeners({ type: 'denied' });
+};
+
+// Starts a browser geolocation request, broadcasting the pending state up front
+// and the outcome (position / denied / error) to every instance when it settles.
+const runRequest = () => {
+  requestInFlight = true;
+  notifyListeners({ type: 'pending' });
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const coordinates = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      };
+      localStorage.setItem(STORAGE_KEYS.position, JSON.stringify(coordinates));
+      localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
+      localStorage.setItem(STORAGE_KEYS.permission, 'granted');
+      requestInFlight = false;
+      notifyListeners({ type: 'position', coordinates });
+    },
+    (err) => {
+      requestInFlight = false;
+      if (err.code === err.PERMISSION_DENIED) {
+        resolveDenied();
+      } else {
+        notifyListeners({ type: 'error', message: err.message });
+      }
+    },
+    POSITION_OPTIONS,
+  );
 };
 
 interface UseGeolocationOptions {
@@ -60,19 +110,24 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
     permissionDenied: false,
   });
 
-  // Tracks an in-flight explicit request (requestPermission). The mount effect's
-  // async permissions.query() can resolve *after* such a request started; without
-  // this guard its 'prompt' branch would call setIdle() and clobber the in-flight
-  // request's loading:true, making consumers treat geolocation as settled.
-  const manualRequestRef = useRef(false);
-
   useEffect(() => {
-    // Subscribe to updates from other instances (e.g. requestPermission called elsewhere)
+    // Subscribe to updates from any instance (its own requests included).
     const handleUpdate = (update: LocationUpdate) => {
-      if (update.type === 'position') {
-        setState({ position: update.coordinates, error: null, loading: false, permissionDenied: false });
-      } else {
-        setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
+      switch (update.type) {
+        case 'position':
+          setState({ position: update.coordinates, error: null, loading: false, permissionDenied: false });
+          break;
+        case 'denied':
+          setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
+          break;
+        case 'pending':
+          // A request started somewhere — reflect loading without dropping a
+          // position we may already have.
+          setState((prev) => ({ ...prev, error: null, loading: true, permissionDenied: false }));
+          break;
+        case 'error':
+          setState({ position: null, error: update.message, loading: false, permissionDenied: false });
+          break;
       }
     };
     locationListeners.add(handleUpdate);
@@ -96,71 +151,46 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
       return;
     }
 
-    const onSuccess = (pos: GeolocationPosition) => {
-      const coordinates = {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      };
-      localStorage.setItem(STORAGE_KEYS.position, JSON.stringify(coordinates));
-      localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
-      localStorage.setItem(STORAGE_KEYS.permission, 'granted');
-      setState({ position: coordinates, error: null, loading: false, permissionDenied: false });
-      notifyListeners({ type: 'position', coordinates });
-    };
-
-    const onError = (err: GeolocationPositionError) => {
-      const isDenied = err.code === err.PERMISSION_DENIED;
-      if (isDenied) {
-        localStorage.setItem(STORAGE_KEYS.permission, 'denied');
-        notifyListeners({ type: 'denied' });
-      }
-      setState({ position: null, error: err.message, loading: false, permissionDenied: isDenied });
-    };
-
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: CACHE_DURATION,
-    };
-
-    const requestLocation = () =>
-      navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
-
     // Idle state used when we intentionally don't request location (no prompt,
     // no error, not denied) — consumers see position=null and can offer a gesture.
-    // Skip if an explicit request is already in flight so we don't clobber its
-    // loading:true (it will set the final state when the GPS callback returns).
+    // Skip if a request is already in flight (possibly from a sibling instance)
+    // so we don't report positionLoading=false while a prompt/GPS call is pending.
     const setIdle = () => {
-      if (manualRequestRef.current) return;
+      if (requestInFlight) return;
       setState({ position: null, error: null, loading: false, permissionDenied: false });
     };
+
+    // If this instance will actively request on mount, mark in-flight
+    // synchronously (before the async permission check) so sibling instances
+    // mounting alongside us don't idle out before the request actually starts.
+    if (autoRequest) requestInFlight = true;
 
     if ('permissions' in navigator) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'denied') {
-          localStorage.setItem(STORAGE_KEYS.permission, 'denied');
-          setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
+          resolveDenied();
         } else if (result.state === 'granted') {
-          // Already granted in a previous session: reuse it silently. querying
+          // Already granted in a previous session: reuse it silently. Querying
           // permission state never shows a prompt, and getCurrentPosition won't
           // either once granted, so this is safe and non-invasive.
-          requestLocation();
+          runRequest();
         } else {
           // 'prompt': permission undecided. Only ask if the caller explicitly
           // opted in (autoRequest). Otherwise stay idle until a user gesture.
-          if (autoRequest) requestLocation();
+          if (autoRequest) runRequest();
           else setIdle();
         }
       });
     } else {
-      // Fallback for browsers without Permissions API
+      // Fallback for browsers without the Permissions API: we can't read the
+      // real permission state, so we must not silently call getCurrentPosition
+      // (a stale localStorage 'granted' could still trigger a prompt). Only
+      // request when the caller explicitly opted in.
       const stored = localStorage.getItem(STORAGE_KEYS.permission);
       if (stored === 'denied') {
         setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
-      } else if (stored === 'granted') {
-        requestLocation();
       } else if (autoRequest) {
-        requestLocation();
+        runRequest();
       } else {
         setIdle();
       }
@@ -178,31 +208,7 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
       return;
     }
 
-    manualRequestRef.current = true;
-    setState((prev) => ({ ...prev, loading: true }));
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coordinates = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        };
-        localStorage.setItem(STORAGE_KEYS.position, JSON.stringify(coordinates));
-        localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
-        localStorage.setItem(STORAGE_KEYS.permission, 'granted');
-        setState({ position: coordinates, error: null, loading: false, permissionDenied: false });
-        notifyListeners({ type: 'position', coordinates });
-      },
-      (err) => {
-        const isDenied = err.code === err.PERMISSION_DENIED;
-        if (isDenied) {
-          localStorage.setItem(STORAGE_KEYS.permission, 'denied');
-          notifyListeners({ type: 'denied' });
-        }
-        setState({ position: null, error: err.message, loading: false, permissionDenied: isDenied });
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    runRequest();
   };
 
   return {

@@ -925,6 +925,9 @@ function SearchPage() {
     setOnlineOnly(values.onlineOnly);
     setHasInstallments(values.hasInstallments);
     setSortByDistance(values.sortByDistance);
+    // Enabling proximity from the full filter sheet is an explicit gesture too:
+    // request location if it's newly turned on and we don't have a position yet.
+    if (values.sortByDistance && !sortByDistance && !position) requestPermission();
     setShowFilters(false);
   };
 
