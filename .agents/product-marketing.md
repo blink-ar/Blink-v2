@@ -169,6 +169,13 @@
 
 **Current metrics:** Hay tracking con GA4/PostHog, eventos de búsqueda, filtros, selección de comercio, vista de beneficio, guardado, compartir y navegación. No hay métricas de negocio consultables en este contexto salvo inventario público de beneficios/categorías/bancos.
 
+## AI SEO Resources
+**AI visibility spreadsheet:** https://docs.google.com/spreadsheets/d/10oUAX5rGXhoGB9satOnORZCTskciYqk-INeyF_shkJo/edit?gid=0#gid=0
+
+**Use:** Recurso para la skill `ai-seo`. Usar esta planilla como fuente de trabajo/seguimiento para queries, competidores, presencia en respuestas de IA, citas, gaps y evolución mes a mes.
+
+**Note:** Verificar el contenido de la planilla en cada corrida antes de tomar decisiones, porque puede cambiar fuera del repo.
+
 ## Open Questions To Validate
 - ¿Cuál es el objetivo principal de negocio para los próximos 90 días: tráfico SEO, usuarios recurrentes, instalaciones PWA, cuentas, notificaciones, afiliación o B2B?
 - ¿El modelo de negocio deseado es afiliados, ads, featured listings, partnerships con bancos/comercios, B2B para proveedores o una combinación?
