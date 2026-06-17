@@ -698,10 +698,13 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     tipo: 'descuento',
     cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
     valor: value,
-    tope:
-      Array.isArray(benefit?.caps) && benefit.caps.length > 0 && Number.isFinite(benefit.caps[0]?.amount)
-        ? benefit.caps[0].amount
-        : null,
+    tope: (() => {
+      if (!Array.isArray(benefit?.caps)) return null;
+      const txnCaps = benefit.caps
+        .filter(c => c.resetsEvery !== 'PER_USER' && Number.isFinite(c?.amount))
+        .map(c => c.amount);
+      return txnCaps.length > 0 ? Math.min(...txnCaps) : null;
+    })(),
     condicion: benefit?.termsAndConditions || null,
     requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de credito'],
     usos: benefit?.online ? ['online', 'presencial'] : ['presencial'],

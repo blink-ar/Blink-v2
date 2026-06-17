@@ -9,6 +9,11 @@ export interface BenefitEligibility {
   subscriptionResolutionStatus: 'resolved' | 'unresolved' | 'not_required';
 }
 
+export interface BenefitCap {
+  amount: number;
+  resetsEvery: 'PER_USER' | 'PER_TXN' | 'PER_MONTH' | string;
+}
+
 export interface BankBenefit {
   eligibilities?: BenefitEligibility[];
   bankName: string;
@@ -42,6 +47,7 @@ export interface BankBenefit {
   subscriptionIds?: string[];
   // Set when a duplicate Modo benefit was merged into this bank benefit
   acceptsModo?: boolean;
+  caps?: BenefitCap[];
 }
 
 export interface Business {

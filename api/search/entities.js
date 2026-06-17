@@ -198,7 +198,13 @@ function enrichMerchantAccumulator(accumulator, benefit) {
     tipo: 'descuento',
     cuando: Array.isArray(benefit.availableDays) ? benefit.availableDays.join(', ') : '',
     valor: Number.isFinite(benefit.discountPercentage) ? `${Number(benefit.discountPercentage)}%` : undefined,
-    tope: Array.isArray(benefit.caps) && benefit.caps.length > 0 ? benefit.caps[0]?.amount : null,
+    tope: (() => {
+      if (!Array.isArray(benefit.caps)) return null;
+      const txnCaps = benefit.caps
+        .filter(c => c.resetsEvery !== 'PER_USER' && Number.isFinite(c?.amount))
+        .map(c => c.amount);
+      return txnCaps.length > 0 ? Math.min(...txnCaps) : null;
+    })(),
     condicion: benefit.termsAndConditions || '',
     requisitos: cardNames,
     usos: benefit.online ? ['online', 'presencial'] : ['presencial'],

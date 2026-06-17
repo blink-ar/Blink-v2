@@ -409,6 +409,7 @@ function BenefitDetailPage() {
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
+  const perUserCap = (benefit.caps ?? []).find(c => c.resetsEvery === 'PER_USER');
   const paymentMethod = getPaymentMethod(benefit);
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -647,6 +648,16 @@ function BenefitDetailPage() {
               <p className="font-bold text-[15px] text-blink-ink mb-3">Condiciones</p>
 
               <div className="divide-y divide-blink-border">
+
+                {/* Usos por cuenta */}
+                {perUserCap && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Usos por cuenta</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {perUserCap.amount === 1 ? '1 uso' : `${perUserCap.amount} usos`}
+                    </span>
+                  </div>
+                )}
 
                 {/* Tope descuento */}
                 {!isNoLimit && benefit.tope && (
