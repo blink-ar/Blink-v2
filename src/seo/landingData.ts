@@ -27,12 +27,12 @@ export const LANDING_BANKS: LandingBank[] = [
   { slug: 'santander', name: 'Banco Santander', aliases: ['santander', 'rio'] },
   { slug: 'bbva', name: 'BBVA', aliases: ['bbva', 'frances', 'banco frances'] },
   { slug: 'macro', name: 'Banco Macro', aliases: ['macro'] },
-  { slug: 'nacion', name: 'Banco Nacion', aliases: ['nacion', 'bna', 'banco nacion'] },
+  { slug: 'nacion', name: 'Banco Nación', aliases: ['nacion', 'bna', 'banco nacion'] },
   { slug: 'icbc', name: 'ICBC', aliases: ['icbc'] },
 ];
 
 export const LANDING_CATEGORIES: LandingCategory[] = [
-  { slug: 'gastronomia', name: 'Gastronomia' },
+  { slug: 'gastronomia', name: 'Gastronomía' },
   { slug: 'moda', name: 'Moda' },
   { slug: 'shopping', name: 'Supermercado y shopping' },
   { slug: 'hogar', name: 'Hogar' },

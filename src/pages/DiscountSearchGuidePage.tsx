@@ -10,11 +10,11 @@ import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
 
 const DIRECT_DEFINITION =
-  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, dias, cuotas y disponibilidad online o presencial antes de pagar. Reune beneficios publicos de comercios y emisores para que puedas decidir donde comprar y que medio de pago usar.';
+  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, días, cuotas y disponibilidad online o presencial antes de pagar. Reúne beneficios públicos de comercios y emisores para que puedas decidir dónde comprar y qué medio de pago usar.';
 
 const QUICK_FILTERS = [
   { label: '20%+ OFF', icon: 'percent', path: '/search?discount=20' },
-  { label: 'Cuotas sin interes', icon: 'credit_card', path: '/search?installments=1' },
+  { label: 'Cuotas sin interés', icon: 'credit_card', path: '/search?installments=1' },
   { label: 'Online', icon: 'language', path: '/search?online=1' },
   { label: 'Cerca tuyo', icon: 'near_me', path: '/search?nearby=1' },
 ];
@@ -23,40 +23,40 @@ const GUIDE_STEPS = [
   {
     icon: 'search',
     title: 'Busca por comercio, banco o rubro',
-    text: 'Escribe una marca, elige un emisor o entra por categorias como gastronomia, supermercado, moda, viajes y hogar.',
+    text: 'Escribe una marca, elige un emisor o entra por categorías como gastronomía, supermercado, moda, viajes y hogar.',
   },
   {
     icon: 'rule',
     title: 'Compara condiciones reales',
-    text: 'Revisa descuento, tope, dias, cuotas, tarjetas elegibles, vigencia y si aplica online, presencial o por ubicacion.',
+    text: 'Revisa descuento, tope, días, cuotas, tarjetas elegibles, vigencia y si aplica online, presencial o por ubicación.',
   },
   {
     icon: 'payments',
-    title: 'Elige como pagar',
+    title: 'Elige cómo pagar',
     text: 'Antes de comprar, cruza las opciones disponibles y usa el medio de pago que mejor se ajusta a esa compra.',
   },
 ];
 
 const COMPARISON_ROWS = [
   {
-    criterion: 'Busqueda por comercio, banco y rubro',
-    blink: 'Si, orientada a comparar antes de pagar.',
+    criterion: 'Búsqueda por comercio, banco y rubro',
+    blink: 'Sí, orientada a comparar antes de pagar.',
     modo: 'Principalmente beneficios dentro de su ecosistema.',
     promoarg: 'Foco en promociones publicadas por banco/rubro.',
     clash: 'Foco en descubrimiento y comunidad de descuentos.',
     banks: 'Cada banco muestra sus propios beneficios.',
   },
   {
-    criterion: 'Comparacion de topes, dias y cuotas',
-    blink: 'Si, cuando esos datos estan disponibles en la fuente.',
-    modo: 'Disponible segun la promocion dentro de la app.',
-    promoarg: 'Depende de la informacion cargada en cada promo.',
+    criterion: 'Comparación de topes, días y cuotas',
+    blink: 'Sí, cuando esos datos están disponibles en la fuente.',
+    modo: 'Disponible según la promoción dentro de la app.',
+    promoarg: 'Depende de la información cargada en cada promo.',
     clash: 'Depende del contenido publicado.',
     banks: 'Suele estar completo para ese banco, no entre bancos.',
   },
   {
     criterion: 'Vista multi-banco antes de pagar',
-    blink: 'Si, cruza bancos, billeteras y comercios en una busqueda.',
+    blink: 'Sí, cruza bancos, billeteras y comercios en una búsqueda.',
     modo: 'Limitada a medios y comercios de su experiencia.',
     promoarg: 'Lista promociones por banco y comercio.',
     clash: 'Agrupa oportunidades y descuentos publicados.',
@@ -64,11 +64,11 @@ const COMPARISON_ROWS = [
   },
   {
     criterion: 'Mejor uso',
-    blink: 'Decidir donde comprar o con que medio pagar.',
+    blink: 'Decidir dónde comprar o con qué medio pagar.',
     modo: 'Usar beneficios dentro del flujo de pago MODO.',
-    promoarg: 'Consultar promociones por entidad o categoria.',
+    promoarg: 'Consultar promociones por entidad o categoría.',
     clash: 'Descubrir descuentos y oportunidades compartidas.',
-    banks: 'Confirmar terminos finales del emisor.',
+    banks: 'Confirmar términos finales del emisor.',
   },
 ];
 
@@ -76,22 +76,22 @@ const FAQ_ITEMS = [
   {
     question: '¿Dónde buscar descuentos bancarios hoy?',
     answer:
-      'Puedes usar Blink para buscar descuentos bancarios por comercio, banco, billetera, rubro, ubicacion, descuento minimo, cuotas y modalidad online o presencial. La busqueda te ayuda a comparar opciones antes de pagar.',
+      'Puedes usar Blink para buscar descuentos bancarios por comercio, banco, billetera, rubro, ubicación, descuento mínimo, cuotas y modalidad online o presencial. La búsqueda te ayuda a comparar opciones antes de pagar.',
   },
   {
     question: '¿Cómo comparar promociones antes de pagar?',
     answer:
-      'Compara el porcentaje de descuento, el tope de reintegro, los dias de vigencia, las cuotas disponibles, las tarjetas elegibles y las condiciones de cada beneficio. Despues elige el medio de pago que mejor aplica a esa compra.',
+      'Compara el porcentaje de descuento, el tope de reintegro, los días de vigencia, las cuotas disponibles, las tarjetas elegibles y las condiciones de cada beneficio. Después elige el medio de pago que mejor aplica a esa compra.',
   },
   {
     question: '¿Blink reemplaza revisar las condiciones del banco?',
     answer:
-      'No. Blink organiza informacion publica para facilitar la comparacion, pero las condiciones finales siempre dependen del banco, billetera, comercio o programa que emite cada promocion.',
+      'No. Blink organiza información pública para facilitar la comparación, pero las condiciones finales siempre dependen del banco, billetera, comercio o programa que emite cada promoción.',
   },
   {
     question: '¿Se puede buscar por banco, comercio o rubro?',
     answer:
-      'Si. Blink permite iniciar la busqueda por marcas, bancos, billeteras y categorias como gastronomia, supermercado, moda, hogar, belleza, deportes, viajes y otros rubros.',
+      'Sí. Blink permite iniciar la búsqueda por marcas, bancos, billeteras y categorías como gastronomía, supermercado, moda, hogar, belleza, deportes, viajes y otros rubros.',
   },
 ];
 
@@ -225,7 +225,7 @@ function DiscountSearchGuidePage() {
         <section className="border-b border-blink-border bg-white">
           <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:px-8 lg:py-12">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Guia de compra</p>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Guía de compra</p>
               <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-blink-ink lg:text-6xl">
                 Buscador de descuentos bancarios en Argentina
               </h1>
@@ -245,7 +245,7 @@ function DiscountSearchGuidePage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
-                  placeholder="Ej: supermercado Galicia, zapatillas, cafe"
+                  placeholder="Ej: supermercado Galicia, zapatillas, café"
                   type="search"
                   autoComplete="off"
                 />
@@ -310,7 +310,7 @@ function DiscountSearchGuidePage() {
                 Blink no reemplaza a tu banco: te ayuda a comparar antes.
               </h2>
               <p className="mt-3 text-sm leading-6 text-blink-muted lg:max-w-2xl">
-                Las paginas de bancos y billeteras siguen siendo la fuente final de condiciones. Blink sirve para el paso previo: encontrar alternativas, entender topes y ver que comercio o medio de pago conviene revisar.
+                Las páginas de bancos y billeteras siguen siendo la fuente final de condiciones. Blink sirve para el paso previo: encontrar alternativas, entender topes y ver qué comercio o medio de pago conviene revisar.
               </p>
             </div>
 
@@ -338,7 +338,7 @@ function DiscountSearchGuidePage() {
             <div className="overflow-hidden rounded-2xl border border-blink-border shadow-soft">
               <div className="overflow-x-auto">
                 <table className="min-w-[920px] divide-y divide-blink-border bg-white text-sm">
-                  <caption className="sr-only">Comparacion neutral de buscadores y fuentes de descuentos bancarios</caption>
+                  <caption className="sr-only">Comparación neutral de buscadores y fuentes de descuentos bancarios</caption>
                   <thead className="bg-blink-bg text-left text-xs font-black uppercase tracking-[0.08em] text-blink-muted">
                     <tr>
                       <th scope="col" className="px-4 py-3">Criterio</th>
@@ -346,7 +346,7 @@ function DiscountSearchGuidePage() {
                       <th scope="col" className="px-4 py-3">MODO</th>
                       <th scope="col" className="px-4 py-3">PromoArg</th>
                       <th scope="col" className="px-4 py-3">Clash</th>
-                      <th scope="col" className="px-4 py-3">Paginas de bancos</th>
+                      <th scope="col" className="px-4 py-3">Páginas de bancos</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-blink-border">
@@ -430,10 +430,10 @@ function DiscountSearchGuidePage() {
           </div>
 
           <aside className="self-start rounded-2xl border border-blink-border bg-white p-5 shadow-soft">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-blink-muted">Atajos utiles</p>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-blink-muted">Atajos útiles</p>
             <h2 className="mt-2 text-xl font-black text-blink-ink">Explora por rubro o banco</h2>
             <div className="mt-4 space-y-5">
-              <nav aria-label="Categorias de descuentos" className="flex flex-wrap gap-2">
+              <nav aria-label="Categorías de descuentos" className="flex flex-wrap gap-2">
                 {FEATURED_CATEGORY_LINKS.map((link) => (
                   <Link
                     key={link.href}
@@ -474,7 +474,7 @@ function DiscountSearchGuidePage() {
               <div>
                 <h2 className="text-2xl font-black">Abrir Blink y comparar descuentos</h2>
                 <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-white/80">
-                  Usa el buscador para filtrar por comercio, banco, rubro, ubicacion, cuotas y modalidad antes de pagar.
+                  Usa el buscador para filtrar por comercio, banco, rubro, ubicación, cuotas y modalidad antes de pagar.
                 </p>
               </div>
               <Link

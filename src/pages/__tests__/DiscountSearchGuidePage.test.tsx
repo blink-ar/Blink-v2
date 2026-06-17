@@ -28,7 +28,7 @@ const availableBanks = [
   'HSBC',
   'AMEX',
   'Naranja X',
-  'Nacion',
+  'Nación',
   'Ciudad',
 ];
 

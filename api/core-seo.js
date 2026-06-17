@@ -8,9 +8,9 @@ const BLINK_ENTITY_CANONICAL_IDENTITY =
 const DISCOUNT_SEARCH_GUIDE_PATH = '/buscador-de-descuentos-bancarios';
 const DISCOUNT_SEARCH_GUIDE_TITLE = `Buscador de descuentos bancarios en Argentina | ${DEFAULT_SITE_NAME}`;
 const DISCOUNT_SEARCH_GUIDE_DESCRIPTION =
-  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, dias, cuotas y disponibilidad online o presencial antes de pagar.';
+  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, días, cuotas y disponibilidad online o presencial antes de pagar.';
 const DISCOUNT_SEARCH_GUIDE_DEFINITION =
-  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, dias, cuotas y disponibilidad online o presencial antes de pagar. Reune beneficios publicos de comercios y emisores para que puedas decidir donde comprar y que medio de pago usar.';
+  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, días, cuotas y disponibilidad online o presencial antes de pagar. Reúne beneficios públicos de comercios y emisores para que puedas decidir dónde comprar y qué medio de pago usar.';
 const BLINK_KNOWS_ABOUT = [
   'descuentos bancarios en Argentina',
   'promociones con tarjetas',
@@ -23,7 +23,7 @@ const BLINK_KNOWS_ABOUT = [
 ];
 
 const FEATURED_CATEGORIES = [
-  { label: 'Gastronomia', href: '/categorias/gastronomia' },
+  { label: 'Gastronomía', href: '/categorias/gastronomia' },
   { label: 'Moda', href: '/categorias/moda' },
   { label: 'Supermercado', href: '/categorias/supermercado' },
   { label: 'Hogar', href: '/categorias/hogar' },
@@ -32,49 +32,49 @@ const FEATURED_CATEGORIES = [
 ];
 
 const FEATURED_DISCOUNTS = [
-  { label: 'Galicia en Gastronomia', href: '/descuentos/galicia/gastronomia' },
+  { label: 'Galicia en Gastronomía', href: '/descuentos/galicia/gastronomia' },
   { label: 'Santander en Moda', href: '/descuentos/santander/moda' },
   { label: 'BBVA en Supermercado', href: '/descuentos/bbva/shopping' },
   { label: 'Macro en Hogar', href: '/descuentos/macro/hogar' },
-  { label: 'Banco Nacion en Deportes', href: '/descuentos/nacion/deportes' },
+  { label: 'Banco Nación en Deportes', href: '/descuentos/nacion/deportes' },
   { label: 'ICBC en Belleza', href: '/descuentos/icbc/belleza' },
 ];
 
 const DISCOUNT_SEARCH_GUIDE_STEPS = [
   {
     title: 'Busca por comercio, banco o rubro',
-    text: 'Escribe una marca, elige un emisor o entra por categorias como gastronomia, supermercado, moda, viajes y hogar.',
+    text: 'Escribe una marca, elige un emisor o entra por categorías como gastronomía, supermercado, moda, viajes y hogar.',
   },
   {
     title: 'Compara condiciones reales',
-    text: 'Revisa descuento, tope, dias, cuotas, tarjetas elegibles, vigencia y si aplica online, presencial o por ubicacion.',
+    text: 'Revisa descuento, tope, días, cuotas, tarjetas elegibles, vigencia y si aplica online, presencial o por ubicación.',
   },
   {
-    title: 'Elige como pagar',
+    title: 'Elige cómo pagar',
     text: 'Antes de comprar, cruza las opciones disponibles y usa el medio de pago que mejor se ajusta a esa compra.',
   },
 ];
 
 const DISCOUNT_SEARCH_GUIDE_COMPARISON = [
   {
-    criterion: 'Busqueda por comercio, banco y rubro',
-    blink: 'Si, orientada a comparar antes de pagar.',
+    criterion: 'Búsqueda por comercio, banco y rubro',
+    blink: 'Sí, orientada a comparar antes de pagar.',
     modo: 'Principalmente beneficios dentro de su ecosistema.',
     promoarg: 'Foco en promociones publicadas por banco/rubro.',
     clash: 'Foco en descubrimiento y comunidad de descuentos.',
     banks: 'Cada banco muestra sus propios beneficios.',
   },
   {
-    criterion: 'Comparacion de topes, dias y cuotas',
-    blink: 'Si, cuando esos datos estan disponibles en la fuente.',
-    modo: 'Disponible segun la promocion dentro de la app.',
-    promoarg: 'Depende de la informacion cargada en cada promo.',
+    criterion: 'Comparación de topes, días y cuotas',
+    blink: 'Sí, cuando esos datos están disponibles en la fuente.',
+    modo: 'Disponible según la promoción dentro de la app.',
+    promoarg: 'Depende de la información cargada en cada promo.',
     clash: 'Depende del contenido publicado.',
     banks: 'Suele estar completo para ese banco, no entre bancos.',
   },
   {
     criterion: 'Vista multi-banco antes de pagar',
-    blink: 'Si, cruza bancos, billeteras y comercios en una busqueda.',
+    blink: 'Sí, cruza bancos, billeteras y comercios en una búsqueda.',
     modo: 'Limitada a medios y comercios de su experiencia.',
     promoarg: 'Lista promociones por banco y comercio.',
     clash: 'Agrupa oportunidades y descuentos publicados.',
@@ -82,30 +82,30 @@ const DISCOUNT_SEARCH_GUIDE_COMPARISON = [
   },
   {
     criterion: 'Mejor uso',
-    blink: 'Decidir donde comprar o con que medio pagar.',
+    blink: 'Decidir dónde comprar o con qué medio pagar.',
     modo: 'Usar beneficios dentro del flujo de pago MODO.',
-    promoarg: 'Consultar promociones por entidad o categoria.',
+    promoarg: 'Consultar promociones por entidad o categoría.',
     clash: 'Descubrir descuentos y oportunidades compartidas.',
-    banks: 'Confirmar terminos finales del emisor.',
+    banks: 'Confirmar términos finales del emisor.',
   },
 ];
 
 const DISCOUNT_SEARCH_GUIDE_FAQ = [
   {
     question: '¿Dónde buscar descuentos bancarios hoy?',
-    answer: 'Puedes usar Blink para buscar descuentos bancarios por comercio, banco, billetera, rubro, ubicacion, descuento minimo, cuotas y modalidad online o presencial. La busqueda te ayuda a comparar opciones antes de pagar.',
+    answer: 'Puedes usar Blink para buscar descuentos bancarios por comercio, banco, billetera, rubro, ubicación, descuento mínimo, cuotas y modalidad online o presencial. La búsqueda te ayuda a comparar opciones antes de pagar.',
   },
   {
     question: '¿Cómo comparar promociones antes de pagar?',
-    answer: 'Compara el porcentaje de descuento, el tope de reintegro, los dias de vigencia, las cuotas disponibles, las tarjetas elegibles y las condiciones de cada beneficio. Despues elige el medio de pago que mejor aplica a esa compra.',
+    answer: 'Compara el porcentaje de descuento, el tope de reintegro, los días de vigencia, las cuotas disponibles, las tarjetas elegibles y las condiciones de cada beneficio. Después elige el medio de pago que mejor aplica a esa compra.',
   },
   {
     question: '¿Blink reemplaza revisar las condiciones del banco?',
-    answer: 'No. Blink organiza informacion publica para facilitar la comparacion, pero las condiciones finales siempre dependen del banco, billetera, comercio o programa que emite cada promocion.',
+    answer: 'No. Blink organiza información pública para facilitar la comparación, pero las condiciones finales siempre dependen del banco, billetera, comercio o programa que emite cada promoción.',
   },
   {
     question: '¿Se puede buscar por banco, comercio o rubro?',
-    answer: 'Si. Blink permite iniciar la busqueda por marcas, bancos, billeteras y categorias como gastronomia, supermercado, moda, hogar, belleza, deportes, viajes y otros rubros.',
+    answer: 'Sí. Blink permite iniciar la búsqueda por marcas, bancos, billeteras y categorías como gastronomía, supermercado, moda, hogar, belleza, deportes, viajes y otros rubros.',
   },
 ];
 
@@ -192,10 +192,24 @@ function formatMetric(value, fallback) {
   return Math.round(numeric).toLocaleString('es-AR');
 }
 
+function formatDisplayName(value) {
+  const text = String(value || '').trim();
+  const normalized = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (normalized === 'nacion' || normalized === 'banco nacion') return 'Banco Nación';
+  if (normalized === 'gastronomia') return 'Gastronomía';
+
+  return text;
+}
+
 function formatNamedCounts(items, fallback) {
   const values = (items || [])
     .map((item) => String(item?._id || item?.name || '').trim())
     .filter(Boolean)
+    .map(formatDisplayName)
     .slice(0, 5);
 
   return values.length > 0 ? values.join(', ') : fallback;
@@ -416,8 +430,8 @@ function renderFactList(summary) {
   const facts = [
     ['Beneficios activos', formatMetric(summary.totalBenefits, 'Actualizando')],
     ['Comercios activos', formatMetric(summary.activeMerchantCount || summary.merchantCount, 'Actualizando')],
-    ['Bancos frecuentes', formatNamedCounts(summary.topBanks, 'Galicia, Santander, BBVA, Macro, Nacion e ICBC')],
-    ['Categorias frecuentes', formatNamedCounts(summary.topCategories, 'Gastronomia, moda, supermercado, hogar, deportes y belleza')],
+    ['Bancos frecuentes', formatNamedCounts(summary.topBanks, 'Galicia, Santander, BBVA, Macro, Nación e ICBC')],
+    ['Categorías frecuentes', formatNamedCounts(summary.topCategories, 'Gastronomía, moda, supermercado, hogar, deportes y belleza')],
   ];
 
   return [
@@ -455,7 +469,7 @@ function renderFaq(summary) {
     },
     {
       question: '¿Qué comercios y bancos cubre Blink?',
-      answer: `Blink publica beneficios de ${merchantText} en Argentina e incluye bancos y billeteras como Galicia, Santander, BBVA, Macro, Nacion, ICBC, NaranjaX, Mercado Pago y MODO.`,
+      answer: `Blink publica beneficios de ${merchantText} en Argentina e incluye bancos y billeteras como Galicia, Santander, BBVA, Macro, Nación, ICBC, NaranjaX, Mercado Pago y MODO.`,
     },
     {
       question: '¿De dónde salen los datos de Blink?',
@@ -479,7 +493,7 @@ function renderFaq(summary) {
 function renderDiscountGuideSteps() {
   return [
     '<section class="blink-core-section blink-core-cards">',
-    '  <h2>Como usar Blink para comparar descuentos bancarios</h2>',
+    '  <h2>Cómo usar Blink para comparar descuentos bancarios</h2>',
     ...DISCOUNT_SEARCH_GUIDE_STEPS.map((step, index) => [
       '  <article>',
       `    <p class="blink-core-step">Paso ${index + 1}</p>`,
@@ -494,12 +508,12 @@ function renderDiscountGuideSteps() {
 function renderDiscountGuideComparison() {
   return [
     '<section class="blink-core-section">',
-    '  <h2>Blink vs MODO vs PromoArg vs Clash vs paginas de bancos</h2>',
+    '  <h2>Blink vs MODO vs PromoArg vs Clash vs páginas de bancos</h2>',
     '  <p>Blink no reemplaza a bancos o billeteras como fuente final de condiciones. Sirve para el paso previo: encontrar y comparar alternativas antes de pagar.</p>',
     '  <div class="blink-core-table-wrap">',
     '    <table class="blink-core-table">',
     '      <thead>',
-    '        <tr><th>Criterio</th><th>Blink</th><th>MODO</th><th>PromoArg</th><th>Clash</th><th>Paginas de bancos</th></tr>',
+    '        <tr><th>Criterio</th><th>Blink</th><th>MODO</th><th>PromoArg</th><th>Clash</th><th>Páginas de bancos</th></tr>',
     '      </thead>',
     '      <tbody>',
     ...DISCOUNT_SEARCH_GUIDE_COMPARISON.map((row) => [
@@ -537,7 +551,7 @@ function buildDiscountGuideBodyHtml({ summary }) {
   return [
     '<main class="blink-core-shell" data-blink-core-seo>',
     '  <section class="blink-core-hero">',
-    '    <p class="blink-core-kicker">Guia de compra</p>',
+    '    <p class="blink-core-kicker">Guía de compra</p>',
     '    <h1>Buscador de descuentos bancarios en Argentina</h1>',
     `    <p>${escapeHtml(DISCOUNT_SEARCH_GUIDE_DEFINITION)}</p>`,
     '    <form class="blink-core-search" action="/search" method="get" role="search">',
@@ -551,7 +565,7 @@ function buildDiscountGuideBodyHtml({ summary }) {
     renderDiscountGuideComparison(),
     '  <section class="blink-core-section">',
     '    <h2>Atajos para explorar</h2>',
-    '    <h3>Categorias</h3>',
+    '    <h3>Categorías</h3>',
     renderLinkList(FEATURED_CATEGORIES),
     '    <h3>Descuentos por banco y rubro</h3>',
     renderLinkList(FEATURED_DISCOUNTS),
@@ -571,7 +585,7 @@ function buildBodyHtml({ page, summary, description }) {
     ? 'Buscar descuentos y promociones bancarias'
     : 'Descuentos bancarios en Argentina';
   const intro = isSearch
-    ? 'Usa Blink para encontrar beneficios por comercio, banco, billetera, categoria, cuotas, topes y dias de vigencia.'
+    ? 'Usa Blink para encontrar beneficios por comercio, banco, billetera, categoría, cuotas, topes y días de vigencia.'
     : description;
 
   return [
@@ -593,7 +607,7 @@ function buildBodyHtml({ page, summary, description }) {
     `    <p>${escapeHtml(BLINK_ENTITY_CANONICAL_IDENTITY)}</p>`,
     '  </section>',
     '  <section class="blink-core-section">',
-    '    <h2>Categorias principales</h2>',
+    '    <h2>Categorías principales</h2>',
     renderLinkList(FEATURED_CATEGORIES),
     '  </section>',
     '  <section class="blink-core-section">',
@@ -601,7 +615,7 @@ function buildBodyHtml({ page, summary, description }) {
     renderLinkList(FEATURED_DISCOUNTS),
     '  </section>',
     '  <section class="blink-core-section">',
-    '    <h2>Como evaluamos los beneficios</h2>',
+    '    <h2>Cómo evaluamos los beneficios</h2>',
     '    <p>Para cada comercio, Blink prioriza promociones activas y muestra bancos, tarjetas, cuotas, topes de reintegro, vigencia y ubicaciones disponibles cuando esos datos existen.</p>',
     '  </section>',
     renderFaq(summary),

@@ -21,11 +21,11 @@ export const HOME_CATEGORY_LINKS: HomeSeoLink[] = SEO_CATEGORY_LINKS
   }));
 
 export const HOME_DISCOUNT_LINKS: HomeSeoLink[] = [
-  { label: 'Galicia en Gastronomia', href: getLandingPath('galicia', 'gastronomia') },
+  { label: 'Galicia en Gastronomía', href: getLandingPath('galicia', 'gastronomia') },
   { label: 'Santander en Moda', href: getLandingPath('santander', 'moda') },
   { label: 'BBVA en Supermercado', href: getLandingPath('bbva', 'shopping') },
   { label: 'Macro en Hogar', href: getLandingPath('macro', 'hogar') },
-  { label: 'Banco Nacion en Deportes', href: getLandingPath('nacion', 'deportes') },
+  { label: 'Banco Nación en Deportes', href: getLandingPath('nacion', 'deportes') },
   { label: 'ICBC en Belleza', href: getLandingPath('icbc', 'belleza') },
 ];
 

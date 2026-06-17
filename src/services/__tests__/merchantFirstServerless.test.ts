@@ -702,7 +702,7 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('<h1>Buscador de descuentos bancarios en Argentina</h1>');
     expect(res.body).toContain('Blink es un buscador de descuentos bancarios en Argentina');
     expect(res.body).toContain('Compara condiciones reales');
-    expect(res.body).toContain('Blink vs MODO vs PromoArg vs Clash vs paginas de bancos');
+    expect(res.body).toContain('Blink vs MODO vs PromoArg vs Clash vs páginas de bancos');
     expect(res.body).toContain('¿Dónde buscar descuentos bancarios hoy?');
     expect(res.body).toContain('data-blink-core-seo="structured-data"');
     expect(res.body).toContain('SearchAction');
@@ -1235,7 +1235,7 @@ describe('merchant-first serverless helpers', () => {
     const bankPatterns = (merchantQueries[0] as Record<string, { $in: RegExp[] }>)['searchProfile.benefits.bankName'].$in;
     expect(bankPatterns.some((pattern) => pattern.test('Banco Nación'))).toBe(true);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('<title>Descuentos Banco Nacion en Supermercado y shopping | Blink</title>');
+    expect(res.body).toContain('<title>Descuentos Banco Nación en Supermercado y shopping | Blink</title>');
   });
 
   it('handleLandingSeoPage preserves client bank aliases for Santander Rio merchant data', async () => {
