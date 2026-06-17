@@ -410,6 +410,9 @@ function BenefitDetailPage() {
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
   const perUserCap = (benefit.caps ?? []).find(c => c.resetsEvery === 'PER_USER');
+  // PER_USER caps with small amounts (<=20) represent usage counts; larger amounts are monetary topes per client
+  const perUserUsageCount = perUserCap && perUserCap.amount <= 20 ? perUserCap.amount : null;
+  const perUserMonetaryCap = perUserCap && perUserCap.amount > 20 ? perUserCap.amount : null;
   const paymentMethod = getPaymentMethod(benefit);
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -649,17 +652,25 @@ function BenefitDetailPage() {
 
               <div className="divide-y divide-blink-border">
 
-                {/* Usos por cuenta */}
-                {perUserCap && (
+                {/* Usos por cuenta (PER_USER cap with small count) */}
+                {perUserUsageCount !== null && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Usos por cuenta</span>
                     <span className="text-sm font-semibold text-blink-ink">
-                      {perUserCap.amount === 1 ? '1 uso' : `${perUserCap.amount} usos`}
+                      {perUserUsageCount === 1 ? '1 uso' : `${perUserUsageCount} usos`}
                     </span>
                   </div>
                 )}
 
-                {/* Tope descuento */}
+                {/* Tope por cliente (PER_USER cap with monetary amount) */}
+                {perUserMonetaryCap !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Tope por cliente</span>
+                    <span className="text-sm font-semibold text-blink-ink">{formatArgentinePeso(perUserMonetaryCap)}</span>
+                  </div>
+                )}
+
+                {/* Tope descuento (PER_TXN cap) */}
                 {!isNoLimit && benefit.tope && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
