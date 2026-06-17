@@ -8,6 +8,7 @@ import { buildBankOptions } from '../utils/banks';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
+import { CATEGORY_OPTIONS } from '../components/neo/CategoryFilterSheet';
 
 const DIRECT_DEFINITION =
   'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, días, cuotas y disponibilidad online o presencial antes de pagar. Reúne beneficios públicos de comercios y emisores para que puedas decidir dónde comprar y qué medio de pago usar.';
@@ -89,6 +90,7 @@ const FAQ_ITEMS = [
 
 const FEATURED_CATEGORY_LINKS = HOME_CATEGORY_LINKS.slice(0, 6);
 const FEATURED_DISCOUNT_LINKS = HOME_DISCOUNT_LINKS.slice(0, 6);
+const SEARCH_CATEGORY_COUNT = CATEGORY_OPTIONS.length;
 
 function formatCount(value: unknown, fallback: string) {
   const numberValue = Number(value || 0);
@@ -177,9 +179,8 @@ function DiscountSearchGuidePage() {
   const physicalCount = formatCount(stats?.physicalBenefits, '0');
   const channelCount = hasChannelStats ? `${onlineCount} / ${physicalCount}` : 'Actualizando';
   const topBankCount = countItems(stats?.topBanks);
-  const topCategoryCount = countItems(stats?.topCategories);
   const bankCount = formatCount(allBankOptions.length || topBankCount, 'Actualizando');
-  const categoryCount = formatCount(topCategoryCount, 'Actualizando');
+  const categoryCount = formatCount(SEARCH_CATEGORY_COUNT, 'Actualizando');
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -334,7 +335,12 @@ function DiscountSearchGuidePage() {
                   <thead className="bg-blink-bg text-left text-xs font-black uppercase tracking-[0.08em] text-blink-muted">
                     <tr>
                       <th scope="col" className="px-4 py-3">Criterio</th>
-                      <th scope="col" className="px-4 py-3 text-blink-ink">Blink</th>
+                      <th scope="col" className="border-x border-primary bg-primary px-4 py-3 text-white">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1">
+                          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>verified</span>
+                          Blink
+                        </span>
+                      </th>
                       <th scope="col" className="px-4 py-3">MODO</th>
                       <th scope="col" className="px-4 py-3">PromoArg</th>
                       <th scope="col" className="px-4 py-3">Clash</th>
@@ -345,7 +351,14 @@ function DiscountSearchGuidePage() {
                     {COMPARISON_ROWS.map((row) => (
                       <tr key={row.criterion}>
                         <th scope="row" className="px-4 py-4 text-left font-black text-blink-ink">{row.criterion}</th>
-                        <td className="px-4 py-4 font-semibold text-blink-ink">{row.blink}</td>
+                        <td className="border-x border-primary/25 bg-primary/5 px-4 py-4 font-bold text-blink-ink">
+                          <span className="flex items-start gap-2">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check</span>
+                            </span>
+                            <span>{row.blink}</span>
+                          </span>
+                        </td>
                         <td className="px-4 py-4 text-blink-muted">{row.modo}</td>
                         <td className="px-4 py-4 text-blink-muted">{row.promoarg}</td>
                         <td className="px-4 py-4 text-blink-muted">{row.clash}</td>

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useQuery } from '@tanstack/react-query';
 import DiscountSearchGuidePage from '../DiscountSearchGuidePage';
+import { CATEGORY_OPTIONS } from '../../components/neo/CategoryFilterSheet';
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: vi.fn(),
@@ -31,6 +32,7 @@ const availableBanks = [
   'Nación',
   'Ciudad',
 ];
+const searchCategoryCount = CATEGORY_OPTIONS.length.toLocaleString('es-AR');
 
 describe('DiscountSearchGuidePage', () => {
   beforeEach(() => {
@@ -93,7 +95,7 @@ describe('DiscountSearchGuidePage', () => {
     expect(screen.getByText('1.234')).toBeInTheDocument();
     expect(screen.getByText('98 / 1.136')).toBeInTheDocument();
     expect(screen.getByText('11')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText(searchCategoryCount)).toBeInTheDocument();
     expect(screen.getByText('Online / presencial')).toBeInTheDocument();
     expect(screen.getByText('Emisores disponibles')).toBeInTheDocument();
     expect(screen.getByText('Rubros para explorar')).toBeInTheDocument();
