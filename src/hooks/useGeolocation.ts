@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Coordinates {
   latitude: number;
@@ -59,6 +59,12 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
     loading: true,
     permissionDenied: false,
   });
+
+  // Tracks an in-flight explicit request (requestPermission). The mount effect's
+  // async permissions.query() can resolve *after* such a request started; without
+  // this guard its 'prompt' branch would call setIdle() and clobber the in-flight
+  // request's loading:true, making consumers treat geolocation as settled.
+  const manualRequestRef = useRef(false);
 
   useEffect(() => {
     // Subscribe to updates from other instances (e.g. requestPermission called elsewhere)
@@ -122,8 +128,12 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
 
     // Idle state used when we intentionally don't request location (no prompt,
     // no error, not denied) — consumers see position=null and can offer a gesture.
-    const setIdle = () =>
+    // Skip if an explicit request is already in flight so we don't clobber its
+    // loading:true (it will set the final state when the GPS callback returns).
+    const setIdle = () => {
+      if (manualRequestRef.current) return;
       setState({ position: null, error: null, loading: false, permissionDenied: false });
+    };
 
     if ('permissions' in navigator) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
@@ -158,6 +168,17 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
   }, [autoRequest]);
 
   const requestPermission = () => {
+    if (!navigator.geolocation) {
+      setState({
+        position: null,
+        error: 'Geolocation is not supported by your browser',
+        loading: false,
+        permissionDenied: false,
+      });
+      return;
+    }
+
+    manualRequestRef.current = true;
     setState((prev) => ({ ...prev, loading: true }));
 
     navigator.geolocation.getCurrentPosition(

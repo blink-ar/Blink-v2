@@ -387,20 +387,15 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position, requestPermission } = useGeolocation();
-
-  // Honor an explicit proximity intent that arrives before we have a position:
-  // either a `nearby=1` deeplink (e.g. the "Cerca tuyo" pill on Home) or a
-  // previously granted permission whose location hasn't resolved yet. Fires
-  // once; for already-granted users this never shows a prompt.
-  const proximityRequested = useRef(false);
-  useEffect(() => {
-    if (proximityRequested.current) return;
-    if (sortByDistance && !position) {
-      proximityRequested.current = true;
-      requestPermission();
-    }
-  }, [sortByDistance, position, requestPermission]);
+  // A `nearby=1` deeplink (e.g. the "Cerca tuyo" pill on Home) is an explicit
+  // proximity intent, so we let the hook prompt for permission on mount. We
+  // capture it once: later URL syncs (toggling the pill writes nearby=1) must
+  // not flip this on and re-trigger the request. Note this is intentionally NOT
+  // derived from a stale `locationPermission=granted` in localStorage — that
+  // would re-introduce an unprompted request on load; truly-granted permission
+  // is reused silently by the hook instead.
+  const [nearbyDeeplink] = useState(() => searchParams.get('nearby') === '1');
+  const { position, requestPermission } = useGeolocation({ autoRequest: nearbyDeeplink });
 
   const {
     businesses,
