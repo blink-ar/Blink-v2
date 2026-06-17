@@ -44,6 +44,7 @@ const SERVER_STRUCTURED_DATA_SELECTOR = [
   'script[type="application/ld+json"][data-blink-category-seo="structured-data"]',
   'script[type="application/ld+json"][data-blink-merchant-seo="structured-data"]',
   'script[type="application/ld+json"][data-blink-landing-seo="structured-data"]',
+  'script[type="application/ld+json"][data-blink-core-seo="structured-data"]',
 ].join(', ');
 
 function getSiteUrl(): string {

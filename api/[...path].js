@@ -13,6 +13,7 @@ import {
   tokenizeSearchText
 } from './search/normalize.js';
 import {
+  FALLBACK_CORE_SEO_SUMMARY,
   renderCoreSeoHtml
 } from './core-seo.js';
 import {
@@ -2089,56 +2090,65 @@ async function handleGetStats(req, res, url, db) {
 }
 
 async function loadCoreSeoSummary(db) {
-  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
-  const benefitsCollection = db.collection(DEFAULT_COLLECTION);
-  const activeBenefitMatch = getActiveBenefitsMatch(new URLSearchParams()) || {};
-  const indexableMerchantQuery = {
-    isActive: { $ne: false },
-    merchantId: { $exists: true, $type: 'string' },
-    benefitCount: { $gt: 0 }
-  };
-  const activeMerchantQuery = {
-    ...indexableMerchantQuery,
-    activeBenefitCount: { $gt: 0 }
-  };
+  if (!db) {
+    return FALLBACK_CORE_SEO_SUMMARY;
+  }
 
-  const [
-    totalBenefits,
-    merchantCount,
-    activeMerchantCount,
-    topCategories,
-    topBanks
-  ] = await Promise.all([
-    benefitsCollection.countDocuments(activeBenefitMatch),
-    merchantCollection.countDocuments(indexableMerchantQuery),
-    merchantCollection.countDocuments(activeMerchantQuery),
-    merchantCollection
-      .aggregate([
-        { $match: activeMerchantQuery },
-        { $unwind: '$categories' },
-        { $group: { _id: '$categories', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 6 }
-      ])
-      .toArray(),
-    merchantCollection
-      .aggregate([
-        { $match: activeMerchantQuery },
-        { $unwind: '$banks' },
-        { $group: { _id: '$banks', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 6 }
-      ])
-      .toArray()
-  ]);
+  try {
+    const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+    const benefitsCollection = db.collection(DEFAULT_COLLECTION);
+    const activeBenefitMatch = getActiveBenefitsMatch(new URLSearchParams()) || {};
+    const indexableMerchantQuery = {
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
+      benefitCount: { $gt: 0 }
+    };
+    const activeMerchantQuery = {
+      ...indexableMerchantQuery,
+      activeBenefitCount: { $gt: 0 }
+    };
 
-  return {
-    totalBenefits,
-    merchantCount,
-    activeMerchantCount,
-    topCategories,
-    topBanks
-  };
+    const [
+      totalBenefits,
+      merchantCount,
+      activeMerchantCount,
+      topCategories,
+      topBanks
+    ] = await Promise.all([
+      benefitsCollection.countDocuments(activeBenefitMatch),
+      merchantCollection.countDocuments(indexableMerchantQuery),
+      merchantCollection.countDocuments(activeMerchantQuery),
+      merchantCollection
+        .aggregate([
+          { $match: activeMerchantQuery },
+          { $unwind: '$categories' },
+          { $group: { _id: '$categories', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+          { $limit: 6 }
+        ])
+        .toArray(),
+      merchantCollection
+        .aggregate([
+          { $match: activeMerchantQuery },
+          { $unwind: '$banks' },
+          { $group: { _id: '$banks', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+          { $limit: 6 }
+        ])
+        .toArray()
+    ]);
+
+    return {
+      totalBenefits,
+      merchantCount,
+      activeMerchantCount,
+      topCategories,
+      topBanks
+    };
+  } catch (error) {
+    console.warn('[Vercel API] Core SEO summary unavailable, rendering fallback shell:', error);
+    return FALLBACK_CORE_SEO_SUMMARY;
+  }
 }
 
 async function handleHomeSeoPage(req, res, url, db, options = {}) {
@@ -2922,6 +2932,21 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (isReadMethod(req) && (path === '/api/__page/home' || path === '/api/__page/search')) {
+      let coreSeoDb = null;
+      try {
+        coreSeoDb = await getDb();
+      } catch (error) {
+        console.warn('[Vercel API] Core SEO database unavailable, rendering fallback shell:', error);
+      }
+
+      if (path === '/api/__page/home') {
+        return await handleHomeSeoPage(req, res, url, coreSeoDb);
+      }
+
+      return await handleSearchSeoPage(req, res, url, coreSeoDb);
+    }
+
     const db = await getDb();
 
     if (req.method === 'GET' && path === '/api/benefits') {
@@ -2937,14 +2962,6 @@ export default async function handler(req, res) {
     }
 
     if (isReadMethod(req)) {
-      if (path === '/api/__page/home') {
-        return await handleHomeSeoPage(req, res, url, db);
-      }
-
-      if (path === '/api/__page/search') {
-        return await handleSearchSeoPage(req, res, url, db);
-      }
-
       const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
       if (categorySeoMatch) {
         return await handleCategorySeoPage(

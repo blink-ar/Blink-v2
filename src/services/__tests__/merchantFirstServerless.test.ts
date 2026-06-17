@@ -93,6 +93,7 @@ function createAggregateCursor<T>(data: T[]) {
 describe('merchant-first serverless helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
@@ -577,6 +578,35 @@ describe('merchant-first serverless helpers', () => {
     expect(benefitQueries).toHaveLength(1);
     expect(merchantQueries).toHaveLength(2);
     expect(merchantAggregatePipelines).toHaveLength(2);
+  });
+
+  it('handleHomeSeoPage falls back to crawlable HTML when summary queries fail', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const db = {
+      collection() {
+        throw new Error('Mongo unavailable');
+      }
+    };
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/?path=__page/home');
+
+    await handleHomeSeoPage(req as never, res as never, url, db as never, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<h1>Descuentos bancarios en Argentina</h1>');
+    expect(res.body).toContain('beneficios activos y comercios activos');
+    expect(res.body).toContain('<dd>Actualizando</dd>');
+    expect(res.body).toContain('data-blink-core-seo="structured-data"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Core SEO summary unavailable'),
+      expect.any(Error)
+    );
   });
 
   it('handleSearchSeoPage returns crawlable search overview HTML', async () => {

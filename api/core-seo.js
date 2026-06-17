@@ -20,6 +20,14 @@ const FEATURED_DISCOUNTS = [
   { label: 'ICBC en Belleza', href: '/descuentos/icbc/belleza' },
 ];
 
+export const FALLBACK_CORE_SEO_SUMMARY = {
+  totalBenefits: null,
+  merchantCount: null,
+  activeMerchantCount: null,
+  topCategories: [],
+  topBanks: [],
+};
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -78,9 +86,20 @@ function injectBody(shell, bodyHtml) {
   return `${shell}\n<div id="root">${bodyHtml}</div>`;
 }
 
-function formatCount(value) {
+function hasPositiveCount(value) {
   const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric) || numeric <= 0) return '0';
+  return Number.isFinite(numeric) && numeric > 0;
+}
+
+function formatCount(value, fallback = '0') {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return Math.round(numeric).toLocaleString('es-AR');
+}
+
+function formatMetric(value, fallback) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
   return Math.round(numeric).toLocaleString('es-AR');
 }
 
@@ -94,9 +113,15 @@ function formatNamedCounts(items, fallback) {
 }
 
 function buildDescription(summary) {
-  const benefitCount = formatCount(summary.totalBenefits);
-  const merchantCount = formatCount(summary.activeMerchantCount || summary.merchantCount);
-  return `Blink es un buscador de descuentos bancarios en Argentina con ${benefitCount} beneficios y ${merchantCount} comercios activos. Compara bancos, billeteras, cuotas, dias de vigencia y topes antes de pagar.`;
+  const merchantCountValue = summary.activeMerchantCount || summary.merchantCount;
+  const benefitText = hasPositiveCount(summary.totalBenefits)
+    ? `${formatCount(summary.totalBenefits)} beneficios`
+    : 'beneficios activos';
+  const merchantText = hasPositiveCount(merchantCountValue)
+    ? `${formatCount(merchantCountValue)} comercios activos`
+    : 'comercios activos';
+
+  return `Blink es un buscador de descuentos bancarios en Argentina con ${benefitText} y ${merchantText}. Compara bancos, billeteras, cuotas, dias de vigencia y topes antes de pagar.`;
 }
 
 function buildStructuredData({ absoluteUrl, description, page }) {
@@ -151,8 +176,8 @@ function renderLinkList(links) {
 
 function renderFactList(summary) {
   const facts = [
-    ['Beneficios activos', formatCount(summary.totalBenefits)],
-    ['Comercios activos', formatCount(summary.activeMerchantCount || summary.merchantCount)],
+    ['Beneficios activos', formatMetric(summary.totalBenefits, 'Actualizando')],
+    ['Comercios activos', formatMetric(summary.activeMerchantCount || summary.merchantCount, 'Actualizando')],
     ['Bancos frecuentes', formatNamedCounts(summary.topBanks, 'Galicia, Santander, BBVA, Macro, Nacion e ICBC')],
     ['Categorias frecuentes', formatNamedCounts(summary.topCategories, 'Gastronomia, moda, supermercado, hogar, deportes y belleza')],
   ];
@@ -170,12 +195,17 @@ function renderFactList(summary) {
 }
 
 function renderFaq(summary) {
-  const benefitCount = formatCount(summary.totalBenefits);
-  const merchantCount = formatCount(summary.activeMerchantCount || summary.merchantCount);
+  const merchantCountValue = summary.activeMerchantCount || summary.merchantCount;
+  const benefitText = hasPositiveCount(summary.totalBenefits)
+    ? `${formatCount(summary.totalBenefits)} beneficios`
+    : 'beneficios activos';
+  const merchantText = hasPositiveCount(merchantCountValue)
+    ? `${formatCount(merchantCountValue)} comercios activos`
+    : 'comercios activos';
   const items = [
     {
       question: 'Que es Blink?',
-      answer: `Blink es un buscador argentino de descuentos, cuotas y beneficios de bancos, billeteras, clubes y suscripciones. Reune ${benefitCount} beneficios para comparar antes de pagar.`,
+      answer: `Blink es un buscador argentino de descuentos, cuotas y beneficios de bancos, billeteras, clubes y suscripciones. Reune ${benefitText} para comparar antes de pagar.`,
     },
     {
       question: 'Como se usa Blink para encontrar descuentos?',
@@ -183,7 +213,7 @@ function renderFaq(summary) {
     },
     {
       question: 'Que comercios y bancos cubre Blink?',
-      answer: `Blink publica beneficios de ${merchantCount} comercios activos en Argentina e incluye bancos y billeteras como Galicia, Santander, BBVA, Macro, Nacion, ICBC, NaranjaX, Mercado Pago y MODO.`,
+      answer: `Blink publica beneficios de ${merchantText} en Argentina e incluye bancos y billeteras como Galicia, Santander, BBVA, Macro, Nacion, ICBC, NaranjaX, Mercado Pago y MODO.`,
     },
     {
       question: 'De donde salen los datos de Blink?',
