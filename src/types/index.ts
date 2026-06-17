@@ -42,6 +42,10 @@ export interface BankBenefit {
   subscriptionIds?: string[];
   // Set when a duplicate Modo benefit was merged into this bank benefit
   acceptsModo?: boolean;
+  minimumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
 }
 
 export interface Business {
@@ -152,6 +156,10 @@ export interface Benefit {
   purchaseMethod: string;
   howToRedeem: string;
   limits: string;
+  minimumPurchaseAmount?: {
+    amount: number;
+    currency?: string;
+  };
 }
 
 export interface BenefitsResponse {

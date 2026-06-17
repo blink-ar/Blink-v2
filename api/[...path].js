@@ -100,6 +100,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   termsAndConditions: 1,
   link: 1,
   validUntil: 1,
+  minimumPurchaseAmount: 1,
   sourceCollection: 1,
   rawBenefitCollection: 1,
   source: 1
@@ -711,6 +712,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     validUntil: benefit?.validUntil || null,
     caps: Array.isArray(benefit?.caps) ? benefit.caps : [],
     otherDiscounts: benefit?.otherDiscounts || null,
+    minimumPurchaseAmount: benefit?.minimumPurchaseAmount || null,
     subscriptionIds: getBenefitSubscriptionIds(benefit),
     ...(benefit?.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
     ...(benefit?.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
