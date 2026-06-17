@@ -559,6 +559,7 @@ function BusinessDetailPage() {
                     const activeDays = !allDays ? getActiveDays(benefit.cuando) : new Set<string>();
                     const benefitIdx = business.benefits.indexOf(benefit);
                     const providerSummary = getBenefitProviderSummary(benefit);
+                    const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
 
                     return (
                       <div
@@ -648,6 +649,11 @@ function BusinessDetailPage() {
                               ) : (
                                 <p className="text-xs font-medium text-blink-muted max-w-[80px] text-right leading-tight">
                                   {benefit.rewardRate}
+                                </p>
+                              )}
+                              {minPurchase !== null && (
+                                <p className="text-[10px] text-blink-muted mt-0.5 leading-tight">
+                                  Mín: ${minPurchase.toLocaleString('es-AR')}
                                 </p>
                               )}
                             </div>
