@@ -338,13 +338,16 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
-  const [sortByDistance, setSortByDistance] = useState(() => {
-    if (searchParams.get('nearby') === '1') return true;
-    if (!searchParams.has('nearby')) {
-      return localStorage.getItem('locationPermission') === 'granted';
-    }
-    return false;
-  });
+  // Proximity sort is enabled only via explicit intent: a `nearby=1` deeplink
+  // (e.g. the "Cerca tuyo" pill on Home) or tapping the "Cerca" pill here. We do
+  // NOT derive it from a stored `locationPermission=granted` flag — that flag can
+  // be stale (browser reset to 'prompt'), which would leave the pill active
+  // without a usable position and make the first tap turn it off instead of
+  // requesting location. Returning granted users still get geohash-based
+  // proximity ordering silently, and a tap upgrades to exact distance sort.
+  const [sortByDistance, setSortByDistance] = useState(
+    () => searchParams.get('nearby') === '1',
+  );
 
   const { data: availableBankNames = [] } = useQuery({
     queryKey: ['availableBanks'],
