@@ -41,8 +41,15 @@ const notifyListeners = (update: LocationUpdate) => {
 };
 
 // Shared across all hook instances: true while a browser geolocation request is
-// pending. Lets sibling instances avoid idling out (loading:false) mid-request.
+// pending (or imminent). Lets sibling instances avoid idling out (loading:false)
+// mid-request.
 let requestInFlight = false;
+
+// Shared across all hook instances: true while a getCurrentPosition() call is
+// actually outstanding. Used to dedupe concurrent requests so only one runs at a
+// time — otherwise a slow duplicate's later timeout/error could overwrite a
+// position that another request already obtained.
+let requestDispatched = false;
 
 const getCachedPosition = (): Coordinates | null => {
   const cached = localStorage.getItem(STORAGE_KEYS.position);
@@ -65,6 +72,14 @@ const runRequest = () => {
   requestInFlight = true;
   notifyListeners({ type: 'pending' });
 
+  // Dedupe: if a request is already outstanding (e.g. started by another
+  // useGeolocation instance entering the granted branch), don't fire a second
+  // getCurrentPosition. The single in-flight request broadcasts its outcome to
+  // every instance, so a slow duplicate can't later overwrite a position that
+  // another request already obtained.
+  if (requestDispatched) return;
+  requestDispatched = true;
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const coordinates = {
@@ -74,10 +89,12 @@ const runRequest = () => {
       localStorage.setItem(STORAGE_KEYS.position, JSON.stringify(coordinates));
       localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());
       localStorage.setItem(STORAGE_KEYS.permission, 'granted');
+      requestDispatched = false;
       requestInFlight = false;
       notifyListeners({ type: 'position', coordinates });
     },
     (err) => {
+      requestDispatched = false;
       requestInFlight = false;
       if (err.code === err.PERMISSION_DENIED) {
         resolveDenied();
