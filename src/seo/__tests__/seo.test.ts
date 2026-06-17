@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { applySEO, toAbsoluteUrl } from '../seo';
 
 function addServerStructuredData(
-  kind: 'merchant' | 'category',
+  kind: 'merchant' | 'category' | 'core',
   url: string | undefined,
   value: unknown
 ): HTMLScriptElement {
@@ -10,8 +10,10 @@ function addServerStructuredData(
   script.type = 'application/ld+json';
   if (kind === 'merchant') {
     script.dataset.blinkMerchantSeo = 'structured-data';
-  } else {
+  } else if (kind === 'category') {
     script.dataset.blinkCategorySeo = 'structured-data';
+  } else {
+    script.dataset.blinkCoreSeo = 'structured-data';
   }
   if (url) {
     script.dataset.blinkSeoUrl = url;
@@ -49,6 +51,30 @@ describe('applySEO structured data handling', () => {
     expect(scripts).toHaveLength(1);
     expect(scripts[0].textContent).toContain('FAQPage');
     expect(scripts[0]).toHaveAttribute('data-blink-merchant-seo', 'structured-data');
+    expect(document.querySelector('script[data-blink-seo="structured-data"]')).toBeNull();
+  });
+
+  it('preserves matching core server-rendered JSON-LD instead of duplicating client schema', () => {
+    addServerStructuredData('core', toAbsoluteUrl('/'), [
+      { '@context': 'https://schema.org', '@type': 'Organization', name: 'Blink' },
+      { '@context': 'https://schema.org', '@type': 'WebSite' },
+    ]);
+
+    applySEO({
+      title: 'Descuentos bancarios en Argentina | Blink',
+      description: 'Client description',
+      path: '/',
+      structuredData: [
+        { '@context': 'https://schema.org', '@type': 'Organization', name: 'Thin client schema' },
+        { '@context': 'https://schema.org', '@type': 'WebSite' },
+      ],
+    });
+
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toHaveAttribute('data-blink-core-seo', 'structured-data');
+    expect(scripts[0].textContent).toContain('Organization');
+    expect(scripts[0].textContent).not.toContain('Thin client schema');
     expect(document.querySelector('script[data-blink-seo="structured-data"]')).toBeNull();
   });
 

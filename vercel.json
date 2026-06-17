@@ -62,6 +62,14 @@
       "dest": "/api/[...path]?path=$1"
     },
     {
+      "src": "/",
+      "dest": "/api/[...path]?path=__page/home"
+    },
+    {
+      "src": "/search",
+      "dest": "/api/[...path]?path=__page/search"
+    },
+    {
       "src": "/business/([^/]+)",
       "dest": "/api/[...path]?path=business/$1"
     },

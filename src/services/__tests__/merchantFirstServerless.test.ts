@@ -6,9 +6,11 @@ import {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleHomeSeoPage,
   handleLegacyBusinessRedirect,
   handleLandingSeoPage,
   handleMerchantSeoPage,
+  handleSearchSeoPage,
   resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
@@ -91,6 +93,7 @@ function createAggregateCursor<T>(data: T[]) {
 describe('merchant-first serverless helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
@@ -100,6 +103,8 @@ describe('merchant-first serverless helpers', () => {
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
     expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia?path=descuentos/galicia/gastronomia'))).toBe('/api/descuentos/galicia/gastronomia');
     expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia/caba?path=descuentos/galicia/gastronomia/caba'))).toBe('/api/descuentos/galicia/gastronomia/caba');
+    expect(resolveRequestPath(new URL('https://example.com/?path=__page/home'))).toBe('/api/__page/home');
+    expect(resolveRequestPath(new URL('https://example.com/search?path=__page/search'))).toBe('/api/__page/search');
   });
 
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {
@@ -511,6 +516,129 @@ describe('merchant-first serverless helpers', () => {
       error: 'Merchant not found',
       merchantId: 'missing'
     });
+  });
+
+  it('handleHomeSeoPage returns crawlable homepage HTML with counts and JSON-LD', async () => {
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+    const merchantAggregatePipelines: unknown[] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return merchantQueries.length === 1 ? 20 : 12;
+            },
+            aggregate(pipeline: unknown[]) {
+              merchantAggregatePipelines.push(pipeline);
+              const serialized = JSON.stringify(pipeline);
+              return createAggregateCursor(
+                serialized.includes('$categories')
+                  ? [{ _id: 'gastronomia', count: 8 }, { _id: 'moda', count: 5 }]
+                  : [{ _id: 'Banco Galicia', count: 7 }, { _id: 'BBVA', count: 4 }]
+              );
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            async countDocuments(query: unknown) {
+              benefitQueries.push(query);
+              return 150;
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/?path=__page/home');
+
+    await handleHomeSeoPage(req as never, res as never, url, db as never, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Descuentos bancarios en Argentina | Blink</title>');
+    expect(res.body).toContain('<h1>Descuentos bancarios en Argentina</h1>');
+    expect(res.body).toContain('150 beneficios');
+    expect(res.body).toContain('12 comercios activos');
+    expect(res.body).toContain('data-blink-core-seo="structured-data"');
+    expect(res.body).toContain('SearchAction');
+    expect(res.body).toContain('Organization');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(benefitQueries).toHaveLength(1);
+    expect(merchantQueries).toHaveLength(2);
+    expect(merchantAggregatePipelines).toHaveLength(2);
+  });
+
+  it('handleHomeSeoPage falls back to crawlable HTML when summary queries fail', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const db = {
+      collection() {
+        throw new Error('Mongo unavailable');
+      }
+    };
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/?path=__page/home');
+
+    await handleHomeSeoPage(req as never, res as never, url, db as never, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<h1>Descuentos bancarios en Argentina</h1>');
+    expect(res.body).toContain('beneficios activos y comercios activos');
+    expect(res.body).toContain('<dd>Actualizando</dd>');
+    expect(res.body).toContain('data-blink-core-seo="structured-data"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Core SEO summary unavailable'),
+      expect.any(Error)
+    );
+  });
+
+  it('handleSearchSeoPage returns crawlable search overview HTML', async () => {
+    const db = {
+      collection() {
+        throw new Error('Search SEO test uses an injected summary');
+      }
+    };
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/search?path=__page/search');
+
+    await handleSearchSeoPage(req as never, res as never, url, db as never, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      summary: {
+        totalBenefits: 200,
+        activeMerchantCount: 30,
+        topCategories: [{ _id: 'supermercado', count: 10 }],
+        topBanks: [{ _id: 'Santander', count: 9 }]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Buscar descuentos y promociones bancarias | Blink</title>');
+    expect(res.body).toContain('<h1>Buscar descuentos y promociones bancarias</h1>');
+    expect(res.body).toContain('Usa Blink para encontrar beneficios por comercio');
+    expect(res.body).toContain('SearchResultsPage');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/search"');
+    expect(res.body).toContain('href="/categorias/supermercado"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
   });
 
   it('handleMerchantSeoPage returns HTML for a canonical merchant URL', async () => {
