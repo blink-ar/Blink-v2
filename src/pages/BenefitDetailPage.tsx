@@ -21,6 +21,7 @@ import BankLogo from '../components/BankLogos/BankLogo';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useResponsive } from '../hooks/useResponsive';
 import { calculateDistance } from '../utils/distance';
+import { parseTopeAmount, formatArgentinePeso } from '../utils/tope';
 import {
   buildBenefitPath,
   decodeBenefitRouteRef,
@@ -123,20 +124,6 @@ const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null
     ? response.businesses[0]
     : null;
 };
-
-// Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
-const parseTopeAmount = (tope: unknown): number | null => {
-  if (tope == null) return null;
-  const s = String(tope).trim();
-  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
-  // Argentine format: "." = thousands separator, "," = decimal
-  const cleaned = s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? null : num;
-};
-
-const formatArgentinePeso = (amount: number): string =>
-  '$' + Math.round(amount).toLocaleString('es-AR');
 
 const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
   return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
@@ -408,10 +395,16 @@ function BenefitDetailPage() {
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
-  // PER_USER caps: <=20 = usage count, >20 = monetary tope per client
-  const perUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER');
-  const perUserUsageCount = perUserCaps.find(c => c.amount <= 20)?.amount ?? null;
-  const perUserMonetaryCap = perUserCaps.find(c => c.amount > 20)?.amount ?? null;
+  // PER_USER caps: <=20 = usage count, >20 = monetary tope per client. When more
+  // than one cap of the same kind exists, use the most restrictive (minimum) so
+  // cap ordering can't overstate the benefit.
+  const perUserCaps = (benefit.caps ?? []).filter(
+    c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number',
+  );
+  const perUserUsageCounts = perUserCaps.filter(c => c.amount <= 20).map(c => c.amount);
+  const perUserMonetaryCaps = perUserCaps.filter(c => c.amount > 20).map(c => c.amount);
+  const perUserUsageCount = perUserUsageCounts.length ? Math.min(...perUserUsageCounts) : null;
+  const perUserMonetaryCap = perUserMonetaryCaps.length ? Math.min(...perUserMonetaryCaps) : null;
   // Effective cap: use the most restrictive (minimum) of PER_TXN and monetary PER_USER caps
   const effectiveCapAmount = [topeAmount, perUserMonetaryCap].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
   const maxSpend = effectiveCapAmount != null && discount > 0 ? effectiveCapAmount / (discount / 100) : null;

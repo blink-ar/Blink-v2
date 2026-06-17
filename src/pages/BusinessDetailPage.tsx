@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getMerchantSeoPath, parseMerchantSeoParam } from '../seo/merchantUrls';
 import { formatLocalDateOnly, isBenefitActive } from '../utils/benefits';
 import { buildBenefitPath } from '../utils/benefitIdentity';
+import { parseTopeAmount, formatArgentinePeso } from '../utils/tope';
 import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../utils/benefitDisplay';
 import BankLogo from '../components/BankLogos/BankLogo';
 import { getOptimizedImageUrl } from '../utils/images';
@@ -561,7 +562,13 @@ function BusinessDetailPage() {
                     const providerSummary = getBenefitProviderSummary(benefit);
                     const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
                     const monetaryUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
-                    const effectiveTope = [benefit.tope != null ? Number(benefit.tope) : null, monetaryUserCaps.length > 0 ? Math.min(...monetaryUserCaps) : null].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
+                    const minUserCap = monetaryUserCaps.length > 0 ? Math.min(...monetaryUserCaps) : null;
+                    const topeAmount = parseTopeAmount(benefit.tope);
+                    // Show the per-user monetary cap when it's the binding (lower) limit;
+                    // otherwise keep the original tope string (preserves "Sin tope" / format).
+                    const effectiveTope = minUserCap != null && (topeAmount == null || minUserCap < topeAmount)
+                      ? formatArgentinePeso(minUserCap)
+                      : benefit.tope;
 
                     return (
                       <div
@@ -777,7 +784,13 @@ function BusinessDetailPage() {
               const accent = getBankAccent(providerName);
               const benefitIdx = business.benefits.indexOf(benefit);
               const flatMonetaryUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
-              const flatEffectiveTope = [benefit.tope != null ? Number(benefit.tope) : null, flatMonetaryUserCaps.length > 0 ? Math.min(...flatMonetaryUserCaps) : null].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
+              const flatMinUserCap = flatMonetaryUserCaps.length > 0 ? Math.min(...flatMonetaryUserCaps) : null;
+              const flatTopeAmount = parseTopeAmount(benefit.tope);
+              // Show the per-user monetary cap when it's the binding (lower) limit;
+              // otherwise keep the original tope string (preserves "Sin tope" / format).
+              const flatEffectiveTope = flatMinUserCap != null && (flatTopeAmount == null || flatMinUserCap < flatTopeAmount)
+                ? formatArgentinePeso(flatMinUserCap)
+                : benefit.tope;
 
               return (
                 <div
