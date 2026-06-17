@@ -560,6 +560,8 @@ function BusinessDetailPage() {
                     const benefitIdx = business.benefits.indexOf(benefit);
                     const providerSummary = getBenefitProviderSummary(benefit);
                     const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
+                    const monetaryUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
+                    const effectiveTope = benefit.tope ?? (monetaryUserCaps.length > 0 ? Math.min(...monetaryUserCaps) : null);
 
                     return (
                       <div
@@ -635,9 +637,9 @@ function BusinessDetailPage() {
                                 <>
                                   <p className="font-black text-[26px] leading-tight text-blink-ink">{discount}%</p>
                                   <p className="text-[11px] text-blink-muted -mt-0.5">de ahorro</p>
-                                  {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
+                                  {effectiveTope != null && !String(effectiveTope).toUpperCase().includes('SIN TOPE') && (
                                     <p className="text-[10px] text-blink-muted mt-0.5 leading-tight">
-                                      Tope: {benefit.tope}
+                                      Tope: {effectiveTope}
                                     </p>
                                   )}
                                 </>
@@ -774,6 +776,8 @@ function BusinessDetailPage() {
               const providerSummary = getBenefitProviderSummary(benefit);
               const accent = getBankAccent(providerName);
               const benefitIdx = business.benefits.indexOf(benefit);
+              const flatMonetaryUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
+              const flatEffectiveTope = benefit.tope ?? (flatMonetaryUserCaps.length > 0 ? Math.min(...flatMonetaryUserCaps) : null);
 
               return (
                 <div
@@ -796,8 +800,8 @@ function BusinessDetailPage() {
                           {providerSummary}
                         </span>
                       )}
-                      {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
-                        <p className="text-[10px] text-blink-muted mt-0.5">{benefit.tope}</p>
+                      {flatEffectiveTope != null && !String(flatEffectiveTope).toUpperCase().includes('SIN TOPE') && (
+                        <p className="text-[10px] text-blink-muted mt-0.5">{flatEffectiveTope}</p>
                       )}
                     </div>
                   </div>

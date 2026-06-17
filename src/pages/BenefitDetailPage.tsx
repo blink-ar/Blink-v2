@@ -408,11 +408,13 @@ function BenefitDetailPage() {
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
-  const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
-  const perUserCap = (benefit.caps ?? []).find(c => c.resetsEvery === 'PER_USER');
-  // PER_USER caps with small amounts (<=20) represent usage counts; larger amounts are monetary topes per client
-  const perUserUsageCount = perUserCap && perUserCap.amount <= 20 ? perUserCap.amount : null;
-  const perUserMonetaryCap = perUserCap && perUserCap.amount > 20 ? perUserCap.amount : null;
+  // PER_USER caps: <=20 = usage count, >20 = monetary tope per client
+  const perUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER');
+  const perUserUsageCount = perUserCaps.find(c => c.amount <= 20)?.amount ?? null;
+  const perUserMonetaryCap = perUserCaps.find(c => c.amount > 20)?.amount ?? null;
+  // Effective cap for simulation: PER_TXN tope takes priority, monetary PER_USER cap as fallback
+  const effectiveCapAmount = topeAmount ?? perUserMonetaryCap ?? null;
+  const maxSpend = effectiveCapAmount != null && discount > 0 ? effectiveCapAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
 
@@ -923,7 +925,7 @@ function BenefitDetailPage() {
           {discount > 0 && (
             <SavingsSimulator
               discountPercentage={discount}
-              maxCap={benefit.tope || null}
+              maxCap={effectiveCapAmount != null ? String(effectiveCapAmount) : (benefit.tope || null)}
               installments={benefit.installments}
             />
           )}
