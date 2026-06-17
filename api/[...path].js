@@ -100,6 +100,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   termsAndConditions: 1,
   link: 1,
   validUntil: 1,
+  minimumPurchaseAmount: 1,
   sourceCollection: 1,
   rawBenefitCollection: 1,
   source: 1

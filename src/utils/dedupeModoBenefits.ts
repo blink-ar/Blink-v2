@@ -112,18 +112,26 @@ interface MatchKey {
   days: string;
   installments: number | typeof UNKNOWN_INSTALLMENTS;
   discount: number;
+  minimumPurchaseAmount: string;
 }
+
+const getMinimumPurchaseKey = (benefit: BankBenefit): string => {
+  const m = benefit.minimumPurchaseAmount;
+  if (!m) return '';
+  return `${m.amount}:${m.currency ?? ''}`;
+};
 
 const benefitMatchKey = (benefit: BankBenefit): MatchKey => ({
   days: getAvailableDaysKey(benefit),
   installments: getInstallments(benefit),
   discount: getDiscountPercentage(benefit),
+  minimumPurchaseAmount: getMinimumPurchaseKey(benefit),
 });
 
 const keysEqual = (a: MatchKey, b: MatchKey): boolean => {
   if ((a.days === UNKNOWN_DAYS_KEY) !== (b.days === UNKNOWN_DAYS_KEY)) return false;
   if ((a.installments === UNKNOWN_INSTALLMENTS) !== (b.installments === UNKNOWN_INSTALLMENTS)) return false;
-  return a.days === b.days && a.installments === b.installments && a.discount === b.discount;
+  return a.days === b.days && a.installments === b.installments && a.discount === b.discount && a.minimumPurchaseAmount === b.minimumPurchaseAmount;
 };
 
 export function dedupeModoBenefits(benefits: BankBenefit[]): BankBenefit[] {
