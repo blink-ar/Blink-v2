@@ -14,7 +14,7 @@ export const KNOWN_BANKS: BankDescriptor[] = [
   { token: 'hsbc', code: 'HSBC', label: 'HSBC' },
   { token: 'amex', code: 'AMEX', label: 'AMEX' },
   { token: 'naranjax', code: 'NX', label: 'NARANJA X' },
-  { token: 'nacion', code: 'BNA', label: 'NACION' },
+  { token: 'nacion', code: 'BNA', label: 'NACIÓN' },
   { token: 'ciudad', code: 'CIUD', label: 'CIUDAD' },
   { token: 'patagonia', code: 'PAT', label: 'PATAGONIA' },
   { token: 'visa', code: 'VISA', label: 'VISA' },

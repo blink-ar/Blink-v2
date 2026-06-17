@@ -19,7 +19,7 @@ import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking'
 import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
-import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS } from '../seo/homeSeoLinks';
+import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS, HOME_GUIDE_LINKS } from '../seo/homeSeoLinks';
 import BankLogo from '../components/BankLogos/BankLogo';
 
 type NavigatorWithStandalone = Navigator & {
@@ -651,6 +651,23 @@ function HomePage() {
 
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
+                  Guías
+                </p>
+                <nav aria-label="Guías para comparar descuentos" className="flex flex-wrap gap-x-4 gap-y-2">
+                  {HOME_GUIDE_LINKS.map((link) => (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      className="text-sm font-medium leading-6 text-blink-muted underline-offset-4 hover:text-blink-ink hover:underline active:text-primary"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blink-muted">
                   Categorías
                 </p>
                 <nav aria-label="Categorías de descuentos" className="flex flex-wrap gap-x-4 gap-y-2">
@@ -982,6 +999,17 @@ function HomePage() {
             <p className="mt-2 max-w-3xl text-xs leading-5 text-blink-muted">
               {BLINK_ENTITY_CANONICAL_IDENTITY}
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {HOME_GUIDE_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="rounded-xl border border-blink-border bg-white px-3 py-2 text-sm font-semibold text-blink-muted transition-colors hover:border-primary/30 hover:text-blink-ink"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </section>
 

@@ -22,6 +22,32 @@ const BLINK_KNOWS_ABOUT = [
   'comercios con descuentos',
   'comparación de beneficios antes de pagar',
 ];
+const DISCOUNT_SEARCH_GUIDE_PATH = '/buscador-de-descuentos-bancarios';
+const DISCOUNT_SEARCH_GUIDE_TITLE = `Buscador de descuentos bancarios en Argentina | ${SITE_NAME}`;
+const DISCOUNT_SEARCH_GUIDE_DESCRIPTION =
+  'Blink es un buscador de descuentos bancarios en Argentina para comparar promociones, bancos, billeteras, topes, días, cuotas y disponibilidad online o presencial antes de pagar.';
+const DISCOUNT_SEARCH_GUIDE_FAQ = [
+  {
+    question: '¿Dónde buscar descuentos bancarios hoy?',
+    answer:
+      'Puedes usar Blink para buscar descuentos bancarios por comercio, banco, billetera, rubro, ubicación, descuento mínimo, cuotas y modalidad online o presencial. La búsqueda te ayuda a comparar opciones antes de pagar.',
+  },
+  {
+    question: '¿Cómo comparar promociones antes de pagar?',
+    answer:
+      'Compara el porcentaje de descuento, el tope de reintegro, los días de vigencia, las cuotas disponibles, las tarjetas elegibles y las condiciones de cada beneficio. Después elige el medio de pago que mejor aplica a esa compra.',
+  },
+  {
+    question: '¿Blink reemplaza revisar las condiciones del banco?',
+    answer:
+      'No. Blink organiza información pública para facilitar la comparación, pero las condiciones finales siempre dependen del banco, billetera, comercio o programa que emite cada promoción.',
+  },
+  {
+    question: '¿Se puede buscar por banco, comercio o rubro?',
+    answer:
+      'Sí. Blink permite iniciar la búsqueda por marcas, bancos, billeteras y categorías como gastronomía, supermercado, moda, hogar, belleza, deportes, viajes y otros rubros.',
+  },
+];
 
 function toBlinkCanonicalUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) {
@@ -149,6 +175,94 @@ function buildCoreEntityStructuredData(searchResultsUrl?: string): Array<Record<
   ];
 }
 
+function buildDiscountSearchGuideStructuredData(): Array<Record<string, unknown>> {
+  const pageUrl = toBlinkCanonicalUrl(DISCOUNT_SEARCH_GUIDE_PATH);
+  const websiteId = toBlinkCanonicalUrl('/#website');
+  const organizationId = toBlinkCanonicalUrl('/#organization');
+  const webAppId = toBlinkCanonicalUrl('/#webapp');
+
+  return [
+    ...buildCoreEntityStructuredData(),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${pageUrl}#webpage`,
+      name: DISCOUNT_SEARCH_GUIDE_TITLE,
+      description: DISCOUNT_SEARCH_GUIDE_DESCRIPTION,
+      url: pageUrl,
+      inLanguage: 'es-AR',
+      isPartOf: {
+        '@id': websiteId,
+      },
+      about: [
+        { '@id': organizationId },
+        { '@id': webAppId },
+      ],
+      primaryImageOfPage: toBlinkCanonicalUrl('/pwa-512x512.png'),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'HowTo',
+      '@id': `${pageUrl}#howto`,
+      name: 'Cómo usar Blink para comparar descuentos bancarios',
+      description: 'Tres pasos para encontrar, comparar y elegir beneficios bancarios antes de pagar.',
+      inLanguage: 'es-AR',
+      step: [
+        {
+          '@type': 'HowToStep',
+          position: 1,
+          name: 'Buscar por comercio, banco o rubro',
+          text: 'Escribe una marca, elige un emisor o entra por categorías como gastronomía, supermercado, moda, viajes y hogar.',
+        },
+        {
+          '@type': 'HowToStep',
+          position: 2,
+          name: 'Comparar condiciones reales',
+          text: 'Revisa descuento, tope, días, cuotas, tarjetas elegibles, vigencia y si aplica online, presencial o por ubicación.',
+        },
+        {
+          '@type': 'HowToStep',
+          position: 3,
+          name: 'Elegir cómo pagar',
+          text: 'Antes de comprar, cruza las opciones disponibles y usa el medio de pago que mejor se ajusta a esa compra.',
+        },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      '@id': `${pageUrl}#breadcrumbs`,
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: toBlinkCanonicalUrl('/'),
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Buscador de descuentos bancarios',
+          item: pageUrl,
+        },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      '@id': `${pageUrl}#faq`,
+      mainEntity: DISCOUNT_SEARCH_GUIDE_FAQ.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    },
+  ];
+}
+
 function RouteSEO() {
   const location = useLocation();
   const normalizedPathname = normalizePathname(location.pathname);
@@ -169,7 +283,7 @@ function RouteSEO() {
         'descuentos bancarios',
         'promociones tarjetas',
         'beneficios bancos argentina',
-        'cuotas sin interes',
+        'cuotas sin interés',
       ],
       structuredData: buildCoreEntityStructuredData(),
     };
@@ -181,7 +295,7 @@ function RouteSEO() {
 
     const description = hasSearchTerm
       ? `Resultados de descuentos y promociones bancarias para ${searchTerm} en Argentina.`
-      : 'Busca descuentos bancarios por comercio, categoria y banco en Argentina.';
+      : 'Busca descuentos bancarios por comercio, categoría y banco en Argentina.';
 
     seoConfig = {
       title,
@@ -194,24 +308,38 @@ function RouteSEO() {
           : item
       )),
     };
+  } else if (normalizedPathname === DISCOUNT_SEARCH_GUIDE_PATH) {
+    seoConfig = {
+      title: DISCOUNT_SEARCH_GUIDE_TITLE,
+      description: DISCOUNT_SEARCH_GUIDE_DESCRIPTION,
+      path: DISCOUNT_SEARCH_GUIDE_PATH,
+      keywords: [
+        'buscador de descuentos bancarios',
+        'descuentos bancarios argentina',
+        'comparar promociones bancarias',
+        'beneficios bancos argentina',
+        'topes de reintegro',
+      ],
+      structuredData: buildDiscountSearchGuideStructuredData(),
+    };
   } else if (location.pathname === '/map') {
     seoConfig = {
       title: `Mapa de descuentos bancarios cercanos | ${SITE_NAME}`,
-      description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicacion.',
+      description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicación.',
       path: '/map',
     };
   } else if (location.pathname.startsWith('/descuentos/')) {
     seoConfig = {
-      title: `Descuentos bancarios por banco y categoria | ${SITE_NAME}`,
-      description: 'Explora descuentos bancarios por banco, categoria y ciudad en Argentina.',
+      title: `Descuentos bancarios por banco y categoría | ${SITE_NAME}`,
+      description: 'Explora descuentos bancarios por banco, categoría y ciudad en Argentina.',
       path: location.pathname,
     };
   } else if (location.pathname.startsWith('/categorias/')) {
     const [, , categoryParam, pageSegment, pageParam] = location.pathname.split('/');
     const category = resolveSeoCategory(categoryParam);
     const page = pageSegment === 'page' ? Number.parseInt(pageParam || '1', 10) : 1;
-    const pageSuffix = Number.isFinite(page) && page > 1 ? ` - pagina ${page}` : '';
-    const label = category?.label || 'categoria';
+    const pageSuffix = Number.isFinite(page) && page > 1 ? ` - página ${page}` : '';
+    const label = category?.label || 'categoría';
 
     seoConfig = {
       title: `Comercios de ${label} con descuentos${pageSuffix} | ${SITE_NAME}`,

@@ -77,4 +77,32 @@ describe('RouteSEO', () => {
     expect(structuredData).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
     expect(structuredData).not.toContain('Blink Home Monitor');
   });
+
+  it('adds guide page metadata and structured data for bank discount search page', () => {
+    renderRouteSEO('/buscador-de-descuentos-bancarios');
+
+    const calls = vi.mocked(useSEO).mock.calls;
+    const seoConfig = calls[calls.length - 1]?.[0];
+    const structuredData = JSON.stringify(seoConfig?.structuredData);
+
+    expect(seoConfig).toEqual(
+      expect.objectContaining({
+        path: '/buscador-de-descuentos-bancarios',
+        title: 'Buscador de descuentos bancarios en Argentina | Blink',
+        description: expect.stringContaining('buscador de descuentos bancarios'),
+      })
+    );
+    expect(structuredData).toContain('Organization');
+    expect(structuredData).toContain('WebSite');
+    expect(structuredData).toContain('WebApplication');
+    expect(structuredData).toContain('WebPage');
+    expect(structuredData).toContain('HowTo');
+    expect(structuredData).toContain('BreadcrumbList');
+    expect(structuredData).toContain('FAQPage');
+    expect(structuredData).toContain('SearchAction');
+    expect(structuredData).toContain('disambiguatingDescription');
+    expect(structuredData).toContain('https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios');
+    expect(structuredData).toContain('¿Dónde buscar descuentos bancarios hoy?');
+    expect(structuredData).not.toContain('Blink Home Monitor');
+  });
 });

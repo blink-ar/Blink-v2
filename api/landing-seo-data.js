@@ -188,12 +188,12 @@ const CLIENT_LANDING_BANK_DEFINITIONS = [
   { slug: 'santander', name: 'Banco Santander', aliases: createAliases('santander', 'rio', 'Banco Santander', 'Banco Santander Rio', 'Banco Santander Río') },
   { slug: 'bbva', name: 'BBVA', aliases: createAliases('bbva', 'frances', 'banco frances', 'Banco Francés') },
   { slug: 'macro', name: 'Banco Macro', aliases: createAliases('macro', 'Banco Macro') },
-  { slug: 'nacion', name: 'Banco Nacion', aliases: createAliases('nacion', 'bna', 'banco nacion', 'Banco Nación') },
+  { slug: 'nacion', name: 'Banco Nación', aliases: createAliases('nacion', 'bna', 'banco nacion', 'Banco Nación') },
   { slug: 'icbc', name: 'ICBC', aliases: createAliases('icbc', 'ICBC') },
 ];
 
 const CLIENT_LANDING_CATEGORY_DEFINITIONS = [
-  { slug: 'gastronomia', category: 'gastronomia', name: 'Gastronomia', aliases: createAliases('gastronomia') },
+  { slug: 'gastronomia', category: 'gastronomia', name: 'Gastronomía', aliases: createAliases('gastronomia') },
   { slug: 'moda', category: 'moda', name: 'Moda', aliases: createAliases('moda') },
   { slug: 'shopping', category: 'shopping', name: 'Supermercado y shopping', aliases: createAliases('shopping') },
   { slug: 'hogar', category: 'hogar', name: 'Hogar', aliases: createAliases('hogar') },
