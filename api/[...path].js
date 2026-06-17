@@ -313,6 +313,12 @@ function html(res, statusCode, payload) {
   res.send(payload);
 }
 
+function text(res, statusCode, payload) {
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send(payload);
+}
+
 // Cache-Control directives
 const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
 const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
@@ -2764,6 +2770,13 @@ async function handlePlaceDetails(req, res) {
   });
 }
 
+function handleStaticNotFound(req, res, url) {
+  const requestedPath = url?.pathname || '/';
+  setCacheControl(res, 'public, max-age=60');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  return text(res, 404, `Not found: ${requestedPath}\n`);
+}
+
 export {
   applyLocalDistanceGuardrail,
   buildBusinessBenefitSummary,
@@ -2776,6 +2789,7 @@ export {
   handleLandingSeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
+  handleStaticNotFound,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2834,6 +2848,10 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (isReadMethod(req) && path === '/api/__not_found') {
+      return handleStaticNotFound(req, res, url);
+    }
+
     const db = await getDb();
 
     if (req.method === 'GET' && path === '/api/benefits') {

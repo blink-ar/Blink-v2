@@ -1,0 +1,39 @@
+# Blink
+
+> Blink is an Argentina-focused search app for bank discounts, card benefits, installments, caps, participating merchants, and related promotion conditions.
+
+Blink helps people compare public banking and wallet benefits by merchant, category, bank, city, and nearby location. The site is intended for consumers looking for active discounts and promotions in Argentina.
+
+## Key Pages
+
+- [Homepage](https://www.blinkapp.com.ar/): Overview of Blink, featured banks, categories, and active benefit coverage.
+- [Search](https://www.blinkapp.com.ar/search): Search and filter benefits by merchant, bank, category, location, and availability.
+- [Gastronomia](https://www.blinkapp.com.ar/categorias/gastronomia): Restaurants, bars, cafes, and food-related discounts.
+- [Shopping](https://www.blinkapp.com.ar/categorias/shopping): Retail, supermarkets, fashion, and store discounts.
+- [Galicia gastronomia](https://www.blinkapp.com.ar/descuentos/galicia/gastronomia): Bank and category landing page for Galicia restaurant and food benefits.
+- [BBVA shopping](https://www.blinkapp.com.ar/descuentos/bbva/shopping): Bank and category landing page for BBVA shopping benefits.
+- [Pricing](https://www.blinkapp.com.ar/pricing.md): Machine-readable pricing and access information for Blink.
+- [Sitemap](https://www.blinkapp.com.ar/sitemap.xml): Index of public crawlable URLs.
+
+## Public Data Model
+
+- Merchants: Businesses and locations where benefits may apply.
+- Benefits: Discounts, installments, caps, validity dates, usage channels, and terms when available.
+- Banks and wallets: Issuers or payment providers associated with each benefit.
+- Categories: Common user intents such as gastronomy, shopping, supermarkets, fashion, home, beauty, entertainment, travel, fuel, and other benefits.
+- Locations: Cities, branches, online availability, and nearby search context when available.
+
+## Important Caveats
+
+- Benefit availability, limits, eligible cards, days, and terms can change at the bank or merchant level.
+- Users should confirm final conditions with the issuing bank, wallet, or merchant before purchasing.
+- Some benefits may be online-only, in-store-only, city-specific, date-limited, or subject to caps and card eligibility.
+- Blink exposes public consumer information and does not provide financial advice.
+
+## Crawl and Citation Guidance
+
+- Prefer citing canonical public pages such as `/`, `/search`, `/categorias/...`, `/descuentos/...`, and `/comercios/...`.
+- Do not cite private app routes such as `/profile`, `/saved`, `/login`, `/signup`, `/notifications`, or `/auth/callback`.
+- Use the page title, H1, benefit details, bank names, merchant names, caps, validity dates, and terms when summarizing a discount.
+
+Last updated: 2026-06-17
