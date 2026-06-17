@@ -8,6 +8,21 @@ import {
 } from '../../../api/canonical-site.js';
 import { normalizeBlinkSiteUrl } from '../../seo/seo';
 
+const NOINDEX_APP_ROUTE_SOURCES = [
+  '/profile',
+  '/profile/',
+  '/saved',
+  '/saved/',
+  '/login',
+  '/login/',
+  '/signup',
+  '/signup/',
+  '/notifications',
+  '/notifications/',
+  '/auth/callback',
+  '/auth/callback/',
+];
+
 describe('canonical site URL normalization', () => {
   it('canonicalizes Blink apex URLs to the https www origin', () => {
     expect(normalizeSiteUrl('https://blinkapp.com.ar/categorias/gastronomia')).toBe(
@@ -57,46 +72,46 @@ describe('Vercel host redirect config', () => {
       fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
     );
 
-    expect(vercelConfig.headers).toEqual(
+    for (const source of NOINDEX_APP_ROUTE_SOURCES) {
+      expect(vercelConfig.headers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source,
+            headers: expect.arrayContaining([
+              {
+                key: 'X-Robots-Tag',
+                value: 'noindex, nofollow',
+              },
+            ]),
+          }),
+        ])
+      );
+    }
+  });
+
+  it('routes private app pages through the server noindex shell before filesystem fallback', () => {
+    const vercelConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
+    );
+
+    const filesystemIndex = vercelConfig.routes.findIndex((route: { handle?: string }) => route.handle === 'filesystem');
+    const noindexRoutes = vercelConfig.routes
+      .map((route: { src?: string; dest?: string }, index: number) => ({ ...route, index }))
+      .filter((route: { dest?: string }) => route.dest?.includes('__app_noindex'));
+
+    expect(noindexRoutes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          source: '/profile',
-          headers: expect.arrayContaining([
-            {
-              key: 'X-Robots-Tag',
-              value: 'noindex, nofollow',
-            },
-          ]),
+          src: '/(profile|saved|login|signup|notifications)/?',
+          dest: '/api/[...path]?path=__app_noindex/$1',
         }),
         expect.objectContaining({
-          source: '/profile/',
-          headers: expect.arrayContaining([
-            {
-              key: 'X-Robots-Tag',
-              value: 'noindex, nofollow',
-            },
-          ]),
-        }),
-        expect.objectContaining({
-          source: '/saved',
-          headers: expect.arrayContaining([
-            {
-              key: 'X-Robots-Tag',
-              value: 'noindex, nofollow',
-            },
-          ]),
-        }),
-        expect.objectContaining({
-          source: '/saved/',
-          headers: expect.arrayContaining([
-            {
-              key: 'X-Robots-Tag',
-              value: 'noindex, nofollow',
-            },
-          ]),
+          src: '/auth/callback/?',
+          dest: '/api/[...path]?path=__app_noindex/auth/callback',
         }),
       ])
     );
+    expect(noindexRoutes.every((route: { index: number }) => route.index < filesystemIndex)).toBe(true);
   });
 });
 

@@ -21,14 +21,17 @@ describe('RouteSEO', () => {
     vi.mocked(useSEO).mockClear();
   });
 
-  it.each(['/profile/', '/saved/'])('marks private trailing slash route %s as noindex', (pathname) => {
-    renderRouteSEO(pathname);
+  it.each(['/profile/', '/saved/', '/login/', '/signup/', '/notifications/', '/auth/callback/'])(
+    'marks private trailing slash route %s as noindex',
+    (pathname) => {
+      renderRouteSEO(pathname);
 
-    expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: pathname.replace(/\/+$/, ''),
-        robots: 'noindex, nofollow',
-      })
-    );
-  });
+      expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: pathname.replace(/\/+$/, ''),
+          robots: 'noindex, nofollow',
+        })
+      );
+    }
+  );
 });
