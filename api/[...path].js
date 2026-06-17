@@ -2189,6 +2189,21 @@ async function handleSearchSeoPage(req, res, url, db, options = {}) {
   return html(res, 200, renderedHtml);
 }
 
+async function handleDiscountSearchGuideSeoPage(req, res, url, db, options = {}) {
+  const appShell = options.appShell || readViteAppShell();
+  const summary = options.summary || await loadCoreSeoSummary(db);
+  const renderedHtml = renderCoreSeoHtml({
+    appShell,
+    page: 'discount-search-guide',
+    path: '/buscador-de-descuentos-bancarios',
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    summary
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handleGetNearbyBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -2883,6 +2898,7 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleDiscountSearchGuideSeoPage,
   handleHomeSeoPage,
   handleCategorySeoPage,
   handleLandingSeoPage,
@@ -2952,7 +2968,14 @@ export default async function handler(req, res) {
       return handleStaticNotFound(req, res, url);
     }
 
-    if (isReadMethod(req) && (path === '/api/__page/home' || path === '/api/__page/search')) {
+    if (
+      isReadMethod(req) &&
+      (
+        path === '/api/__page/home' ||
+        path === '/api/__page/search' ||
+        path === '/api/__page/buscador-de-descuentos-bancarios'
+      )
+    ) {
       let coreSeoDb = null;
       try {
         coreSeoDb = await getDb();
@@ -2962,6 +2985,10 @@ export default async function handler(req, res) {
 
       if (path === '/api/__page/home') {
         return await handleHomeSeoPage(req, res, url, coreSeoDb);
+      }
+
+      if (path === '/api/__page/buscador-de-descuentos-bancarios') {
+        return await handleDiscountSearchGuideSeoPage(req, res, url, coreSeoDb);
       }
 
       return await handleSearchSeoPage(req, res, url, coreSeoDb);

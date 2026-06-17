@@ -19,6 +19,7 @@ function ScrollToTop() {
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
+const DiscountSearchGuidePage = lazy(() => import('./pages/DiscountSearchGuidePage'));
 const BusinessDetailPage = lazy(() => import('./pages/BusinessDetailPage'));
 const BenefitDetailPage = lazy(() => import('./pages/BenefitDetailPage'));
 const SavedPage = lazy(() => import('./pages/SavedPage'));
@@ -68,6 +69,7 @@ function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/home" element={<HomeRedirect />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/buscador-de-descuentos-bancarios" element={<DiscountSearchGuidePage />} />
           <Route path="/comercios/:slugId" element={<BusinessDetailPage />} />
           <Route path="/business/:id" element={<BusinessDetailPage />} />
           <Route path="/benefit/:id/:benefitIndex?" element={<BenefitDetailPage />} />

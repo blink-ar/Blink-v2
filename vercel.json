@@ -70,6 +70,10 @@
       "dest": "/api/[...path]?path=__page/search"
     },
     {
+      "src": "/buscador-de-descuentos-bancarios",
+      "dest": "/api/[...path]?path=__page/buscador-de-descuentos-bancarios"
+    },
+    {
       "src": "/business/([^/]+)",
       "dest": "/api/[...path]?path=business/$1"
     },

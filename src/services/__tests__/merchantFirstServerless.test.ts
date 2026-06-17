@@ -6,6 +6,7 @@ import {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleDiscountSearchGuideSeoPage,
   handleHomeSeoPage,
   handleLegacyBusinessRedirect,
   handleLandingSeoPage,
@@ -107,6 +108,7 @@ describe('merchant-first serverless helpers', () => {
     expect(resolveRequestPath(new URL('https://example.com/okf/index.md?path=__not_found'))).toBe('/api/__not_found');
     expect(resolveRequestPath(new URL('https://example.com/?path=__page/home'))).toBe('/api/__page/home');
     expect(resolveRequestPath(new URL('https://example.com/search?path=__page/search'))).toBe('/api/__page/search');
+    expect(resolveRequestPath(new URL('https://example.com/buscador-de-descuentos-bancarios?path=__page/buscador-de-descuentos-bancarios'))).toBe('/api/__page/buscador-de-descuentos-bancarios');
   });
 
   it('handleStaticNotFound returns a crawl-safe 404 for missing agent-readable files', () => {
@@ -670,6 +672,48 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/search"');
     expect(res.body).toContain('href="/categorias/supermercado"');
+    expect(res.body).toContain('src="/assets/index-test.js"');
+  });
+
+  it('handleDiscountSearchGuideSeoPage returns crawlable guide HTML and page schema', async () => {
+    const db = {
+      collection() {
+        throw new Error('Discount search guide SEO test uses an injected summary');
+      }
+    };
+    const req = {};
+    const res = createResponseCapture();
+    const url = new URL('https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios?path=__page/buscador-de-descuentos-bancarios');
+
+    await handleDiscountSearchGuideSeoPage(req as never, res as never, url, db as never, {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      summary: {
+        totalBenefits: 240,
+        activeMerchantCount: 42,
+        topCategories: [{ _id: 'gastronomia', count: 10 }],
+        topBanks: [{ _id: 'Galicia', count: 8 }]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.body).toContain('<title>Buscador de descuentos bancarios en Argentina | Blink</title>');
+    expect(res.body).toContain('<h1>Buscador de descuentos bancarios en Argentina</h1>');
+    expect(res.body).toContain('Blink es un buscador de descuentos bancarios en Argentina');
+    expect(res.body).toContain('Compara condiciones reales');
+    expect(res.body).toContain('Blink vs MODO vs PromoArg vs Clash vs paginas de bancos');
+    expect(res.body).toContain('¿Dónde buscar descuentos bancarios hoy?');
+    expect(res.body).toContain('data-blink-core-seo="structured-data"');
+    expect(res.body).toContain('SearchAction');
+    expect(res.body).toContain('Organization');
+    expect(res.body).toContain('WebApplication');
+    expect(res.body).toContain('WebPage');
+    expect(res.body).toContain('HowTo');
+    expect(res.body).toContain('BreadcrumbList');
+    expect(res.body).toContain('FAQPage');
+    expect(res.body).toContain('disambiguatingDescription');
+    expect(res.body).toContain('href="https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios"');
     expect(res.body).toContain('src="/assets/index-test.js"');
   });
 

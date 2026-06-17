@@ -28,3 +28,10 @@ export const HOME_DISCOUNT_LINKS: HomeSeoLink[] = [
   { label: 'Banco Nacion en Deportes', href: getLandingPath('nacion', 'deportes') },
   { label: 'ICBC en Belleza', href: getLandingPath('icbc', 'belleza') },
 ];
+
+export const HOME_GUIDE_LINKS: HomeSeoLink[] = [
+  {
+    label: 'Buscador de descuentos bancarios',
+    href: '/buscador-de-descuentos-bancarios',
+  },
+];
