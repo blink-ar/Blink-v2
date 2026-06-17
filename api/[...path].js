@@ -702,7 +702,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     tope: (() => {
       if (!Array.isArray(benefit?.caps)) return null;
       const txnCaps = benefit.caps
-        .filter(c => c.resetsEvery !== 'PER_USER' && Number.isFinite(c?.amount))
+        .filter(c => c != null && c.resetsEvery !== 'PER_USER' && Number.isFinite(c?.amount))
         .map(c => c.amount);
       return txnCaps.length > 0 ? Math.min(...txnCaps) : null;
     })(),

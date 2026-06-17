@@ -412,8 +412,8 @@ function BenefitDetailPage() {
   const perUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER');
   const perUserUsageCount = perUserCaps.find(c => c.amount <= 20)?.amount ?? null;
   const perUserMonetaryCap = perUserCaps.find(c => c.amount > 20)?.amount ?? null;
-  // Effective cap for simulation: PER_TXN tope takes priority, monetary PER_USER cap as fallback
-  const effectiveCapAmount = topeAmount ?? perUserMonetaryCap ?? null;
+  // Effective cap: use the most restrictive (minimum) of PER_TXN and monetary PER_USER caps
+  const effectiveCapAmount = [topeAmount, perUserMonetaryCap].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
   const maxSpend = effectiveCapAmount != null && discount > 0 ? effectiveCapAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
