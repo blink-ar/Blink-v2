@@ -98,6 +98,26 @@ describe('Vercel host redirect config', () => {
       ])
     );
   });
+
+  it('returns real 404s for missing AI-readable static paths before the SPA fallback', () => {
+    const vercelConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
+    );
+
+    const filesystemIndex = vercelConfig.routes.findIndex((route: { handle?: string }) => route.handle === 'filesystem');
+    const staticNotFoundIndex = vercelConfig.routes.findIndex(
+      (route: { dest?: string }) => route.dest === '/api/[...path]?path=__not_found'
+    );
+    const spaFallbackIndex = vercelConfig.routes.findIndex((route: { dest?: string }) => route.dest === '/index.html');
+
+    expect(filesystemIndex).toBeGreaterThan(-1);
+    expect(staticNotFoundIndex).toBeGreaterThan(filesystemIndex);
+    expect(staticNotFoundIndex).toBeLessThan(spaFallbackIndex);
+    expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('txt');
+    expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('md');
+    expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('ya?ml');
+    expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('okf');
+  });
 });
 
 describe('robots.txt', () => {
@@ -108,5 +128,20 @@ describe('robots.txt', () => {
     expect(robots).not.toContain('Disallow: /profile');
     expect(robots).not.toContain('Disallow: /saved');
     expect(robots).toContain('Sitemap: https://www.blinkapp.com.ar/sitemap.xml');
+  });
+});
+
+describe('AI-readable static files', () => {
+  it('ships root files that agents can fetch without JavaScript', () => {
+    const llms = fs.readFileSync(path.resolve(process.cwd(), 'public/llms.txt'), 'utf8');
+    const pricingMarkdown = fs.readFileSync(path.resolve(process.cwd(), 'public/pricing.md'), 'utf8');
+    const pricingText = fs.readFileSync(path.resolve(process.cwd(), 'public/pricing.txt'), 'utf8');
+
+    expect(llms).toContain('# Blink');
+    expect(llms).toContain('https://www.blinkapp.com.ar/search');
+    expect(llms).toContain('Do not cite private app routes');
+    expect(pricingMarkdown).toContain('# Pricing - Blink');
+    expect(pricingMarkdown).toContain('Price: Free to use');
+    expect(pricingText).toContain('Public consumer app: Free to use.');
   });
 });

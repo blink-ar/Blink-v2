@@ -14,6 +14,7 @@ import { buildBenefitPath } from '../utils/benefitIdentity';
 import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../utils/benefitDisplay';
 import BankLogo from '../components/BankLogos/BankLogo';
 import { getOptimizedImageUrl } from '../utils/images';
+import { hasInAppHistory } from '../utils/navigation';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -379,6 +380,13 @@ function BusinessDetailPage() {
     navigate(buildBenefitPath(business.id, selectedBenefit, selectedIndex), { state: { business } });
   };
 
+  const handleBack = () => {
+    // Direct/deep link (e.g. coming up from a shared benefit URL): go to the
+    // search page instead of leaving the app.
+    if (hasInAppHistory()) navigate(-1);
+    else navigate('/search', { replace: true });
+  };
+
   const handleOpenMap = () => {
     if (!business) return;
     trackStartNavigation({ source: 'business_detail_page', destinationBusinessId: business.id, provider: 'in_app_map' });
@@ -399,7 +407,7 @@ function BusinessDetailPage() {
           <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 32 }}>storefront_off</span>
         </div>
         <p className="font-semibold text-blink-ink">{error || 'No encontrado'}</p>
-        <button onClick={() => navigate(-1)} className="text-primary font-medium text-sm">← Volver</button>
+        <button onClick={handleBack} className="text-primary font-medium text-sm">← Volver</button>
       </div>
     );
   }
@@ -418,7 +426,7 @@ function BusinessDetailPage() {
         {/* Top row */}
         <div className="flex items-center gap-3 px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 22 }}>arrow_back</span>
