@@ -13,6 +13,9 @@ import {
   tokenizeSearchText
 } from './search/normalize.js';
 import {
+  renderCoreSeoHtml
+} from './core-seo.js';
+import {
   getMerchantSeoPathFromMerchant,
   parseMerchantSeoSlugId,
   readViteAppShell,
@@ -2085,6 +2088,89 @@ async function handleGetStats(req, res, url, db) {
   });
 }
 
+async function loadCoreSeoSummary(db) {
+  const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
+  const benefitsCollection = db.collection(DEFAULT_COLLECTION);
+  const activeBenefitMatch = getActiveBenefitsMatch(new URLSearchParams()) || {};
+  const indexableMerchantQuery = {
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
+    benefitCount: { $gt: 0 }
+  };
+  const activeMerchantQuery = {
+    ...indexableMerchantQuery,
+    activeBenefitCount: { $gt: 0 }
+  };
+
+  const [
+    totalBenefits,
+    merchantCount,
+    activeMerchantCount,
+    topCategories,
+    topBanks
+  ] = await Promise.all([
+    benefitsCollection.countDocuments(activeBenefitMatch),
+    merchantCollection.countDocuments(indexableMerchantQuery),
+    merchantCollection.countDocuments(activeMerchantQuery),
+    merchantCollection
+      .aggregate([
+        { $match: activeMerchantQuery },
+        { $unwind: '$categories' },
+        { $group: { _id: '$categories', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 6 }
+      ])
+      .toArray(),
+    merchantCollection
+      .aggregate([
+        { $match: activeMerchantQuery },
+        { $unwind: '$banks' },
+        { $group: { _id: '$banks', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 6 }
+      ])
+      .toArray()
+  ]);
+
+  return {
+    totalBenefits,
+    merchantCount,
+    activeMerchantCount,
+    topCategories,
+    topBanks
+  };
+}
+
+async function handleHomeSeoPage(req, res, url, db, options = {}) {
+  const appShell = options.appShell || readViteAppShell();
+  const summary = options.summary || await loadCoreSeoSummary(db);
+  const renderedHtml = renderCoreSeoHtml({
+    appShell,
+    page: 'home',
+    path: '/',
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    summary
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
+async function handleSearchSeoPage(req, res, url, db, options = {}) {
+  const appShell = options.appShell || readViteAppShell();
+  const summary = options.summary || await loadCoreSeoSummary(db);
+  const renderedHtml = renderCoreSeoHtml({
+    appShell,
+    page: 'search',
+    path: '/search',
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url),
+    summary
+  });
+
+  setCacheControl(res, CC_CONTENT);
+  return html(res, 200, renderedHtml);
+}
+
 async function handleGetNearbyBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
@@ -2772,10 +2858,12 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBusinesses,
+  handleHomeSeoPage,
   handleCategorySeoPage,
   handleLandingSeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
+  handleSearchSeoPage,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2849,6 +2937,14 @@ export default async function handler(req, res) {
     }
 
     if (isReadMethod(req)) {
+      if (path === '/api/__page/home') {
+        return await handleHomeSeoPage(req, res, url, db);
+      }
+
+      if (path === '/api/__page/search') {
+        return await handleSearchSeoPage(req, res, url, db);
+      }
+
       const categorySeoMatch = path.match(/^\/api\/categorias\/([^/]+)(?:\/page\/([^/]+))?$/);
       if (categorySeoMatch) {
         return await handleCategorySeoPage(
@@ -2961,6 +3057,8 @@ export default async function handler(req, res) {
         'GET /api/descuentos/:bank/:category/:city',
         'GET /api/comercios/:slugId',
         'GET /api/business/:id',
+        'GET /',
+        'GET /search',
         'GET /api/search',
         'GET /api/categories',
         'GET /api/banks',
