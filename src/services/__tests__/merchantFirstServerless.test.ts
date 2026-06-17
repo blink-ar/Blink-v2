@@ -703,6 +703,12 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('Blink es un buscador de descuentos bancarios en Argentina');
     expect(res.body).toContain('Compara condiciones reales');
     expect(res.body).toContain('Blink vs MODO vs PromoArg vs Clash vs páginas de bancos');
+    expect(res.body).toContain('Información disponible');
+    expect(res.body).toContain('Únicamente beneficios dentro de su ecosistema.');
+    expect(res.body).toContain('Poco contenido en cada beneficio.');
+    expect(res.body).toContain('Escasez de beneficios.');
+    expect(res.body).toContain('No agrupa por comercio.');
+    expect(res.body).not.toContain('Mejor uso');
     expect(res.body).toContain('¿Dónde buscar descuentos bancarios hoy?');
     expect(res.body).toContain('data-blink-core-seo="structured-data"');
     expect(res.body).toContain('SearchAction');

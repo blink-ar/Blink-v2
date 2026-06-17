@@ -97,5 +97,11 @@ describe('DiscountSearchGuidePage', () => {
     expect(screen.getByText('Online / presencial')).toBeInTheDocument();
     expect(screen.getByText('Emisores disponibles')).toBeInTheDocument();
     expect(screen.getByText('Rubros para explorar')).toBeInTheDocument();
+    expect(screen.getByText('Información disponible')).toBeInTheDocument();
+    expect(screen.getByText('Únicamente beneficios dentro de su ecosistema.')).toBeInTheDocument();
+    expect(screen.getByText('Poco contenido en cada beneficio.')).toBeInTheDocument();
+    expect(screen.getByText('Escasez de beneficios.')).toBeInTheDocument();
+    expect(screen.getByText('No agrupa por comercio.')).toBeInTheDocument();
+    expect(screen.queryByText('Mejor uso')).not.toBeInTheDocument();
   });
 });
