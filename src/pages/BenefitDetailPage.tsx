@@ -409,7 +409,7 @@ function BenefitDetailPage() {
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   // PER_USER caps: <=20 = usage count, >20 = monetary tope per client
-  const perUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER');
+  const perUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER');
   const perUserUsageCount = perUserCaps.find(c => c.amount <= 20)?.amount ?? null;
   const perUserMonetaryCap = perUserCaps.find(c => c.amount > 20)?.amount ?? null;
   // Effective cap: use the most restrictive (minimum) of PER_TXN and monetary PER_USER caps

@@ -560,8 +560,8 @@ function BusinessDetailPage() {
                     const benefitIdx = business.benefits.indexOf(benefit);
                     const providerSummary = getBenefitProviderSummary(benefit);
                     const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
-                    const monetaryUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
-                    const effectiveTope = benefit.tope ?? (monetaryUserCaps.length > 0 ? Math.min(...monetaryUserCaps) : null);
+                    const monetaryUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
+                    const effectiveTope = [benefit.tope != null ? Number(benefit.tope) : null, monetaryUserCaps.length > 0 ? Math.min(...monetaryUserCaps) : null].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
 
                     return (
                       <div
@@ -776,8 +776,8 @@ function BusinessDetailPage() {
               const providerSummary = getBenefitProviderSummary(benefit);
               const accent = getBankAccent(providerName);
               const benefitIdx = business.benefits.indexOf(benefit);
-              const flatMonetaryUserCaps = (benefit.caps ?? []).filter(c => c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
-              const flatEffectiveTope = benefit.tope ?? (flatMonetaryUserCaps.length > 0 ? Math.min(...flatMonetaryUserCaps) : null);
+              const flatMonetaryUserCaps = (benefit.caps ?? []).filter(c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number' && c.amount > 20).map(c => c.amount);
+              const flatEffectiveTope = [benefit.tope != null ? Number(benefit.tope) : null, flatMonetaryUserCaps.length > 0 ? Math.min(...flatMonetaryUserCaps) : null].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
 
               return (
                 <div
