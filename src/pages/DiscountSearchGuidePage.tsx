@@ -104,6 +104,15 @@ function formatCount(value: unknown, fallback: string) {
   return Math.round(numberValue).toLocaleString('es-AR');
 }
 
+function hasPositiveCount(value: unknown) {
+  const numberValue = Number(value || 0);
+  return Number.isFinite(numberValue) && numberValue > 0;
+}
+
+function countItems(value: unknown) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
 function getBusinessBenefitLabel(business: Business) {
   const benefit = business.benefits[0];
   if (!benefit) return business.category || 'Beneficio disponible';
@@ -166,13 +175,19 @@ function DiscountSearchGuidePage() {
     staleTime: 1000 * 60 * 10,
   });
 
-  const bankOptions = useMemo(() => buildBankOptions(availableBanks).slice(0, 10), [availableBanks]);
+  const allBankOptions = useMemo(() => buildBankOptions(availableBanks), [availableBanks]);
+  const bankOptions = allBankOptions.slice(0, 10);
   const merchantExamples = merchantResponse?.businesses?.slice(0, 6) ?? [];
   const stats = statsResponse?.stats;
-  const benefitCount = formatCount(stats?.totalBenefits, 'Beneficios activos');
-  const merchantCount = formatCount(stats?.totalMerchants, 'Comercios indexados');
-  const bankCount = formatCount(bankOptions.length || stats?.totalBanks, 'Emisores disponibles');
-  const categoryCount = formatCount(stats?.totalCategories, 'Rubros destacados');
+  const benefitCount = formatCount(stats?.totalBenefits, 'Actualizando');
+  const hasChannelStats = hasPositiveCount(stats?.onlineBenefits) || hasPositiveCount(stats?.physicalBenefits);
+  const onlineCount = formatCount(stats?.onlineBenefits, '0');
+  const physicalCount = formatCount(stats?.physicalBenefits, '0');
+  const channelCount = hasChannelStats ? `${onlineCount} / ${physicalCount}` : 'Actualizando';
+  const topBankCount = countItems(stats?.topBanks);
+  const topCategoryCount = countItems(stats?.topCategories);
+  const bankCount = formatCount(allBankOptions.length || topBankCount, 'Actualizando');
+  const categoryCount = formatCount(topCategoryCount, 'Actualizando');
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -261,7 +276,7 @@ function DiscountSearchGuidePage() {
 
             <div className="grid grid-cols-2 gap-3 self-start">
               <ProofCard icon="sell" label="Beneficios activos" value={benefitCount} tone={{ bg: '#EEF2FF', color: '#4338CA' }} />
-              <ProofCard icon="storefront" label="Comercios indexados" value={merchantCount} tone={{ bg: '#F0FDF4', color: '#166534' }} />
+              <ProofCard icon="storefront" label="Online / presencial" value={channelCount} tone={{ bg: '#F0FDF4', color: '#166534' }} />
               <ProofCard icon="account_balance" label="Emisores disponibles" value={bankCount} tone={{ bg: '#FCE7F3', color: '#9D174D' }} />
               <ProofCard icon="category" label="Rubros para explorar" value={categoryCount} tone={{ bg: '#DBEAFE', color: '#1D4ED8' }} />
             </div>
