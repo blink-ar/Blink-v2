@@ -3,6 +3,15 @@ import { useSEO } from '../../hooks/useSEO';
 import { SEOConfig, SITE_NAME, toAbsoluteUrl } from '../../seo/seo';
 import { resolveSeoCategory } from '../../seo/categoryPages';
 
+const NOINDEX_APP_ROUTES = new Set([
+  '/profile',
+  '/saved',
+  '/login',
+  '/signup',
+  '/notifications',
+  '/auth/callback',
+]);
+
 function normalizePathname(pathname: string): string {
   return pathname.replace(/\/+$/, '') || '/';
 }
@@ -111,7 +120,7 @@ function RouteSEO() {
       path: location.pathname,
       type: 'article',
     };
-  } else if (normalizedPathname === '/saved' || normalizedPathname === '/profile') {
+  } else if (NOINDEX_APP_ROUTES.has(normalizedPathname)) {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,

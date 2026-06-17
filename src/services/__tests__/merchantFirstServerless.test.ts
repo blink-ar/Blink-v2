@@ -9,6 +9,7 @@ import {
   handleLegacyBusinessRedirect,
   handleLandingSeoPage,
   handleMerchantSeoPage,
+  handleNoindexAppShell,
   resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
@@ -100,6 +101,27 @@ describe('merchant-first serverless helpers', () => {
     expect(resolveRequestPath(new URL('https://example.com/categorias/moda/page/2?path=categorias/moda/page/2'))).toBe('/api/categorias/moda/page/2');
     expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia?path=descuentos/galicia/gastronomia'))).toBe('/api/descuentos/galicia/gastronomia');
     expect(resolveRequestPath(new URL('https://example.com/descuentos/galicia/gastronomia/caba?path=descuentos/galicia/gastronomia/caba'))).toBe('/api/descuentos/galicia/gastronomia/caba');
+    expect(resolveRequestPath(new URL('https://example.com/auth/callback?path=__app_noindex/auth/callback'))).toBe('/api/__app_noindex/auth/callback');
+  });
+
+  it('handleNoindexAppShell returns an app shell with server-side noindex controls', () => {
+    const req = { method: 'GET' };
+    const res = createResponseCapture();
+    const url = new URL('https://blinkapp.com.ar/profile?path=__app_noindex/profile');
+
+    handleNoindexAppShell(req as never, res as never, url, 'profile', {
+      appShell: merchantSeoAppShell,
+      siteUrl: 'https://www.blinkapp.com.ar'
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow');
+    expect(res.headers['Cache-Control']).toBe('private, no-store');
+    expect(res.body).toContain('<meta name="robots" content="noindex, nofollow" />');
+    expect(res.body).toContain('<link rel="canonical" href="https://www.blinkapp.com.ar/profile" />');
+    expect(res.body).not.toContain('<link rel="canonical" href="/" />');
+    expect(res.body).toContain('<script type="module" src="/assets/index-test.js"></script>');
   });
 
   it('rehydrateBenefitDoc prefers merchant-owned fields', () => {

@@ -136,6 +136,14 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_
 const AUTH0_DOMAIN = (process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || '').replace(/\/$/, '');
 
 const USER_DATA_COLLECTION = 'user_data';
+const NOINDEX_APP_ROUTES = new Set([
+  '/profile',
+  '/saved',
+  '/login',
+  '/signup',
+  '/notifications',
+  '/auth/callback'
+]);
 
 const globalState = globalThis;
 if (!globalState.__blinkMongo) {
@@ -313,6 +321,15 @@ function html(res, statusCode, payload) {
   res.send(payload);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Cache-Control directives
 const CC_METADATA = 's-maxage=43200, stale-while-revalidate=86400, max-age=3600';  // 12h CDN, 1h browser
 const CC_CONTENT  = 's-maxage=3600, stale-while-revalidate=7200, max-age=300';     // 1h CDN, 5m browser
@@ -332,8 +349,52 @@ function getCanonicalSiteUrl(url) {
   );
 }
 
+function toAbsoluteSiteUrl(siteUrl, pathOrUrl) {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  const normalizedSiteUrl = String(siteUrl || 'https://www.blinkapp.com.ar').replace(/\/$/, '');
+  const normalizedPath = String(pathOrUrl || '/').startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+  return `${normalizedSiteUrl}${normalizedPath}`;
+}
+
 function isReadMethod(req) {
   return req.method === 'GET' || req.method === 'HEAD';
+}
+
+function normalizeNoindexAppPath(pathname) {
+  const normalized = `/${String(pathname || '')
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join('/')}`.replace(/\/+$/, '') || '/';
+
+  return NOINDEX_APP_ROUTES.has(normalized) ? normalized : null;
+}
+
+function stripDefaultSeo(shell) {
+  return shell
+    .replace(/<title>[\s\S]*?<\/title>\s*/i, '')
+    .replace(/<meta\s+(name|property)=["'](?:description|robots|keywords|og:[^"']+|twitter:[^"']+)["'][^>]*>\s*/gi, '')
+    .replace(/<link\s+rel=["']canonical["'][^>]*>\s*/gi, '')
+    .replace(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>\s*/gi, '');
+}
+
+function renderNoindexAppHtml({ appShell, path: routePath, siteUrl }) {
+  const absoluteUrl = toAbsoluteSiteUrl(siteUrl, routePath);
+  const headHtml = [
+    '    <title>Blink</title>',
+    '    <meta name="robots" content="noindex, nofollow" />',
+    `    <link rel="canonical" href="${escapeHtml(absoluteUrl)}" />`
+  ].join('\n');
+  const strippedShell = stripDefaultSeo(appShell);
+
+  if (strippedShell.includes('</head>')) {
+    return strippedShell.replace('</head>', `${headHtml}\n  </head>`);
+  }
+
+  return `${headHtml}\n${strippedShell}`;
 }
 
 /**
@@ -2764,6 +2825,28 @@ async function handlePlaceDetails(req, res) {
   });
 }
 
+function handleNoindexAppShell(req, res, url, routePath, options = {}) {
+  const normalizedRoutePath = normalizeNoindexAppPath(routePath);
+  if (!normalizedRoutePath) {
+    return json(res, 404, {
+      success: false,
+      error: 'Noindex app route not found',
+      path: routePath
+    });
+  }
+
+  const appShell = options.appShell || readViteAppShell();
+  const renderedHtml = renderNoindexAppHtml({
+    appShell,
+    path: normalizedRoutePath,
+    siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
+  });
+
+  setCacheControl(res, 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  return html(res, 200, renderedHtml);
+}
+
 export {
   applyLocalDistanceGuardrail,
   buildBusinessBenefitSummary,
@@ -2776,6 +2859,7 @@ export {
   handleLandingSeoPage,
   handleLegacyBusinessRedirect,
   handleMerchantSeoPage,
+  handleNoindexAppShell,
   handleSearch,
   rehydrateBenefitDoc
 };
@@ -2834,6 +2918,13 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (isReadMethod(req)) {
+      const noindexAppMatch = path.match(/^\/api\/__app_noindex\/(.+)$/);
+      if (noindexAppMatch) {
+        return handleNoindexAppShell(req, res, url, noindexAppMatch[1]);
+      }
+    }
+
     const db = await getDb();
 
     if (req.method === 'GET' && path === '/api/benefits') {
