@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { MongoClient } from 'mongodb';
-import { PROVIDER_STATIC_METADATA } from '../api/provider-metadata.js';
+import { PROVIDER_STATIC_METADATA } from '../server/provider-metadata.js';
 
 function loadEnvFile(fileName) {
   if (!fs.existsSync(fileName)) return;

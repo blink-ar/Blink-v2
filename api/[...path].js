@@ -17,7 +17,7 @@ import {
   normalizeProviderKey,
   resolveProviderFilterValues,
   serializeProviderDescriptor
-} from './providers.js';
+} from '../server/providers.js';
 import {
   FALLBACK_CORE_SEO_SUMMARY,
   renderCoreSeoHtml

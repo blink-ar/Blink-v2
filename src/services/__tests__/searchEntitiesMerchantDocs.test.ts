@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildProviderCatalog } from '../../../api/providers.js';
+import { buildProviderCatalog } from '../../../server/providers.js';
 import { buildSearchDatasetFromMerchantDocs } from '../../../api/search/entities.js';
 
 describe('buildSearchDatasetFromMerchantDocs', () => {

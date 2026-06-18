@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProviderCatalog,
   resolveProviderFilterValues,
-} from '../../../api/providers.js';
+} from '../../../server/providers.js';
 
 describe('provider canonical resolver', () => {
   const catalog = buildProviderCatalog([

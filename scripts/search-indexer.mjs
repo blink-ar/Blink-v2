@@ -5,7 +5,7 @@ import {
   buildMeiliSynonyms,
   buildSearchDatasetFromMerchantDocs
 } from '../api/search/entities.js';
-import { loadProviderCatalog } from '../api/providers.js';
+import { loadProviderCatalog } from '../server/providers.js';
 import {
   meiliAddDocuments,
   meiliDeleteAllDocuments,
