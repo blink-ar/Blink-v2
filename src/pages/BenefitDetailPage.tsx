@@ -431,9 +431,7 @@ function BenefitDetailPage() {
   const dayAvailability = parseDayAvailability(benefit.cuando);
   const hasDayData = !!benefit.cuando;
 
-  const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
-    .filter(Boolean)
-    .join('\n\n');
+  const termsText = benefit.condicion || '';
 
   const locations = (() => {
     const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
