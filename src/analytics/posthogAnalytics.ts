@@ -68,7 +68,7 @@ export function initializePostHog(): PostHog | null {
         capture_unhandled_rejections: true,
         capture_console_errors: false,
       },
-      person_profiles: 'identified_only',
+      person_profiles: 'always',
       disable_surveys: false,
       disable_surveys_automatic_display: false,
     });

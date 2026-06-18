@@ -4,6 +4,7 @@ import {
   getActiveBenefitsMatch,
   handleCategorySeoPage,
   handleGetBenefitById,
+  handleGetBanks,
   handleGetBenefits,
   handleGetBusinesses,
   handleDiscountSearchGuideSeoPage,
@@ -62,6 +63,10 @@ function createCursor<T>(data: T[]) {
   return cursor;
 }
 
+function expectAnyRegexMatches(patterns: RegExp[], value: string) {
+  expect(patterns.some((pattern) => pattern.test(value))).toBe(true);
+}
+
 function createPaginatedCursor<T>(data: T[]) {
   let offset = 0;
   let count = data.length;
@@ -96,6 +101,7 @@ describe('merchant-first serverless helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
   });
 
   it('resolveRequestPath honors Vercel path rewrites for pretty merchant URLs', () => {
@@ -208,6 +214,16 @@ describe('merchant-first serverless helpers', () => {
 
     const db = {
       collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'bbva', name: 'BBVA', aliases: ['banco frances', 'banco francés'], shortName: 'BBVA' },
+              ]);
+            }
+          };
+        }
+
         if (name === 'merchant_assets') {
           return {
             async countDocuments(query: unknown) {
@@ -255,6 +271,362 @@ describe('merchant-first serverless helpers', () => {
     expect(payload.businesses[0].benefits).toHaveLength(1);
     expect((merchantQueries[0] as { categories: unknown }).categories).toEqual({ $in: ['shopping'] });
     expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+  });
+
+  it('handleGetBanks returns provider descriptors with derived index metadata', async () => {
+    const providers = [
+      {
+        key: 'mercadopago',
+        name: 'Mercado Pago',
+        aliases: ['mercado'],
+        shortName: 'MP',
+        image: 'https://cdn.example.com/mp.png',
+        promotion_url: 'https://www.mercadopago.com.ar',
+      },
+      {
+        key: 'personal',
+        name: 'Personal Pay',
+        shortName: 'PP',
+      },
+    ];
+    const bankCounts = [
+      { _id: 'mercadopago', count: 7 },
+      { _id: 'personal', count: 3 },
+      { _id: 'Banco Provincia', count: 12 },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor(providers);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            aggregate() {
+              return createAggregateCursor(bankCounts);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/banks?collection=confirmed_benefits');
+
+    await handleGetBanks({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.banks).toHaveLength(1);
+    expect(payload.banks[0]).toMatchObject({
+      key: 'mercadopago',
+      name: 'Mercado Pago',
+      shortName: 'MP',
+      count: 7,
+      indexed: true,
+    });
+    expect(payload.banks[0].aliases).toContain('mercado');
+    expect(payload.banks.some((bank: { key: string }) => bank.key === 'bancoprovincia')).toBe(false);
+    expect(payload.banks.some((bank: { key: string }) => bank.key === 'provincia')).toBe(false);
+  });
+
+  it('handleGetBanks resolves counted display names only through cataloged providers', async () => {
+    const providers = [
+      {
+        key: 'provincia',
+        name: 'Banco Provincia',
+        aliases: ['bapro', 'banco provincia'],
+        shortName: 'BAPRO',
+      },
+    ];
+    const bankCounts = [
+      { _id: 'Banco Provincia', count: 12 },
+      { _id: 'Banco No Catalogado', count: 20 },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor(providers);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            aggregate() {
+              return createAggregateCursor(bankCounts);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/banks?collection=confirmed_benefits');
+
+    await handleGetBanks({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.banks).toHaveLength(1);
+    expect(payload.banks[0]).toMatchObject({
+      key: 'provincia',
+      name: 'Banco Provincia',
+      shortName: 'BAPRO',
+      count: 12,
+      indexed: true,
+    });
+  });
+
+  it('handleGetBanks fails when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/banks?collection=confirmed_benefits');
+
+    await handleGetBanks({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+  });
+
+  it('handleGetBenefits fails for bank filters when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?bank=galicia&collection=confirmed_benefits');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+  });
+
+  it('handleGetBusinesses fails for bank filters when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?bank=galicia&collection=confirmed_benefits');
+
+    await handleGetBusinesses({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+  });
+
+  it('handleGetBusinesses resolves legacy bank aliases before querying merchants and benefits', async () => {
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+
+    const providers = [
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+    ];
+    const merchants = [
+      {
+        merchantId: 'merchant_1',
+        merchantName: 'Adidas',
+        merchantKey: 'adidas',
+        categories: ['shopping'],
+        locations: [],
+        banks: ['mercadopago'],
+        searchProfile: { description: 'Sportswear' },
+        activeBenefitCount: 1,
+        benefitCount: 1,
+        hasOnlineBenefits: false,
+      },
+    ];
+    const benefits = [
+      {
+        id: 'benefit-1',
+        merchantId: 'merchant_1',
+        eligibilities: [
+          {
+            bank: 'mercadopago',
+            bankDisplayName: 'Mercado Pago',
+            cardTypes: [],
+            cardResolutionStatus: 'not_required',
+            subscriptionResolutionStatus: 'not_required',
+          },
+        ],
+        benefitTitle: '20% OFF',
+        availableDays: ['Lunes'],
+        discountPercentage: 20,
+        caps: [],
+        online: false,
+        installments: null,
+        description: 'Promo',
+        termsAndConditions: '',
+        link: null,
+        validUntil: '2099-12-31',
+      },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor(providers);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments(query: unknown) {
+              merchantQueries.push(query);
+              return merchants.length;
+            },
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor(merchants);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor(benefits);
+            },
+          };
+        }
+
+        if (name === 'bank_cards') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?collection=confirmed_benefits&bank=mercado&limit=1&offset=0');
+
+    await handleGetBusinesses({ method: 'GET' } as never, res as never, url, db as never);
+
+    const merchantBankRegexes = ((merchantQueries[0] as { banks: { $in: RegExp[] } }).banks.$in);
+    const benefitBankRegexes = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in);
+    expectAnyRegexMatches(merchantBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(merchantBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(merchantBankRegexes, 'mercado');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
+    expect(JSON.parse(res.body || '{}').filters.bank).toBe('mercadopago');
+  });
+
+  it('handleGetBenefits resolves legacy bank aliases before querying benefits', async () => {
+    const benefitQueries: unknown[] = [];
+    const providers = [
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor(providers);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor([]);
+            },
+            async countDocuments() {
+              return 0;
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?collection=confirmed_benefits&bank=mercado');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    const benefitBankRegexes = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in);
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercado');
+    expect(JSON.parse(res.body || '{}').filters.bank).toBe('mercadopago');
   });
 
   it('handleGetBusinesses supports exact merchantId lookups without fuzzy search filters', async () => {

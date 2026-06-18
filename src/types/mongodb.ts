@@ -191,9 +191,22 @@ export interface MongoCategoriesResponse {
     categories: string[];
 }
 
+export interface MongoBankProvider {
+    key: string;
+    name: string;
+    shortName?: string;
+    aliases?: string[];
+    image?: string | null;
+    promotionUrl?: string | null;
+    providerType?: string | null;
+    bcraCode?: string | null;
+    count?: number;
+    indexed?: boolean;
+}
+
 export interface MongoBanksResponse {
     success: boolean;
-    banks: string[];
+    banks: Array<string | MongoBankProvider>;
 }
 
 export interface MongoStatsResponse {

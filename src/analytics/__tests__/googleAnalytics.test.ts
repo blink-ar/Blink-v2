@@ -80,7 +80,7 @@ describe('googleAnalytics', () => {
       autocapture: true,
       capture_pageview: 'history_change',
       capture_pageleave: 'if_capture_pageview',
-      person_profiles: 'identified_only',
+      person_profiles: 'always',
     }));
     expect(posthogMock.capture).toHaveBeenCalledWith('signup_completed', {
       source: 'home_page',

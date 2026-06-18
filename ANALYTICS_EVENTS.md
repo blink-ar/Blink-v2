@@ -1,6 +1,6 @@
 # Analytics Event Dictionary
 
-Last updated: 2026-06-15
+Last updated: 2026-06-18
 
 Maintenance rule:
 - Any change to analytics event names or params in `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/googleAnalytics.ts` or `/Users/tomas/Dev/Blink/Blink-v2/src/analytics/intentTracking.ts` must update this file in the same PR.
@@ -22,7 +22,8 @@ Maintenance rule:
 - Provider behavior:
   - GA4 and PostHog are independent; a missing env var for one provider must not block the other.
   - Existing normalized app events fan out to both providers when both are configured.
-  - PostHog uses ID-only identification from the app auth user id. Email and name are not sent as PostHog person properties.
+  - PostHog creates person profiles for anonymous and identified traffic (`person_profiles: 'always'`) so the persons list includes more visitors.
+  - Identified PostHog users still use only the app auth user id. Email and name are not sent as PostHog person properties.
   - Web/PostHog integration scope only; Expo mobile analytics are not covered here.
 
 ## PostHog Product Features

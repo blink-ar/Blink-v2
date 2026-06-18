@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSearchDatasetFromMerchantDocs } from '../../../api/search/entities.js';
+import { buildProviderCatalog } from '../../../server/providers.js';
 
 const { meiliSearchMock, isMeilisearchConfiguredMock } = vi.hoisted(() => ({
   meiliSearchMock: vi.fn(),
@@ -11,7 +12,7 @@ vi.mock('../../../api/search/meilisearch.js', () => ({
   isMeilisearchConfigured: isMeilisearchConfiguredMock
 }));
 
-import { handleSearch } from '../../../api/[...path].js';
+import { handleSearch, normalizeSavedBankCodesForCatalog } from '../../../api/[...path].js';
 
 function createResponseCapture() {
   return {
@@ -93,6 +94,10 @@ function collectRegexes(value: unknown, out: RegExp[] = []) {
   return out;
 }
 
+function expectAnyRegexMatches(patterns: RegExp[], value: string) {
+  expect(patterns.some((pattern) => pattern.test(value))).toBe(true);
+}
+
 interface MerchantSearchFixture {
   merchantName?: string;
   merchantKey?: string;
@@ -120,6 +125,232 @@ function merchantMatchesRegexQuery(query: unknown, merchant: MerchantSearchFixtu
 describe('handleSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+  });
+
+  it('resolves legacy bank aliases before building Meilisearch filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+    meiliSearchMock
+      .mockResolvedValueOnce({ hits: [], estimatedTotalHits: 0 })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=mercado&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "mercadopago"');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
+  });
+
+  it('does not broaden Meilisearch queries for uncataloged bank filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+    meiliSearchMock
+      .mockResolvedValueOnce({ hits: [], estimatedTotalHits: 0 })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets' || name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=bancoprovincia&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "__unknown_provider__"');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBeUndefined();
+  });
+
+  it('returns 503 for bank filters when the provider catalog is empty', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=galicia&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+    expect(meiliSearchMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes saved banks only against an available provider catalog', () => {
+    const catalog = buildProviderCatalog([
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+    ]);
+
+    expect(normalizeSavedBankCodesForCatalog(catalog, ['mercado', 'Mercado Pago'])).toEqual({
+      ok: true,
+      savedBankCodes: ['mercadopago'],
+    });
+    expect(normalizeSavedBankCodesForCatalog(buildProviderCatalog([]), ['mercado'])).toMatchObject({
+      ok: false,
+      status: 503,
+    });
+    expect(normalizeSavedBankCodesForCatalog(catalog, ['banco no catalogado'])).toMatchObject({
+      ok: false,
+      status: 400,
+      payload: {
+        error: 'Banco no catalogado',
+        unresolvedBanks: ['banco no catalogado'],
+      },
+    });
+    expect(normalizeSavedBankCodesForCatalog(buildProviderCatalog([]), [])).toEqual({
+      ok: true,
+      savedBankCodes: [],
+    });
+  });
+
+  it('expands legacy bank aliases for Mongo fallback bank filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(false);
+
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_mp',
+      merchantName: 'Adidas',
+      merchantKey: 'adidas',
+      categories: ['shopping'],
+      banks: ['Mercado Pago'],
+      locations: [],
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: false,
+      maxDiscountPercentage: 20,
+      searchProfile: {
+        aliases: ['adidas'],
+        description: 'Adidas descuentos',
+        benefits: []
+      },
+      imageUrl: '',
+      logoUrl: '',
+      coverUrl: ''
+    };
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=mercado&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    const merchantBankRegexes = (
+      merchantQueries[0] as { $and: Array<{ banks?: { $in: RegExp[] } }> }
+    ).$and[0].banks?.$in || [];
+    const benefitBankRegexes = (
+      benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } }
+    )['eligibilities.bank'].$in;
+
+    expectAnyRegexMatches(merchantBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(merchantBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(merchantBankRegexes, 'mercado');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
   });
 
   it('rescues an exact-name merchant that meilisearch omitted from merchant candidates', async () => {
