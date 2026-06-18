@@ -410,6 +410,9 @@ function BenefitDetailPage() {
   const maxSpend = effectiveCapAmount != null && discount > 0 ? effectiveCapAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
+  const hasTransactionCap = (benefit.caps ?? []).some(
+    c => c != null && c.resetsEvery !== 'PER_USER' && c.resetsEvery !== 'OTHER' && typeof c.amount === 'number',
+  );
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -665,10 +668,12 @@ function BenefitDetailPage() {
                 )}
 
                 {/* Tope descuento (PER_TXN cap) */}
-                {!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount) && (
+                {(!hasTransactionCap || (!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount))) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
-                    <span className="text-sm font-semibold text-blink-ink">{topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope)}</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {!hasTransactionCap ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
+                    </span>
                   </div>
                 )}
 
