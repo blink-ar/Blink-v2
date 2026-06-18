@@ -668,11 +668,14 @@ function BenefitDetailPage() {
                 )}
 
                 {/* Tope descuento (PER_TXN cap) */}
-                {(!hasTransactionCap || (!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount))) && (
+                {discount > 0 && (
+                  (!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount)) ||
+                  (!benefit.tope || isNoLimit)
+                ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
                     <span className="text-sm font-semibold text-blink-ink">
-                      {!hasTransactionCap ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
+                      {(!benefit.tope || isNoLimit) ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
                     </span>
                   </div>
                 )}
