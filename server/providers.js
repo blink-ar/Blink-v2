@@ -1,5 +1,3 @@
-import { PROVIDER_STATIC_METADATA } from './provider-metadata.js';
-
 export const PROVIDERS_COLLECTION = 'providers';
 
 const PROVIDER_CATALOG_TTL_MS = 30 * 60 * 1000;
@@ -106,18 +104,16 @@ function descriptorFromProviderDoc(doc) {
   const key = normalizeProviderKey(doc?.key);
   if (!key) return null;
 
-  const staticMetadata = PROVIDER_STATIC_METADATA[key] || {};
-  const name = String(doc?.name || staticMetadata.name || key).trim();
-  const aliases = uniqueStrings([
-    ...(Array.isArray(staticMetadata.aliases) ? staticMetadata.aliases : []),
-    ...(Array.isArray(doc?.aliases) ? doc.aliases : [])
-  ]);
-  const shortName = String(doc?.shortName || staticMetadata.shortName || fallbackShortName(key, name)).trim();
+  const name = String(doc?.name || key).trim();
+  const aliases = uniqueStrings(Array.isArray(doc?.aliases) ? doc.aliases : []);
+  const catalogShortName = String(doc?.shortName || '').trim();
+  const shortName = catalogShortName || fallbackShortName(key, name);
 
   return {
     key,
     name,
     shortName,
+    hasCatalogShortName: Boolean(catalogShortName),
     aliases,
     image: typeof doc?.image === 'string' && doc.image.trim() ? doc.image.trim() : null,
     promotionUrl: typeof doc?.promotionUrl === 'string' && doc.promotionUrl.trim()
@@ -148,6 +144,7 @@ export function buildProviderCatalog(providerDocs = []) {
     byKey.set(descriptor.key, {
       ...existing,
       ...descriptor,
+      hasCatalogShortName: Boolean(existing.hasCatalogShortName || descriptor.hasCatalogShortName),
       aliases: uniqueStrings([...(existing.aliases || []), ...(descriptor.aliases || [])])
     });
   }
@@ -164,7 +161,7 @@ export function buildProviderCatalog(providerDocs = []) {
   for (const provider of providers) {
     addLookup(provider.key, provider.key);
     addLookup(provider.name, provider.key);
-    addLookup(provider.shortName, provider.key);
+    if (provider.hasCatalogShortName) addLookup(provider.shortName, provider.key);
     for (const alias of provider.aliases || []) {
       addLookup(alias, provider.key);
     }

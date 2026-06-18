@@ -114,7 +114,7 @@ console.log(`✔ src/data/bankLogosManifest.ts: ${[args.key, ...args.aliases].jo
 console.log(`
 Pasos manuales a revisar (ver .claude/skills/add-bank-logo/SKILL.md):
   1. Mongo providers -> agregar/actualizar el doc con key canonical, name,
-     shortName y aliases estaticos. El frontend deriva filtros desde /api/banks.
+     shortName y aliases catalogados. El frontend deriva filtros desde /api/banks.
   2. src/components/neo/BankFilterSheet.tsx -> BANK_BRAND[token] con los colores
      de marca del chip.
   3. src/utils/bankColors.ts -> acento de color para el fallback de iniciales.

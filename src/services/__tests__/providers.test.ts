@@ -7,12 +7,27 @@ import {
 
 describe('provider canonical resolver', () => {
   const catalog = buildProviderCatalog([
-    { key: 'mercadopago', name: 'Mercado Pago' },
-    { key: 'personal', name: 'Personal Pay' },
-    { key: 'nacion', name: 'Banco Nación' },
+    {
+      key: 'mercadopago',
+      name: 'Mercado Pago',
+      aliases: ['mercado', 'mercado pago', 'mp'],
+      shortName: 'MP',
+    },
+    {
+      key: 'personal',
+      name: 'Personal Pay',
+      aliases: ['personalpay', 'personal pay'],
+      shortName: 'PP',
+    },
+    {
+      key: 'nacion',
+      name: 'Banco Nación',
+      aliases: ['bna', 'banco nacion', 'banco nación'],
+      shortName: 'BNA',
+    },
   ]);
 
-  it('resolves static aliases to provider keys', () => {
+  it('resolves catalog aliases to provider keys', () => {
     expect(catalog.resolveKey('mercado')).toBe('mercadopago');
     expect(catalog.resolveKey('Mercado Pago')).toBe('mercadopago');
     expect(catalog.resolveKey('personalpay')).toBe('personal');
@@ -41,5 +56,15 @@ describe('provider canonical resolver', () => {
     expect(catalog.resolveProvider('Banco Test')).toBeNull();
     expect(resolveProviderCanonicalValues(catalog, 'Banco Test')).toEqual([]);
     expect(resolveProviderFilterValues(catalog, 'Banco Test')).toEqual([]);
+  });
+
+  it('does not use seed metadata when aliases are missing from provider docs', () => {
+    const catalogWithoutAliases = buildProviderCatalog([
+      { key: 'mercadopago', name: 'Mercado Pago' },
+    ]);
+
+    expect(catalogWithoutAliases.resolveKey('Mercado Pago')).toBe('mercadopago');
+    expect(catalogWithoutAliases.resolveKey('mercado')).toBeNull();
+    expect(catalogWithoutAliases.resolveKey('mp')).toBeNull();
   });
 });
