@@ -11,7 +11,6 @@
     "dev:vercel:functions": "npx vercel dev --local-config vercel.functions-dev.json --listen 3000",
     "search:index": "node scripts/search-indexer.mjs full",
     "search:watch": "node scripts/search-indexer.mjs watch",
-    "providers:seed": "node scripts/seed-provider-metadata.mjs",
     "seo:generate": "node scripts/generate-seo-files.mjs",
     "prebuild": "npm run seo:generate",
     "build": "vite build",
