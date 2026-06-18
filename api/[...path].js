@@ -13,6 +13,13 @@ import {
   tokenizeSearchText
 } from './search/normalize.js';
 import {
+  loadProviderCatalog,
+  resolveProviderCanonicalValues,
+  resolveProviderFilterValues,
+  serializeProviderDescriptor,
+  splitProviderParam
+} from '../server/providers.js';
+import {
   FALLBACK_CORE_SEO_SUMMARY,
   renderCoreSeoHtml
 } from './core-seo.js';
@@ -278,6 +285,53 @@ async function handleGetUserBanks(req, res) {
   return json(res, 200, { success: true, savedBankCodes: doc?.savedBankCodes ?? [] });
 }
 
+function normalizeSavedBankCodesForCatalog(providerCatalog, banks) {
+  if (banks.length === 0) {
+    return { ok: true, savedBankCodes: [] };
+  }
+
+  if (!isProviderCatalogAvailable(providerCatalog)) {
+    return {
+      ok: false,
+      status: 503,
+      payload: {
+        success: false,
+        error: 'Catálogo de bancos no disponible'
+      }
+    };
+  }
+
+  const savedBankCodes = [];
+  const unresolvedBanks = [];
+  const seen = new Set();
+
+  for (const bank of banks) {
+    const resolvedKey = providerCatalog.resolveKey(bank);
+    if (!resolvedKey || !providerCatalog.hasKey(resolvedKey)) {
+      unresolvedBanks.push(bank);
+      continue;
+    }
+    if (!seen.has(resolvedKey)) {
+      seen.add(resolvedKey);
+      savedBankCodes.push(resolvedKey);
+    }
+  }
+
+  if (unresolvedBanks.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        error: 'Banco no catalogado',
+        unresolvedBanks
+      }
+    };
+  }
+
+  return { ok: true, savedBankCodes };
+}
+
 async function handleUpdateUserBanks(req, res) {
   const userId = await getUserIdFromRequest(req);
   if (!userId) return json(res, 401, { error: 'No autenticado' });
@@ -286,17 +340,26 @@ async function handleUpdateUserBanks(req, res) {
   if (!Array.isArray(banks) || banks.some((b) => typeof b !== 'string')) {
     return json(res, 400, { error: 'banks debe ser un array de strings' });
   }
-  const unique = Array.from(new Set(banks.map((b) => b.trim()).filter(Boolean)));
+  let providerCatalog = null;
+  try {
+    providerCatalog = await loadProviderCatalogForRequest(await getDb());
+  } catch {
+    providerCatalog = null;
+  }
+  const normalized = normalizeSavedBankCodesForCatalog(providerCatalog, banks);
+  if (!normalized.ok) {
+    return json(res, normalized.status, normalized.payload);
+  }
   const col = await getUserDataCollection();
   await col.updateOne(
     { userId },
     {
-      $set: { savedBankCodes: unique, updatedAt: new Date() },
+      $set: { savedBankCodes: normalized.savedBankCodes, updatedAt: new Date() },
       $setOnInsert: { userId, createdAt: new Date() }
     },
     { upsert: true }
   );
-  return json(res, 200, { success: true, savedBankCodes: unique });
+  return json(res, 200, { success: true, savedBankCodes: normalized.savedBankCodes });
 }
 
 function json(res, statusCode, payload) {
@@ -734,6 +797,41 @@ function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function hasProviderFilterParam(bankParam) {
+  return splitProviderParam(bankParam).length > 0;
+}
+
+function isProviderCatalogAvailable(providerCatalog) {
+  return Boolean(providerCatalog?.isAvailable && Array.isArray(providerCatalog.providers) && providerCatalog.providers.length > 0);
+}
+
+function hasUnavailableProviderCatalogForBank(providerCatalog, bankParam) {
+  return hasProviderFilterParam(bankParam) && !isProviderCatalogAvailable(providerCatalog);
+}
+
+function providerCatalogUnavailableResponse(res) {
+  return json(res, 503, {
+    success: false,
+    error: 'Catálogo de bancos no disponible'
+  });
+}
+
+function buildProviderFilterRegexes(providerCatalog, bankParam) {
+  const values = resolveProviderFilterValues(providerCatalog, bankParam);
+  if (values.length === 0 && hasProviderFilterParam(bankParam)) {
+    return [/a^/];
+  }
+  return values.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i'));
+}
+
+function normalizeProviderFilterParam(providerCatalog, bankParam) {
+  return resolveProviderCanonicalValues(providerCatalog, bankParam).join(',');
+}
+
+async function loadProviderCatalogForRequest(db) {
+  return loadProviderCatalog(db, { fallbackOnError: true });
+}
+
 function haversineKm(lat1, lng1, lat2, lng2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -850,8 +948,9 @@ function enrichBusinessWithDistance(business, userLat, userLng) {
   };
 }
 
-function parseSearchFilters(searchParams) {
-  const bank = searchParams.get('bank') || undefined;
+function parseSearchFilters(searchParams, providerCatalog) {
+  const rawBank = searchParams.get('bank');
+  const bank = normalizeProviderFilterParam(providerCatalog, rawBank) || undefined;
   const category = searchParams.get('category') || undefined;
   const latParam = searchParams.get('lat');
   const lngParam = searchParams.get('lng');
@@ -860,6 +959,7 @@ function parseSearchFilters(searchParams) {
   const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
   return {
     bank,
+    hasUnresolvedBank: hasProviderFilterParam(rawBank) && !bank,
     category,
     lat: hasLocation ? lat : null,
     lng: hasLocation ? lng : null
@@ -964,7 +1064,7 @@ function buildMerchantNameRescuePatterns(normalizedQuery, options = {}) {
   return Array.from(sources).map((source) => new RegExp(source, 'i'));
 }
 
-function buildActiveMerchantSearchQuery(filters, searchParams) {
+function buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog) {
   const query = {
     isActive: { $ne: false },
     merchantId: { $exists: true, $type: 'string' },
@@ -977,12 +1077,10 @@ function buildActiveMerchantSearchQuery(filters, searchParams) {
     query.categories = { $in: [filters.category] };
   }
 
-  if (filters.bank) {
-    const bankPatterns = filters.bank
-      .split(',')
-      .map((bank) => bank.trim())
-      .filter(Boolean)
-      .map((bank) => new RegExp(escapeRegex(bank), 'i'));
+  if (filters.hasUnresolvedBank) {
+    query.banks = { $in: [/a^/] };
+  } else if (filters.bank) {
+    const bankPatterns = buildProviderFilterRegexes(providerCatalog, filters.bank);
     if (bankPatterns.length > 0) {
       query.banks = { $in: bankPatterns };
     }
@@ -1012,13 +1110,13 @@ function mergeMerchantDocsById(merchantLists) {
   return Array.from(mergedByMerchantId.values());
 }
 
-async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchParams) {
+async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchParams, providerCatalog) {
   if (!normalizedQuery) {
     return [];
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
-  const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
+  const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog);
   const exactPatterns = buildMerchantNameRescuePatterns(normalizedQuery);
   const prefixPatterns = buildMerchantNameRescuePatterns(normalizedQuery, { prefix: true });
 
@@ -1066,7 +1164,9 @@ function buildMeiliFilter(entityType, filters) {
     clauses.push(`categories = "${normalizeSearchText(filters.category)}"`);
   }
 
-  if (filters.bank) {
+  if (filters.hasUnresolvedBank) {
+    clauses.push('(banks = "__unknown_provider__")');
+  } else if (filters.bank) {
     const banks = filters.bank
       .split(',')
       .map((value) => normalizeSearchText(value))
@@ -1341,7 +1441,7 @@ function mapMerchantHitToResponse(hit, scoreMeta, filters) {
   };
 }
 
-async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants, searchParams) {
+async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants, searchParams, providerCatalog) {
   const merchantIds = Array.from(
     new Set(
       (merchants || [])
@@ -1358,15 +1458,10 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     merchantId: { $in: merchantIds }
   };
   const bank = searchParams.get('bank');
-  const bankFilter = bank
-    ? bank
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean)
-    : [];
+  const bankPatterns = buildProviderFilterRegexes(providerCatalog, bank);
 
-  if (bankFilter.length > 0) {
-    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  if (bankPatterns.length > 0) {
+    benefitQuery['eligibilities.bank'] = { $in: bankPatterns };
   }
   applyActiveBenefitsFilter(benefitQuery, searchParams);
 
@@ -1424,13 +1519,13 @@ function mapProductHit(hit) {
   };
 }
 
-async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams) {
+async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams, providerCatalog) {
   const expandedTokens = buildExpandedQueryTokens(query);
   const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
   const regex = new RegExp(regexSource, 'i');
 
   const merchantQuery = combineQueriesWithAnd(
-    buildActiveMerchantSearchQuery(filters, searchParams),
+    buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog),
     {
       $or: [
         { merchantName: { $regex: regex } },
@@ -1453,11 +1548,13 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
     db,
     normalizeSearchText(query),
     filters,
-    searchParams
+    searchParams,
+    providerCatalog
   );
 
   const dataset = buildSearchDatasetFromMerchantDocs(
-    mergeMerchantDocsById([fallbackMerchants, rescueMerchants])
+    mergeMerchantDocsById([fallbackMerchants, rescueMerchants]),
+    { providerCatalog }
   );
   const normalizedQuery = normalizeSearchText(query);
   const intentTags = resolveIntentTagsFromTokens(expandedTokens);
@@ -1519,7 +1616,11 @@ async function handleSearch(req, res, url, db) {
   const limitNum = Math.min(Math.max(toPositiveInt(searchParams.get('limit'), 20), 1), 100);
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
   const sectionLimit = Math.min(Math.max(toPositiveInt(searchParams.get('sectionLimit'), 12), 1), 30);
-  const filters = parseSearchFilters(searchParams);
+  const providerCatalog = await loadProviderCatalogForRequest(db);
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, searchParams.get('bank'))) {
+    return providerCatalogUnavailableResponse(res);
+  }
+  const filters = parseSearchFilters(searchParams, providerCatalog);
   const debugMode = searchParams.get('debug') === '1' || process.env.SEARCH_DEBUG === 'true';
 
   const normalized = normalizeSearchText(q);
@@ -1559,8 +1660,8 @@ async function handleSearch(req, res, url, db) {
 
     const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
     const merchantBaseHits = Array.isArray(merchantSearch.hits) ? merchantSearch.hits : [];
-    const rescueMerchantDocs = await loadMerchantNameRescueDocs(db, normalized, filters, searchParams);
-    const rescueMerchantHits = buildSearchDatasetFromMerchantDocs(rescueMerchantDocs).merchantDocuments;
+    const rescueMerchantDocs = await loadMerchantNameRescueDocs(db, normalized, filters, searchParams, providerCatalog);
+    const rescueMerchantHits = buildSearchDatasetFromMerchantDocs(rescueMerchantDocs, { providerCatalog }).merchantDocuments;
     let merchantCandidateHits = mergeMerchantHitCandidates([merchantBaseHits, rescueMerchantHits]);
 
     if (seedMerchantIds.length > 0) {
@@ -1628,7 +1729,8 @@ async function handleSearch(req, res, url, db) {
       db,
       collectionName,
       distanceAwareMerchants.slice(offsetNum, offsetNum + limitNum),
-      searchParams
+      searchParams,
+      providerCatalog
     );
     const intents = (intentSearch.hits || []).map(mapIntentHit);
     const products = (productSearch.hits || []).map(mapProductHit);
@@ -1680,13 +1782,15 @@ async function handleSearch(req, res, url, db) {
       limitNum,
       offsetNum,
       filters,
-      searchParams
+      searchParams,
+      providerCatalog
     );
     const merchants = await hydrateSearchMerchantsWithBenefits(
       db,
       collectionName,
       fallback.merchants,
-      searchParams
+      searchParams,
+      providerCatalog
     );
 
     return json(res, 200, {
@@ -1871,9 +1975,14 @@ async function handleGetBenefits(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
   const includeExpired = shouldIncludeExpired(searchParams);
+  const providerCatalog = await loadProviderCatalogForRequest(db);
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, bank)) {
+    return providerCatalogUnavailableResponse(res);
+  }
+  const normalizedBank = normalizeProviderFilterParam(providerCatalog, bank);
   const network = searchParams.get('network');
   const online = searchParams.get('online');
   const search = searchParams.get('search');
@@ -1883,7 +1992,10 @@ async function handleGetBenefits(req, res, url, db) {
   const query = {};
 
   if (bank) {
-    query['eligibilities.bank'] = { $regex: bank, $options: 'i' };
+    const bankPatterns = buildProviderFilterRegexes(providerCatalog, bank);
+    if (bankPatterns.length > 0) {
+      query['eligibilities.bank'] = { $in: bankPatterns };
+    }
   }
 
   if (network) {
@@ -1915,7 +2027,7 @@ async function handleGetBenefits(req, res, url, db) {
         },
         filters: {
           category,
-          bank,
+          bank: normalizedBank || bank,
           network,
           online,
           search,
@@ -1950,7 +2062,7 @@ async function handleGetBenefits(req, res, url, db) {
     },
     filters: {
       category,
-      bank,
+      bank: normalizedBank || bank,
       network,
       online,
       search,
@@ -2018,6 +2130,14 @@ async function handleGetBanks(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
   const activeMatch = getActiveBenefitsMatch(searchParams);
+  const providerCatalog = await loadProviderCatalogForRequest(db);
+  if (!isProviderCatalogAvailable(providerCatalog)) {
+    return providerCatalogUnavailableResponse(res);
+  }
+  const includeAllProviders =
+    searchParams.get('includeAllProviders') === '1' ||
+    searchParams.get('includeAllProviders') === 'true';
+  const minIndexedCount = Math.max(1, toPositiveInt(searchParams.get('minIndexedCount'), 5));
 
   const banks = await db.collection(collectionName)
     .aggregate([
@@ -2027,18 +2147,36 @@ async function handleGetBanks(req, res, url, db) {
       { $match: EXCLUDE_MODO_SOURCE_MATCH },
       { $unwind: '$eligibilities' },
       { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
-      { $match: { count: { $gte: 5 } } },
       { $sort: { count: -1 } }
     ])
     .toArray();
+  const countByKey = new Map();
+
+  for (const bank of banks) {
+    const provider = providerCatalog.resolveProvider(bank._id);
+    if (!provider) continue;
+    countByKey.set(provider.key, (countByKey.get(provider.key) || 0) + Number(bank.count || 0));
+  }
+
+  const descriptorMap = new Map();
+
+  for (const provider of providerCatalog.providers) {
+    const count = countByKey.get(provider.key) || 0;
+    const descriptor = serializeProviderDescriptor(provider, {
+      count,
+      indexed: count >= minIndexedCount
+    });
+    descriptorMap.set(descriptor.key, descriptor);
+  }
+
+  const providerDescriptors = Array.from(descriptorMap.values())
+    .filter((provider) => includeAllProviders || provider.indexed)
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'es'));
 
   setCacheControl(res, CC_METADATA);
   return json(res, 200, {
     success: true,
-    banks: banks.map((bank) => ({
-      name: bank._id,
-      count: bank.count
-    }))
+    banks: providerDescriptors
   });
 }
 
@@ -2340,9 +2478,14 @@ async function handleGetBusinesses(req, res, url, db) {
   const searchParams = url.searchParams;
   const collectionName = getCollectionName(searchParams);
   const includeExpired = shouldIncludeExpired(searchParams);
+  const providerCatalog = await loadProviderCatalogForRequest(db);
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, bank)) {
+    return providerCatalogUnavailableResponse(res);
+  }
+  const normalizedBank = normalizeProviderFilterParam(providerCatalog, bank);
   const subscription = searchParams.get('subscription');
   const search = searchParams.get('search');
   const merchantId = searchParams.get('merchantId')?.trim() || null;
@@ -2364,12 +2507,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
   const hasLocation = userLat !== null && userLng !== null;
 
-  const bankFilter = bank
-    ? bank
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean)
-    : null;
+  const bankPatterns = bank ? buildProviderFilterRegexes(providerCatalog, bank) : null;
 
   const merchantQuery = {
     isActive: { $ne: false },
@@ -2380,8 +2518,8 @@ async function handleGetBusinesses(req, res, url, db) {
   if (category && category !== 'all') {
     merchantQuery.categories = { $in: [category] };
   }
-  if (bankFilter && bankFilter.length > 0) {
-    merchantQuery.banks = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  if (bankPatterns && bankPatterns.length > 0) {
+    merchantQuery.banks = { $in: bankPatterns };
   }
   if (subscription) {
     merchantQuery.subscriptionIds = subscription;
@@ -2561,8 +2699,8 @@ async function handleGetBusinesses(req, res, url, db) {
     merchantId: { $in: merchantIds }
   };
 
-  if (bankFilter && bankFilter.length > 0) {
-    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(escapeRegex(value), 'i')) };
+  if (bankPatterns && bankPatterns.length > 0) {
+    benefitQuery['eligibilities.bank'] = { $in: bankPatterns };
   }
   if (subscription) {
     benefitQuery['eligibilities.subscription'] = subscription;
@@ -2624,7 +2762,7 @@ async function handleGetBusinesses(req, res, url, db) {
     filters: {
       ...(merchantId && { merchantId }),
       ...(category && { category }),
-      ...(bank && { bank }),
+      ...(bank && { bank: normalizedBank || bank }),
       ...(search && { search }),
       ...(onlineOnly && { online: 'true' }),
       ...(subscription && { subscription }),
@@ -2897,6 +3035,7 @@ export {
   resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
+  handleGetBanks,
   handleGetBusinesses,
   handleDiscountSearchGuideSeoPage,
   handleHomeSeoPage,
@@ -2907,6 +3046,7 @@ export {
   handleStaticNotFound,
   handleSearchSeoPage,
   handleSearch,
+  normalizeSavedBankCodesForCatalog,
   rehydrateBenefitDoc
 };
 

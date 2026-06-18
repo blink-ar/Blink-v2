@@ -109,6 +109,10 @@ export const bankLogosManifest: Record<string, BankLogoEntry> = {
     "file": "patagonia.png",
     "name": "Patagonia"
   },
+  "personal": {
+    "file": "personalpay.png",
+    "name": "Personal Pay"
+  },
   "personalpay": {
     "file": "personalpay.png",
     "name": "Personal Pay"
