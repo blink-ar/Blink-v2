@@ -670,7 +670,7 @@ function BenefitDetailPage() {
                 {!isNoLimit && benefit.tope && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
-                    <span className="text-sm font-semibold text-blink-ink">{benefit.tope}</span>
+                    <span className="text-sm font-semibold text-blink-ink">{topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope)}</span>
                   </div>
                 )}
 
