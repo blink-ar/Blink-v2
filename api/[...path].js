@@ -285,6 +285,53 @@ async function handleGetUserBanks(req, res) {
   return json(res, 200, { success: true, savedBankCodes: doc?.savedBankCodes ?? [] });
 }
 
+function normalizeSavedBankCodesForCatalog(providerCatalog, banks) {
+  if (banks.length === 0) {
+    return { ok: true, savedBankCodes: [] };
+  }
+
+  if (!isProviderCatalogAvailable(providerCatalog)) {
+    return {
+      ok: false,
+      status: 503,
+      payload: {
+        success: false,
+        error: 'Catálogo de bancos no disponible'
+      }
+    };
+  }
+
+  const savedBankCodes = [];
+  const unresolvedBanks = [];
+  const seen = new Set();
+
+  for (const bank of banks) {
+    const resolvedKey = providerCatalog.resolveKey(bank);
+    if (!resolvedKey || !providerCatalog.hasKey(resolvedKey)) {
+      unresolvedBanks.push(bank);
+      continue;
+    }
+    if (!seen.has(resolvedKey)) {
+      seen.add(resolvedKey);
+      savedBankCodes.push(resolvedKey);
+    }
+  }
+
+  if (unresolvedBanks.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        error: 'Banco no catalogado',
+        unresolvedBanks
+      }
+    };
+  }
+
+  return { ok: true, savedBankCodes };
+}
+
 async function handleUpdateUserBanks(req, res) {
   const userId = await getUserIdFromRequest(req);
   if (!userId) return json(res, 401, { error: 'No autenticado' });
@@ -299,21 +346,20 @@ async function handleUpdateUserBanks(req, res) {
   } catch {
     providerCatalog = null;
   }
-  const unique = Array.from(new Set(
-    banks
-      .map((bank) => (providerCatalog ? providerCatalog.resolveKey(bank) : null))
-      .filter(Boolean)
-  ));
+  const normalized = normalizeSavedBankCodesForCatalog(providerCatalog, banks);
+  if (!normalized.ok) {
+    return json(res, normalized.status, normalized.payload);
+  }
   const col = await getUserDataCollection();
   await col.updateOne(
     { userId },
     {
-      $set: { savedBankCodes: unique, updatedAt: new Date() },
+      $set: { savedBankCodes: normalized.savedBankCodes, updatedAt: new Date() },
       $setOnInsert: { userId, createdAt: new Date() }
     },
     { upsert: true }
   );
-  return json(res, 200, { success: true, savedBankCodes: unique });
+  return json(res, 200, { success: true, savedBankCodes: normalized.savedBankCodes });
 }
 
 function json(res, statusCode, payload) {
@@ -753,6 +799,21 @@ function escapeRegex(value) {
 
 function hasProviderFilterParam(bankParam) {
   return splitProviderParam(bankParam).length > 0;
+}
+
+function isProviderCatalogAvailable(providerCatalog) {
+  return Boolean(providerCatalog?.isAvailable && Array.isArray(providerCatalog.providers) && providerCatalog.providers.length > 0);
+}
+
+function hasUnavailableProviderCatalogForBank(providerCatalog, bankParam) {
+  return hasProviderFilterParam(bankParam) && !isProviderCatalogAvailable(providerCatalog);
+}
+
+function providerCatalogUnavailableResponse(res) {
+  return json(res, 503, {
+    success: false,
+    error: 'Catálogo de bancos no disponible'
+  });
 }
 
 function buildProviderFilterRegexes(providerCatalog, bankParam) {
@@ -1556,6 +1617,9 @@ async function handleSearch(req, res, url, db) {
   const offsetNum = Math.max(toPositiveInt(searchParams.get('offset'), 0), 0);
   const sectionLimit = Math.min(Math.max(toPositiveInt(searchParams.get('sectionLimit'), 12), 1), 30);
   const providerCatalog = await loadProviderCatalogForRequest(db);
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, searchParams.get('bank'))) {
+    return providerCatalogUnavailableResponse(res);
+  }
   const filters = parseSearchFilters(searchParams, providerCatalog);
   const debugMode = searchParams.get('debug') === '1' || process.env.SEARCH_DEBUG === 'true';
 
@@ -1915,6 +1979,9 @@ async function handleGetBenefits(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, bank)) {
+    return providerCatalogUnavailableResponse(res);
+  }
   const normalizedBank = normalizeProviderFilterParam(providerCatalog, bank);
   const network = searchParams.get('network');
   const online = searchParams.get('online');
@@ -2064,6 +2131,9 @@ async function handleGetBanks(req, res, url, db) {
   const collectionName = getCollectionName(searchParams);
   const activeMatch = getActiveBenefitsMatch(searchParams);
   const providerCatalog = await loadProviderCatalogForRequest(db);
+  if (!isProviderCatalogAvailable(providerCatalog)) {
+    return providerCatalogUnavailableResponse(res);
+  }
   const includeAllProviders =
     searchParams.get('includeAllProviders') === '1' ||
     searchParams.get('includeAllProviders') === 'true';
@@ -2412,6 +2482,9 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  if (hasUnavailableProviderCatalogForBank(providerCatalog, bank)) {
+    return providerCatalogUnavailableResponse(res);
+  }
   const normalizedBank = normalizeProviderFilterParam(providerCatalog, bank);
   const subscription = searchParams.get('subscription');
   const search = searchParams.get('search');
@@ -2973,6 +3046,7 @@ export {
   handleStaticNotFound,
   handleSearchSeoPage,
   handleSearch,
+  normalizeSavedBankCodesForCatalog,
   rehydrateBenefitDoc
 };
 

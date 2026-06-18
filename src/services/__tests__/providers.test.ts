@@ -67,4 +67,9 @@ describe('provider canonical resolver', () => {
     expect(catalogWithoutAliases.resolveKey('mercado')).toBeNull();
     expect(catalogWithoutAliases.resolveKey('mp')).toBeNull();
   });
+
+  it('marks an empty provider catalog as unavailable', () => {
+    expect(buildProviderCatalog([]).isAvailable).toBe(false);
+    expect(catalog.isAvailable).toBe(true);
+  });
 });

@@ -171,6 +171,7 @@ export function buildProviderCatalog(providerDocs = []) {
     providers,
     byKey,
     lookup,
+    isAvailable: providers.length > 0,
     hasKey(key) {
       return byKey.has(normalizeProviderKey(key));
     },

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSearchDatasetFromMerchantDocs } from '../../../api/search/entities.js';
+import { buildProviderCatalog } from '../../../server/providers.js';
 
 const { meiliSearchMock, isMeilisearchConfiguredMock } = vi.hoisted(() => ({
   meiliSearchMock: vi.fn(),
@@ -11,7 +12,7 @@ vi.mock('../../../api/search/meilisearch.js', () => ({
   isMeilisearchConfigured: isMeilisearchConfiguredMock
 }));
 
-import { handleSearch } from '../../../api/[...path].js';
+import { handleSearch, normalizeSavedBankCodesForCatalog } from '../../../api/[...path].js';
 
 function createResponseCapture() {
   return {
@@ -213,6 +214,63 @@ describe('handleSearch', () => {
 
     expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "__unknown_provider__"');
     expect(JSON.parse(res.body || '{}').query.filters.bank).toBeUndefined();
+  });
+
+  it('returns 503 for bank filters when the provider catalog is empty', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=galicia&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+    expect(meiliSearchMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes saved banks only against an available provider catalog', () => {
+    const catalog = buildProviderCatalog([
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+    ]);
+
+    expect(normalizeSavedBankCodesForCatalog(catalog, ['mercado', 'Mercado Pago'])).toEqual({
+      ok: true,
+      savedBankCodes: ['mercadopago'],
+    });
+    expect(normalizeSavedBankCodesForCatalog(buildProviderCatalog([]), ['mercado'])).toMatchObject({
+      ok: false,
+      status: 503,
+    });
+    expect(normalizeSavedBankCodesForCatalog(catalog, ['banco no catalogado'])).toMatchObject({
+      ok: false,
+      status: 400,
+      payload: {
+        error: 'Banco no catalogado',
+        unresolvedBanks: ['banco no catalogado'],
+      },
+    });
+    expect(normalizeSavedBankCodesForCatalog(buildProviderCatalog([]), [])).toEqual({
+      ok: true,
+      savedBankCodes: [],
+    });
   });
 
   it('expands legacy bank aliases for Mongo fallback bank filters', async () => {

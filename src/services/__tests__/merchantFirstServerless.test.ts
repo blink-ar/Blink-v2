@@ -214,6 +214,16 @@ describe('merchant-first serverless helpers', () => {
 
     const db = {
       collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'bbva', name: 'BBVA', aliases: ['banco frances', 'banco francés'], shortName: 'BBVA' },
+              ]);
+            }
+          };
+        }
+
         if (name === 'merchant_assets') {
           return {
             async countDocuments(query: unknown) {
@@ -377,6 +387,87 @@ describe('merchant-first serverless helpers', () => {
       shortName: 'BAPRO',
       count: 12,
       indexed: true,
+    });
+  });
+
+  it('handleGetBanks fails when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/banks?collection=confirmed_benefits');
+
+    await handleGetBanks({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+  });
+
+  it('handleGetBenefits fails for bank filters when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?bank=galicia&collection=confirmed_benefits');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
+    });
+  });
+
+  it('handleGetBusinesses fails for bank filters when the provider catalog is empty', async () => {
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?bank=galicia&collection=confirmed_benefits');
+
+    await handleGetBusinesses({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({
+      success: false,
+      error: 'Catálogo de bancos no disponible',
     });
   });
 
