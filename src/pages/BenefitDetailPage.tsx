@@ -428,6 +428,9 @@ function BenefitDetailPage() {
   const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
+  const hasTransactionCap = (benefit.caps ?? []).some(
+    c => c != null && c.resetsEvery !== 'PER_USER' && c.resetsEvery !== 'OTHER' && typeof c.amount === 'number',
+  );
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -666,11 +669,31 @@ function BenefitDetailPage() {
 
               <div className="divide-y divide-blink-border">
 
-                {/* Tope descuento */}
-                {!isNoLimit && benefit.tope && (
+                {/* Usos por cuenta (PER_USER cap with small count) */}
+                {perUserUsageCount !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Usos por cuenta</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {perUserUsageCount === 1 ? '1 uso' : `${perUserUsageCount} usos`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Tope por cliente (PER_USER cap with monetary amount) */}
+                {perUserMonetaryCap !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Tope por cliente</span>
+                    <span className="text-sm font-semibold text-blink-ink">{formatArgentinePeso(perUserMonetaryCap)}</span>
+                  </div>
+                )}
+
+                {/* Tope descuento (PER_TXN cap) */}
+                {(!hasTransactionCap || (!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount))) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
-                    <span className="text-sm font-semibold text-blink-ink">{topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope)}</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {!hasTransactionCap ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
+                    </span>
                   </div>
                 )}
 
