@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { MongoClient } from 'mongodb';
 import {
   buildMeiliSynonyms,
@@ -117,17 +118,27 @@ async function uploadDocuments(documents) {
   }
 }
 
+export function assertProviderCatalogAvailable(providerCatalog) {
+  if (!providerCatalog?.isAvailable) {
+    throw new Error(
+      'Provider catalog is empty; aborting search index to avoid publishing documents without bank facets.'
+    );
+  }
+}
+
 async function runFullReindex(db) {
   console.log('[search-indexer] Checking Meilisearch health...');
   await meiliHealth();
-  await applyMeiliIndexSettings();
 
   console.log('[search-indexer] Loading Mongo merchants...');
   const [merchants, providerCatalog] = await Promise.all([
     loadMerchants(db),
     loadProviderCatalog(db)
   ]);
-  console.log(`[search-indexer] Loaded ${merchants.length} active merchants`);
+  assertProviderCatalogAvailable(providerCatalog);
+  console.log(`[search-indexer] Loaded ${merchants.length} active merchants and ${providerCatalog.providers.length} providers`);
+
+  await applyMeiliIndexSettings();
 
   const dataset = buildSearchDatasetFromMerchantDocs(merchants, { providerCatalog });
   console.log(
@@ -209,7 +220,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('[search-indexer] Fatal error:', error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error('[search-indexer] Fatal error:', error);
+    process.exit(1);
+  });
+}

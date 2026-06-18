@@ -287,7 +287,14 @@ export async function loadProviderCatalog(db, options = {}) {
       cache.promise = db.collection(PROVIDERS_COLLECTION)
         .find({}, { projection: PROVIDER_PROJECTION })
         .toArray()
-        .then((docs) => buildProviderCatalog(docs))
+        .then((docs) => {
+          const catalog = buildProviderCatalog(docs);
+          if (!catalog.isAvailable) {
+            cache.promise = null;
+            cache.loadedAt = 0;
+          }
+          return catalog;
+        })
         .catch((error) => {
           cache.promise = null;
           cache.loadedAt = 0;

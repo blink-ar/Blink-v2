@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildProviderCatalog,
+  loadProviderCatalog,
   resolveProviderCanonicalValues,
   resolveProviderFilterValues,
 } from '../../../server/providers.js';
@@ -71,5 +72,36 @@ describe('provider canonical resolver', () => {
   it('marks an empty provider catalog as unavailable', () => {
     expect(buildProviderCatalog([]).isAvailable).toBe(false);
     expect(catalog.isAvailable).toBe(true);
+  });
+
+  it('does not keep an empty loaded catalog cached', async () => {
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+    const providerDocs = [
+      [],
+      [{ key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' }],
+    ];
+    let readCount = 0;
+    const db = {
+      collection(name: string) {
+        expect(name).toBe('providers');
+        return {
+          find() {
+            return {
+              async toArray() {
+                return providerDocs[Math.min(readCount++, providerDocs.length - 1)];
+              },
+            };
+          },
+        };
+      },
+    };
+
+    const emptyCatalog = await loadProviderCatalog(db as never);
+    const reloadedCatalog = await loadProviderCatalog(db as never);
+
+    expect(emptyCatalog.isAvailable).toBe(false);
+    expect(reloadedCatalog.isAvailable).toBe(true);
+    expect(reloadedCatalog.resolveKey('mercado')).toBe('mercadopago');
+    expect(readCount).toBe(2);
   });
 });
