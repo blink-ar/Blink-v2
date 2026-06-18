@@ -282,6 +282,7 @@ describe('merchant-first serverless helpers', () => {
     const bankCounts = [
       { _id: 'mercadopago', count: 7 },
       { _id: 'personal', count: 3 },
+      { _id: 'Banco Provincia', count: 12 },
     ];
 
     const db = {
@@ -322,6 +323,61 @@ describe('merchant-first serverless helpers', () => {
       indexed: true,
     });
     expect(payload.banks[0].aliases).toContain('mercado');
+    expect(payload.banks.some((bank: { key: string }) => bank.key === 'bancoprovincia')).toBe(false);
+    expect(payload.banks.some((bank: { key: string }) => bank.key === 'provincia')).toBe(false);
+  });
+
+  it('handleGetBanks resolves counted display names only through cataloged providers', async () => {
+    const providers = [
+      {
+        key: 'provincia',
+        name: 'Banco Provincia',
+        aliases: ['bapro', 'banco provincia'],
+        shortName: 'BAPRO',
+      },
+    ];
+    const bankCounts = [
+      { _id: 'Banco Provincia', count: 12 },
+      { _id: 'Banco No Catalogado', count: 20 },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor(providers);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            aggregate() {
+              return createAggregateCursor(bankCounts);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/banks?collection=confirmed_benefits');
+
+    await handleGetBanks({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.banks).toHaveLength(1);
+    expect(payload.banks[0]).toMatchObject({
+      key: 'provincia',
+      name: 'Banco Provincia',
+      shortName: 'BAPRO',
+      count: 12,
+      indexed: true,
+    });
   });
 
   it('handleGetBusinesses resolves legacy bank aliases before querying merchants and benefits', async () => {

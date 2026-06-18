@@ -175,6 +175,46 @@ describe('handleSearch', () => {
     expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
   });
 
+  it('does not broaden Meilisearch queries for uncataloged bank filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+    meiliSearchMock
+      .mockResolvedValueOnce({ hits: [], estimatedTotalHits: 0 })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets' || name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=bancoprovincia&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "__unknown_provider__"');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBeUndefined();
+  });
+
   it('expands legacy bank aliases for Mongo fallback bank filters', async () => {
     isMeilisearchConfiguredMock.mockReturnValue(false);
 

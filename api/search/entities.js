@@ -151,23 +151,7 @@ function getCatalogProviderKey(providerCatalog, value) {
 function getBankIndexValues(value, providerCatalog) {
   const canonicalKey = getCatalogProviderKey(providerCatalog, value);
   if (canonicalKey) return [canonicalKey];
-
-  const bank = normalizeSearchText(value);
-  if (!bank) return [];
-
-  const values = [bank];
-  const withoutPrefix = bank.replace(/^banco\s+/, '').trim();
-  if (withoutPrefix) {
-    values.push(withoutPrefix);
-  }
-
-  for (const token of bank.split(' ')) {
-    if (token && token.length > 2 && token !== 'banco') {
-      values.push(token);
-    }
-  }
-
-  return uniqueStrings(values);
+  return [];
 }
 
 function enrichMerchantAccumulator(accumulator, benefit, options = {}) {
@@ -313,7 +297,7 @@ function buildMerchantDocumentFromStoredMerchant(merchant, options = {}) {
     Array.isArray(merchant?.banks)
       ? merchant.banks.flatMap((bank) => {
         const canonicalKey = getCatalogProviderKey(options.providerCatalog, bank);
-        return canonicalKey || normalizeSearchText(bank);
+        return canonicalKey ? [canonicalKey] : [];
       })
       : []
   );

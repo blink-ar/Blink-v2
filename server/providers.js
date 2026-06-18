@@ -107,7 +107,7 @@ function descriptorFromProviderDoc(doc) {
   if (!key) return null;
 
   const staticMetadata = PROVIDER_STATIC_METADATA[key] || {};
-  const name = String(doc?.name || key).trim();
+  const name = String(doc?.name || staticMetadata.name || key).trim();
   const aliases = uniqueStrings([
     ...(Array.isArray(staticMetadata.aliases) ? staticMetadata.aliases : []),
     ...(Array.isArray(doc?.aliases) ? doc.aliases : [])
@@ -183,10 +183,11 @@ export function buildProviderCatalog(providerDocs = []) {
         const match = lookup.get(variant);
         if (match) return match;
       }
-      return normalizeProviderKey(value);
+      return null;
     },
     resolveProvider(value) {
-      return byKey.get(this.resolveKey(value)) || null;
+      const key = this.resolveKey(value);
+      return key ? byKey.get(key) || null : null;
     }
   };
 }
@@ -223,7 +224,9 @@ export function resolveProviderCanonicalValues(catalog, value) {
 
   for (const rawValue of splitProviderParam(value)) {
     const resolvedKey = providerCatalog.resolveKey(rawValue);
-    values.add(resolvedKey || normalizeProviderKey(rawValue));
+    if (resolvedKey && providerCatalog.hasKey(resolvedKey)) {
+      values.add(resolvedKey);
+    }
   }
 
   return Array.from(values).filter(Boolean);
@@ -240,11 +243,6 @@ export function resolveProviderFilterValues(catalog, value) {
       for (const variant of getProviderFilterTextValues(provider, rawValue)) {
         values.add(variant);
       }
-      continue;
-    }
-
-    for (const variant of getProviderLookupVariants(rawValue)) {
-      values.add(variant);
     }
   }
 

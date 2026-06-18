@@ -117,4 +117,31 @@ describe('buildSearchDatasetFromMerchantDocs', () => {
 
     expect(dataset.merchantDocuments[0].banks).toEqual(['mercadopago']);
   });
+
+  it('does not index uncataloged bank display values as filter tokens', () => {
+    const providerCatalog = buildProviderCatalog([
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'] },
+    ]);
+    const dataset = buildSearchDatasetFromMerchantDocs([
+      {
+        merchantId: 'merchant_1',
+        merchantName: 'Adidas',
+        merchantKey: 'adidas',
+        categories: ['shopping'],
+        banks: ['Banco Provincia'],
+        locations: [],
+        activeBenefitCount: 1,
+        benefitCount: 1,
+        searchProfile: {
+          aliases: [],
+          description: '',
+          productTags: [],
+          intentTags: [],
+          benefits: [],
+        },
+      },
+    ], { providerCatalog });
+
+    expect(dataset.merchantDocuments[0].banks).toEqual([]);
+  });
 });

@@ -14,10 +14,10 @@ import {
 } from './search/normalize.js';
 import {
   loadProviderCatalog,
-  normalizeProviderKey,
   resolveProviderCanonicalValues,
   resolveProviderFilterValues,
-  serializeProviderDescriptor
+  serializeProviderDescriptor,
+  splitProviderParam
 } from '../server/providers.js';
 import {
   FALLBACK_CORE_SEO_SUMMARY,
@@ -301,11 +301,7 @@ async function handleUpdateUserBanks(req, res) {
   }
   const unique = Array.from(new Set(
     banks
-      .map((bank) => providerCatalog
-        ? (providerCatalog.hasKey(providerCatalog.resolveKey(bank))
-          ? providerCatalog.resolveKey(bank)
-          : normalizeProviderKey(bank))
-        : normalizeProviderKey(bank))
+      .map((bank) => (providerCatalog ? providerCatalog.resolveKey(bank) : null))
       .filter(Boolean)
   ));
   const col = await getUserDataCollection();
@@ -755,9 +751,16 @@ function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function hasProviderFilterParam(bankParam) {
+  return splitProviderParam(bankParam).length > 0;
+}
+
 function buildProviderFilterRegexes(providerCatalog, bankParam) {
-  return resolveProviderFilterValues(providerCatalog, bankParam)
-    .map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i'));
+  const values = resolveProviderFilterValues(providerCatalog, bankParam);
+  if (values.length === 0 && hasProviderFilterParam(bankParam)) {
+    return [/a^/];
+  }
+  return values.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i'));
 }
 
 function normalizeProviderFilterParam(providerCatalog, bankParam) {
@@ -885,7 +888,8 @@ function enrichBusinessWithDistance(business, userLat, userLng) {
 }
 
 function parseSearchFilters(searchParams, providerCatalog) {
-  const bank = normalizeProviderFilterParam(providerCatalog, searchParams.get('bank')) || undefined;
+  const rawBank = searchParams.get('bank');
+  const bank = normalizeProviderFilterParam(providerCatalog, rawBank) || undefined;
   const category = searchParams.get('category') || undefined;
   const latParam = searchParams.get('lat');
   const lngParam = searchParams.get('lng');
@@ -894,6 +898,7 @@ function parseSearchFilters(searchParams, providerCatalog) {
   const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
   return {
     bank,
+    hasUnresolvedBank: hasProviderFilterParam(rawBank) && !bank,
     category,
     lat: hasLocation ? lat : null,
     lng: hasLocation ? lng : null
@@ -1011,7 +1016,9 @@ function buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog) 
     query.categories = { $in: [filters.category] };
   }
 
-  if (filters.bank) {
+  if (filters.hasUnresolvedBank) {
+    query.banks = { $in: [/a^/] };
+  } else if (filters.bank) {
     const bankPatterns = buildProviderFilterRegexes(providerCatalog, filters.bank);
     if (bankPatterns.length > 0) {
       query.banks = { $in: bankPatterns };
@@ -1096,7 +1103,9 @@ function buildMeiliFilter(entityType, filters) {
     clauses.push(`categories = "${normalizeSearchText(filters.category)}"`);
   }
 
-  if (filters.bank) {
+  if (filters.hasUnresolvedBank) {
+    clauses.push('(banks = "__unknown_provider__")');
+  } else if (filters.bank) {
     const banks = filters.bank
       .split(',')
       .map((value) => normalizeSearchText(value))
@@ -1388,10 +1397,10 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     merchantId: { $in: merchantIds }
   };
   const bank = searchParams.get('bank');
-  const bankFilter = resolveProviderFilterValues(providerCatalog, bank);
+  const bankPatterns = buildProviderFilterRegexes(providerCatalog, bank);
 
-  if (bankFilter.length > 0) {
-    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i')) };
+  if (bankPatterns.length > 0) {
+    benefitQuery['eligibilities.bank'] = { $in: bankPatterns };
   }
   applyActiveBenefitsFilter(benefitQuery, searchParams);
 
@@ -2074,9 +2083,9 @@ async function handleGetBanks(req, res, url, db) {
   const countByKey = new Map();
 
   for (const bank of banks) {
-    const key = providerCatalog.resolveKey(bank._id) || normalizeProviderKey(bank._id);
-    if (!key) continue;
-    countByKey.set(key, (countByKey.get(key) || 0) + Number(bank.count || 0));
+    const provider = providerCatalog.resolveProvider(bank._id);
+    if (!provider) continue;
+    countByKey.set(provider.key, (countByKey.get(provider.key) || 0) + Number(bank.count || 0));
   }
 
   const descriptorMap = new Map();
@@ -2088,22 +2097,6 @@ async function handleGetBanks(req, res, url, db) {
       indexed: count >= minIndexedCount
     });
     descriptorMap.set(descriptor.key, descriptor);
-  }
-
-  for (const [key, count] of countByKey.entries()) {
-    if (descriptorMap.has(key)) continue;
-    descriptorMap.set(key, serializeProviderDescriptor(
-      {
-        key,
-        name: key,
-        shortName: key.slice(0, 4).toUpperCase(),
-        aliases: []
-      },
-      {
-        count,
-        indexed: count >= minIndexedCount
-      }
-    ));
   }
 
   const providerDescriptors = Array.from(descriptorMap.values())
@@ -2441,7 +2434,7 @@ async function handleGetBusinesses(req, res, url, db) {
   const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
   const hasLocation = userLat !== null && userLng !== null;
 
-  const bankFilter = bank ? resolveProviderFilterValues(providerCatalog, bank) : null;
+  const bankPatterns = bank ? buildProviderFilterRegexes(providerCatalog, bank) : null;
 
   const merchantQuery = {
     isActive: { $ne: false },
@@ -2452,8 +2445,8 @@ async function handleGetBusinesses(req, res, url, db) {
   if (category && category !== 'all') {
     merchantQuery.categories = { $in: [category] };
   }
-  if (bankFilter && bankFilter.length > 0) {
-    merchantQuery.banks = { $in: bankFilter.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i')) };
+  if (bankPatterns && bankPatterns.length > 0) {
+    merchantQuery.banks = { $in: bankPatterns };
   }
   if (subscription) {
     merchantQuery.subscriptionIds = subscription;
@@ -2633,8 +2626,8 @@ async function handleGetBusinesses(req, res, url, db) {
     merchantId: { $in: merchantIds }
   };
 
-  if (bankFilter && bankFilter.length > 0) {
-    benefitQuery['eligibilities.bank'] = { $in: bankFilter.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i')) };
+  if (bankPatterns && bankPatterns.length > 0) {
+    benefitQuery['eligibilities.bank'] = { $in: bankPatterns };
   }
   if (subscription) {
     benefitQuery['eligibilities.subscription'] = subscription;

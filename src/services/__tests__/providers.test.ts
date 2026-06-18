@@ -36,13 +36,10 @@ describe('provider canonical resolver', () => {
     ]));
   });
 
-  it('falls back to normalized keys for unknown providers', () => {
-    expect(catalog.resolveKey('Banco Test')).toBe('bancotest');
-    expect(resolveProviderCanonicalValues(catalog, 'Banco Test')).toEqual(['bancotest']);
-    expect(resolveProviderFilterValues(catalog, 'Banco Test')).toEqual([
-      'banco test',
-      'bancotest',
-      'test',
-    ]);
+  it('does not resolve unknown providers outside the catalog', () => {
+    expect(catalog.resolveKey('Banco Test')).toBeNull();
+    expect(catalog.resolveProvider('Banco Test')).toBeNull();
+    expect(resolveProviderCanonicalValues(catalog, 'Banco Test')).toEqual([]);
+    expect(resolveProviderFilterValues(catalog, 'Banco Test')).toEqual([]);
   });
 });

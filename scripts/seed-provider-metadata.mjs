@@ -40,20 +40,27 @@ try {
   const providers = client.db(databaseName).collection('providers');
 
   for (const [key, metadata] of Object.entries(PROVIDER_STATIC_METADATA)) {
+    const now = new Date().toISOString();
     const result = await providers.updateOne(
       { key },
       {
+        $setOnInsert: {
+          key,
+          createdAt: now
+        },
         $addToSet: {
           aliases: { $each: metadata.aliases || [] }
         },
         $set: {
+          name: metadata.name || key,
           shortName: metadata.shortName,
-          updatedAt: new Date().toISOString()
+          updatedAt: now
         }
-      }
+      },
+      { upsert: true }
     );
 
-    console.log(`[providers] ${key}: matched=${result.matchedCount} modified=${result.modifiedCount}`);
+    console.log(`[providers] ${key}: matched=${result.matchedCount} upserted=${result.upsertedCount} modified=${result.modifiedCount}`);
   }
 } finally {
   await client.close();
