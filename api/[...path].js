@@ -15,6 +15,7 @@ import {
 import {
   loadProviderCatalog,
   normalizeProviderKey,
+  resolveProviderCanonicalValues,
   resolveProviderFilterValues,
   serializeProviderDescriptor
 } from '../server/providers.js';
@@ -760,7 +761,7 @@ function buildProviderFilterRegexes(providerCatalog, bankParam) {
 }
 
 function normalizeProviderFilterParam(providerCatalog, bankParam) {
-  return resolveProviderFilterValues(providerCatalog, bankParam).join(',');
+  return resolveProviderCanonicalValues(providerCatalog, bankParam).join(',');
 }
 
 async function loadProviderCatalogForRequest(db) {
@@ -997,7 +998,7 @@ function buildMerchantNameRescuePatterns(normalizedQuery, options = {}) {
   return Array.from(sources).map((source) => new RegExp(source, 'i'));
 }
 
-function buildActiveMerchantSearchQuery(filters, searchParams) {
+function buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog) {
   const query = {
     isActive: { $ne: false },
     merchantId: { $exists: true, $type: 'string' },
@@ -1011,11 +1012,7 @@ function buildActiveMerchantSearchQuery(filters, searchParams) {
   }
 
   if (filters.bank) {
-    const bankPatterns = filters.bank
-      .split(',')
-      .map((bank) => bank.trim())
-      .filter(Boolean)
-      .map((bank) => new RegExp(`^${escapeRegex(bank)}$`, 'i'));
+    const bankPatterns = buildProviderFilterRegexes(providerCatalog, filters.bank);
     if (bankPatterns.length > 0) {
       query.banks = { $in: bankPatterns };
     }
@@ -1045,13 +1042,13 @@ function mergeMerchantDocsById(merchantLists) {
   return Array.from(mergedByMerchantId.values());
 }
 
-async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchParams) {
+async function loadMerchantNameRescueDocs(db, normalizedQuery, filters, searchParams, providerCatalog) {
   if (!normalizedQuery) {
     return [];
   }
 
   const merchantCollection = db.collection(MERCHANT_ASSETS_COLLECTION);
-  const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams);
+  const baseQuery = buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog);
   const exactPatterns = buildMerchantNameRescuePatterns(normalizedQuery);
   const prefixPatterns = buildMerchantNameRescuePatterns(normalizedQuery, { prefix: true });
 
@@ -1458,7 +1455,7 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
   const regex = new RegExp(regexSource, 'i');
 
   const merchantQuery = combineQueriesWithAnd(
-    buildActiveMerchantSearchQuery(filters, searchParams),
+    buildActiveMerchantSearchQuery(filters, searchParams, providerCatalog),
     {
       $or: [
         { merchantName: { $regex: regex } },
@@ -1481,7 +1478,8 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
     db,
     normalizeSearchText(query),
     filters,
-    searchParams
+    searchParams,
+    providerCatalog
   );
 
   const dataset = buildSearchDatasetFromMerchantDocs(
@@ -1589,7 +1587,7 @@ async function handleSearch(req, res, url, db) {
 
     const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
     const merchantBaseHits = Array.isArray(merchantSearch.hits) ? merchantSearch.hits : [];
-    const rescueMerchantDocs = await loadMerchantNameRescueDocs(db, normalized, filters, searchParams);
+    const rescueMerchantDocs = await loadMerchantNameRescueDocs(db, normalized, filters, searchParams, providerCatalog);
     const rescueMerchantHits = buildSearchDatasetFromMerchantDocs(rescueMerchantDocs, { providerCatalog }).merchantDocuments;
     let merchantCandidateHits = mergeMerchantHitCandidates([merchantBaseHits, rescueMerchantHits]);
 
@@ -2421,6 +2419,7 @@ async function handleGetBusinesses(req, res, url, db) {
 
   const category = searchParams.get('category');
   const bank = searchParams.get('bank');
+  const normalizedBank = normalizeProviderFilterParam(providerCatalog, bank);
   const subscription = searchParams.get('subscription');
   const search = searchParams.get('search');
   const merchantId = searchParams.get('merchantId')?.trim() || null;
@@ -2697,7 +2696,7 @@ async function handleGetBusinesses(req, res, url, db) {
     filters: {
       ...(merchantId && { merchantId }),
       ...(category && { category }),
-      ...(bankFilter && bankFilter.length > 0 && { bank: bankFilter.join(',') }),
+      ...(bank && { bank: normalizedBank || bank }),
       ...(search && { search }),
       ...(onlineOnly && { online: 'true' }),
       ...(subscription && { subscription }),

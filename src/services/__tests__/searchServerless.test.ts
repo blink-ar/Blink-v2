@@ -93,6 +93,10 @@ function collectRegexes(value: unknown, out: RegExp[] = []) {
   return out;
 }
 
+function expectAnyRegexMatches(patterns: RegExp[], value: string) {
+  expect(patterns.some((pattern) => pattern.test(value))).toBe(true);
+}
+
 interface MerchantSearchFixture {
   merchantName?: string;
   merchantKey?: string;
@@ -168,6 +172,86 @@ describe('handleSearch', () => {
     await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
 
     expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "mercadopago"');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
+  });
+
+  it('expands legacy bank aliases for Mongo fallback bank filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(false);
+
+    const merchantQueries: unknown[] = [];
+    const benefitQueries: unknown[] = [];
+    const merchant = {
+      merchantId: 'merchant_mp',
+      merchantName: 'Adidas',
+      merchantKey: 'adidas',
+      categories: ['shopping'],
+      banks: ['Mercado Pago'],
+      locations: [],
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: false,
+      maxDiscountPercentage: 20,
+      searchProfile: {
+        aliases: ['adidas'],
+        description: 'Adidas descuentos',
+        benefits: []
+      },
+      imageUrl: '',
+      logoUrl: '',
+      coverUrl: ''
+    };
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find(query: unknown) {
+              merchantQueries.push(query);
+              return createCursor([merchant]);
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor([]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=mercado&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    const merchantBankRegexes = (
+      merchantQueries[0] as { $and: Array<{ banks?: { $in: RegExp[] } }> }
+    ).$and[0].banks?.$in || [];
+    const benefitBankRegexes = (
+      benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } }
+    )['eligibilities.bank'].$in;
+
+    expectAnyRegexMatches(merchantBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(merchantBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(merchantBankRegexes, 'mercado');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
     expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
   });
 

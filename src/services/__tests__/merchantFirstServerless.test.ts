@@ -63,6 +63,10 @@ function createCursor<T>(data: T[]) {
   return cursor;
 }
 
+function expectAnyRegexMatches(patterns: RegExp[], value: string) {
+  expect(patterns.some((pattern) => pattern.test(value))).toBe(true);
+}
+
 function createPaginatedCursor<T>(data: T[]) {
   let offset = 0;
   let count = data.length;
@@ -416,11 +420,14 @@ describe('merchant-first serverless helpers', () => {
 
     await handleGetBusinesses({ method: 'GET' } as never, res as never, url, db as never);
 
-    const merchantBankRegex = ((merchantQueries[0] as { banks: { $in: RegExp[] } }).banks.$in[0]);
-    const benefitBankRegex = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in[0]);
-    expect(merchantBankRegex.test('mercadopago')).toBe(true);
-    expect(merchantBankRegex.test('mercado')).toBe(false);
-    expect(benefitBankRegex.test('mercadopago')).toBe(true);
+    const merchantBankRegexes = ((merchantQueries[0] as { banks: { $in: RegExp[] } }).banks.$in);
+    const benefitBankRegexes = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in);
+    expectAnyRegexMatches(merchantBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(merchantBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(merchantBankRegexes, 'mercado');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
+    expect(JSON.parse(res.body || '{}').filters.bank).toBe('mercadopago');
   });
 
   it('handleGetBenefits resolves legacy bank aliases before querying benefits', async () => {
@@ -468,9 +475,10 @@ describe('merchant-first serverless helpers', () => {
 
     await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
 
-    const benefitBankRegex = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in[0]);
-    expect(benefitBankRegex.test('mercadopago')).toBe(true);
-    expect(benefitBankRegex.test('mercado')).toBe(false);
+    const benefitBankRegexes = ((benefitQueries[0] as { 'eligibilities.bank': { $in: RegExp[] } })['eligibilities.bank'].$in);
+    expectAnyRegexMatches(benefitBankRegexes, 'mercadopago');
+    expectAnyRegexMatches(benefitBankRegexes, 'Mercado Pago');
+    expectAnyRegexMatches(benefitBankRegexes, 'mercado');
     expect(JSON.parse(res.body || '{}').filters.bank).toBe('mercadopago');
   });
 

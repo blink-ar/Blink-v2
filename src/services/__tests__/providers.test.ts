@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildProviderCatalog,
+  resolveProviderCanonicalValues,
   resolveProviderFilterValues,
 } from '../../../server/providers.js';
 
@@ -23,8 +24,21 @@ describe('provider canonical resolver', () => {
     expect(catalog.resolveProvider('personal pay')?.shortName).toBe('PP');
   });
 
+  it('expands known providers for legacy exact-match filters', () => {
+    expect(resolveProviderCanonicalValues(catalog, 'mercado')).toEqual(['mercadopago']);
+    expect(resolveProviderFilterValues(catalog, 'mercado')).toEqual(expect.arrayContaining([
+      'mercadopago',
+      'Mercado Pago',
+      'mercado pago',
+      'mercado',
+      'MP',
+      'mp',
+    ]));
+  });
+
   it('falls back to normalized keys for unknown providers', () => {
     expect(catalog.resolveKey('Banco Test')).toBe('bancotest');
+    expect(resolveProviderCanonicalValues(catalog, 'Banco Test')).toEqual(['bancotest']);
     expect(resolveProviderFilterValues(catalog, 'Banco Test')).toEqual([
       'banco test',
       'bancotest',

@@ -200,6 +200,35 @@ export function splitProviderParam(value) {
     .filter(Boolean);
 }
 
+function getProviderFilterTextValues(provider, rawValue) {
+  const sourceValues = uniqueStrings([
+    provider?.key,
+    provider?.name,
+    provider?.shortName,
+    ...(Array.isArray(provider?.aliases) ? provider.aliases : []),
+    rawValue
+  ]);
+
+  return uniqueStrings(
+    sourceValues.flatMap((sourceValue) => [
+      sourceValue,
+      ...getProviderLookupVariants(sourceValue)
+    ])
+  );
+}
+
+export function resolveProviderCanonicalValues(catalog, value) {
+  const providerCatalog = catalog || buildProviderCatalog([]);
+  const values = new Set();
+
+  for (const rawValue of splitProviderParam(value)) {
+    const resolvedKey = providerCatalog.resolveKey(rawValue);
+    values.add(resolvedKey || normalizeProviderKey(rawValue));
+  }
+
+  return Array.from(values).filter(Boolean);
+}
+
 export function resolveProviderFilterValues(catalog, value) {
   const providerCatalog = catalog || buildProviderCatalog([]);
   const values = new Set();
@@ -207,7 +236,10 @@ export function resolveProviderFilterValues(catalog, value) {
   for (const rawValue of splitProviderParam(value)) {
     const resolvedKey = providerCatalog.resolveKey(rawValue);
     if (resolvedKey && providerCatalog.hasKey(resolvedKey)) {
-      values.add(resolvedKey);
+      const provider = providerCatalog.byKey.get(resolvedKey);
+      for (const variant of getProviderFilterTextValues(provider, rawValue)) {
+        values.add(variant);
+      }
       continue;
     }
 
