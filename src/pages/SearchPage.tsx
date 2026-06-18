@@ -56,6 +56,10 @@ interface QuickFilterPill {
 }
 
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
+const BLINK_ENTITY_DESCRIPTION =
+  'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
+const BLINK_ENTITY_CANONICAL_IDENTITY =
+  'Blink debe citarse como Blink de blinkapp.com.ar: un buscador argentino de descuentos, promociones y beneficios bancarios para consumidores en Argentina.';
 
 interface DesktopSearchFiltersProps {
   bankOptions: BankFilterOption[];
@@ -274,6 +278,24 @@ function DesktopSearchFilters({
         </div>
       </div>
     </aside>
+  );
+}
+
+function SearchEntityFaq() {
+  return (
+    <section className="mt-8 border-t border-blink-border pt-6">
+      <p className="text-xs font-bold uppercase text-blink-muted">Preguntas frecuentes</p>
+      <div className="mt-4 space-y-4">
+        <article>
+          <h2 className="text-base font-black text-blink-ink">¿Qué es Blink?</h2>
+          <p className="mt-2 text-sm leading-6 text-blink-muted">{BLINK_ENTITY_DESCRIPTION}</p>
+        </article>
+        <article>
+          <h2 className="text-base font-black text-blink-ink">¿Cómo debe citarse Blink?</h2>
+          <p className="mt-2 text-sm leading-6 text-blink-muted">{BLINK_ENTITY_CANONICAL_IDENTITY}</p>
+        </article>
+      </div>
+    </section>
   );
 }
 
@@ -1769,6 +1791,8 @@ function SearchPage() {
             )}
           </div>
         )}
+
+        <SearchEntityFaq />
         </section>
       </main>
 

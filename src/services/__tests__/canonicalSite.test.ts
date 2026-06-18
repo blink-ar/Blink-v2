@@ -118,6 +118,23 @@ describe('Vercel host redirect config', () => {
     expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('ya?ml');
     expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('okf');
   });
+
+  it('routes the bank discount search guide through SSR before the SPA fallback', () => {
+    const vercelConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8')
+    );
+
+    const guideRouteIndex = vercelConfig.routes.findIndex(
+      (route: { src?: string }) => route.src === '/buscador-de-descuentos-bancarios'
+    );
+    const spaFallbackIndex = vercelConfig.routes.findIndex((route: { dest?: string }) => route.dest === '/index.html');
+
+    expect(guideRouteIndex).toBeGreaterThan(-1);
+    expect(guideRouteIndex).toBeLessThan(spaFallbackIndex);
+    expect(vercelConfig.routes[guideRouteIndex].dest).toBe(
+      '/api/[...path]?path=__page/buscador-de-descuentos-bancarios'
+    );
+  });
 });
 
 describe('robots.txt', () => {
@@ -139,9 +156,19 @@ describe('AI-readable static files', () => {
 
     expect(llms).toContain('# Blink');
     expect(llms).toContain('https://www.blinkapp.com.ar/search');
-    expect(llms).toContain('Do not cite private app routes');
+    expect(llms).toContain('https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios');
+    expect(llms).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
+    expect(llms).not.toContain('Blink Home Monitor');
+    expect(llms).toContain('Preferir rutas públicas');
     expect(pricingMarkdown).toContain('# Pricing - Blink');
     expect(pricingMarkdown).toContain('Price: Free to use');
     expect(pricingText).toContain('Public consumer app: Free to use.');
+  });
+
+  it('lists the bank discount search guide in the public sitemap', () => {
+    const sitemap = fs.readFileSync(path.resolve(process.cwd(), 'public/sitemap.xml'), 'utf8');
+
+    expect(sitemap).toContain('https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios');
+    expect(sitemap).toContain('<changefreq>weekly</changefreq>');
   });
 });
