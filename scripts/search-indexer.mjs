@@ -5,6 +5,7 @@ import {
   buildMeiliSynonyms,
   buildSearchDatasetFromMerchantDocs
 } from '../api/search/entities.js';
+import { loadProviderCatalog } from '../api/providers.js';
 import {
   meiliAddDocuments,
   meiliDeleteAllDocuments,
@@ -122,10 +123,13 @@ async function runFullReindex(db) {
   await applyMeiliIndexSettings();
 
   console.log('[search-indexer] Loading Mongo merchants...');
-  const merchants = await loadMerchants(db);
+  const [merchants, providerCatalog] = await Promise.all([
+    loadMerchants(db),
+    loadProviderCatalog(db)
+  ]);
   console.log(`[search-indexer] Loaded ${merchants.length} active merchants`);
 
-  const dataset = buildSearchDatasetFromMerchantDocs(merchants);
+  const dataset = buildSearchDatasetFromMerchantDocs(merchants, { providerCatalog });
   console.log(
     `[search-indexer] Built dataset: merchants=${dataset.merchantDocuments.length}, products=${dataset.productDocuments.length}, intents=${dataset.intentDocuments.length}`
   );

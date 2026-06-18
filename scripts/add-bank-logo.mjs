@@ -113,13 +113,11 @@ console.log(`✔ src/data/bankLogosManifest.ts: ${[args.key, ...args.aliases].jo
 
 console.log(`
 Pasos manuales a revisar (ver .claude/skills/add-bank-logo/SKILL.md):
-  1. src/utils/banks.ts -> KNOWN_BANKS + getKnownDescriptor si el banco debe
-     aparecer ordenado/etiquetado en los filtros. IMPORTANTE: el token tiene que
-     matchear el backend (una palabra que el indexer guarde, sin espacios
-     colapsados; ej. Mercado Pago usa el token 'mercado', no 'mercadopago').
+  1. Mongo providers -> agregar/actualizar el doc con key canonical, name,
+     shortName y aliases estaticos. El frontend deriva filtros desde /api/banks.
   2. src/components/neo/BankFilterSheet.tsx -> BANK_BRAND[token] con los colores
      de marca del chip.
   3. src/utils/bankColors.ts -> acento de color para el fallback de iniciales.
-  4. Si el token de KNOWN_BANKS difiere de --key, agregarlo como --alias para que
-     BankFilterSheet (que pasa el token a BankLogo) encuentre el logo.
+  4. Si una key canonical difiere del nombre de archivo/logo previo, agregarla
+     como --alias para que BankLogo encuentre el logo.
 `);

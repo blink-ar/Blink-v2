@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildProviderCatalog } from '../../../api/providers.js';
 import { buildSearchDatasetFromMerchantDocs } from '../../../api/search/entities.js';
 
 describe('buildSearchDatasetFromMerchantDocs', () => {
@@ -88,5 +89,32 @@ describe('buildSearchDatasetFromMerchantDocs', () => {
       ])
     );
     expect(dataset.merchantDocuments[0].searchText).toContain('almacen pizza');
+  });
+
+  it('uses provider canonical keys for merchant bank filters when a catalog is provided', () => {
+    const providerCatalog = buildProviderCatalog([
+      { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'] },
+    ]);
+    const dataset = buildSearchDatasetFromMerchantDocs([
+      {
+        merchantId: 'merchant_1',
+        merchantName: 'Adidas',
+        merchantKey: 'adidas',
+        categories: ['shopping'],
+        banks: ['Mercado Pago'],
+        locations: [],
+        activeBenefitCount: 1,
+        benefitCount: 1,
+        searchProfile: {
+          aliases: [],
+          description: '',
+          productTags: [],
+          intentTags: [],
+          benefits: [],
+        },
+      },
+    ], { providerCatalog });
+
+    expect(dataset.merchantDocuments[0].banks).toEqual(['mercadopago']);
   });
 });

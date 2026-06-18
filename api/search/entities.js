@@ -139,7 +139,38 @@ function getSubscriptionIds(benefit) {
   ));
 }
 
-function enrichMerchantAccumulator(accumulator, benefit) {
+function getCatalogProviderKey(providerCatalog, value) {
+  if (!providerCatalog || typeof providerCatalog.resolveKey !== 'function' || typeof providerCatalog.hasKey !== 'function') {
+    return '';
+  }
+
+  const key = providerCatalog.resolveKey(value);
+  return key && providerCatalog.hasKey(key) ? key : '';
+}
+
+function getBankIndexValues(value, providerCatalog) {
+  const canonicalKey = getCatalogProviderKey(providerCatalog, value);
+  if (canonicalKey) return [canonicalKey];
+
+  const bank = normalizeSearchText(value);
+  if (!bank) return [];
+
+  const values = [bank];
+  const withoutPrefix = bank.replace(/^banco\s+/, '').trim();
+  if (withoutPrefix) {
+    values.push(withoutPrefix);
+  }
+
+  for (const token of bank.split(' ')) {
+    if (token && token.length > 2 && token !== 'banco') {
+      values.push(token);
+    }
+  }
+
+  return uniqueStrings(values);
+}
+
+function enrichMerchantAccumulator(accumulator, benefit, options = {}) {
   const categories = toArray(benefit.categories).map((category) => normalizeSearchText(category));
   categories.forEach((category) => {
     if (!category) return;
@@ -149,19 +180,8 @@ function enrichMerchantAccumulator(accumulator, benefit) {
   });
 
   for (const bankName of getProviderNames(benefit)) {
-    const bank = normalizeSearchText(bankName);
-    if (!bank) continue;
-    accumulator.banks.add(bank);
-
-    const withoutPrefix = bank.replace(/^banco\s+/, '').trim();
-    if (withoutPrefix) {
-      accumulator.banks.add(withoutPrefix);
-    }
-
-    for (const token of bank.split(' ')) {
-      if (token && token.length > 2 && token !== 'banco') {
-        accumulator.banks.add(token);
-      }
+    for (const bank of getBankIndexValues(bankName, options.providerCatalog)) {
+      accumulator.banks.add(bank);
     }
   }
 
@@ -283,13 +303,20 @@ function pickMerchantImage(merchant) {
   return '';
 }
 
-function buildMerchantDocumentFromStoredMerchant(merchant) {
+function buildMerchantDocumentFromStoredMerchant(merchant, options = {}) {
   const merchantId = merchant?.merchantId || merchant?.merchantKey || slugify(merchant?.merchantName || 'merchant');
   const merchantName = merchant?.merchantName || 'Unknown Merchant';
   const merchantKey = merchant?.merchantKey || normalizeSearchText(merchantName);
   const searchProfile = merchant?.searchProfile || {};
   const categories = uniqueStrings(Array.isArray(merchant?.categories) ? merchant.categories.map((category) => normalizeSearchText(category)) : []);
-  const banks = uniqueStrings(Array.isArray(merchant?.banks) ? merchant.banks.map((bank) => normalizeSearchText(bank)) : []);
+  const banks = uniqueStrings(
+    Array.isArray(merchant?.banks)
+      ? merchant.banks.flatMap((bank) => {
+        const canonicalKey = getCatalogProviderKey(options.providerCatalog, bank);
+        return canonicalKey || normalizeSearchText(bank);
+      })
+      : []
+  );
   const locations = Array.isArray(merchant?.locations) ? merchant.locations.slice(0, 15) : [];
   const aliases = uniqueStrings([
     ...resolveMerchantAliases(merchantName, merchantKey),
@@ -396,7 +423,7 @@ function buildIntentDocuments(merchantDocuments) {
   return intentDocs;
 }
 
-export function buildSearchDataset(benefits) {
+export function buildSearchDataset(benefits, options = {}) {
   const merchantMap = new Map();
 
   for (const benefit of benefits || []) {
@@ -428,7 +455,7 @@ export function buildSearchDataset(benefits) {
     if (benefit.description && benefit.description.length > entry.description.length) {
       entry.description = benefit.description;
     }
-    enrichMerchantAccumulator(entry, benefit);
+    enrichMerchantAccumulator(entry, benefit, options);
   }
 
   const merchantDocuments = Array.from(merchantMap.values())
@@ -446,10 +473,10 @@ export function buildSearchDataset(benefits) {
   };
 }
 
-export function buildSearchDatasetFromMerchantDocs(merchants) {
+export function buildSearchDatasetFromMerchantDocs(merchants, options = {}) {
   const merchantDocuments = (Array.isArray(merchants) ? merchants : [])
     .filter((merchant) => merchant?.merchantId && merchant?.merchantName)
-    .map((merchant) => buildMerchantDocumentFromStoredMerchant(merchant))
+    .map((merchant) => buildMerchantDocumentFromStoredMerchant(merchant, options))
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
 
   const productDocuments = buildProductDocuments(merchantDocuments);

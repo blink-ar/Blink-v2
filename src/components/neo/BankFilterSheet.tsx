@@ -25,7 +25,9 @@ const BANK_BRAND: Record<string, { bg: string; color: string }> = {
   mastercard:  { bg: '#FFF3E8', color: '#EB001B' },
   lagaceta:    { bg: '#EBF4FF', color: '#0E5FA0' },
   buepp:       { bg: '#FEF9C3', color: '#A16207' },
+  personal:    { bg: '#F3E8FF', color: '#7C3AED' },
   personalpay: { bg: '#F3E8FF', color: '#7C3AED' },
+  mercadopago: { bg: '#E0F2FE', color: '#0369A1' },
   mercado:     { bg: '#E0F2FE', color: '#0369A1' },
 };
 

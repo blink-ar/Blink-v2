@@ -7,6 +7,7 @@ import {
   MongoBenefitsResponse,
   MongoCategoriesResponse,
   MongoBanksResponse,
+  MongoBankProvider,
   MongoStatsResponse,
   transformRawBenefitToBenefit,
   BankSubscription
@@ -22,6 +23,14 @@ declare global {
 const BASE_URL = '';
 const COLLECTION = 'confirmed_benefits';
 const SUBSCRIPTIONS_COLLECTION = 'bank_subscriptions';
+
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  Boolean(value) && typeof value === 'object';
+
+const getString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
 // Response type for the new /api/businesses endpoint
 export interface BusinessesApiResponse {
@@ -75,30 +84,32 @@ function mapSearchResponseToBusinessesResponse(
   };
 }
 
-function getBenefitEligibilities(benefit: any) {
-  return Array.isArray(benefit?.eligibilities)
-    ? benefit.eligibilities.filter((eligibility: any) =>
-        eligibility && typeof eligibility === 'object' && typeof eligibility.bank === 'string'
-      )
+function getBenefitEligibilities(benefit: unknown): BenefitEligibility[] {
+  const eligibilities = isRecord(benefit) && Array.isArray(benefit.eligibilities)
+    ? benefit.eligibilities
     : [];
+
+  return eligibilities.filter((eligibility): eligibility is BenefitEligibility =>
+    isRecord(eligibility) && typeof eligibility.bank === 'string'
+  );
 }
 
-function getBenefitProviderNames(benefit: any): string[] {
+function getBenefitProviderNames(benefit: unknown): string[] {
   return [...new Set(getBenefitEligibilities(benefit)
-    .map((eligibility: any) => eligibility.bankDisplayName || eligibility.bank)
+    .map((eligibility) => eligibility.bankDisplayName || eligibility.bank)
     .filter(Boolean))] as string[];
 }
 
-function getBenefitCardNames(benefit: any): string[] {
+function getBenefitCardNames(benefit: unknown): string[] {
   return [...new Set(getBenefitEligibilities(benefit)
-    .flatMap((eligibility: any) => Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : [])
-    .map((card: any) => typeof card === 'string' ? card : card?.name)
+    .flatMap((eligibility) => Array.isArray(eligibility.cardTypes) ? eligibility.cardTypes : [])
+    .map((card) => typeof card === 'string' ? card : isRecord(card) ? getString(card.name) : undefined)
     .filter(Boolean))] as string[];
 }
 
-function getBenefitSubscriptionIds(benefit: any): string[] {
+function getBenefitSubscriptionIds(benefit: unknown): string[] {
   return [...new Set(getBenefitEligibilities(benefit)
-    .map((eligibility: any) => eligibility.subscription)
+    .map((eligibility) => eligibility.subscription)
     .filter(Boolean))] as string[];
 }
 
@@ -133,39 +144,46 @@ export async function fetchSearch(options: {
 }
 
 export function normalizeBusinesses(
-  businesses: any[],
+  businesses: unknown[],
   options: { includeExpired?: boolean } = {},
 ): Business[] {
-  return businesses.map((raw) => {
-    const rawLocations = raw.location || raw.locations || [];
+  return businesses.map((rawValue) => {
+    const raw = isRecord(rawValue) ? rawValue : {};
+    const rawLocations = Array.isArray(raw.location)
+      ? raw.location
+      : Array.isArray(raw.locations)
+        ? raw.locations
+        : [];
 
-    const uniqueLocations: any[] = [];
+    const uniqueLocations: unknown[] = [];
     const seenAddresses = new Set();
 
-    if (Array.isArray(rawLocations)) {
-      for (const loc of rawLocations) {
-        const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
+    for (const loc of rawLocations) {
+      if (!isRecord(loc)) continue;
+      const key = loc.formattedAddress || `${loc.lat},${loc.lng}`;
 
-        if (!seenAddresses.has(key)) {
-          seenAddresses.add(key);
-          uniqueLocations.push(loc);
-        }
+      if (!seenAddresses.has(key)) {
+        seenAddresses.add(key);
+        uniqueLocations.push(loc);
       }
     }
 
     const benefits = Array.isArray(raw.benefits)
-      ? raw.benefits.map((b: any) => ({
+      ? raw.benefits.map((benefitValue) => {
+        const b = isRecord(benefitValue) ? benefitValue : {};
+        return {
           ...b,
           bankName: b.bankName || getBenefitProviderNames(b).join(', ') || 'Provider',
           cardTypes: Array.isArray(b.cardTypes) ? [...new Set(b.cardTypes)] : getBenefitCardNames(b),
           subscription: b.subscription || getBenefitSubscriptionIds(b)[0] || null,
           subscriptionIds: Array.isArray(b.subscriptionIds) ? b.subscriptionIds : getBenefitSubscriptionIds(b)
-        }))
+        } as BankBenefit;
+      })
       : [];
     const now = new Date();
-    const activeBenefits: any[] = [];
-    const expiredBenefits: any[] = [];
-    benefits.forEach((b: any) => {
+    const activeBenefits: BankBenefit[] = [];
+    const expiredBenefits: BankBenefit[] = [];
+    benefits.forEach((b) => {
       if (isBenefitActive(b, now)) activeBenefits.push(b);
       else expiredBenefits.push(b);
     });
@@ -176,18 +194,19 @@ export function normalizeBusinesses(
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';
+    const rawImage = getString(raw.image);
     const image =
-      !raw.image || raw.image.includes(GENERIC_DEFAULT)
+      !rawImage || rawImage.includes(GENERIC_DEFAULT)
         ? getCategoryDefaultImage(category)
-        : raw.image;
+        : rawImage;
 
-    const business: any = {
+    const business = {
       ...raw,
       category,
       benefits: visibleBenefits,
       location: uniqueLocations,
       image
-    };
+    } as Business & { locations?: unknown };
 
     if ("locations" in business) {
       delete business.locations;
@@ -436,7 +455,7 @@ class BenefitsAPI {
     return data.categories || [];
   }
 
-  async getBanks(): Promise<string[]> {
+  async getBanks(): Promise<Array<string | MongoBankProvider>> {
     const response = await fetch(`${BASE_URL}/api/banks?collection=${COLLECTION}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -471,14 +490,19 @@ export async function fetchBankSubscriptions(): Promise<BankSubscription[]> {
     }
 
     const data = await response.json();
-    const rawSubscriptions = data.benefits || [];
+    const rawSubscriptions = Array.isArray(data.benefits) ? data.benefits : [];
 
-    return rawSubscriptions.map((raw: any) => ({
-      id: raw._id?.$oid || raw._id || raw.id,
-      bank: raw.bank,
-      name: raw.name,
-      icon: raw.icon
-    }));
+    return rawSubscriptions.map((rawValue) => {
+      const raw = isRecord(rawValue) ? rawValue : {};
+      const rawId = isRecord(raw._id) ? raw._id.$oid : raw._id;
+
+      return {
+        id: String(rawId || raw.id || ''),
+        bank: String(raw.bank || ''),
+        name: String(raw.name || ''),
+        icon: getString(raw.icon) || null
+      };
+    });
   } catch (error) {
     console.error('[API] fetchBankSubscriptions failed:', error);
     return [];
@@ -579,7 +603,7 @@ export async function fetchMongoCategories(): Promise<string[]> {
   }
 }
 
-export async function fetchMongoBanks(): Promise<string[]> {
+export async function fetchMongoBanks(): Promise<Array<string | MongoBankProvider>> {
   try {
     return await benefitsAPI.getBanks();
   } catch {
@@ -667,7 +691,7 @@ export async function fetchBusinesses(options: {
         const cardNames = getBenefitCardNames(benefit);
         const subscriptionIds = getBenefitSubscriptionIds(benefit);
         const bankBenefit: BankBenefit = {
-          eligibilities: getBenefitEligibilities(benefit) as any,
+          eligibilities: getBenefitEligibilities(benefit),
           bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Provider',
           cardName: cardNames[0] || 'Credit Card',
           cardTypes: cardNames,
@@ -704,7 +728,7 @@ export async function fetchBusinesses(options: {
         const cardNames = getBenefitCardNames(benefit);
         const subscriptionIds = getBenefitSubscriptionIds(benefit);
         const bankBenefit: BankBenefit = {
-          eligibilities: getBenefitEligibilities(benefit) as any,
+          eligibilities: getBenefitEligibilities(benefit),
           bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Provider',
           cardName: cardNames[0] || 'Credit Card',
           cardTypes: cardNames,

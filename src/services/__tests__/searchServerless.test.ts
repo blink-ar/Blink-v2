@@ -120,6 +120,55 @@ function merchantMatchesRegexQuery(query: unknown, merchant: MerchantSearchFixtu
 describe('handleSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+  });
+
+  it('resolves legacy bank aliases before building Meilisearch filters', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+    meiliSearchMock
+      .mockResolvedValueOnce({ hits: [], estimatedTotalHits: 0 })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([
+                { key: 'mercadopago', name: 'Mercado Pago', aliases: ['mercado'], shortName: 'MP' },
+              ]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=adidas&bank=mercado&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(meiliSearchMock.mock.calls[0][1].filter).toContain('banks = "mercadopago"');
+    expect(JSON.parse(res.body || '{}').query.filters.bank).toBe('mercadopago');
   });
 
   it('rescues an exact-name merchant that meilisearch omitted from merchant candidates', async () => {
