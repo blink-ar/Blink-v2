@@ -21,6 +21,7 @@ import BankLogo from '../components/BankLogos/BankLogo';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useResponsive } from '../hooks/useResponsive';
 import { calculateDistance } from '../utils/distance';
+import { parseTopeAmount, formatArgentinePeso } from '../utils/tope';
 import {
   buildBenefitPath,
   decodeBenefitRouteRef,
@@ -125,20 +126,6 @@ const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null
     ? response.businesses[0]
     : null;
 };
-
-// Extract numeric amount from Argentine peso strings like "$25.000" or "25000"
-const parseTopeAmount = (tope: unknown): number | null => {
-  if (tope == null) return null;
-  const s = String(tope).trim();
-  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
-  // Argentine format: "." = thousands separator, "," = decimal
-  const cleaned = s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? null : num;
-};
-
-const formatArgentinePeso = (amount: number): string =>
-  '$' + Math.round(amount).toLocaleString('es-AR');
 
 const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
   return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
@@ -425,9 +412,24 @@ function BenefitDetailPage() {
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
   const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
-  const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
+  // PER_USER caps: <=20 = usage count, >20 = monetary tope per client. When more
+  // than one cap of the same kind exists, use the most restrictive (minimum) so
+  // cap ordering can't overstate the benefit.
+  const perUserCaps = (benefit.caps ?? []).filter(
+    c => c != null && c.resetsEvery === 'PER_USER' && typeof c.amount === 'number',
+  );
+  const perUserUsageCounts = perUserCaps.filter(c => c.amount <= 20).map(c => c.amount);
+  const perUserMonetaryCaps = perUserCaps.filter(c => c.amount > 20).map(c => c.amount);
+  const perUserUsageCount = perUserUsageCounts.length ? Math.min(...perUserUsageCounts) : null;
+  const perUserMonetaryCap = perUserMonetaryCaps.length ? Math.min(...perUserMonetaryCaps) : null;
+  // Effective cap: use the most restrictive (minimum) of PER_TXN and monetary PER_USER caps
+  const effectiveCapAmount = [topeAmount, perUserMonetaryCap].filter((n): n is number => n != null).reduce<number | null>((min, n) => min === null ? n : Math.min(min, n), null);
+  const maxSpend = effectiveCapAmount != null && discount > 0 ? effectiveCapAmount / (discount / 100) : null;
   const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
+  const hasTransactionCap = (benefit.caps ?? []).some(
+    c => c != null && c.resetsEvery !== 'PER_USER' && c.resetsEvery !== 'OTHER' && typeof c.amount === 'number',
+  );
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -449,9 +451,7 @@ function BenefitDetailPage() {
   const dayAvailability = parseDayAvailability(benefit.cuando);
   const hasDayData = !!benefit.cuando;
 
-  const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
-    .filter(Boolean)
-    .join('\n\n');
+  const termsText = benefit.condicion || '';
 
   const locations = (() => {
     const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
@@ -666,11 +666,34 @@ function BenefitDetailPage() {
 
               <div className="divide-y divide-blink-border">
 
-                {/* Tope descuento */}
-                {!isNoLimit && benefit.tope && (
+                {/* Usos por cuenta (PER_USER cap with small count) */}
+                {perUserUsageCount !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Usos por cuenta</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {perUserUsageCount === 1 ? '1 uso' : `${perUserUsageCount} usos`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Tope por cliente (PER_USER cap with monetary amount) */}
+                {perUserMonetaryCap !== null && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-blink-muted">Tope por cliente</span>
+                    <span className="text-sm font-semibold text-blink-ink">{formatArgentinePeso(perUserMonetaryCap)}</span>
+                  </div>
+                )}
+
+                {/* Tope descuento (PER_TXN cap) */}
+                {discount > 0 && (
+                  (!isNoLimit && benefit.tope && !(topeAmount !== null && topeAmount === minPurchaseAmount)) ||
+                  (!benefit.tope || isNoLimit)
+                ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
-                    <span className="text-sm font-semibold text-blink-ink">{benefit.tope}</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {(!benefit.tope || isNoLimit) ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
+                    </span>
                   </div>
                 )}
 
@@ -918,7 +941,7 @@ function BenefitDetailPage() {
           {discount > 0 && (
             <SavingsSimulator
               discountPercentage={discount}
-              maxCap={benefit.tope || null}
+              maxCap={effectiveCapAmount != null ? String(effectiveCapAmount) : (benefit.tope || null)}
               installments={benefit.installments}
             />
           )}
