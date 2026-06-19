@@ -1,5 +1,16 @@
 {
   "enabledPlugins": {
-    "github@claude-plugins-official": true
+    "github@claude-plugins-official": true,
+    "mongodb@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "mcp__plugin_mongodb_mongodb__connect",
+      "mcp__plugin_mongodb_mongodb__list-collections",
+      "mcp__plugin_mongodb_mongodb__collection-schema",
+      "mcp__plugin_mongodb_mongodb__find",
+      "mcp__plugin_mongodb_mongodb__count",
+      "mcp__plugin_mongodb_mongodb__aggregate"
+    ]
   }
 }
