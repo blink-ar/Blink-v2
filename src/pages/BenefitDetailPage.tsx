@@ -678,7 +678,7 @@ function BenefitDetailPage() {
                 {/* Tope descuento (PER_TXN cap) */}
                 {(
                   (!isNoLimit && benefit.tope && !isFalsePositiveCap) ||
-                  (discount > 0 && (!benefit.tope || isNoLimit) && !hasAnyCap)
+                  (discount > 0 && (benefit.tope === 0 || (!!topeStr && /sin tope|sin l[ií]mite/i.test(topeStr))) && !hasAnyCap)
                 ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
