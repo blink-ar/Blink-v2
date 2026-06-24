@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blink — Todos tus descuentos en un solo lugar</title>
+  <meta name="description" content="Encontrá descuentos, cuotas y beneficios bancarios en comercios de toda Argentina." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --primary:#6366F1; --primary-2:#818CF8;
+      --bg:#F7F6F4; --ink:#1C1C1E; --surface:#FFFFFF;
+      --positive:#10B981; --warning:#F59E0B;
+      --muted:#9CA3AF; --border:#E8E6E1;
+      --grad-indigo:linear-gradient(135deg,#6366F1 0%,#818CF8 100%);
+      --grad-emerald:linear-gradient(135deg,#10B981 0%,#34D399 100%);
+      --soft:0 2px 8px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+      --soft-md:0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04);
+      --soft-lg:0 16px 40px rgba(0,0,0,.10),0 4px 12px rgba(0,0,0,.06);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--ink);
+      -webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden;
+    }
+    .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:400;font-style:normal;line-height:1;vertical-align:middle;}
+    .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+    a{color:inherit;text-decoration:none}
+    .mono{font-family:'JetBrains Mono',monospace}
+
+    /* ---------- NAV ---------- */
+    nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+      background:rgba(247,246,244,.82);border-bottom:1px solid rgba(232,230,225,.8)}
+    .nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:-.02em}
+    .brand .dot{width:30px;height:30px;border-radius:10px;background:var(--grad-indigo);display:grid;place-items:center;
+      color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.35)}
+    .beta{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--primary);
+      background:#EEF2FF;border:1px solid rgba(99,102,241,.25);padding:3px 9px;border-radius:999px}
+    .nav-links{display:flex;align-items:center;gap:28px;font-size:14px;font-weight:500;color:#52525B}
+    .nav-links a:hover{color:var(--ink)}
+    .btn{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:15px;border:0;cursor:pointer;
+      border-radius:16px;padding:0 18px;height:46px;transition:transform .15s ease,box-shadow .2s ease}
+    .btn:active{transform:scale(.97)}
+    .btn-primary{background:var(--grad-indigo);color:#fff;box-shadow:0 4px 20px rgba(99,102,241,.35)}
+    .btn-primary:hover{box-shadow:0 8px 28px rgba(99,102,241,.45)}
+    .btn-primary .ic{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.2);display:grid;place-items:center}
+    .btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:var(--soft)}
+    @media(max-width:760px){.nav-links{display:none}}
+
+    /* ---------- HERO ---------- */
+    .hero{position:relative;padding:64px 0 40px}
+    .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+    .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--primary);background:#EEF2FF;border:1px solid rgba(99,102,241,.22);
+      padding:6px 12px;border-radius:999px}
+    h1.title{font-size:clamp(38px,5.2vw,60px);line-height:1.04;letter-spacing:-.03em;font-weight:700;margin:22px 0 0}
+    h1.title .grad{background:var(--grad-indigo);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .lede{font-size:18px;color:#52525B;max-width:30ch;margin-top:18px}
+    .sub-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:13px;color:var(--muted);font-weight:500}
+    .sub-tags span{display:inline-flex;align-items:center;gap:6px}
+    .sub-tags .sep{width:4px;height:4px;border-radius:999px;background:var(--border)}
+    .cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+    .btn-lg{height:56px;border-radius:18px;font-size:16px;padding:0 22px}
+    .trust{display:flex;align-items:center;gap:18px;margin-top:26px;font-size:13px;color:#52525B}
+    .trust .avatars{display:flex}
+    .trust .avatars i{width:30px;height:30px;border-radius:999px;border:2px solid var(--bg);margin-left:-8px;
+      display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:700;color:#fff}
+
+    /* phone mock */
+    .phone-col{display:flex;justify-content:center;position:relative}
+    .glow{position:absolute;inset:-10% -20%;background:radial-gradient(60% 50% at 60% 30%,rgba(99,102,241,.22),transparent 70%);
+      filter:blur(10px);z-index:0}
+    .phone{position:relative;z-index:1;width:312px;background:#0F0F0F;border-radius:44px;padding:12px;
+      box-shadow:var(--soft-lg),0 40px 80px rgba(28,28,30,.22)}
+    .screen{background:var(--bg);border-radius:34px;overflow:hidden;height:620px;display:flex;flex-direction:column}
+    .s-head{padding:18px 18px 12px}
+    .s-search{display:flex;align-items:center;gap:10px;height:46px;background:#fff;border:1px solid var(--border);
+      border-radius:14px;padding:0 14px;color:var(--muted);font-size:14px}
+    .s-title{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:16px 4px 2px}
+    .s-title .grad{background:var(--grad-indigo);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .s-sub{font-size:12px;color:var(--muted);margin:0 4px 4px}
+    .s-body{flex:1;overflow:hidden;padding:6px 14px 14px;display:flex;flex-direction:column;gap:10px}
+    .bcard{background:#fff;border:1px solid var(--border);border-radius:18px;padding:13px;box-shadow:var(--soft)}
+    .bcard .top{display:flex;align-items:center;gap:10px}
+    .bcard .logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
+    .bcard .name{font-weight:600;font-size:14px;letter-spacing:-.01em}
+    .bcard .cat{font-size:11px;color:var(--muted)}
+    .bcard .pct{margin-left:auto;font-weight:700;font-size:18px;color:var(--positive)}
+    .bcard .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .chip{font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+    .chip .material-symbols-outlined{font-size:13px}
+    .chip-indigo{background:#EEF2FF;color:#4338CA}
+    .chip-emerald{background:#D1FAE5;color:#065F46}
+    .chip-amber{background:#FEF3C7;color:#92400E}
+    .s-nav{display:flex;justify-content:space-around;align-items:center;height:62px;background:#fff;border-top:1px solid var(--border)}
+    .s-nav .material-symbols-outlined{font-size:24px;color:var(--muted)}
+    .s-nav .active{color:var(--primary)}
+    @media(max-width:880px){.hero-grid{grid-template-columns:1fr;gap:36px}.lede{max-width:none}.phone-col{order:-1}}
+
+    /* ---------- SECTION SHELL ---------- */
+    section.block{padding:64px 0}
+    .sec-head{max-width:640px;margin-bottom:36px}
+    .sec-kicker{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--primary)}
+    .sec-h{font-size:clamp(26px,3.4vw,38px);line-height:1.1;letter-spacing:-.02em;font-weight:700;margin-top:10px}
+    .sec-p{font-size:16px;color:#52525B;margin-top:12px}
+
+    /* emisores */
+    .emisores{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .emis-note{text-align:center;font-size:14px;font-weight:600;color:#52525B;margin-bottom:22px}
+    .bank-row{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+    .bank{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 8px;border:1px solid var(--border);
+      border-radius:18px;background:var(--bg);transition:transform .15s ease,box-shadow .2s ease}
+    .bank:hover{transform:translateY(-3px);box-shadow:var(--soft-md)}
+    .bank .b-logo{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:16px}
+    .bank .b-name{font-size:12.5px;font-weight:600;text-align:center;letter-spacing:-.01em}
+    @media(max-width:860px){.bank-row{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:420px){.bank-row{grid-template-columns:repeat(2,1fr)}}
+
+    /* anatomy / how it reads */
+    .anat{display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:center}
+    .anat-card{background:#fff;border:1px solid var(--border);border-radius:24px;padding:22px;box-shadow:var(--soft-md)}
+    .anat-top{display:flex;align-items:center;gap:12px}
+    .anat-logo{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:700}
+    .anat-name{font-weight:600;font-size:18px}
+    .anat-addr{font-size:12.5px;color:var(--muted)}
+    .anat-pct{margin-left:auto;text-align:right}
+    .anat-pct b{font-size:30px;color:var(--positive);font-weight:700;line-height:1}
+    .anat-pct span{font-size:11px;color:var(--muted);display:block}
+    .anat-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .feat-list{display:flex;flex-direction:column;gap:16px}
+    .feat{display:flex;gap:14px;align-items:flex-start}
+    .feat .fi{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;
+      background:#EEF2FF;color:var(--primary)}
+    .feat .fi .material-symbols-outlined{font-size:22px}
+    .feat h4{font-size:15.5px;font-weight:600;letter-spacing:-.01em}
+    .feat p{font-size:14px;color:#52525B;margin-top:2px}
+    @media(max-width:860px){.anat{grid-template-columns:1fr;gap:32px}}
+
+    /* categories bento */
+    .bento{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .cat{border-radius:22px;padding:20px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;
+      border:1px solid rgba(0,0,0,.04);transition:transform .15s ease}
+    .cat:hover{transform:translateY(-3px)}
+    .cat .material-symbols-outlined{font-size:28px}
+    .cat h4{font-size:16px;font-weight:700;letter-spacing:-.01em}
+    .cat small{font-size:12px;opacity:.75;font-weight:500}
+    @media(max-width:760px){.bento{grid-template-columns:repeat(2,1fr)}}
+
+    /* cities */
+    .cities{display:flex;flex-wrap:wrap;gap:10px}
+    .city{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--border);
+      border-radius:14px;padding:11px 15px;font-size:14px;font-weight:600;box-shadow:var(--soft);transition:transform .15s ease}
+    .city:hover{transform:translateY(-2px)}
+    .city .material-symbols-outlined{font-size:17px;color:var(--primary)}
+
+    /* PWA cta */
+    .pwa{background:var(--ink);color:#fff;border-radius:28px;padding:54px 48px;display:grid;
+      grid-template-columns:1.2fr .8fr;gap:40px;align-items:center;overflow:hidden;position:relative}
+    .pwa::before{content:"";position:absolute;right:-60px;top:-60px;width:320px;height:320px;border-radius:999px;
+      background:radial-gradient(circle,rgba(99,102,241,.45),transparent 65%)}
+    .pwa h3{font-size:clamp(26px,3vw,36px);line-height:1.1;letter-spacing:-.02em;font-weight:700;position:relative}
+    .pwa p{color:#A1A1AA;font-size:16px;margin-top:14px;position:relative;max-width:42ch}
+    .pwa-feats{position:relative;display:flex;flex-direction:column;gap:14px}
+    .pwa-feats div{display:flex;align-items:center;gap:12px;font-size:15px;color:#E4E4E7}
+    .pwa-feats .material-symbols-outlined{color:var(--primary-2);font-size:22px}
+    .pwa-cta{margin-top:26px;position:relative}
+    @media(max-width:760px){.pwa{grid-template-columns:1fr;padding:38px 28px}}
+
+    /* footer */
+    footer{padding:54px 0 40px;border-top:1px solid var(--border);margin-top:40px}
+    .foot{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:24px}
+    .foot p{font-size:13px;color:var(--muted);max-width:34ch;margin-top:12px}
+    .foot-links{display:flex;gap:40px;font-size:14px}
+    .foot-links b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;font-weight:700}
+    .foot-links a{display:block;color:#52525B;margin-bottom:9px}
+    .foot-links a:hover{color:var(--ink)}
+    .copy{font-size:12.5px;color:var(--muted);margin-top:40px;border-top:1px solid var(--border);padding-top:22px;
+      display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="wrap nav-in">
+      <a class="brand" href="#top">
+        <span class="dot material-symbols-outlined" style="font-size:18px">bolt</span>
+        Blink <span class="beta">Beta</span>
+      </a>
+      <div class="nav-links">
+        <a href="#emisores">Emisores</a>
+        <a href="#beneficios">Cómo funciona</a>
+        <a href="#categorias">Categorías</a>
+        <a href="#ciudades">Ciudades</a>
+      </div>
+      <a class="btn btn-primary" href="#top">
+        Buscá beneficios
+        <span class="ic material-symbols-outlined" style="font-size:18px">arrow_forward</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header id="top" class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow"><span class="material-symbols-outlined" style="font-size:15px">location_on</span> Hecho para Argentina</span>
+        <h1 class="title">Todos tus descuentos<br><span class="grad">en un solo lugar</span></h1>
+        <p class="lede">Encontrá descuentos, cuotas y beneficios bancarios en comercios de toda Argentina.</p>
+        <div class="sub-tags">
+          <span>Bancos</span><i class="sep"></i><span>Billeteras</span><i class="sep"></i>
+          <span>Clubes</span><i class="sep"></i><span>Suscripciones</span>
+        </div>
+        <div class="cta-row">
+          <a class="btn btn-primary btn-lg" href="#top">
+            Buscá beneficios
+            <span class="ic material-symbols-outlined" style="font-size:18px">arrow_forward</span>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="#beneficios">
+            <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary)">install_mobile</span>
+            Instalá la app
+          </a>
+        </div>
+        <div class="trust">
+          <div class="avatars">
+            <i style="background:#FF7A45">G</i><i style="background:#EC0000">S</i>
+            <i style="background:#1464A5">B</i><i style="background:#0033A0">M</i><i style="background:#6366F1">+2</i>
+          </div>
+          <span>6 emisores indexados &middot; gastronomía, moda, hogar y más</span>
+        </div>
+      </div>
+
+      <!-- phone -->
+      <div class="phone-col">
+        <div class="glow"></div>
+        <div class="phone">
+          <div class="screen">
+            <div class="s-head">
+              <div class="s-search"><span class="material-symbols-outlined" style="font-size:18px">search</span> Buscar beneficios…</div>
+              <div class="s-title">Todos tus descuentos<br><span class="grad">en un solo lugar</span></div>
+              <p class="s-sub">Bancos · Billeteras · Clubes · Suscripciones</p>
+            </div>
+            <div class="s-body">
+              <div class="bcard">
+                <div class="top">
+                  <div class="logo" style="background:#FF7A45">G</div>
+                  <div><div class="name">Banco Galicia</div><div class="cat">Gastronomía</div></div>
+                  <div class="pct">30%</div>
+                </div>
+                <div class="meta">
+                  <span class="chip chip-emerald"><span class="material-symbols-outlined">savings</span>Tope $6.000</span>
+                  <span class="chip chip-indigo"><span class="material-symbols-outlined">calendar_today</span>Jueves</span>
+                  <span class="chip chip-amber"><span class="material-symbols-outlined">account_balance_wallet</span>Modo</span>
+                </div>
+              </div>
+              <div class="bcard">
+                <div class="top">
+                  <div class="logo" style="background:#EC0000">S</div>
+                  <div><div class="name">Banco Santander</div><div class="cat">Moda</div></div>
+                  <div class="pct" style="color:var(--primary)">3 cuotas</div>
+                </div>
+                <div class="meta">
+                  <span class="chip chip-indigo"><span class="material-symbols-outlined">credit_card</span>Sin interés</span>
+                  <span class="chip chip-emerald"><span class="material-symbols-outlined">storefront</span>Presencial</span>
+                </div>
+              </div>
+              <div class="bcard">
+                <div class="top">
+                  <div class="logo" style="background:#1464A5">B</div>
+                  <div><div class="name">BBVA</div><div class="cat">Supermercado y shopping</div></div>
+                  <div class="pct">20%</div>
+                </div>
+                <div class="meta">
+                  <span class="chip chip-indigo"><span class="material-symbols-outlined">calendar_today</span>Mié y Sáb</span>
+                  <span class="chip chip-emerald"><span class="material-symbols-outlined">language</span>Online</span>
+                </div>
+              </div>
+            </div>
+            <div class="s-nav">
+              <span class="material-symbols-outlined active">home</span>
+              <span class="material-symbols-outlined">search</span>
+              <span class="material-symbols-outlined">map</span>
+              <span class="material-symbols-outlined">bookmark</span>
+              <span class="material-symbols-outlined">person</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- EMISORES -->
+  <section id="emisores" class="emisores block">
+    <div class="wrap">
+      <p class="emis-note">Estamos en Beta — estos son los emisores disponibles hoy en Blink.</p>
+      <div class="bank-row">
+        <div class="bank"><div class="b-logo" style="background:#FF7A45">G</div><div class="b-name">Banco Galicia</div></div>
+        <div class="bank"><div class="b-logo" style="background:#EC0000">S</div><div class="b-name">Banco Santander</div></div>
+        <div class="bank"><div class="b-logo" style="background:#1464A5">B</div><div class="b-name">BBVA</div></div>
+        <div class="bank"><div class="b-logo" style="background:#0033A0">M</div><div class="b-name">Banco Macro</div></div>
+        <div class="bank"><div class="b-logo" style="background:#00843D">N</div><div class="b-name">Banco Nación</div></div>
+        <div class="bank"><div class="b-logo" style="background:#E60012">I</div><div class="b-name">ICBC</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS / BENEFIT ANATOMY -->
+  <section id="beneficios" class="block">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-kicker">Cada beneficio, sin letra chica</p>
+        <h2 class="sec-h">Sabés exactamente qué aplica hoy</h2>
+        <p class="sec-p">Blink lee cada promoción y la deja clara: el descuento, las cuotas, los días, el tope de reintegro y la vigencia. Las promos duplicadas con Modo se unifican en una sola tarjeta.</p>
+      </div>
+
+      <div class="anat">
+        <div class="anat-card">
+          <div class="anat-top">
+            <div class="anat-logo" style="background:#FF7A45">G</div>
+            <div>
+              <div class="anat-name">Banco Galicia</div>
+              <div class="anat-addr">Gastronomía · Av. Corrientes 1234, CABA</div>
+            </div>
+            <div class="anat-pct"><b>30%</b><span>de descuento</span></div>
+          </div>
+          <div class="anat-meta">
+            <span class="chip chip-indigo"><span class="material-symbols-outlined">calendar_today</span>Jueves</span>
+            <span class="chip chip-emerald"><span class="material-symbols-outlined">savings</span>Tope $6.000</span>
+            <span class="chip chip-indigo"><span class="material-symbols-outlined">credit_card</span>Visa · Mastercard</span>
+            <span class="chip chip-amber"><span class="material-symbols-outlined">account_balance_wallet</span>Acepta Modo</span>
+            <span class="chip chip-emerald"><span class="material-symbols-outlined">event_available</span>Vigente</span>
+          </div>
+        </div>
+
+        <div class="feat-list">
+          <div class="feat">
+            <div class="fi"><span class="material-symbols-outlined">percent</span></div>
+            <div><h4>Descuento o cuotas, al instante</h4><p>Reintegro en porcentaje o cuotas sin interés, ordenados de mayor a menor ahorro.</p></div>
+          </div>
+          <div class="feat">
+            <div class="fi"><span class="material-symbols-outlined">calendar_today</span></div>
+            <div><h4>Los días que aplica</h4><p>Si la promo es de jueves o fin de semana, lo ves antes de salir de casa.</p></div>
+          </div>
+          <div class="feat">
+            <div class="fi"><span class="material-symbols-outlined">savings</span></div>
+            <div><h4>Tope de reintegro y vigencia</h4><p>El límite de ahorro y hasta cuándo corre la promo, sin sorpresas en la caja.</p></div>
+          </div>
+          <div class="feat">
+            <div class="fi"><span class="material-symbols-outlined">account_balance_wallet</span></div>
+            <div><h4>Modo unificado</h4><p>Cuando una promo del banco también vale por Modo, la mostramos una sola vez.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORIES -->
+  <section id="categorias" class="block">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-kicker">Explorá por rubro</p>
+        <h2 class="sec-h">Comprá donde comprás siempre</h2>
+        <p class="sec-p">Filtrá los comercios adheridos por categoría y encontrá el beneficio que más te conviene.</p>
+      </div>
+      <div class="bento">
+        <a class="cat" style="background:#FEF3C7;color:#92400E">
+          <span class="material-symbols-outlined">restaurant</span>
+          <div><h4>Gastronomía</h4><small>Restaurantes, cafés y delivery</small></div>
+        </a>
+        <a class="cat" style="background:#FCE7F3;color:#9D174D">
+          <span class="material-symbols-outlined">checkroom</span>
+          <div><h4>Moda</h4><small>Indumentaria y calzado</small></div>
+        </a>
+        <a class="cat" style="background:#DBEAFE;color:#1E40AF">
+          <span class="material-symbols-outlined">shopping_cart</span>
+          <div><h4>Supermercado y shopping</h4><small>Súper y centros comerciales</small></div>
+        </a>
+        <a class="cat" style="background:#FEE2E2;color:#991B1B">
+          <span class="material-symbols-outlined">chair</span>
+          <div><h4>Hogar</h4><small>Muebles, deco y bazar</small></div>
+        </a>
+        <a class="cat" style="background:#D1FAE5;color:#065F46">
+          <span class="material-symbols-outlined">exercise</span>
+          <div><h4>Deportes</h4><small>Indumentaria y equipamiento</small></div>
+        </a>
+        <a class="cat" style="background:#EDE9FE;color:#4C1D95">
+          <span class="material-symbols-outlined">spa</span>
+          <div><h4>Belleza</h4><small>Perfumerías y cuidado personal</small></div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CITIES -->
+  <section id="ciudades" class="block">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-kicker">De norte a sur</p>
+        <h2 class="sec-h">Beneficios cerca tuyo</h2>
+        <p class="sec-p">Mirá las promos por ciudad o en todo el país. El mapa te muestra los comercios adheridos más cercanos.</p>
+      </div>
+      <div class="cities">
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Buenos Aires</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>CABA</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Córdoba</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Rosario</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Mendoza</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>La Plata</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Mar del Plata</a>
+        <a class="city"><span class="material-symbols-outlined">location_on</span>Tucumán</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PWA -->
+  <section class="block">
+    <div class="wrap">
+      <div class="pwa">
+        <div>
+          <h3>Llevá Blink en el bolsillo</h3>
+          <p>Instalala como app desde el navegador. Sin tiendas, sin esperas — funciona offline y se actualiza sola.</p>
+          <a class="btn btn-primary btn-lg pwa-cta" href="#top">
+            Instalá la app
+            <span class="ic material-symbols-outlined" style="font-size:18px">install_mobile</span>
+          </a>
+        </div>
+        <div class="pwa-feats">
+          <div><span class="material-symbols-outlined">install_mobile</span> Se instala en un toque</div>
+          <div><span class="material-symbols-outlined">wifi_off</span> Funciona sin conexión</div>
+          <div><span class="material-symbols-outlined">bolt</span> Liviana y al instante</div>
+          <div><span class="material-symbols-outlined">notifications</span> Avisos de nuevas promos</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div class="foot">
+        <div>
+          <a class="brand" href="#top">
+            <span class="dot material-symbols-outlined" style="font-size:18px">bolt</span> Blink
+          </a>
+          <p>Descuentos, cuotas y beneficios bancarios en comercios de toda Argentina.</p>
+        </div>
+        <div class="foot-links">
+          <div>
+            <b>Explorar</b>
+            <a href="#emisores">Emisores</a>
+            <a href="#categorias">Categorías</a>
+            <a href="#ciudades">Ciudades</a>
+          </div>
+          <div>
+            <b>Producto</b>
+            <a href="#beneficios">Cómo funciona</a>
+            <a href="#top">Buscá beneficios</a>
+            <a href="#top">Instalá la app</a>
+          </div>
+        </div>
+      </div>
+      <div class="copy">
+        <span>© 2026 Blink · blinkapp.com.ar</span>
+        <span class="mono">Hecho en Argentina 🇦🇷</span>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
