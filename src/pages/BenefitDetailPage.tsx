@@ -434,6 +434,7 @@ function BenefitDetailPage() {
   const hasTransactionCap = (benefit.caps ?? []).some(
     c => c != null && c.resetsEvery !== 'PER_USER' && c.resetsEvery !== 'OTHER' && typeof c.amount === 'number',
   );
+  const hasAnyCap = (benefit.caps ?? []).some(c => c != null && typeof c.amount === 'number');
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -673,9 +674,9 @@ function BenefitDetailPage() {
               <div className="divide-y divide-blink-border">
 
                 {/* Tope descuento (PER_TXN cap) */}
-                {discount > 0 && (
+                {(
                   (!isNoLimit && benefit.tope && !isFalsePositiveCap) ||
-                  ((!benefit.tope || isNoLimit) && !hasTransactionCap)
+                  (discount > 0 && (!benefit.tope || isNoLimit) && !hasAnyCap)
                 ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
@@ -929,7 +930,7 @@ function BenefitDetailPage() {
           {discount > 0 && (
             <SavingsSimulator
               discountPercentage={discount}
-              maxCap={benefit.tope || null}
+              maxCap={isFalsePositiveCap ? null : (benefit.tope || null)}
               installments={benefit.installments}
             />
           )}
