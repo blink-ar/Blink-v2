@@ -130,7 +130,7 @@ const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null
 const parseTopeAmount = (tope: unknown): number | null => {
   if (tope == null) return null;
   const s = String(tope).trim();
-  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
+  if (!s || /sin tope|sin l[í­]mite/i.test(s)) return null;
   // Only parse purely numeric/currency strings — reject free-text descriptions
   if (!/^\$?[\d.,\s]+$/.test(s)) return null;
   // Argentine format: "." = thousands separator, "," = decimal
@@ -426,7 +426,7 @@ function BenefitDetailPage() {
 
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
   // tope: 0 is the backend sentinel for "no cap" (same as null)
-  const isNoLimit = !topeStr || benefit.tope === 0 || /sin tope|sin l[ií]mite/i.test(topeStr);
+  const isNoLimit = !topeStr || benefit.tope === 0 || /sin tope|sin l[í­]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
   const isFalsePositiveCap = topeAmount !== null && topeAmount === minPurchaseAmount;
@@ -678,7 +678,7 @@ function BenefitDetailPage() {
                 {/* Tope descuento (PER_TXN cap) */}
                 {(
                   (!isNoLimit && benefit.tope && !isFalsePositiveCap) ||
-                  (discount > 0 && (!benefit.tope || isNoLimit) && !hasAnyCap)
+                  (discount > 0 && (benefit.tope === 0 || (!!topeStr && /sin tope|sin l[í­]mite/i.test(topeStr))) && !hasAnyCap)
                 ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
