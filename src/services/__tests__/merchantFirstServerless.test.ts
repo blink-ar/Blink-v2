@@ -1369,7 +1369,8 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('src="/assets/index-test.js"');
     expect(res.body).toContain('https://schema.org');
     expect(merchantQueries[0]).toEqual({
-      isActive: true,
+      isActive: { $ne: false },
+      merchantId: { $exists: true, $type: 'string' },
       benefitCount: { $gt: 0 },
       categories: 'shopping'
     });

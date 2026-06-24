@@ -310,7 +310,8 @@ export function renderCategorySeoHtml({
 export async function loadCategorySeoData({ db, merchantCollectionName, category, page }) {
   const safePage = Math.max(1, Number.parseInt(String(page || 1), 10) || 1);
   const query = {
-    isActive: true,
+    isActive: { $ne: false },
+    merchantId: { $exists: true, $type: 'string' },
     benefitCount: { $gt: 0 },
     categories: category.category,
   };
