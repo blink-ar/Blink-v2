@@ -56,6 +56,11 @@ export default function BenefitDetailScreen() {
           const rawData = await getRawBenefitById(businessId);
           if (rawData) {
             setRawBenefit(rawData);
+            const merchantName =
+              rawData.merchant?.name ||
+              rawData.merchantSnapshot?.merchantName ||
+              rawData.merchantIds?.filter(Boolean).join(', ') ||
+              'Comercio';
             const converted: BankBenefit = {
               bankName: rawData.bank,
               cardName: rawData.cardTypes[0]?.name || 'Credit Card',
@@ -74,7 +79,7 @@ export default function BenefitDetailScreen() {
 
             const biz: Business = {
               id: rawData._id.$oid,
-              name: rawData.merchant.name,
+              name: merchantName,
               category: rawData.categories[0] || 'otros',
               description: `Business offering ${rawData.benefitTitle}`,
               rating: 5,

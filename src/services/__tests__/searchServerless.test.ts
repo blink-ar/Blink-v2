@@ -52,7 +52,6 @@ function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
   expect(query).toHaveProperty('$or');
   expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
       { merchantIds: { $in: merchantIds } },
-      { $expr: expect.any(Object) },
       {
         $and: [
           { merchantId: { $in: merchantIds } },

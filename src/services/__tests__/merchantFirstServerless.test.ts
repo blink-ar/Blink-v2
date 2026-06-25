@@ -73,7 +73,6 @@ function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
   expect(query).toHaveProperty('$or');
   expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
       { merchantIds: { $in: merchantIds } },
-      { $expr: expect.any(Object) },
       {
         $and: [
           { merchantId: { $in: merchantIds } },
@@ -443,7 +442,7 @@ describe('merchant-first serverless helpers', () => {
     expect(invalidQueries[0]).toHaveProperty('merchantIds.1');
     expect(aggregatePipelines[0]).toEqual([
       { $project: { effectiveMerchantIds: expect.any(Object) } },
-      { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
+      { $unwind: '$effectiveMerchantIds' },
       { $count: 'count' },
     ]);
   });

@@ -741,17 +741,10 @@ function buildBenefitMerchantLinkQueryForIds(merchantIds) {
   const ids = Array.from(new Set((merchantIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
   if (ids.length === 0) return { _id: { $exists: false } };
 
+  // Merchant hydration is a hot path; stored merchantIds are normalized before write.
   return {
     $or: [
       { merchantIds: { $in: ids } },
-      {
-        $expr: {
-          $gt: [
-            { $size: { $setIntersection: [normalizedMerchantIdsExpression('$merchantIds'), ids] } },
-            0
-          ]
-        }
-      },
       {
         $and: [
           { merchantId: { $in: ids } },
@@ -815,7 +808,7 @@ async function countBenefitApplications(collection, match = {}) {
     .aggregate([
       ...(Object.keys(match).length > 0 ? [{ $match: match }] : []),
       { $project: { effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-      { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
+      { $unwind: '$effectiveMerchantIds' },
       { $count: 'count' }
     ])
     .toArray();
@@ -2446,7 +2439,7 @@ async function handleGetStats(req, res, url, db) {
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $project: { categories: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-        { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
+        { $unwind: '$effectiveMerchantIds' },
         { $unwind: '$categories' },
         { $group: { _id: '$categories', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -2457,7 +2450,7 @@ async function handleGetStats(req, res, url, db) {
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $project: { eligibilities: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-        { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
+        { $unwind: '$effectiveMerchantIds' },
         { $unwind: '$eligibilities' },
         { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
