@@ -423,6 +423,148 @@ describe('handleSearch', () => {
     expect(meiliSearchMock).toHaveBeenCalledTimes(4);
   });
 
+  it('keeps an exact locationless Uber search result first when user coordinates are present', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+
+    const uberMerchant = {
+      merchantId: 'uber--merchant_69a6f6efb7ff0ecb9e33cf28',
+      merchantName: 'Uber',
+      merchantKey: 'uber',
+      aliases: ['Uber'],
+      categories: ['movilidad'],
+      banks: ['BBVA'],
+      locations: [],
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: true,
+      maxDiscountPercentage: 20,
+      searchProfile: {
+        aliases: ['Uber'],
+        description: 'Viajes y movilidad',
+        benefits: []
+      },
+      imageUrl: '',
+      logoUrl: '',
+      coverUrl: ''
+    };
+    const nearbyMerchants = [1, 2, 3].map((index) => ({
+      merchantId: `nearby_uber_${index}`,
+      merchantName: `Uber Cafe ${index}`,
+      merchantKey: `uber-cafe-${index}`,
+      aliases: [`Uber Cafe ${index}`],
+      categories: ['gastronomia'],
+      banks: ['BBVA'],
+      locations: [{ formattedAddress: `Store ${index}`, lat: -34.6037 + index * 0.001, lng: -58.3816 }],
+      activeBenefitCount: 1,
+      benefitCount: 1,
+      hasOnlineBenefits: false,
+      maxDiscountPercentage: 10,
+      searchProfile: {
+        aliases: [`Uber Cafe ${index}`],
+        description: 'Cafe cercano',
+        benefits: []
+      },
+      imageUrl: '',
+      logoUrl: '',
+      coverUrl: ''
+    }));
+    const nearbyHits = buildSearchDatasetFromMerchantDocs(nearbyMerchants)
+      .merchantDocuments
+      .map((hit) => ({ ...hit, _rankingScore: 1 }));
+
+    meiliSearchMock
+      .mockResolvedValueOnce({ hits: nearbyHits, estimatedTotalHits: nearbyHits.length })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    const benefits = [
+      {
+        id: 'benefit-uber',
+        merchantId: uberMerchant.merchantId,
+        eligibilities: [{
+          bank: 'bbva',
+          bankDisplayName: 'BBVA',
+          cardTypes: [],
+          cardResolutionStatus: 'not_required',
+          subscription: null,
+          subscriptionResolutionStatus: 'not_required'
+        }],
+        benefitTitle: '20% OFF en Uber',
+        availableDays: ['Lunes'],
+        discountPercentage: 20,
+        caps: [],
+        online: true,
+        otherDiscounts: null,
+        installments: null,
+        description: 'Promo Uber',
+        termsAndConditions: '',
+        link: null,
+        validUntil: '2099-12-31',
+      },
+      ...nearbyMerchants.map((merchant, index) => ({
+        id: `benefit-nearby-${index}`,
+        merchantId: merchant.merchantId,
+        eligibilities: [{
+          bank: 'bbva',
+          bankDisplayName: 'BBVA',
+          cardTypes: [],
+          cardResolutionStatus: 'not_required',
+          subscription: null,
+          subscriptionResolutionStatus: 'not_required'
+        }],
+        benefitTitle: '10% OFF cerca',
+        availableDays: ['Lunes'],
+        discountPercentage: 10,
+        caps: [],
+        online: false,
+        otherDiscounts: null,
+        installments: null,
+        description: 'Promo cercana',
+        termsAndConditions: '',
+        link: null,
+        validUntil: '2099-12-31',
+      }))
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            find(findQuery: unknown) {
+              return createCursor(
+                merchantMatchesRegexQuery(findQuery, uberMerchant) ? [uberMerchant] : []
+              );
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor(benefits);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=Uber&lat=-34.6037&lng=-58.3816&limit=4&offset=0&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.merchants[0].merchantId).toBe('uber--merchant_69a6f6efb7ff0ecb9e33cf28');
+    expect(payload.merchants[0].merchantName).toBe('Uber');
+    expect(payload.merchants[0].reasons).toContain('merchant_exact');
+    expect(payload.merchants[0].business.location).toEqual([]);
+    expect(payload.merchants[0].business.benefits).toHaveLength(1);
+    expect(payload.merchants.slice(1).every((merchant: { business: { distance: number } }) => Number.isFinite(merchant.business.distance))).toBe(true);
+  });
+
   it('hydrates search result benefits from confirmed benefits before returning merchants', async () => {
     isMeilisearchConfiguredMock.mockReturnValue(true);
     meiliSearchMock
