@@ -449,9 +449,45 @@ describe('merchant-first serverless helpers', () => {
     expect(invalidQueries[0]).toHaveProperty('merchantIds.1');
     expect(aggregatePipelines[0]).toEqual([
       { $project: { effectiveMerchantIds: expect.any(Object) } },
-      { $unwind: '$effectiveMerchantIds' },
+      { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
       { $count: 'count' },
     ]);
+  });
+
+  it('handleGetStats only treats meaningful singular merchant fields as invalid', async () => {
+    let invalidQuery: unknown;
+    const db = {
+      collection(name: string) {
+        if (name === 'confirmed_benefits') {
+          return {
+            async findOne(query: unknown) {
+              invalidQuery = query;
+              return null;
+            },
+            aggregate() {
+              return createAggregateCursor([{ count: 1 }]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/stats?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetStats({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(invalidQuery).toMatchObject({
+      'merchantIds.1': { $exists: true },
+      $or: [
+        { merchantId: { $exists: true, $nin: [null, ''] } },
+        { merchant: { $exists: true, $ne: null } },
+        { merchantSnapshot: { $exists: true, $ne: null } },
+      ],
+    });
   });
 
   it('handleGetBenefits keeps pagination document-based for shared merchantIds benefits', async () => {
@@ -514,6 +550,70 @@ describe('merchant-first serverless helpers', () => {
     expect(payload.benefits).toHaveLength(1);
     expect(payload.benefits[0].merchantIds).toEqual(['merchant_1', 'merchant_2']);
     expect(payload.benefits[0]).not.toHaveProperty('merchant');
+  });
+
+  it('handleGetBenefits accepts shared merchantIds benefits with null legacy merchant fields', async () => {
+    const benefits = [
+      {
+        id: 'shared-null-benefit',
+        merchantId: null,
+        merchantIds: ['merchant_1', 'merchant_2'],
+        merchant: null,
+        merchantSnapshot: null,
+        benefitTitle: '30% OFF compartido',
+        description: 'Promo',
+        online: true,
+        validUntil: '2099-12-31',
+      },
+    ];
+    const merchants = [
+      { merchantId: 'merchant_1', merchantName: 'Adidas' },
+      { merchantId: 'merchant_2', merchantName: 'Sporting' },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor(benefits);
+            },
+            async countDocuments() {
+              return 1;
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor(merchants);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.pagination.total).toBe(1);
+    expect(payload.benefits[0].id).toBe('shared-null-benefit');
+    expect(payload.benefits[0].merchantIds).toEqual(['merchant_1', 'merchant_2']);
   });
 
   it('transformRawBenefitToBenefit tolerates merchantIds without a singular merchant', () => {

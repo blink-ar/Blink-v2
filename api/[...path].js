@@ -612,15 +612,26 @@ function normalizeBenefitMerchantIds(value) {
   return ids;
 }
 
-function hasOwnField(value, field) {
-  return Boolean(value && Object.prototype.hasOwnProperty.call(value, field));
+function toNonEmptyString(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function hasMeaningfulSingularMerchantField(value, field) {
+  const fieldValue = value?.[field];
+  if (fieldValue === null || fieldValue === undefined) return false;
+  if (field === 'merchantId') return Boolean(toNonEmptyString(fieldValue));
+  if (typeof fieldValue === 'object') return Object.keys(fieldValue).length > 0;
+  return Boolean(toNonEmptyString(fieldValue));
 }
 
 function assertValidBenefitMerchantLinkage(benefit) {
   const merchantIds = normalizeBenefitMerchantIds(benefit?.merchantIds);
   if (merchantIds.length <= 1) return;
 
-  const singularFields = ['merchantId', 'merchant', 'merchantSnapshot'].filter((field) => hasOwnField(benefit, field));
+  const singularFields = ['merchantId', 'merchant', 'merchantSnapshot'].filter((field) =>
+    hasMeaningfulSingularMerchantField(benefit, field)
+  );
   if (singularFields.length === 0) return;
 
   const id = benefit?.id || benefit?._id?.toString?.() || '(unknown)';
@@ -685,9 +696,9 @@ function invalidMultiMerchantBenefitQuery() {
   return {
     'merchantIds.1': { $exists: true },
     $or: [
-      { merchantId: { $exists: true } },
-      { merchant: { $exists: true } },
-      { merchantSnapshot: { $exists: true } }
+      { merchantId: { $exists: true, $nin: [null, ''] } },
+      { merchant: { $exists: true, $ne: null } },
+      { merchantSnapshot: { $exists: true, $ne: null } }
     ]
   };
 }
@@ -745,7 +756,7 @@ async function countBenefitApplications(collection, match = {}) {
     .aggregate([
       ...(Object.keys(match).length > 0 ? [{ $match: match }] : []),
       { $project: { effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-      { $unwind: '$effectiveMerchantIds' },
+      { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
       { $count: 'count' }
     ])
     .toArray();
@@ -2376,7 +2387,7 @@ async function handleGetStats(req, res, url, db) {
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $project: { categories: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-        { $unwind: '$effectiveMerchantIds' },
+        { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
         { $unwind: '$categories' },
         { $group: { _id: '$categories', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -2387,7 +2398,7 @@ async function handleGetStats(req, res, url, db) {
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
         { $project: { eligibilities: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
-        { $unwind: '$effectiveMerchantIds' },
+        { $unwind: { path: '$effectiveMerchantIds', preserveNullAndEmptyArrays: true } },
         { $unwind: '$eligibilities' },
         { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
