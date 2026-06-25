@@ -848,6 +848,34 @@ function formatDistanceText(distance) {
   return `${Math.round(distance)}km`;
 }
 
+function enrichMerchantWithDistance(merchant, userLat, userLng) {
+  const validDistances = (Array.isArray(merchant?.locations) ? merchant.locations : [])
+    .filter((location) => Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng)))
+    .map((location) => haversineKm(
+      userLat,
+      userLng,
+      Number(location.lat),
+      Number(location.lng)
+    ));
+
+  if (validDistances.length === 0) {
+    return {
+      ...merchant,
+      distance: null,
+      distanceText: null,
+      isNearby: false
+    };
+  }
+
+  const distance = Math.min(...validDistances);
+  return {
+    ...merchant,
+    distance,
+    distanceText: formatDistanceText(distance),
+    isNearby: distance <= 50
+  };
+}
+
 const LOCAL_DISTANCE_RADIUS_KM = Number.parseFloat(process.env.SEARCH_LOCAL_DISTANCE_RADIUS_KM || '80');
 const DISTANT_RESULT_CUTOFF_KM = Number.parseFloat(process.env.SEARCH_DISTANT_RESULT_CUTOFF_KM || '120');
 const MIN_NEARBY_RESULTS_FOR_DISTANCE_PRUNING = Number.parseInt(
@@ -2575,11 +2603,34 @@ async function handleGetBusinesses(req, res, url, db) {
   };
   let pagedMerchants = [];
   if (hasLocation) {
+    const prioritySearchMerchants = search && !merchantId
+      ? (await merchantCollection
+        .find(
+          combineQueriesWithAnd(merchantQuery, {
+            $or: [
+              ...buildMerchantNameRescueClauses(buildMerchantNameRescuePatterns(normalizeSearchText(search))),
+              ...buildMerchantNameRescueClauses(buildMerchantNameRescuePatterns(normalizeSearchText(search), { prefix: true }))
+            ]
+          }),
+          { projection: merchantProjection }
+        )
+        .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
+        .limit(MERCHANT_EXACT_RESCUE_LIMIT)
+        .toArray()).map((merchant) => enrichMerchantWithDistance(merchant, userLat, userLng))
+      : [];
+    const priorityMerchantIds = new Set(prioritySearchMerchants.map((merchant) => merchant.merchantId).filter(Boolean));
+    const priorityPage = prioritySearchMerchants.slice(offsetNum, offsetNum + limitNum);
+    const remainingLimit = Math.max(limitNum - priorityPage.length, 0);
+    const locationOffset = Math.max(offsetNum - prioritySearchMerchants.length, 0);
+    const locationQuery = priorityMerchantIds.size > 0
+      ? combineQueriesWithAnd(merchantQuery, { merchantId: { $nin: Array.from(priorityMerchantIds) } })
+      : merchantQuery;
+
     try {
       const usableGeoMatch = buildUsableGeoMatch();
-      const withGeoQuery = combineQueriesWithAnd(merchantQuery, usableGeoMatch);
-      const withoutGeoQuery = combineQueriesWithAnd(merchantQuery, buildMissingGeoMatch());
-      const withGeo = limitNum > 0
+      const withGeoQuery = combineQueriesWithAnd(locationQuery, usableGeoMatch);
+      const withoutGeoQuery = combineQueriesWithAnd(locationQuery, buildMissingGeoMatch());
+      const withGeo = remainingLimit > 0
         ? await merchantCollection
           .aggregate([
             {
@@ -2591,8 +2642,8 @@ async function handleGetBusinesses(req, res, url, db) {
                 query: withGeoQuery
               }
             },
-            { $skip: offsetNum },
-            { $limit: limitNum },
+            { $skip: locationOffset },
+            { $limit: remainingLimit },
             {
               $project: {
                 ...merchantProjection,
@@ -2604,12 +2655,12 @@ async function handleGetBusinesses(req, res, url, db) {
         : [];
 
       let withoutGeoOffset = 0;
-      if (offsetNum > 0 && withGeo.length < limitNum) {
+      if (locationOffset > 0 && withGeo.length < remainingLimit) {
         const withGeoCount = await merchantCollection.countDocuments(withGeoQuery);
-        withoutGeoOffset = Math.max(offsetNum - withGeoCount, 0);
+        withoutGeoOffset = Math.max(locationOffset - withGeoCount, 0);
       }
 
-      const withoutGeoLimit = Math.max(limitNum - withGeo.length, 0);
+      const withoutGeoLimit = Math.max(remainingLimit - withGeo.length, 0);
       const withoutGeo = withoutGeoLimit > 0
         ? await merchantCollection
           .find(withoutGeoQuery, { projection: merchantProjection })
@@ -2631,7 +2682,7 @@ async function handleGetBusinesses(req, res, url, db) {
         distanceText: null,
         isNearby: false
       }));
-      pagedMerchants = [...merchantsWithDistance, ...merchantsWithoutDistance];
+      pagedMerchants = [...priorityPage, ...merchantsWithDistance, ...merchantsWithoutDistance];
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const missingGeoIndex = message.includes('unable to find index for $geoNear query');
@@ -2642,37 +2693,11 @@ async function handleGetBusinesses(req, res, url, db) {
       console.warn('[businesses] Falling back to in-memory distance sort because geoPoints is not indexed');
 
       const merchants = await merchantCollection
-        .find(merchantQuery, { projection: merchantProjection })
+        .find(locationQuery, { projection: merchantProjection })
         .toArray();
 
       pagedMerchants = merchants
-        .map((merchant) => {
-          const validDistances = (Array.isArray(merchant.locations) ? merchant.locations : [])
-            .filter((location) => Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng)))
-            .map((location) => haversineKm(
-              userLat,
-              userLng,
-              Number(location.lat),
-              Number(location.lng)
-            ));
-
-          if (validDistances.length === 0) {
-            return {
-              ...merchant,
-              distance: null,
-              distanceText: null,
-              isNearby: false
-            };
-          }
-
-          const distance = Math.min(...validDistances);
-          return {
-            ...merchant,
-            distance,
-            distanceText: formatDistanceText(distance),
-            isNearby: distance <= 50
-          };
-        })
+        .map((merchant) => enrichMerchantWithDistance(merchant, userLat, userLng))
         .sort((left, right) => {
           const leftDistance = Number.isFinite(left.distance) ? left.distance : Number.POSITIVE_INFINITY;
           const rightDistance = Number.isFinite(right.distance) ? right.distance : Number.POSITIVE_INFINITY;
@@ -2681,7 +2706,8 @@ async function handleGetBusinesses(req, res, url, db) {
           }
           return String(left.merchantName || '').localeCompare(String(right.merchantName || ''));
         })
-        .slice(offsetNum, offsetNum + limitNum);
+        .slice(locationOffset, locationOffset + remainingLimit);
+      pagedMerchants = [...priorityPage, ...pagedMerchants];
     }
   } else {
     pagedMerchants = await merchantCollection
