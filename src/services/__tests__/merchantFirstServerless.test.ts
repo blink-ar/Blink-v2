@@ -1297,6 +1297,7 @@ describe('merchant-first serverless helpers', () => {
 
   it('handleCategorySeoPage returns crawlable HTML with merchant links', async () => {
     const merchantQueries: unknown[] = [];
+    const merchantSorts: unknown[] = [];
     const merchant = {
       merchantId: 'merchant_1',
       merchantName: 'Coto',
@@ -1326,7 +1327,22 @@ describe('merchant-first serverless helpers', () => {
             },
             find(query: unknown) {
               merchantQueries.push(query);
-              return createCursor([merchant]);
+              const cursor = {
+                sort(sortSpec: unknown) {
+                  merchantSorts.push(sortSpec);
+                  return cursor;
+                },
+                skip() {
+                  return cursor;
+                },
+                limit() {
+                  return cursor;
+                },
+                async toArray() {
+                  return [merchant];
+                }
+              };
+              return cursor;
             }
           };
         }
@@ -1356,7 +1372,13 @@ describe('merchant-first serverless helpers', () => {
       isActive: { $ne: false },
       merchantId: { $exists: true, $type: 'string' },
       benefitCount: { $gt: 0 },
-      categories: { $in: ['shopping'] }
+      categories: 'shopping'
+    });
+    expect(merchantSorts[0]).toEqual({
+      maxDiscountPercentage: -1,
+      activeBenefitCount: -1,
+      benefitCount: -1,
+      merchantName: 1
     });
   });
 

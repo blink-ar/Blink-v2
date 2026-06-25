@@ -530,8 +530,8 @@ function BusinessDetailPage() {
 {/* ── Content ── */}
       <main
         ref={containerRef}
-        className="flex-1 pb-4 lg:min-w-0 lg:overflow-visible lg:pb-0"
-        style={{ overflowY: 'auto', overscrollBehavior: 'contain' }}
+        className="flex-1 overflow-y-auto pb-4 lg:min-w-0 lg:overflow-visible lg:pb-0"
+        style={{ overscrollBehavior: 'contain' }}
       >
 
         {/* Grouped by bank — default view */}

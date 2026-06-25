@@ -72,7 +72,7 @@ interface DesktopSearchFiltersProps {
   hasInstallments: boolean | undefined;
   sortByDistance: boolean;
   activeFilterCount: number;
-  permissionDenied: boolean;
+  hasPosition: boolean;
   onBanksChange: (tokens: string[]) => void;
   onCategoryChange: (category: string) => void;
   onMinDiscountChange: (value: number | undefined) => void;
@@ -96,7 +96,7 @@ function DesktopSearchFilters({
   hasInstallments,
   sortByDistance,
   activeFilterCount,
-  permissionDenied,
+  hasPosition,
   onBanksChange,
   onCategoryChange,
   onMinDiscountChange,
@@ -117,8 +117,11 @@ function DesktopSearchFilters({
   };
 
   const handleDistanceToggle = () => {
-    if (permissionDenied) onRequestPermission();
-    onSortByDistanceChange(!sortByDistance);
+    const next = !sortByDistance;
+    onSortByDistanceChange(next);
+    // Request location only on this explicit gesture, and only if we don't
+    // already have a position.
+    if (next && !hasPosition) onRequestPermission();
   };
 
   const Toggle = ({
@@ -358,13 +361,16 @@ function SearchPage() {
   const [cardMode, setCardMode] = useState<'credit' | 'debit' | undefined>((searchParams.get('card') || undefined) as 'credit' | 'debit' | undefined);
   const [network] = useState<string | undefined>(searchParams.get('network') || undefined);
   const [hasInstallments, setHasInstallments] = useState<boolean | undefined>(searchParams.get('installments') === '1' ? true : undefined);
-  const [sortByDistance, setSortByDistance] = useState(() => {
-    if (searchParams.get('nearby') === '1') return true;
-    if (!searchParams.has('nearby')) {
-      return localStorage.getItem('locationPermission') === 'granted';
-    }
-    return false;
-  });
+  // Proximity sort is enabled only via explicit intent: a `nearby=1` deeplink
+  // (e.g. the "Cerca tuyo" pill on Home) or tapping the "Cerca" pill here. We do
+  // NOT derive it from a stored `locationPermission=granted` flag — that flag can
+  // be stale (browser reset to 'prompt'), which would leave the pill active
+  // without a usable position and make the first tap turn it off instead of
+  // requesting location. Returning granted users still get geohash-based
+  // proximity ordering silently, and a tap upgrades to exact distance sort.
+  const [sortByDistance, setSortByDistance] = useState(
+    () => searchParams.get('nearby') === '1',
+  );
 
   const { data: availableBankNames = [] } = useQuery({
     queryKey: ['availableBanks'],
@@ -407,7 +413,15 @@ function SearchPage() {
     window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(selectedBanks));
   }, [selectedBanks]);
 
-  const { position, permissionDenied, requestPermission } = useGeolocation();
+  // A `nearby=1` deeplink (e.g. the "Cerca tuyo" pill on Home) is an explicit
+  // proximity intent, so we let the hook prompt for permission on mount. We
+  // capture it once: later URL syncs (toggling the pill writes nearby=1) must
+  // not flip this on and re-trigger the request. Note this is intentionally NOT
+  // derived from a stale `locationPermission=granted` in localStorage — that
+  // would re-introduce an unprompted request on load; truly-granted permission
+  // is reused silently by the hook instead.
+  const [nearbyDeeplink] = useState(() => searchParams.get('nearby') === '1');
+  const { position, requestPermission } = useGeolocation({ autoRequest: nearbyDeeplink });
 
   const {
     businesses,
@@ -1017,6 +1031,9 @@ function SearchPage() {
     setOnlineOnly(values.onlineOnly);
     setHasInstallments(values.hasInstallments);
     setSortByDistance(values.sortByDistance);
+    // Enabling proximity from the full filter sheet is an explicit gesture too:
+    // request location if it's newly turned on and we don't have a position yet.
+    if (values.sortByDistance && !sortByDistance && !position) requestPermission();
     setShowFilters(false);
   };
 
@@ -1193,12 +1210,11 @@ function SearchPage() {
                 <button
                   key="proximity"
                   onClick={() => {
-                    if (permissionDenied) {
-                      requestPermission();
-                      setSortByDistance(true);
-                    } else {
-                      setSortByDistance(!sortByDistance);
-                    }
+                    const next = !sortByDistance;
+                    setSortByDistance(next);
+                    // Request location only now, on this explicit gesture, and
+                    // only if we don't already have a position.
+                    if (next && !position) requestPermission();
                   }}
                   className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                     sortByDistance
@@ -1333,7 +1349,7 @@ function SearchPage() {
           hasInstallments={hasInstallments}
           sortByDistance={sortByDistance}
           activeFilterCount={activeFilterCount}
-          permissionDenied={permissionDenied}
+          hasPosition={position !== null}
           onBanksChange={setSelectedBanks}
           onCategoryChange={setSelectedCategory}
           onMinDiscountChange={setMinDiscount}

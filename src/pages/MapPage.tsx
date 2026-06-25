@@ -93,7 +93,11 @@ function MapPage() {
   const { isDesktop } = useResponsive();
   const focusBusinessId = searchParams.get('business');
 
-  const { position } = useGeolocation();
+  // Auto-request location only on the general map (where the user's intent is
+  // "show me nearby places"). In single-business mode (?business=...) the map
+  // can center on the merchant's markers without user coordinates, so prompting
+  // on mount would be invasive.
+  const { position } = useGeolocation({ autoRequest: !focusBusinessId });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');

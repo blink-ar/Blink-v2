@@ -130,7 +130,9 @@ const fetchBusinessForRouteId = async (routeId: string): Promise<Business | null
 const parseTopeAmount = (tope: unknown): number | null => {
   if (tope == null) return null;
   const s = String(tope).trim();
-  if (!s || /sin tope|sin l[ií]mite/i.test(s)) return null;
+  if (!s || /sin tope|sin l[í­]mite/i.test(s)) return null;
+  // Only parse purely numeric/currency strings — reject free-text descriptions
+  if (!/^\$?[\d.,\s]+$/.test(s)) return null;
   // Argentine format: "." = thousands separator, "," = decimal
   const cleaned = s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
   const num = parseFloat(cleaned);
@@ -423,11 +425,18 @@ function BenefitDetailPage() {
   const bankAccent = getBankAccent(providerName);
 
   const topeStr = benefit.tope != null ? String(benefit.tope) : '';
-  const isNoLimit = !topeStr || /sin tope|sin l[ií]mite/i.test(topeStr);
+  // tope: 0 is the backend sentinel for "no cap" (same as null)
+  const isNoLimit = !topeStr || benefit.tope === 0 || /sin tope|sin l[í­]mite/i.test(topeStr);
   const topeAmount = !isNoLimit ? parseTopeAmount(topeStr) : null;
-  const maxSpend = topeAmount && discount > 0 ? topeAmount / (discount / 100) : null;
-  const paymentMethod = getPaymentMethod(benefit);
   const minPurchaseAmount = benefit.minimumPurchaseAmount?.amount ?? null;
+  const isFalsePositiveCap = topeAmount !== null && topeAmount === minPurchaseAmount;
+  const maxSpend = topeAmount && !isFalsePositiveCap && discount > 0 ? topeAmount / (discount / 100) : null;
+  const paymentMethod = getPaymentMethod(benefit);
+  // caps with amount: 0 are backend sentinels for "no cap"; only non-zero amounts count
+  const hasTransactionCap = (benefit.caps ?? []).some(
+    c => c != null && c.resetsEvery !== 'PER_USER' && c.resetsEvery !== 'OTHER' && typeof c.amount === 'number' && c.amount > 0,
+  );
+  const hasAnyCap = (benefit.caps ?? []).some(c => c != null && typeof c.amount === 'number' && c.amount > 0);
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -666,11 +675,16 @@ function BenefitDetailPage() {
 
               <div className="divide-y divide-blink-border">
 
-                {/* Tope descuento */}
-                {!isNoLimit && benefit.tope && (
+                {/* Tope descuento (PER_TXN cap) */}
+                {(
+                  (!isNoLimit && benefit.tope && !isFalsePositiveCap) ||
+                  (discount > 0 && (benefit.tope === 0 || (!!topeStr && /sin tope|sin l[í­]mite/i.test(topeStr))) && !hasAnyCap)
+                ) && (
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-blink-muted">Tope descuento</span>
-                    <span className="text-sm font-semibold text-blink-ink">{benefit.tope}</span>
+                    <span className="text-sm font-semibold text-blink-ink">
+                      {(!benefit.tope || isNoLimit) ? 'Sin tope de reintegro' : (topeAmount !== null ? formatArgentinePeso(topeAmount) : String(benefit.tope))}
+                    </span>
                   </div>
                 )}
 
@@ -918,7 +932,7 @@ function BenefitDetailPage() {
           {discount > 0 && (
             <SavingsSimulator
               discountPercentage={discount}
-              maxCap={benefit.tope || null}
+              maxCap={isFalsePositiveCap ? null : (benefit.tope || null)}
               installments={benefit.installments}
             />
           )}
