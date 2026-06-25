@@ -93,10 +93,11 @@ function MapPage() {
   const { isDesktop } = useResponsive();
   const focusBusinessId = searchParams.get('business');
 
-  // The map is centered on the user's location, so entering it is a clear
-  // intent — prompt for permission here (unlike Home/Search/Detail, which only
-  // reuse a previously granted permission).
-  const { position } = useGeolocation({ autoRequest: true });
+  // Auto-request location only on the general map (where the user's intent is
+  // "show me nearby places"). In single-business mode (?business=...) the map
+  // can center on the merchant's markers without user coordinates, so prompting
+  // on mount would be invasive.
+  const { position } = useGeolocation({ autoRequest: !focusBusinessId });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
