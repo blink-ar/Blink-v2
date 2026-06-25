@@ -70,17 +70,17 @@ function expectAnyRegexMatches(patterns: RegExp[], value: string) {
 }
 
 function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
-  expect(query).toMatchObject({
-    $or: [
+  expect(query).toHaveProperty('$or');
+  expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
       { merchantIds: { $in: merchantIds } },
+      { $expr: expect.any(Object) },
       {
         $and: [
           { merchantId: { $in: merchantIds } },
           { $expr: expect.any(Object) },
         ],
       },
-    ],
-  });
+  ]));
 }
 
 function createPaginatedCursor<T>(data: T[]) {
@@ -637,6 +637,7 @@ describe('merchant-first serverless helpers', () => {
 
     expect(benefit.id).toBe('benefit-object-id');
     expect(benefit.merchant.name).toBe('Unknown Merchant');
+    expect(benefit.merchantIds).toEqual(['merchant_1', 'merchant_2']);
     expect(benefit.categories).toEqual(['deportes']);
   });
 

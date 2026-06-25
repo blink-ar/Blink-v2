@@ -642,15 +642,26 @@ function trimMongoStringExpression(input) {
 
 function normalizedMerchantIdsExpression(input = '$merchantIds') {
   return {
-    $filter: {
-      input: {
-        $cond: [{ $isArray: input }, input, []]
+    $setUnion: [
+      {
+        $filter: {
+          input: {
+            $map: {
+              input: {
+                $cond: [{ $isArray: input }, input, []]
+              },
+              as: 'merchantId',
+              in: trimMongoStringExpression('$$merchantId')
+            }
+          },
+          as: 'merchantId',
+          cond: {
+            $ne: ['$$merchantId', '']
+          }
+        }
       },
-      as: 'merchantId',
-      cond: {
-        $ne: [trimMongoStringExpression('$$merchantId'), '']
-      }
-    }
+      []
+    ]
   };
 }
 
@@ -734,6 +745,14 @@ function buildBenefitMerchantLinkQueryForIds(merchantIds) {
     $or: [
       { merchantIds: { $in: ids } },
       {
+        $expr: {
+          $gt: [
+            { $size: { $setIntersection: [normalizedMerchantIdsExpression('$merchantIds'), ids] } },
+            0
+          ]
+        }
+      },
+      {
         $and: [
           { merchantId: { $in: ids } },
           missingOrEmptyMerchantIdsQuery()
@@ -764,20 +783,15 @@ function effectiveMerchantIdsExpression() {
     $let: {
       vars: {
         merchantIds: normalizedMerchantIdsExpression('$merchantIds'),
-        legacyMerchantId: '$merchantId'
+        legacyMerchantId: trimMongoStringExpression('$merchantId')
       },
       in: {
         $cond: [
           { $gt: [{ $size: '$$merchantIds' }, 0] },
-          { $setUnion: ['$$merchantIds', []] },
+          '$$merchantIds',
           {
             $cond: [
-              {
-                $and: [
-                  { $ne: ['$$legacyMerchantId', null] },
-                  { $ne: ['$$legacyMerchantId', ''] }
-                ]
-              },
+              { $ne: ['$$legacyMerchantId', ''] },
               ['$$legacyMerchantId'],
               []
             ]

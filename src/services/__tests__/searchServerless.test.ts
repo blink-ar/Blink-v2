@@ -49,17 +49,17 @@ function createCursor<T>(data: T[]) {
 }
 
 function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
-  expect(query).toMatchObject({
-    $or: [
+  expect(query).toHaveProperty('$or');
+  expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
       { merchantIds: { $in: merchantIds } },
+      { $expr: expect.any(Object) },
       {
         $and: [
           { merchantId: { $in: merchantIds } },
           { $expr: expect.any(Object) },
         ],
       },
-    ],
-  });
+  ]));
 }
 
 function buildMerchantDoc(merchantId: string, merchantName: string, rankingScore?: number) {
