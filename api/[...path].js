@@ -625,6 +625,65 @@ function hasMeaningfulSingularMerchantField(value, field) {
   return Boolean(toNonEmptyString(fieldValue));
 }
 
+function trimMongoStringExpression(input) {
+  return {
+    $trim: {
+      input: {
+        $convert: {
+          input,
+          to: 'string',
+          onError: '',
+          onNull: ''
+        }
+      }
+    }
+  };
+}
+
+function normalizedMerchantIdsExpression(input = '$merchantIds') {
+  return {
+    $filter: {
+      input: {
+        $cond: [{ $isArray: input }, input, []]
+      },
+      as: 'merchantId',
+      cond: {
+        $ne: [trimMongoStringExpression('$$merchantId'), '']
+      }
+    }
+  };
+}
+
+function meaningfulSingularMerchantFieldExpression(path) {
+  return {
+    $let: {
+      vars: {
+        value: { $ifNull: [path, null] },
+        valueType: { $type: { $ifNull: [path, null] } }
+      },
+      in: {
+        $switch: {
+          branches: [
+            {
+              case: { $eq: ['$$valueType', 'null'] },
+              then: false
+            },
+            {
+              case: { $eq: ['$$valueType', 'object'] },
+              then: { $gt: [{ $size: { $objectToArray: '$$value' } }, 0] }
+            },
+            {
+              case: { $eq: ['$$valueType', 'array'] },
+              then: { $gt: [{ $size: '$$value' }, 0] }
+            }
+          ],
+          default: { $ne: [trimMongoStringExpression('$$value'), ''] }
+        }
+      }
+    }
+  };
+}
+
 function assertValidBenefitMerchantLinkage(benefit) {
   const merchantIds = normalizeBenefitMerchantIds(benefit?.merchantIds);
   if (merchantIds.length <= 1) return;
@@ -663,11 +722,7 @@ function collectEffectiveBenefitMerchantIds(benefits) {
 
 function missingOrEmptyMerchantIdsQuery() {
   return {
-    $or: [
-      { merchantIds: { $exists: false } },
-      { merchantIds: null },
-      { merchantIds: { $size: 0 } }
-    ]
+    $expr: { $eq: [{ $size: normalizedMerchantIdsExpression('$merchantIds') }, 0] }
   };
 }
 
@@ -695,10 +750,11 @@ function buildBenefitMerchantLinkQuery(merchantId) {
 function invalidMultiMerchantBenefitQuery() {
   return {
     'merchantIds.1': { $exists: true },
+    $expr: { $gt: [{ $size: normalizedMerchantIdsExpression('$merchantIds') }, 1] },
     $or: [
-      { merchantId: { $exists: true, $nin: [null, ''] } },
-      { merchant: { $exists: true, $ne: null } },
-      { merchantSnapshot: { $exists: true, $ne: null } }
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchantId') },
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchant') },
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchantSnapshot') }
     ]
   };
 }
@@ -707,18 +763,7 @@ function effectiveMerchantIdsExpression() {
   return {
     $let: {
       vars: {
-        merchantIds: {
-          $filter: {
-            input: { $ifNull: ['$merchantIds', []] },
-            as: 'merchantId',
-            cond: {
-              $and: [
-                { $ne: ['$$merchantId', null] },
-                { $ne: ['$$merchantId', ''] }
-              ]
-            }
-          }
-        },
+        merchantIds: normalizedMerchantIdsExpression('$merchantIds'),
         legacyMerchantId: '$merchantId'
       },
       in: {

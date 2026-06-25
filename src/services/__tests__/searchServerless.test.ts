@@ -55,13 +55,7 @@ function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
       {
         $and: [
           { merchantId: { $in: merchantIds } },
-          {
-            $or: [
-              { merchantIds: { $exists: false } },
-              { merchantIds: null },
-              { merchantIds: { $size: 0 } },
-            ],
-          },
+          { $expr: expect.any(Object) },
         ],
       },
     ],

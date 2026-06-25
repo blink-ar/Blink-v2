@@ -76,13 +76,7 @@ function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
       {
         $and: [
           { merchantId: { $in: merchantIds } },
-          {
-            $or: [
-              { merchantIds: { $exists: false } },
-              { merchantIds: null },
-              { merchantIds: { $size: 0 } },
-            ],
-          },
+          { $expr: expect.any(Object) },
         ],
       },
     ],
@@ -482,12 +476,14 @@ describe('merchant-first serverless helpers', () => {
     expect(res.statusCode).toBe(200);
     expect(invalidQuery).toMatchObject({
       'merchantIds.1': { $exists: true },
+      $expr: expect.any(Object),
       $or: [
-        { merchantId: { $exists: true, $nin: [null, ''] } },
-        { merchant: { $exists: true, $ne: null } },
-        { merchantSnapshot: { $exists: true, $ne: null } },
+        { $expr: expect.any(Object) },
+        { $expr: expect.any(Object) },
+        { $expr: expect.any(Object) },
       ],
     });
+    expect(JSON.stringify(invalidQuery)).toContain('$objectToArray');
   });
 
   it('handleGetBenefits keeps pagination document-based for shared merchantIds benefits', async () => {
