@@ -17,6 +17,7 @@ export interface BankBenefit {
   originalAnalyzedText?: string;
   description?: string;
   installments?: number | null;
+  merchantIds?: string[];
 }
 
 export interface Business {

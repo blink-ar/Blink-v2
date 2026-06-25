@@ -120,10 +120,18 @@ export interface RawBankSubscription {
 
 export interface RawMongoBenefit {
     _id: MongoObjectId;
-    merchant: {
+    merchant?: {
         name: string;
         type: string;
     };
+    merchantId?: string | null;
+    merchantIds?: string[];
+    merchantSnapshot?: {
+        merchantId?: string;
+        merchantKey?: string;
+        merchantName?: string;
+        kind?: string;
+    } | null;
     bank: string;
     network: string;
     cardTypes: {
