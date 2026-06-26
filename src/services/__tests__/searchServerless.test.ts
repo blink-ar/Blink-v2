@@ -48,6 +48,19 @@ function createCursor<T>(data: T[]) {
   return cursor;
 }
 
+function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
+  expect(query).toHaveProperty('$or');
+  expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
+      { merchantIds: { $in: merchantIds } },
+      {
+        $and: [
+          { merchantId: { $in: merchantIds } },
+          { $expr: expect.any(Object) },
+        ],
+      },
+  ]));
+}
+
 function buildMerchantDoc(merchantId: string, merchantName: string, rankingScore?: number) {
   const merchant = {
     merchantId,
@@ -684,10 +697,110 @@ describe('handleSearch', () => {
       'Banco Galicia',
       'Naranja X'
     ]);
-    expect(benefitFindQuery).toMatchObject({
-      merchantId: { $in: ['merchant_sporting'] }
-    });
+    expectBenefitQueryForMerchants(benefitFindQuery, ['merchant_sporting']);
     expect(benefitFindQuery).toHaveProperty('$and.0.$expr');
+  });
+
+  it('hydrates shared merchantIds benefits for every linked search merchant', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+    meiliSearchMock
+      .mockResolvedValueOnce({
+        hits: [
+          {
+            ...buildMerchantDoc('merchant_adidas', 'Adidas', 1),
+            business: {
+              id: 'merchant_adidas',
+              name: 'Adidas',
+              category: 'deportes',
+              description: '',
+              rating: 5,
+              location: [],
+              image: '',
+              benefits: []
+            }
+          },
+          {
+            ...buildMerchantDoc('merchant_sporting', 'Sporting', 0.9),
+            business: {
+              id: 'merchant_sporting',
+              name: 'Sporting',
+              category: 'deportes',
+              description: '',
+              rating: 5,
+              location: [],
+              image: '',
+              benefits: []
+            }
+          }
+        ],
+        estimatedTotalHits: 2
+      })
+      .mockResolvedValueOnce({ hits: [] })
+      .mockResolvedValueOnce({ hits: [] });
+
+    let benefitFindQuery: unknown;
+    const sharedBenefit = {
+      id: 'shared-benefit',
+      merchantIds: ['merchant_adidas', 'merchant_sporting'],
+      eligibilities: [{
+        bank: 'galicia',
+        bankDisplayName: 'Banco Galicia',
+        cardTypes: [],
+        cardResolutionStatus: 'not_required',
+        subscription: null,
+        subscriptionResolutionStatus: 'not_required'
+      }],
+      benefitTitle: '30% OFF compartido',
+      availableDays: ['Lunes'],
+      discountPercentage: 30,
+      caps: [],
+      online: true,
+      otherDiscounts: null,
+      installments: null,
+      description: 'Promo compartida',
+      termsAndConditions: '',
+      link: null,
+      validUntil: '2099-12-31',
+    };
+
+    const db = {
+      collection(name: string) {
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor([]);
+            }
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitFindQuery = query;
+              return createCursor([sharedBenefit]);
+            }
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/search?q=deportes&limit=20&offset=0&collection=confirmed_benefits');
+
+    await handleSearch({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.merchants).toHaveLength(2);
+    expect(payload.merchants.every((merchant: { business: { benefits: unknown[] } }) => merchant.business.benefits.length === 1)).toBe(true);
+    expect(payload.merchants.map((merchant: { business: { benefits: Array<{ id: string }> } }) => merchant.business.benefits[0].id)).toEqual([
+      'shared-benefit',
+      'shared-benefit'
+    ]);
+    expect(payload.merchants[0].business.benefits[0].merchantIds).toEqual(['merchant_adidas', 'merchant_sporting']);
+    expectBenefitQueryForMerchants(benefitFindQuery, ['merchant_adidas', 'merchant_sporting']);
   });
 
   it.each([

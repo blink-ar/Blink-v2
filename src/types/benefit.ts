@@ -4,10 +4,18 @@
  */
 export interface RawBenefit {
     _id: { $oid: string };
-    merchant: {
+    merchant?: {
         name: string;
         type: string;
     };
+    merchantId?: string | null;
+    merchantIds?: string[];
+    merchantSnapshot?: {
+        merchantId?: string;
+        merchantKey?: string;
+        merchantName?: string;
+        kind?: string;
+    } | null;
     eligibilities: Array<{
         bank: string;
         bankDisplayName: string;

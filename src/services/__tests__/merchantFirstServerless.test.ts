@@ -7,6 +7,7 @@ import {
   handleGetBanks,
   handleGetBenefits,
   handleGetBusinesses,
+  handleGetStats,
   handleDiscountSearchGuideSeoPage,
   handleHomeSeoPage,
   handleLegacyBusinessRedirect,
@@ -17,6 +18,7 @@ import {
   resolveRequestPath,
   rehydrateBenefitDoc
 } from '../../../api/[...path].js';
+import { transformRawBenefitToBenefit } from '../../types/mongodb';
 
 const merchantSeoAppShell = [
   '<!doctype html>',
@@ -65,6 +67,19 @@ function createCursor<T>(data: T[]) {
 
 function expectAnyRegexMatches(patterns: RegExp[], value: string) {
   expect(patterns.some((pattern) => pattern.test(value))).toBe(true);
+}
+
+function expectBenefitQueryForMerchants(query: unknown, merchantIds: string[]) {
+  expect(query).toHaveProperty('$or');
+  expect((query as { $or: unknown[] }).$or).toEqual(expect.arrayContaining([
+      { merchantIds: { $in: merchantIds } },
+      {
+        $and: [
+          { merchantId: { $in: merchantIds } },
+          { $expr: expect.any(Object) },
+        ],
+      },
+  ]));
 }
 
 function createPaginatedCursor<T>(data: T[]) {
@@ -270,7 +285,359 @@ describe('merchant-first serverless helpers', () => {
     expect(payload.businesses[0].id).toBe('merchant_1');
     expect(payload.businesses[0].benefits).toHaveLength(1);
     expect((merchantQueries[0] as { categories: unknown }).categories).toEqual({ $in: ['shopping'] });
-    expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+    expectBenefitQueryForMerchants(benefitQueries[0], ['merchant_1']);
+  });
+
+  it('handleGetBusinesses attaches a shared merchantIds benefit under every linked merchant', async () => {
+    const benefitQueries: unknown[] = [];
+    const merchants = [
+      {
+        merchantId: 'merchant_1',
+        merchantName: 'Adidas',
+        merchantKey: 'adidas',
+        categories: ['deportes'],
+        locations: [],
+        banks: ['BBVA'],
+        searchProfile: { description: 'Sportswear' },
+        activeBenefitCount: 1,
+        benefitCount: 1,
+        hasOnlineBenefits: true,
+      },
+      {
+        merchantId: 'merchant_2',
+        merchantName: 'Sporting',
+        merchantKey: 'sporting',
+        categories: ['deportes'],
+        locations: [],
+        banks: ['BBVA'],
+        searchProfile: { description: 'Sports store' },
+        activeBenefitCount: 1,
+        benefitCount: 1,
+        hasOnlineBenefits: true,
+      },
+    ];
+    const sharedBenefit = {
+      id: 'shared-benefit',
+      merchantIds: ['merchant_1', 'merchant_2'],
+      eligibilities: [{
+        bank: 'bbva',
+        bankDisplayName: 'BBVA',
+        cardTypes: [],
+        cardResolutionStatus: 'not_required',
+        subscription: null,
+        subscriptionResolutionStatus: 'not_required',
+      }],
+      benefitTitle: '30% OFF compartido',
+      availableDays: ['Lunes'],
+      discountPercentage: 30,
+      caps: [],
+      online: true,
+      otherDiscounts: null,
+      installments: null,
+      description: 'Promo',
+      termsAndConditions: '',
+      link: null,
+      validUntil: '2099-12-31',
+    };
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([{ key: 'bbva', name: 'BBVA', shortName: 'BBVA' }]);
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            async countDocuments() {
+              return merchants.length;
+            },
+            find() {
+              return createCursor(merchants);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find(query: unknown) {
+              benefitQueries.push(query);
+              return createCursor([sharedBenefit]);
+            },
+          };
+        }
+
+        if (name === 'bank_cards') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/businesses?collection=confirmed_benefits&limit=2&offset=0');
+
+    await handleGetBusinesses({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.businesses).toHaveLength(2);
+    expect(payload.businesses.map((business: { id: string }) => business.id)).toEqual(['merchant_1', 'merchant_2']);
+    expect(payload.businesses.every((business: { benefits: unknown[] }) => business.benefits.length === 1)).toBe(true);
+    expect(payload.businesses.map((business: { benefits: Array<{ id: string }> }) => business.benefits[0].id)).toEqual([
+      'shared-benefit',
+      'shared-benefit',
+    ]);
+    expect(payload.businesses[0].benefits[0].merchantIds).toEqual(['merchant_1', 'merchant_2']);
+    expectBenefitQueryForMerchants(benefitQueries[0], ['merchant_1', 'merchant_2']);
+  });
+
+  it('handleGetStats counts merchant-benefit applications instead of benefit documents', async () => {
+    const invalidQueries: unknown[] = [];
+    const aggregatePipelines: unknown[][] = [];
+    const db = {
+      collection(name: string) {
+        if (name === 'confirmed_benefits') {
+          return {
+            async findOne(query: unknown) {
+              invalidQueries.push(query);
+              return null;
+            },
+            aggregate(pipeline: unknown[]) {
+              aggregatePipelines.push(pipeline);
+              const serialized = JSON.stringify(pipeline);
+              if (serialized.includes('"online":true')) return createAggregateCursor([{ count: 3 }]);
+              if (serialized.includes('"online":false')) return createAggregateCursor([{ count: 1 }]);
+              if (serialized.includes('"$categories"')) return createAggregateCursor([{ _id: 'deportes', count: 4 }]);
+              if (serialized.includes('"$eligibilities"')) return createAggregateCursor([{ _id: 'bbva', count: 4 }]);
+              return createAggregateCursor([{ count: 4 }]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/stats?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetStats({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.stats.totalBenefits).toBe(4);
+    expect(payload.stats.onlineBenefits).toBe(3);
+    expect(payload.stats.physicalBenefits).toBe(1);
+    expect(payload.stats.topCategories[0]).toEqual({ category: 'deportes', count: 4 });
+    expect(payload.stats.topBanks[0]).toEqual({ bank: 'bbva', count: 4 });
+    expect(invalidQueries[0]).toHaveProperty('merchantIds.1');
+    expect(aggregatePipelines[0]).toEqual([
+      { $project: { effectiveMerchantIds: expect.any(Object) } },
+      { $unwind: '$effectiveMerchantIds' },
+      { $count: 'count' },
+    ]);
+  });
+
+  it('handleGetStats only treats meaningful singular merchant fields as invalid', async () => {
+    let invalidQuery: unknown;
+    const db = {
+      collection(name: string) {
+        if (name === 'confirmed_benefits') {
+          return {
+            async findOne(query: unknown) {
+              invalidQuery = query;
+              return null;
+            },
+            aggregate() {
+              return createAggregateCursor([{ count: 1 }]);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/stats?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetStats({ method: 'GET' } as never, res as never, url, db as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(invalidQuery).toMatchObject({
+      'merchantIds.1': { $exists: true },
+      $expr: expect.any(Object),
+      $or: [
+        { $expr: expect.any(Object) },
+        { $expr: expect.any(Object) },
+        { $expr: expect.any(Object) },
+      ],
+    });
+    expect(JSON.stringify(invalidQuery)).toContain('$objectToArray');
+  });
+
+  it('handleGetBenefits keeps pagination document-based for shared merchantIds benefits', async () => {
+    const benefits = [
+      {
+        id: 'shared-benefit',
+        merchantIds: ['merchant_1', 'merchant_2'],
+        benefitTitle: '30% OFF compartido',
+        description: 'Promo',
+        online: true,
+        validUntil: '2099-12-31',
+      },
+    ];
+    const merchants = [
+      { merchantId: 'merchant_1', merchantName: 'Adidas' },
+      { merchantId: 'merchant_2', merchantName: 'Sporting' },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor(benefits);
+            },
+            async countDocuments() {
+              return 1;
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor(merchants);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.pagination.total).toBe(1);
+    expect(payload.benefits).toHaveLength(1);
+    expect(payload.benefits[0].merchantIds).toEqual(['merchant_1', 'merchant_2']);
+    expect(payload.benefits[0]).not.toHaveProperty('merchant');
+  });
+
+  it('handleGetBenefits accepts shared merchantIds benefits with null legacy merchant fields', async () => {
+    const benefits = [
+      {
+        id: 'shared-null-benefit',
+        merchantId: null,
+        merchantIds: ['merchant_1', 'merchant_2'],
+        merchant: null,
+        merchantSnapshot: null,
+        benefitTitle: '30% OFF compartido',
+        description: 'Promo',
+        online: true,
+        validUntil: '2099-12-31',
+      },
+    ];
+    const merchants = [
+      { merchantId: 'merchant_1', merchantName: 'Adidas' },
+      { merchantId: 'merchant_2', merchantName: 'Sporting' },
+    ];
+
+    const db = {
+      collection(name: string) {
+        if (name === 'providers') {
+          return {
+            find() {
+              return createCursor([]);
+            },
+          };
+        }
+
+        if (name === 'confirmed_benefits') {
+          return {
+            find() {
+              return createCursor(benefits);
+            },
+            async countDocuments() {
+              return 1;
+            },
+          };
+        }
+
+        if (name === 'merchant_assets') {
+          return {
+            find() {
+              return createCursor(merchants);
+            },
+          };
+        }
+
+        throw new Error(`Unexpected collection: ${name}`);
+      },
+    };
+
+    const res = createResponseCapture();
+    const url = new URL('https://example.com/api/benefits?collection=confirmed_benefits&includeExpired=true');
+
+    await handleGetBenefits({ method: 'GET' } as never, res as never, url, db as never);
+
+    const payload = JSON.parse(res.body || '{}');
+    expect(res.statusCode).toBe(200);
+    expect(payload.pagination.total).toBe(1);
+    expect(payload.benefits[0].id).toBe('shared-null-benefit');
+    expect(payload.benefits[0].merchantIds).toEqual(['merchant_1', 'merchant_2']);
+  });
+
+  it('transformRawBenefitToBenefit tolerates merchantIds without a singular merchant', () => {
+    const benefit = transformRawBenefitToBenefit({
+      _id: { $oid: 'benefit-object-id' },
+      merchantIds: ['merchant_1', 'merchant_2'],
+      bank: 'BBVA',
+      network: 'VISA',
+      cardTypes: [],
+      benefitTitle: '30% OFF compartido',
+      description: 'Promo',
+      categories: ['deportes'],
+      locations: [],
+      online: true,
+      availableDays: [],
+      discountPercentage: 30,
+      link: '',
+      termsAndConditions: '',
+      validUntil: '2099-12-31',
+      originalId: { $oid: 'raw-object-id' },
+      sourceCollection: 'confirmed_benefits',
+      processedAt: { $date: '2026-06-25T00:00:00.000Z' },
+      processingStatus: 'processed',
+    } as never);
+
+    expect(benefit.id).toBe('benefit-object-id');
+    expect(benefit.merchant.name).toBe('Unknown Merchant');
+    expect(benefit.merchantIds).toEqual(['merchant_1', 'merchant_2']);
+    expect(benefit.categories).toEqual(['deportes']);
   });
 
   it('handleGetBanks returns provider descriptors with derived index metadata', async () => {
@@ -715,7 +1082,7 @@ describe('merchant-first serverless helpers', () => {
     expect((merchantQueries[1] as { merchantId: unknown }).merchantId).toBe('merchant_1');
     expect(merchantQueries[0]).not.toHaveProperty('$or');
     expect(merchantQueries[1]).not.toHaveProperty('$or');
-    expect(((benefitQueries[0] as { merchantId: { $in: unknown[] } }).merchantId).$in).toEqual(['merchant_1']);
+    expectBenefitQueryForMerchants(benefitQueries[0], ['merchant_1']);
   });
 
   it('handleGetBusinesses preserves Modo source markers in summarized benefits', async () => {
@@ -909,7 +1276,7 @@ describe('merchant-first serverless helpers', () => {
 
   it('handleHomeSeoPage returns crawlable homepage HTML with counts and JSON-LD', async () => {
     const merchantQueries: unknown[] = [];
-    const benefitQueries: unknown[] = [];
+    const benefitAggregatePipelines: unknown[] = [];
     const merchantAggregatePipelines: unknown[] = [];
     const db = {
       collection(name: string) {
@@ -933,9 +1300,9 @@ describe('merchant-first serverless helpers', () => {
 
         if (name === 'confirmed_benefits') {
           return {
-            async countDocuments(query: unknown) {
-              benefitQueries.push(query);
-              return 150;
+            aggregate(pipeline: unknown[]) {
+              benefitAggregatePipelines.push(pipeline);
+              return createAggregateCursor([{ count: 150 }]);
             }
           };
         }
@@ -970,7 +1337,7 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/"');
     expect(res.body).toContain('src="/assets/index-test.js"');
-    expect(benefitQueries).toHaveLength(1);
+    expect(benefitAggregatePipelines).toHaveLength(1);
     expect(merchantQueries).toHaveLength(2);
     expect(merchantAggregatePipelines).toHaveLength(2);
   });
@@ -1139,6 +1506,15 @@ describe('merchant-first serverless helpers', () => {
                   discountPercentage: 25,
                   availableDays: ['lunes'],
                   validUntil: '2099-12-31'
+                },
+                {
+                  id: 'shared-benefit',
+                  merchantIds: ['merchant_1', 'merchant_2'],
+                  bank: 'Banco Galicia',
+                  benefitTitle: 'Beneficio compartido',
+                  discountPercentage: 30,
+                  availableDays: ['martes'],
+                  validUntil: '2099-12-31'
                 }
               ]);
             }
@@ -1163,6 +1539,7 @@ describe('merchant-first serverless helpers', () => {
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
     expect(res.body).toContain('<title>Coto descuentos y promociones | Blink</title>');
     expect(res.body).toContain('<h1>Coto descuentos y promociones</h1>');
+    expect(res.body).toContain('Beneficio compartido');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/comercios/coto--merchant_1"');
     expect(res.body).toContain('src="/assets/index-test.js"');
     expect(merchantQueries[0]).toEqual({
@@ -1170,7 +1547,7 @@ describe('merchant-first serverless helpers', () => {
       merchantId: 'merchant_1',
       benefitCount: { $gt: 0 }
     });
-    expect((benefitQueries[0] as { merchantId: string }).merchantId).toBe('merchant_1');
+    expectBenefitQueryForMerchants(benefitQueries[0], ['merchant_1']);
   });
 
   it('handleMerchantSeoPage redirects non-canonical merchant slugs', async () => {
