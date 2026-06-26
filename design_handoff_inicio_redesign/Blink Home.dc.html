@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  .noscroll::-webkit-scrollbar { display: none; }
+  .noscroll { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; width: 100%; background: #ECEAE5; display: flex; justify-content: center; align-items: flex-start; padding: 36px 24px; font-family: 'Poppins', system-ui, sans-serif;">
+  <x-import component="IOSDevice" from="./ios-frame.jsx" width="402" height="874" hint-size="402px,874px">
+
+    <div style="min-height: 100%; background: #F7F6F4; color: #1C1C1E; padding-top: 58px;">
+
+      <!-- ░░ TOP APP BAR ░░ -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 12px;">
+        <div style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+          <div style="width: 40px; height: 40px; border-radius: 13px; background: linear-gradient(135deg, #6366F1, #818CF8); display: flex; align-items: center; justify-content: center; flex: none; box-shadow: 0 5px 14px rgba(99,102,241,0.38);">
+            <span class="material-symbols-outlined" style="color: #fff; font-size: 22px;">near_me</span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; letter-spacing: 0.02em; margin-bottom: 1px;">Beneficios cerca de</div>
+            <div style="display: flex; align-items: center; gap: 2px; color: #1C1C1E;">
+              <span style="font-size: 16px; font-weight: 700;">Palermo, CABA</span>
+              <span class="material-symbols-outlined" style="font-size: 19px; color: #6366F1;">expand_more</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <button style="position: relative; width: 40px; height: 40px; border: 1px solid #EBE9E4; background: #fff; border-radius: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(28,28,30,0.05);">
+            <span class="material-symbols-outlined" style="font-size: 21px; color: #1C1C1E;">notifications</span>
+            <span style="position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; border: 1.5px solid #fff;"></span>
+          </button>
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #818CF8); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">M</div>
+        </div>
+      </div>
+
+      <!-- ░░ SEARCH ░░ -->
+      <div style="padding: 0 18px 18px;">
+        <div style="display: flex; align-items: center; gap: 11px; height: 54px; border-radius: 18px; background: #fff; padding: 0 7px 0 16px; box-shadow: 0 8px 22px rgba(28,28,30,0.09); border: 1px solid #EFEDE8;">
+          <span class="material-symbols-outlined" style="color: #9CA3AF; font-size: 23px;">search</span>
+          <span style="flex: 1; font-size: 14.5px; font-weight: 500; color: #9CA3AF;">Buscar comercios, marcas o bancos</span>
+          <div style="width: 40px; height: 40px; border-radius: 13px; background: linear-gradient(135deg, #6366F1, #818CF8); display: flex; align-items: center; justify-content: center; flex: none; box-shadow: 0 4px 12px rgba(99,102,241,0.32);">
+            <span class="material-symbols-outlined" style="color: #fff; font-size: 21px;">tune</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░ CATEGORY CIRCLES ░░ -->
+      <div class="noscroll" style="display: flex; gap: 14px; overflow-x: auto; padding: 0 18px 22px; scroll-snap-type: x proximity;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #FEF3C7; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #92400E;">restaurant</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Gastro</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #FCE7F3; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #9D174D;">checkroom</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Moda</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #D1FAE5; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #065F46;">shopping_cart</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Súper</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #DBEAFE; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #1E40AF;">flight</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Viajes</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #FEE2E2; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #991B1B;">home</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Hogar</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #EDE9FE; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #4C1D95;">devices</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Electro</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 58px;">
+          <div style="width: 58px; height: 58px; border-radius: 19px; background: #FFE4E6; display: flex; align-items: center; justify-content: center;"><span class="material-symbols-outlined" style="font-size: 27px; color: #9F1239;">spa</span></div>
+          <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Belleza</span>
+        </div>
+      </div>
+
+      <!-- ░░ PROMO BANNER ░░ -->
+      <sc-if value="{{ showPromo }}" hint-placeholder-val="{{ true }}">
+        <div style="padding: 0 18px 22px;">
+          <div style="position: relative; overflow: hidden; border-radius: 22px; background: linear-gradient(125deg, #6366F1 0%, #818CF8 100%); padding: 20px; box-shadow: 0 12px 30px rgba(99,102,241,0.32);">
+            <div style="position: absolute; right: -34px; top: -34px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.10);"></div>
+            <div style="position: absolute; right: 18px; bottom: -28px; width: 96px; height: 96px; border-radius: 50%; background: rgba(255,255,255,0.08);"></div>
+            <div style="position: relative; max-width: 72%;">
+              <span style="display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #fff; background: rgba(255,255,255,0.20); padding: 4px 10px; border-radius: 999px;">BENEFICIO DEL DÍA</span>
+              <h2 style="margin: 12px 0 2px; font-size: 27px; font-weight: 800; color: #fff; line-height: 1.05;">Hasta 40% OFF</h2>
+              <p style="margin: 0 0 14px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.88);">unificado entre todas tus tarjetas</p>
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #4F46E5; font-size: 13px; font-weight: 700; padding: 9px 16px; border-radius: 999px;">Ver beneficios <span class="material-symbols-outlined" style="font-size: 17px;">arrow_forward</span></span>
+            </div>
+            <div style="position: absolute; right: 22px; top: 50%; transform: translateY(-50%); width: 60px; height: 60px; border-radius: 18px; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center;">
+              <span class="material-symbols-outlined" style="font-size: 32px; color: #fff;">local_offer</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 6px; padding-top: 12px;">
+            <span style="width: 18px; height: 6px; border-radius: 999px; background: #6366F1;"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: #D6D3CD;"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: #D6D3CD;"></span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ░░ QUICK FILTER CHIPS ░░ -->
+      <div class="noscroll" style="display: flex; gap: 9px; overflow-x: auto; padding: 0 18px 24px;">
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 15px; border-radius: 999px; background: linear-gradient(135deg, #6366F1, #818CF8); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 4px 12px rgba(99,102,241,0.3);"><span class="material-symbols-outlined" style="font-size: 18px;">near_me</span>Cerca tuyo</span>
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 15px; border-radius: 999px; background: #fff; border: 1px solid #EBE9E4; color: #374151; font-size: 13px; font-weight: 600;"><span class="material-symbols-outlined" style="font-size: 18px; color: #10B981;">percent</span>20%+ OFF</span>
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 15px; border-radius: 999px; background: #fff; border: 1px solid #EBE9E4; color: #374151; font-size: 13px; font-weight: 600;"><span class="material-symbols-outlined" style="font-size: 18px; color: #6366F1;">credit_card</span>Cuotas sin interés</span>
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 15px; border-radius: 999px; background: #fff; border: 1px solid #EBE9E4; color: #374151; font-size: 13px; font-weight: 600;"><span class="material-symbols-outlined" style="font-size: 18px; color: #6366F1;">language</span>Online</span>
+      </div>
+
+      <!-- ░░ CERCA TUYO ░░ -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 18px; margin-bottom: 13px;">
+        <span style="font-size: 17px; font-weight: 700; color: #1C1C1E;">Cerca tuyo</span>
+        <span style="font-size: 12px; font-weight: 600; color: #6366F1;">Ver todo</span>
+      </div>
+      <div class="noscroll" style="display: flex; gap: 14px; overflow-x: auto; padding: 0 18px 26px;">
+
+        <!-- card 1 -->
+        <div style="flex: none; width: 232px; background: #fff; border-radius: 20px; border: 1px solid #EFEDE8; overflow: hidden; box-shadow: 0 8px 22px rgba(28,28,30,0.07);">
+          <div style="position: relative; height: 124px; background: repeating-linear-gradient(135deg, #EEF1F8 0 11px, #E6EAF6 11px 22px); display: flex; align-items: center; justify-content: center;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AEB4CC;">foto · comercio</span>
+            <div style="position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12);"><span class="material-symbols-outlined" style="font-size: 18px; color: #6366F1;">favorite</span></div>
+            <span style="position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: baseline; gap: 2px; background: linear-gradient(135deg, #6366F1, #818CF8); color: #fff; padding: 5px 10px; border-radius: 11px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(99,102,241,0.4);">30%<span style="font-size: 9px; font-weight: 700; opacity: 0.85;">OFF</span></span>
+          </div>
+          <div style="padding: 12px 13px 14px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 15px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Café Martínez</span>
+              <span style="font-size: 11px; color: #9CA3AF; flex: none;">· 400 m</span>
+            </div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin: 2px 0 9px;">Gastronomía · Cafetería</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 9px;">
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #F3F2EF; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #4B5563;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #F25C05;"></span>Galicia</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #F3F2EF; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #4B5563;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #1464A5;"></span>BBVA</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #F0EEEA; padding-top: 9px;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #10B981;">savings</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #374151;">Tope $6.000 · Lun a Vie</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- card 2 -->
+        <div style="flex: none; width: 232px; background: #fff; border-radius: 20px; border: 1px solid #EFEDE8; overflow: hidden; box-shadow: 0 8px 22px rgba(28,28,30,0.07);">
+          <div style="position: relative; height: 124px; background: repeating-linear-gradient(135deg, #F8EEF3 0 11px, #F4E6EE 11px 22px); display: flex; align-items: center; justify-content: center;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #CDA9BC;">foto · comercio</span>
+            <div style="position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12);"><span class="material-symbols-outlined" style="font-size: 18px; color: #9CA3AF;">favorite</span></div>
+            <span style="position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: baseline; gap: 2px; background: linear-gradient(135deg, #6366F1, #818CF8); color: #fff; padding: 5px 10px; border-radius: 11px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(99,102,241,0.4);">25%<span style="font-size: 9px; font-weight: 700; opacity: 0.85;">OFF</span></span>
+          </div>
+          <div style="padding: 12px 13px 14px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 15px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Freddo</span>
+              <span style="font-size: 11px; color: #9CA3AF; flex: none;">· 650 m</span>
+            </div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin: 2px 0 9px;">Gastronomía · Heladería</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 9px;">
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #F3F2EF; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #4B5563;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #EC0000;"></span>Santander</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #F0EEEA; padding-top: 9px;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #6366F1;">credit_card</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #374151;">2 cuotas sin interés</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- card 3 -->
+        <div style="flex: none; width: 232px; background: #fff; border-radius: 20px; border: 1px solid #EFEDE8; overflow: hidden; box-shadow: 0 8px 22px rgba(28,28,30,0.07);">
+          <div style="position: relative; height: 124px; background: repeating-linear-gradient(135deg, #EAF3EE 0 11px, #E0EEE6 11px 22px); display: flex; align-items: center; justify-content: center;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #A6C4B4;">foto · comercio</span>
+            <div style="position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12);"><span class="material-symbols-outlined" style="font-size: 18px; color: #9CA3AF;">favorite</span></div>
+            <span style="position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: baseline; gap: 2px; background: linear-gradient(135deg, #6366F1, #818CF8); color: #fff; padding: 5px 10px; border-radius: 11px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(99,102,241,0.4);">20%<span style="font-size: 9px; font-weight: 700; opacity: 0.85;">OFF</span></span>
+          </div>
+          <div style="padding: 12px 13px 14px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 15px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rapsodia</span>
+              <span style="font-size: 11px; color: #9CA3AF; flex: none;">· 1.1 km</span>
+            </div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin: 2px 0 9px;">Moda · Indumentaria</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 9px;">
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #F3F2EF; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #4B5563;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #1464A5;"></span>BBVA</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #F3F2EF; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #4B5563;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #00A3A3;"></span>Macro</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #F0EEEA; padding-top: 9px;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #6366F1;">credit_card</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #374151;">Hasta 6 cuotas</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ░░ TOP DESCUENTOS HOY ░░ -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 18px; margin-bottom: 13px;">
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="font-size: 17px; font-weight: 700; color: #1C1C1E;">Top descuentos hoy</span>
+          <span style="font-size: 16px;">🔥</span>
+        </div>
+        <span style="font-size: 12px; font-weight: 600; color: #6366F1;">Ver todo</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 0 18px 26px;">
+
+        <!-- row 1 -->
+        <div style="display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #EFEDE8; border-radius: 18px; padding: 11px 12px; box-shadow: 0 4px 14px rgba(28,28,30,0.05);">
+          <div style="position: relative; width: 52px; height: 52px; border-radius: 15px; background: #EEF0FE; display: flex; align-items: center; justify-content: center; flex: none;">
+            <span style="font-size: 15px; font-weight: 800; color: #4F46E5;">40%</span>
+            <span style="position: absolute; top: -5px; left: -5px; width: 19px; height: 19px; border-radius: 50%; background: #1C1C1E; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">1</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14.5px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Garbarino</div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin-top: 1px;">Electro · Nación Visa</div>
+            <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; background: #F3F2EF; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; color: #6B7280;"><span class="material-symbols-outlined" style="font-size: 13px;">schedule</span>Mié y Jue</span>
+          </div>
+          <span class="material-symbols-outlined" style="font-size: 22px; color: #C9C6C0; flex: none;">chevron_right</span>
+        </div>
+
+        <!-- row 2 -->
+        <div style="display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #EFEDE8; border-radius: 18px; padding: 11px 12px; box-shadow: 0 4px 14px rgba(28,28,30,0.05);">
+          <div style="position: relative; width: 52px; height: 52px; border-radius: 15px; background: #EEF0FE; display: flex; align-items: center; justify-content: center; flex: none;">
+            <span style="font-size: 15px; font-weight: 800; color: #4F46E5;">35%</span>
+            <span style="position: absolute; top: -5px; left: -5px; width: 19px; height: 19px; border-radius: 50%; background: #1C1C1E; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">2</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14.5px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dexter</div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin-top: 1px;">Deportes · Galicia Eminent</div>
+            <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; background: #F3F2EF; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; color: #6B7280;"><span class="material-symbols-outlined" style="font-size: 13px;">schedule</span>Fines de semana</span>
+          </div>
+          <span class="material-symbols-outlined" style="font-size: 22px; color: #C9C6C0; flex: none;">chevron_right</span>
+        </div>
+
+        <!-- row 3 -->
+        <div style="display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #EFEDE8; border-radius: 18px; padding: 11px 12px; box-shadow: 0 4px 14px rgba(28,28,30,0.05);">
+          <div style="position: relative; width: 52px; height: 52px; border-radius: 15px; background: #EEF0FE; display: flex; align-items: center; justify-content: center; flex: none;">
+            <span style="font-size: 15px; font-weight: 800; color: #4F46E5;">30%</span>
+            <span style="position: absolute; top: -5px; left: -5px; width: 19px; height: 19px; border-radius: 50%; background: #1C1C1E; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14.5px; font-weight: 700; color: #1C1C1E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sushi Club</div>
+            <div style="font-size: 11.5px; color: #9CA3AF; margin-top: 1px;">Gastronomía · Santander</div>
+            <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; background: #F3F2EF; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; color: #6B7280;"><span class="material-symbols-outlined" style="font-size: 13px;">schedule</span>Lun a Jue</span>
+          </div>
+          <span class="material-symbols-outlined" style="font-size: 22px; color: #C9C6C0; flex: none;">chevron_right</span>
+        </div>
+
+      </div>
+
+      <!-- ░░ TUS TARJETAS ░░ -->
+      <sc-if value="{{ showCards }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 18px; margin-bottom: 13px;">
+          <span style="font-size: 17px; font-weight: 700; color: #1C1C1E;">Tus tarjetas</span>
+          <span style="font-size: 12px; font-weight: 600; color: #6366F1;">Gestionar</span>
+        </div>
+        <div class="noscroll" style="display: flex; gap: 9px; overflow-x: auto; padding: 0 18px 18px;">
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 15px; border-radius: 14px; background: #fff; border: 1px solid #EBE9E4; font-size: 13px; font-weight: 600; color: #374151; box-shadow: 0 2px 8px rgba(28,28,30,0.04);"><span style="width: 9px; height: 9px; border-radius: 50%; background: #F25C05;"></span>Galicia</span>
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 15px; border-radius: 14px; background: #fff; border: 1px solid #EBE9E4; font-size: 13px; font-weight: 600; color: #374151; box-shadow: 0 2px 8px rgba(28,28,30,0.04);"><span style="width: 9px; height: 9px; border-radius: 50%; background: #EC0000;"></span>Santander</span>
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 15px; border-radius: 14px; background: #fff; border: 1px solid #EBE9E4; font-size: 13px; font-weight: 600; color: #374151; box-shadow: 0 2px 8px rgba(28,28,30,0.04);"><span style="width: 9px; height: 9px; border-radius: 50%; background: #1464A5;"></span>BBVA</span>
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 16px; border-radius: 14px; background: #F2F1FB; border: 1px dashed #B9BCF0; font-size: 13px; font-weight: 600; color: #6366F1;"><span class="material-symbols-outlined" style="font-size: 18px;">add</span>Agregar</span>
+        </div>
+      </sc-if>
+
+      <div style="height: 18px;"></div>
+
+      <!-- ░░ BOTTOM NAV ░░ -->
+      <div style="position: sticky; bottom: 0; background: rgba(255,255,255,0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid #EBE9E4; box-shadow: 0 -4px 22px rgba(0,0,0,0.05); padding: 8px 14px 24px; display: flex; justify-content: space-around;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 25%;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 32px; border-radius: 13px; background: rgba(99,102,241,0.12);"><span class="material-symbols-outlined" style="font-size: 23px; color: #6366F1; font-variation-settings: 'FILL' 1;">home</span></div>
+          <span style="font-size: 10px; font-weight: 600; color: #6366F1;">Inicio</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 25%;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 32px;"><span class="material-symbols-outlined" style="font-size: 23px; color: #9CA3AF;">search</span></div>
+          <span style="font-size: 10px; font-weight: 500; color: #9CA3AF;">Buscar</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 25%;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 32px;"><span class="material-symbols-outlined" style="font-size: 23px; color: #9CA3AF;">map</span></div>
+          <span style="font-size: 10px; font-weight: 500; color: #9CA3AF;">Mapa</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 25%;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 32px;"><span class="material-symbols-outlined" style="font-size: 23px; color: #9CA3AF;">favorite</span></div>
+          <span style="font-size: 10px; font-weight: 500; color: #9CA3AF;">Guardados</span>
+        </div>
+      </div>
+
+    </div>
+
+  </x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 500, &quot;height&quot;: 960 },
+  &quot;showPromo&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;showCards&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showPromo: this.props.showPromo ?? true,
+      showCards: this.props.showCards ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

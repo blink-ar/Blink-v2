@@ -3,20 +3,17 @@ import { flushSync } from 'react-dom';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
-import Ticker from '../components/neo/Ticker';
 import { useAuth } from '../contexts/AuthContext';
-import CategoryMarquee from '../components/neo/CategoryMarquee';
-import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
-import { Business } from '../types';
+import { Business, BankBenefit } from '../types';
 import { formatDistance } from '../utils/distance';
 import { buildBankOptions, type BankDescriptor } from '../utils/banks';
 import { buildBenefitPath } from '../utils/benefitIdentity';
-import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
+import { getBenefitProviderDisplayName, getBenefitEligibilityBankNames } from '../utils/benefitDisplay';
+import { getBankAccent } from '../utils/bankColors';
 import { trackFilterApply, trackViewBenefit } from '../analytics/intentTracking';
-import InstallPWABanner from '../components/InstallPWAPopup';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS, HOME_GUIDE_LINKS } from '../seo/homeSeoLinks';
@@ -87,6 +84,73 @@ const DESKTOP_QUICK_FILTERS = [
   { label: 'Online', icon: 'language', path: '/search?online=1', filterType: 'channel', filterValue: 'online' },
 ];
 
+// Redesigned mobile home — circular category row ("delivery-app" direction).
+const MOBILE_CATEGORY_CIRCLES = [
+  { label: 'Gastro', token: 'gastronomia', icon: 'restaurant', bg: '#FEF3C7', color: '#92400E' },
+  { label: 'Moda', token: 'moda', icon: 'checkroom', bg: '#FCE7F3', color: '#9D174D' },
+  { label: 'Súper', token: 'shopping', icon: 'shopping_cart', bg: '#D1FAE5', color: '#065F46' },
+  { label: 'Viajes', token: 'viajes', icon: 'flight', bg: '#DBEAFE', color: '#1E40AF' },
+  { label: 'Hogar', token: 'hogar', icon: 'home', bg: '#FEE2E2', color: '#991B1B' },
+  { label: 'Electro', token: 'electro', icon: 'devices', bg: '#EDE9FE', color: '#4C1D95' },
+  { label: 'Belleza', token: 'belleza', icon: 'spa', bg: '#FFE4E6', color: '#9F1239' },
+];
+
+// Static location label — no reverse-geocoding source exists yet, so this is the
+// wire-point for the user's selected city (the group routes to /map to choose a zone).
+const MOBILE_LOCATION_LABEL = 'Argentina';
+
+const getBenefitDiscount = (benefit: BankBenefit): number => {
+  const match = String(benefit.rewardRate).match(/(\d+)%/);
+  return match ? parseInt(match[1], 10) : 0;
+};
+
+// Representative benefit for a merchant card: the one with the highest discount.
+const getTopBenefitForBusiness = (business: Business) => {
+  let benefit = business.benefits[0];
+  let benefitIndex = 0;
+  let discount = benefit ? getBenefitDiscount(benefit) : 0;
+
+  business.benefits.forEach((candidate, index) => {
+    const candidateDiscount = getBenefitDiscount(candidate);
+    if (candidateDiscount > discount) {
+      benefit = candidate;
+      benefitIndex = index;
+      discount = candidateDiscount;
+    }
+  });
+
+  return { benefit, benefitIndex, discount };
+};
+
+// Bank/issuer names to render as chips on a "Cerca tuyo" card.
+const getBenefitBankChips = (benefit: BankBenefit): string[] => {
+  const eligibilityNames = getBenefitEligibilityBankNames(benefit);
+  if (eligibilityNames.length) return eligibilityNames.slice(0, 3);
+  if (benefit.bankName) {
+    return benefit.bankName
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+  return [];
+};
+
+// Footer summary for a "Cerca tuyo" card: tope/ahorro → savings, cuotas → credit_card.
+const getBenefitFooter = (benefit: BankBenefit): { icon: string; color: string; text: string } => {
+  if (benefit.tope) {
+    const when = benefit.cuando ? ` · ${String(benefit.cuando)}` : '';
+    return { icon: 'savings', color: '#10B981', text: `Tope ${benefit.tope}${when}` };
+  }
+  if (benefit.installments && benefit.installments > 0) {
+    return { icon: 'credit_card', color: '#6366F1', text: `${benefit.installments} cuotas sin interés` };
+  }
+  if (benefit.cuando) {
+    return { icon: 'savings', color: '#10B981', text: String(benefit.cuando) };
+  }
+  return { icon: 'savings', color: '#10B981', text: 'Disponible hoy' };
+};
+
 const BLINK_ENTITY_DESCRIPTION =
   'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
 const BLINK_ENTITY_CANONICAL_IDENTITY =
@@ -149,6 +213,10 @@ function HomePage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [homeSearchTerm, setHomeSearchTerm] = useState('');
   const [desktopSearchTerm, setDesktopSearchTerm] = useState('');
+  const [savedBusinessIds, setSavedBusinessIds] = useState<Set<string>>(() => new Set());
+  // Optional section toggles (kept local; could be read from remote config).
+  const showPromo = true;
+  const showCards = true;
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
@@ -332,64 +400,26 @@ function HomePage() {
     [availableBankNames],
   );
 
+  // "Cerca tuyo" carousel — nearest merchants with at least one benefit.
+  const nearbyBusinesses = useMemo(
+    () => businesses.filter((business) => business.benefits.length > 0).slice(0, 10),
+    [businesses],
+  );
+
+  const toggleSavedBusiness = (businessId: string) => {
+    setSavedBusinessIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(businessId)) {
+        next.delete(businessId);
+      } else {
+        next.add(businessId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="bg-blink-bg text-blink-ink font-body min-h-screen flex flex-col overflow-x-hidden">
-      {/* Sticky Header */}
-      <header
-        className="sticky top-0 z-50 flex w-full flex-col lg:hidden"
-        style={{
-          background: 'rgba(255,255,255,0.92)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(232,230,225,0.8)',
-        }}
-      >
-        {/* Top Bar */}
-        <div className="h-14 flex items-center justify-between px-4">
-          <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openSearchOverlay}
-              aria-label="Buscar beneficios"
-              aria-expanded={isSearchOpen}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors active:scale-95"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>search</span>
-            </button>
-            {showBell && (
-              <button
-                onClick={() => navigate('/notifications')}
-                aria-label="Ver notificaciones"
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
-                  notifications
-                </span>
-                {iosNotInstalled && (
-                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                    1
-                  </span>
-                )}
-              </button>
-            )}
-            <Link
-              to="/profile"
-              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center transition-opacity active:opacity-70"
-              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-            >
-              {user ? (
-                <span className="text-white text-sm font-bold uppercase">{user.name.charAt(0)}</span>
-              ) : (
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
-              )}
-            </Link>
-          </div>
-        </div>
-        {/* Ticker */}
-        <Ticker count={activeBenefitsCount} />
-      </header>
-
       <div
         className={`fixed inset-0 z-[80] flex items-center justify-center px-4 pb-20 transition-opacity duration-200 ${
           isSearchOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
@@ -440,194 +470,456 @@ function HomePage() {
         </form>
       </div>
 
-      <main className="flex-1 flex flex-col gap-8 pb-32 lg:hidden">
-        {/* Hero Section */}
-        <section className="px-4 pt-6">
-          <h1 className="text-[2rem] font-bold leading-tight text-blink-ink text-center mb-2">
-            Todos tus descuentos<br />
-            <span
-              className="text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-            >
-              en un solo lugar
-            </span>
-          </h1>
-          <p className="text-center text-blink-muted text-sm mb-5">
-            Bancos - Billeteras - Clubes - Suscripciones
-          </p>
-
-          {/* CTA Button */}
+      <main className="flex-1 flex flex-col gap-6 pb-32 lg:hidden">
+        {/* App Bar */}
+        <div className="flex items-center justify-between gap-3 px-[18px] pt-2 pb-1">
           <button
-            onClick={() => navigate('/search')}
-            className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 px-5 transition-all duration-150 active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-              boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
-            }}
+            type="button"
+            onClick={() => navigate('/map')}
+            className="flex min-w-0 items-center gap-[11px] text-left transition-opacity active:opacity-80"
+            aria-label="Elegir ubicación"
           >
-            <span className="font-semibold text-base text-white tracking-tight">Buscá beneficios</span>
             <span
-              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(255,255,255,0.20)' }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px]"
+              style={{
+                background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                boxShadow: '0 5px 14px rgba(99,102,241,0.38)',
+              }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>arrow_forward</span>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>near_me</span>
+            </span>
+            <span className="min-w-0">
+              <span
+                className="block text-[11px] font-semibold text-blink-muted"
+                style={{ letterSpacing: '0.02em' }}
+              >
+                Beneficios cerca de
+              </span>
+              <span className="flex items-center gap-0.5 text-blink-ink">
+                <span className="truncate text-[16px] font-bold">{MOBILE_LOCATION_LABEL}</span>
+                <span className="material-symbols-outlined shrink-0" style={{ fontSize: 19, color: '#6366F1' }}>expand_more</span>
+              </span>
             </span>
           </button>
 
-          {/* Indexed Entities */}
+          <div className="flex shrink-0 items-center gap-[9px]">
+            {showBell && (
+              <button
+                type="button"
+                onClick={() => navigate('/notifications')}
+                aria-label="Ver notificaciones"
+                className="relative flex h-10 w-10 items-center justify-center rounded-[13px] bg-white transition-transform active:scale-95"
+                style={{ border: '1px solid #EBE9E4', boxShadow: '0 2px 8px rgba(28,28,30,0.05)' }}
+              >
+                <span
+                  className="material-symbols-outlined text-blink-ink"
+                  style={{ fontSize: 21, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}
+                >
+                  notifications
+                </span>
+                {iosNotInstalled && (
+                  <span
+                    className="absolute right-[9px] top-[8px] h-2 w-2 rounded-full"
+                    style={{ background: '#F59E0B', border: '1.5px solid #fff' }}
+                  />
+                )}
+              </button>
+            )}
+            <Link
+              to="/profile"
+              aria-label="Ir al perfil"
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-opacity active:opacity-70"
+              style={{
+                background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+              }}
+            >
+              {user ? (
+                <span className="text-[15px] font-bold uppercase text-white">{user.name.charAt(0)}</span>
+              ) : (
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
+              )}
+            </Link>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="px-[18px]">
           <div
-            className="mt-4 rounded-[28px] px-4 py-4"
-            style={{
-              background: 'linear-gradient(180deg, rgba(238,242,255,0.9) 0%, rgba(255,255,255,0.96) 100%)',
-              border: '1px solid rgba(99,102,241,0.18)',
-              boxShadow: '0 10px 28px rgba(99,102,241,0.08)',
+            role="button"
+            tabIndex={0}
+            onClick={openSearchOverlay}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openSearchOverlay();
+              }
             }}
+            aria-label="Buscar comercios, marcas o bancos"
+            className="flex h-[54px] cursor-text items-center gap-[11px] rounded-[18px] bg-white pl-4 pr-[7px]"
+            style={{ border: '1px solid #EFEDE8', boxShadow: '0 8px 22px rgba(28,28,30,0.09)' }}
           >
-            <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
-              Estos son los emisores disponibles hoy en Blink.
-            </p>
+            <span className="material-symbols-outlined shrink-0" style={{ fontSize: 23, color: '#9CA3AF' }}>search</span>
+            <span className="flex-1 truncate text-[14.5px] font-medium text-blink-muted">
+              Buscar comercios, marcas o bancos
+            </span>
+            <button
+              type="button"
+              aria-label="Filtros de búsqueda"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate('/search');
+              }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] transition-transform active:scale-95"
+              style={{
+                background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.32)',
+              }}
+            >
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 21 }}>tune</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Category circles */}
+        <div className="flex gap-[14px] overflow-x-auto no-scrollbar px-[18px]">
+          {MOBILE_CATEGORY_CIRCLES.map((category) => (
+            <button
+              key={category.token}
+              type="button"
+              onClick={() => handleDesktopCategoryClick(category.token)}
+              className="flex w-[58px] shrink-0 flex-col items-center gap-2 transition-transform active:scale-95"
+            >
+              <span
+                className="flex h-[58px] w-[58px] items-center justify-center rounded-[19px]"
+                style={{ background: category.bg }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 27, color: category.color }}>
+                  {category.icon}
+                </span>
+              </span>
+              <span className="text-[11px] font-semibold" style={{ color: '#4B5563' }}>{category.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Promo banner */}
+        {showPromo && (
+          <div className="px-[18px]">
+            <button
+              type="button"
+              onClick={() => navigate('/search')}
+              className="relative block w-full overflow-hidden rounded-[22px] p-5 text-left transition-transform active:scale-[0.99]"
+              style={{
+                background: 'linear-gradient(125deg, #6366F1 0%, #818CF8 100%)',
+                boxShadow: '0 12px 30px rgba(99,102,241,0.32)',
+              }}
+            >
+              <span
+                className="pointer-events-none absolute h-[150px] w-[150px] rounded-full"
+                style={{ right: -34, top: -34, background: 'rgba(255,255,255,0.10)' }}
+              />
+              <span
+                className="pointer-events-none absolute h-24 w-24 rounded-full"
+                style={{ right: 18, bottom: -28, background: 'rgba(255,255,255,0.08)' }}
+              />
+              <span className="relative block" style={{ maxWidth: '72%' }}>
+                <span
+                  className="inline-block rounded-full px-[10px] py-1 text-[10px] font-bold text-white"
+                  style={{ letterSpacing: '0.08em', background: 'rgba(255,255,255,0.20)' }}
+                >
+                  BENEFICIO DEL DÍA
+                </span>
+                <span className="mb-0.5 mt-3 block text-[27px] font-extrabold leading-[1.05] text-white">
+                  Hasta 40% OFF
+                </span>
+                <span className="mb-[14px] block text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.88)' }}>
+                  unificado entre todas tus tarjetas
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-[9px] text-[13px] font-bold"
+                  style={{ color: '#4F46E5' }}
+                >
+                  Ver beneficios
+                  <span className="material-symbols-outlined" style={{ fontSize: 17 }}>arrow_forward</span>
+                </span>
+              </span>
+              <span
+                className="absolute flex h-[60px] w-[60px] items-center justify-center rounded-[18px]"
+                style={{ right: 22, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.16)' }}
+              >
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 32 }}>local_offer</span>
+              </span>
+            </button>
+            <div className="flex justify-center gap-1.5 pt-3">
+              <span className="h-1.5 w-[18px] rounded-full" style={{ background: '#6366F1' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#D6D3CD' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#D6D3CD' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Quick filter chips */}
+        <div className="flex gap-[9px] overflow-x-auto no-scrollbar px-[18px]">
+          {DESKTOP_QUICK_FILTERS.map((filter, index) => {
+            const isActive = index === 0;
+            const iconColor = isActive ? '#fff' : index === 1 ? '#10B981' : '#6366F1';
+            return (
+              <button
+                key={filter.path}
+                type="button"
+                onClick={() => handleDesktopQuickFilterClick(filter)}
+                className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full px-[15px] text-[13px] font-semibold transition-transform active:scale-95"
+                style={
+                  isActive
+                    ? {
+                        background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                        color: '#fff',
+                        boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                      }
+                    : { background: '#fff', border: '1px solid #EBE9E4', color: '#374151' }
+                }
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: iconColor }}>{filter.icon}</span>
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Cerca tuyo */}
+        <section className="flex flex-col gap-[13px]">
+          <div className="flex items-center justify-between px-[18px]">
+            <h2 className="text-[17px] font-bold text-blink-ink">Cerca tuyo</h2>
+            <Link to="/search" className="text-xs font-semibold" style={{ color: '#6366F1' }}>Ver todo</Link>
+          </div>
+          <div className="flex gap-[14px] overflow-x-auto no-scrollbar px-[18px]">
+            {isLoading
+              ? Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-[244px] w-[232px] shrink-0 animate-pulse rounded-[20px]"
+                  style={{ background: '#E6E4DF' }}
+                />
+              ))
+              : nearbyBusinesses.map((business) => {
+                const { benefit, benefitIndex, discount } = getTopBenefitForBusiness(business);
+                const footer = getBenefitFooter(benefit);
+                const bankChips = getBenefitBankChips(benefit);
+                const distanceLabel = business.distanceText
+                  || (business.distance !== undefined ? formatDistance(business.distance) : null);
+                const isSaved = savedBusinessIds.has(business.id);
+                return (
+                  <article
+                    key={business.id}
+                    onClick={() => handleTopBenefitClick(
+                      business.id,
+                      business.category,
+                      1,
+                      benefitIndex,
+                      benefit,
+                      business,
+                    )}
+                    className="w-[232px] shrink-0 cursor-pointer overflow-hidden rounded-[20px] bg-white transition-transform active:scale-[0.97]"
+                    style={{ border: '1px solid #EFEDE8', boxShadow: '0 8px 22px rgba(28,28,30,0.07)' }}
+                  >
+                    <div
+                      className="relative h-[124px] w-full overflow-hidden"
+                      style={{ background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)' }}
+                    >
+                      {business.image && (
+                        <img
+                          alt={business.name}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          src={getOptimizedImageUrl(business.image, { width: 480 })}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        aria-label={isSaved ? 'Quitar de guardados' : 'Guardar comercio'}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleSavedBusiness(business.id);
+                        }}
+                        className="absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full transition-transform active:scale-90"
+                        style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
+                      >
+                        <span
+                          className="material-symbols-outlined"
+                          style={{ fontSize: 18, color: isSaved ? '#6366F1' : '#9CA3AF', fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0" }}
+                        >
+                          favorite
+                        </span>
+                      </button>
+                      {discount > 0 && (
+                        <span
+                          className="absolute bottom-2.5 left-2.5 inline-flex items-baseline gap-0.5 rounded-[11px] px-2.5 py-[5px]"
+                          style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' }}
+                        >
+                          <span className="text-[15px] font-extrabold text-white">{discount}%</span>
+                          <span className="text-[9px] font-bold text-white/85">OFF</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="px-[13px] pb-[14px] pt-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[15px] font-bold text-blink-ink">{business.name}</span>
+                        {distanceLabel && (
+                          <span className="shrink-0 text-[11px]" style={{ color: '#9CA3AF' }}>· {distanceLabel}</span>
+                        )}
+                      </div>
+                      <div className="mb-[9px] mt-0.5 truncate text-[11.5px]" style={{ color: '#9CA3AF' }}>
+                        {business.category}{benefit.tipo ? ` · ${benefit.tipo}` : ''}
+                      </div>
+                      {bankChips.length > 0 && (
+                        <div className="mb-[9px] flex items-center gap-1.5 overflow-hidden">
+                          {bankChips.map((bankName) => (
+                            <span
+                              key={bankName}
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-[9px] py-[3px] text-[10.5px] font-semibold"
+                              style={{ background: '#F3F2EF', color: '#4B5563' }}
+                            >
+                              <span
+                                className="h-[7px] w-[7px] rounded-full"
+                                style={{ background: getBankAccent(bankName).text }}
+                              />
+                              {bankName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div
+                        className="flex items-center gap-1.5 pt-[9px]"
+                        style={{ borderTop: '1px solid #F0EEEA' }}
+                      >
+                        <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: footer.color }}>
+                          {footer.icon}
+                        </span>
+                        <span className="truncate text-[11.5px] font-semibold" style={{ color: '#374151' }}>
+                          {footer.text}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
+        </section>
+
+        {/* Top descuentos hoy */}
+        <section className="flex flex-col gap-[13px]">
+          <div className="flex items-center justify-between px-[18px]">
+            <div className="flex items-center gap-[7px]">
+              <h2 className="text-[17px] font-bold text-blink-ink">Top descuentos hoy</h2>
+              <span className="text-base">🔥</span>
+            </div>
+            <Link to="/search" className="text-xs font-semibold" style={{ color: '#6366F1' }}>Ver todo</Link>
+          </div>
+          <div className="flex flex-col gap-2.5 px-[18px]">
+            {isLoading
+              ? Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-[76px] animate-pulse rounded-[18px]"
+                  style={{ background: '#E6E4DF' }}
+                />
+              ))
+              : top5.slice(0, 3).map((item, index) => {
+                const provider = getBenefitProviderDisplayName(item.benefit);
+                const card = item.benefit.cardName ? ` ${item.benefit.cardName}` : '';
+                return (
+                  <button
+                    key={`${item.business.id}-${item.benefitIndex}`}
+                    type="button"
+                    onClick={() => handleTopBenefitClick(
+                      item.business.id,
+                      item.business.category,
+                      index + 1,
+                      item.benefitIndex,
+                      item.benefit,
+                      item.business,
+                    )}
+                    className="flex items-center gap-3 rounded-[18px] bg-white p-[11px] pr-3 text-left transition-transform active:scale-[0.99]"
+                    style={{ border: '1px solid #EFEDE8', boxShadow: '0 4px 14px rgba(28,28,30,0.05)' }}
+                  >
+                    <div
+                      className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[15px]"
+                      style={{ background: '#EEF0FE' }}
+                    >
+                      <span className="text-[15px] font-extrabold" style={{ color: '#4F46E5' }}>{item.discount}%</span>
+                      <span
+                        className="absolute -left-[5px] -top-[5px] flex h-[19px] w-[19px] items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        style={{ background: '#1C1C1E' }}
+                      >
+                        {index + 1}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14.5px] font-bold text-blink-ink">{item.business.name}</div>
+                      <div className="mt-px truncate text-[11.5px]" style={{ color: '#9CA3AF' }}>
+                        {item.business.category} · {provider}{card}
+                      </div>
+                      {item.benefit.cuando && (
+                        <span
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                          style={{ background: '#F3F2EF', color: '#6B7280' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>schedule</span>
+                          <span className="max-w-[160px] truncate">{String(item.benefit.cuando)}</span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="material-symbols-outlined shrink-0" style={{ fontSize: 22, color: '#C9C6C0' }}>chevron_right</span>
+                  </button>
+                );
+              })}
+          </div>
+        </section>
+
+        {/* Tus tarjetas */}
+        {showCards && (
+          <section className="flex flex-col gap-[13px]">
+            <div className="flex items-center justify-between px-[18px]">
+              <h2 className="text-[17px] font-bold text-blink-ink">Tus tarjetas</h2>
+              <Link to="/profile" className="text-xs font-semibold" style={{ color: '#6366F1' }}>Gestionar</Link>
+            </div>
             {isBanksLoading ? (
-              <SkeletonAvailableBanks />
+              <div className="px-[18px]">
+                <SkeletonAvailableBanks />
+              </div>
             ) : (
-              <div className="flex flex-wrap justify-center gap-2">
-                {indexedEntities.map((entity) => (
+              <div className="flex gap-[9px] overflow-x-auto no-scrollbar px-[18px]">
+                {indexedEntities.slice(0, 8).map((entity) => (
                   <button
                     key={entity.token}
+                    type="button"
                     onClick={() => handleEntityClick(entity)}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-blink-ink transition-all duration-150 active:scale-95"
-                    style={{ background: '#FFFFFF', border: '1.5px solid #E8E6E1' }}
+                    className="inline-flex h-[42px] shrink-0 items-center gap-[7px] rounded-[14px] bg-white px-[15px] text-[13px] font-semibold transition-transform active:scale-95"
+                    style={{ border: '1px solid #EBE9E4', color: '#374151', boxShadow: '0 2px 8px rgba(28,28,30,0.04)' }}
                   >
+                    <span className="h-[9px] w-[9px] rounded-full" style={{ background: getBankAccent(entity.label).text }} />
                     {entity.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="inline-flex h-[42px] shrink-0 items-center gap-1.5 rounded-[14px] px-4 text-[13px] font-semibold transition-transform active:scale-95"
+                  style={{ background: '#F2F1FB', border: '1px dashed #B9BCF0', color: '#6366F1' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+                  Agregar
+                </button>
               </div>
             )}
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* Install banner */}
-        <section className="px-4 -mt-4">
-          <InstallPWABanner />
-        </section>
-
-        {/* Top 5 Hoy - Bento Cards */}
-        <section className="flex flex-col gap-3">
-          <div className="px-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-base text-blink-ink">Top 5 hoy</h2>
-              <span className="text-base">🔥</span>
-            </div>
-            <button
-              onClick={() => navigate('/search')}
-              className="text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
-            >
-              Ver todo →
-            </button>
-          </div>
-
-          {/* Horizontal Scroll */}
-          <div className="flex overflow-x-auto no-scrollbar gap-3 px-4 pb-2 snap-x snap-mandatory">
-            {isLoading
-              ? Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 w-[240px] h-[200px] rounded-2xl animate-pulse"
-                  style={{ background: '#D1D5DB' }}
-                />
-              ))
-              : top5.map((item, idx) => (
-                <article
-                  key={`${item.business.id}-${idx}`}
-                  onClick={() => handleTopBenefitClick(
-                    item.business.id,
-                    item.business.category,
-                    idx + 1,
-                    item.benefitIndex,
-                    item.benefit,
-                    item.business,
-                  )}
-                  className="group relative flex-shrink-0 w-[240px] snap-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.97]"
-                  style={{
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                    border: '1px solid #E8E6E1',
-                  }}
-                >
-                  {/* Card header — image with dark overlay, indigo fallback */}
-                  <div
-                    className="h-28 w-full relative overflow-hidden"
-                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
-                  >
-                    {item.business.image && (
-                      <img
-                        alt={item.business.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        src={getOptimizedImageUrl(item.business.image, { width: 480 })}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    {/* Dark scrim */}
-                    <div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.52) 100%)' }}
-                    />
-                    {/* Discount badge */}
-                    <div className="absolute top-3 left-3">
-                      <div
-                        className="flex items-baseline gap-0.5 px-2.5 py-1 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)' }}
-                      >
-                        <span className="font-bold text-2xl text-white leading-none">{item.discount}%</span>
-                        <span className="text-xs font-semibold text-white/80">OFF</span>
-                      </div>
-                    </div>
-                    {/* Rank */}
-                    <div
-                      className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center"
-                      style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)' }}
-                    >
-                      <span className="text-xs font-bold text-white">#{idx + 1}</span>
-                    </div>
-                  </div>
-
-                  {/* Card content */}
-                  <div className="p-3 bg-white">
-                    <h3 className="font-semibold text-sm text-blink-ink mb-0.5 flex items-center gap-1 min-w-0">
-                      <span className="truncate">{item.business.name}</span>
-                      {(item.business.distanceText || item.business.distance !== undefined) && (
-                        <>
-                          <span className="shrink-0 font-normal text-blink-muted">·</span>
-                          <span className="shrink-0 text-[11px] font-normal text-blink-muted">
-                            {item.business.distanceText || formatDistance(item.business.distance!)}
-                          </span>
-                        </>
-                      )}
-                    </h3>
-                    <p className="text-xs text-blink-muted truncate mb-2">
-                      {getBenefitProviderDisplayName(item.benefit)} · {item.benefit.cardName}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-blink-muted">
-                        {item.benefit.cuando ? String(item.benefit.cuando).substring(0, 20) : 'Disponible hoy'}
-                      </span>
-                      <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>
-                        bookmark
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              ))}
-          </div>
-        </section>
-
-        {/* Category Marquee */}
-        <CategoryMarquee />
-
-        {/* Coming Soon Banks */}
-        <ComingSoonSection />
-
-        <section className="px-4">
+        {/* SEO internal links (preserved from the previous home) */}
+        <section className="px-[18px]">
           <div className="border-t border-blink-border pt-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-blink-ink">Explorar descuentos</h2>
