@@ -107,6 +107,46 @@ describe('merchant SEO renderer', () => {
     expect(html).toContain('promociones bancarias');
   });
 
+  it('renders related active merchant links when provided', () => {
+    const html = renderMerchantSeoHtml({
+      appShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      path: '/comercios/coto--merchant_1',
+      now: new Date('2026-05-11T12:00:00.000Z'),
+      merchant: {
+        merchantId: 'merchant_1',
+        merchantName: 'Coto',
+        categories: ['supermercados'],
+        banks: ['Banco Galicia'],
+      },
+      benefits: [
+        {
+          bankName: 'Banco Galicia',
+          cardName: 'Visa',
+          benefit: '35% OFF',
+          rewardRate: '35%',
+          validUntil: '2099-12-31',
+        },
+      ],
+      relatedActiveMerchants: [
+        {
+          merchantId: 'merchant_2',
+          merchantName: 'Jumbo',
+          path: '/comercios/jumbo--merchant_2',
+          category: 'supermercados',
+          city: 'Buenos Aires',
+          activeBenefitCount: 3,
+          maxDiscountPercentage: 30,
+        },
+      ],
+    });
+
+    expect(html).toContain('Comercios relacionados con promos activas');
+    expect(html).toContain('href="/comercios/jumbo--merchant_2"');
+    expect(html).toContain('Jumbo');
+    expect(html).toContain('Hasta 30% OFF');
+  });
+
   it('renders multi-bank MODO benefits with compact provider text', () => {
     const longBankName = 'Banco Nación, Galicia, NaranjaX';
     const html = renderMerchantSeoHtml({
