@@ -8,6 +8,7 @@ const DEFAULT_SITE_NAME = 'Blink';
 const DEFAULT_SITE_URL = 'https://www.blinkapp.com.ar';
 const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const RECENT_PAST_BENEFIT_WINDOW_DAYS = 180;
 
 let cachedAppShell = null;
 
@@ -242,7 +243,7 @@ function buildFaqItems(merchant, activeBenefits, pastBenefits, description) {
       question: `Que descuentos hay en ${name}?`,
       answer: activeBenefits.length > 0
         ? `${description}`
-        : `${name} no tiene descuentos activos publicados ahora, pero puedes revisar promociones anteriores.`
+        : `${name} no tiene promos activas publicadas ahora, pero puedes revisar promos recientes anteriores y alternativas activas.`
     },
     {
       question: `Que bancos tienen promociones en ${name}?`,
@@ -398,6 +399,82 @@ function renderBenefitList(benefits, emptyText, isPast = false) {
   return `<ul class="blink-seo-benefits">${items}</ul>`;
 }
 
+function getBenefitValidUntilTime(benefit) {
+  const validUntil = String(benefit?.validUntil || '').trim();
+  if (!validUntil) return null;
+
+  const parsedTime = DATE_ONLY_PATTERN.test(validUntil)
+    ? Date.parse(`${validUntil}T23:59:59.999Z`)
+    : Date.parse(validUntil);
+
+  return Number.isFinite(parsedTime) ? parsedTime : null;
+}
+
+function getRecentPastBenefits(pastBenefits, now) {
+  const nowTime = now.getTime();
+  const earliestRecentTime = nowTime - RECENT_PAST_BENEFIT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  return pastBenefits.filter((benefit) => {
+    const validUntilTime = getBenefitValidUntilTime(benefit);
+    if (validUntilTime === null) return true;
+    return validUntilTime < nowTime && validUntilTime >= earliestRecentTime;
+  });
+}
+
+function getRelatedMerchantPath(merchant) {
+  const path = String(merchant?.path || '').trim();
+  if (path) return path;
+  if (!merchant?.merchantId) return '';
+  return getMerchantSeoPathFromMerchant(merchant);
+}
+
+function getRelatedMerchantOfferText(merchant) {
+  if (Number.isFinite(Number(merchant?.maxDiscountPercentage)) && Number(merchant.maxDiscountPercentage) > 0) {
+    return `Hasta ${Number(merchant.maxDiscountPercentage)}% OFF`;
+  }
+
+  if (Number.isFinite(Number(merchant?.activeBenefitCount)) && Number(merchant.activeBenefitCount) > 0) {
+    return `${Number(merchant.activeBenefitCount)} promos activas`;
+  }
+
+  return 'Promos activas';
+}
+
+function renderRelatedActiveAlternatives(relatedActiveMerchants) {
+  const alternatives = (relatedActiveMerchants || [])
+    .map((merchant) => ({
+      name: getMerchantName(merchant),
+      path: getRelatedMerchantPath(merchant),
+      category: merchant?.category || getPrimaryCategory(merchant),
+      city: merchant?.city || getPrimaryCity(merchant),
+      offerText: getRelatedMerchantOfferText(merchant)
+    }))
+    .filter((merchant) => merchant.name && merchant.path)
+    .slice(0, 4);
+
+  if (alternatives.length === 0) return '';
+
+  const items = alternatives.map((merchant) => {
+    const detail = formatList([merchant.category, merchant.city].filter(Boolean), 'Comercio relacionado');
+    return [
+      '<li class="blink-seo-related-item">',
+      `  <a href="${escapeHtml(merchant.path)}">`,
+      `    <strong>${escapeHtml(merchant.name)}</strong>`,
+      `    <span>${escapeHtml(merchant.offerText)}</span>`,
+      `    <small>${escapeHtml(detail)}</small>`,
+      '  </a>',
+      '</li>'
+    ].join('');
+  }).join('');
+
+  return [
+    '  <section class="blink-seo-section">',
+    '    <h2>Alternativas con promos activas</h2>',
+    `    <ul class="blink-seo-related-list">${items}</ul>`,
+    '  </section>'
+  ].join('\n');
+}
+
 function renderFaq(faqItems) {
   return faqItems.map((item) => [
     '<article class="blink-seo-faq-item">',
@@ -407,10 +484,18 @@ function renderFaq(faqItems) {
   ].join('')).join('');
 }
 
-function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, faqItems }) {
+function buildBodyHtml({
+  merchant,
+  activeBenefits,
+  pastBenefits,
+  relatedActiveMerchants,
+  description,
+  faqItems
+}) {
   const name = getMerchantName(merchant);
   const category = getPrimaryCategory(merchant);
   const city = getPrimaryCity(merchant) || 'Argentina';
+  const hasActiveBenefits = activeBenefits.length > 0;
   const banks = formatList(
     uniqueDisplayStrings([
       ...(Array.isArray(merchant?.banks) ? merchant.banks : []),
@@ -438,12 +523,17 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     '  </section>',
     '  <section class="blink-seo-section">',
     '    <h2>Beneficios activos</h2>',
-    renderBenefitList(activeBenefits, 'No hay descuentos activos ahora.'),
+    renderBenefitList(activeBenefits, 'No hay promos activas :('),
     '  </section>',
     '  <section class="blink-seo-section">',
-    '    <h2>Beneficios anteriores</h2>',
-    renderBenefitList(pastBenefits, 'No hay beneficios anteriores publicados.', true),
+    `    <h2>${hasActiveBenefits ? 'Beneficios anteriores' : 'Promos recientes anteriores'}</h2>`,
+    renderBenefitList(
+      pastBenefits,
+      hasActiveBenefits ? 'No hay beneficios anteriores publicados.' : 'No hay promos recientes publicadas.',
+      true
+    ),
     '  </section>',
+    hasActiveBenefits ? '' : renderRelatedActiveAlternatives(relatedActiveMerchants),
     '  <section class="blink-seo-section blink-seo-faq">',
     '    <h2>Preguntas frecuentes</h2>',
     renderFaq(faqItems),
@@ -481,6 +571,7 @@ function buildHeadHtml({ title, description, absoluteUrl, imageUrl, structuredDa
     '      .blink-seo-kicker{text-transform:uppercase;font-size:12px;letter-spacing:.08em;font-weight:700;color:#4f46e5}.blink-seo-hero h1{font-size:40px;line-height:1.05;margin:8px 0 12px}.blink-seo-hero p{font-size:18px;line-height:1.55;color:#374151}',
     '      .blink-seo-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:24px 0;padding:0}.blink-seo-facts div,.blink-seo-benefit,.blink-seo-faq-item{border:1px solid #e5e7eb;border-radius:8px;padding:14px;background:#fafafa}.blink-seo-facts dt{font-size:12px;text-transform:uppercase;color:#6b7280}.blink-seo-facts dd{margin:4px 0 0;font-weight:700}',
     '      .blink-seo-section{margin-top:36px}.blink-seo-section h2{font-size:24px;margin:0 0 14px}.blink-seo-benefits{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;list-style:none;margin:0;padding:0}.blink-seo-benefit strong{display:block;font-size:20px}.blink-seo-benefit span{display:block;color:#4b5563;margin-top:4px}.blink-seo-benefit p{margin:8px 0;color:#111827}.blink-seo-benefit small{color:#6b7280}.blink-seo-empty{color:#6b7280}',
+    '      .blink-seo-related-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;list-style:none;margin:0;padding:0}.blink-seo-related-item a{display:block;border:1px solid #e5e7eb;border-radius:8px;padding:14px;background:#fff;color:#111827;text-decoration:none}.blink-seo-related-item strong,.blink-seo-related-item span,.blink-seo-related-item small{display:block}.blink-seo-related-item span{margin-top:6px;font-weight:700}.blink-seo-related-item small{margin-top:6px;color:#6b7280}',
     '      .blink-seo-faq{display:grid;gap:12px}.blink-seo-faq h2{grid-column:1/-1}.blink-seo-faq-item h3{font-size:18px;margin:0 0 8px}.blink-seo-faq-item p{margin:0;color:#374151;line-height:1.5}',
     '      @media (max-width:640px){.blink-seo-shell{padding:24px 16px 48px}.blink-seo-hero h1{font-size:32px}}',
     '    </style>'
@@ -603,6 +694,7 @@ export function renderMerchantSeoHtml({
   appShell,
   merchant,
   benefits = [],
+  relatedActiveMerchants = [],
   path: merchantPath,
   siteUrl,
   now = new Date()
@@ -611,14 +703,17 @@ export function renderMerchantSeoHtml({
   const absoluteUrl = toAbsoluteUrl(siteUrl, canonicalPath);
   const allBenefits = sortBenefitsForSeo(benefits);
   const { activeBenefits, pastBenefits } = splitMerchantSeoBenefits(allBenefits, now);
+  const displayPastBenefits = activeBenefits.length > 0
+    ? pastBenefits
+    : getRecentPastBenefits(pastBenefits, now);
   const title = `${getMerchantName(merchant)} descuentos y promociones | ${DEFAULT_SITE_NAME}`;
-  const description = buildMerchantDescription(merchant, allBenefits);
-  const faqItems = buildFaqItems(merchant, activeBenefits, pastBenefits, description);
+  const description = buildMerchantDescription(merchant, [...activeBenefits, ...displayPastBenefits]);
+  const faqItems = buildFaqItems(merchant, activeBenefits, displayPastBenefits, description);
   const imageUrl = toAbsoluteUrl(siteUrl, getMerchantImage(merchant));
   const structuredData = buildStructuredData({
     merchant,
     activeBenefits,
-    pastBenefits,
+    pastBenefits: displayPastBenefits,
     faqItems,
     absoluteUrl
   });
@@ -632,7 +727,8 @@ export function renderMerchantSeoHtml({
   const bodyHtml = buildBodyHtml({
     merchant,
     activeBenefits,
-    pastBenefits,
+    pastBenefits: displayPastBenefits,
+    relatedActiveMerchants,
     description,
     faqItems
   });
