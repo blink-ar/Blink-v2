@@ -14,12 +14,14 @@ export const SEO_CATEGORY_LINKS: SeoCategoryLink[] = [
   { slug: 'deportes', category: 'deportes', label: 'Deportes', description: 'Indumentaria y artículos deportivos', emoji: '⚽' },
   { slug: 'regalos', category: 'regalos', label: 'Regalos', description: 'Regalerías, flores y librerías', emoji: '🎁' },
   { slug: 'viajes', category: 'viajes', label: 'Viajes', description: 'Turismo, hoteles y experiencias', emoji: '✈️' },
+  { slug: 'combustible', category: 'combustible', aliases: ['combustibles', 'nafta'], label: 'Combustible', description: 'Estaciones de servicio y combustibles', emoji: '⛽' },
   { slug: 'automotores', category: 'automotores', label: 'Automotores', description: 'Autos, motos y servicios', emoji: '🚗' },
   { slug: 'belleza', category: 'belleza', label: 'Belleza', description: 'Perfumerías y cuidado personal', emoji: '💄' },
   { slug: 'jugueterias', category: 'jugueterias', label: 'Jugueterías', description: 'Juguetes y artículos infantiles', emoji: '🧸' },
   { slug: 'hogar', category: 'hogar', label: 'Hogar', description: 'Decoración, muebles y bazar', emoji: '🏠' },
   { slug: 'electro', category: 'electro', label: 'Electro', description: 'Tecnología y electrodomésticos', emoji: '💻' },
-  { slug: 'supermercado', category: 'shopping', aliases: ['shopping'], label: 'Supermercado', description: 'Supermercados y compras diarias', emoji: '🛒' },
+  { slug: 'supermercados', category: 'supermercados', aliases: ['supermercado'], label: 'Supermercados', description: 'Supermercados e hipermercados', emoji: '🛒' },
+  { slug: 'shopping', category: 'shopping', label: 'Shopping', description: 'Shoppings y tiendas retail', emoji: '🛍️' },
   { slug: 'otros', category: 'otros', label: 'Otros', description: 'Más comercios con beneficios', emoji: '📦' },
 ];
 
