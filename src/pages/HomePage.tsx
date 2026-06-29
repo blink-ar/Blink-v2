@@ -51,7 +51,7 @@ const DESKTOP_CATEGORY_CARDS = [
     tone: { bg: '#FCE7F3', color: '#9D174D', border: '#FBCFE8' },
   },
   {
-    token: 'shopping',
+    token: 'supermercados',
     label: 'Supermercado',
     icon: 'shopping_cart',
     description: 'Ahorros cotidianos en compras grandes y reposición semanal.',

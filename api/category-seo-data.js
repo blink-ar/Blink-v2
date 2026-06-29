@@ -66,11 +66,24 @@ export const SEO_CATEGORY_DEFINITIONS = [
     description: 'electrodomesticos, tecnologia y electronica',
   },
   {
-    slug: 'supermercado',
+    slug: 'combustible',
+    category: 'combustible',
+    aliases: ['combustibles', 'nafta'],
+    label: 'Combustible',
+    description: 'estaciones de servicio y combustibles',
+  },
+  {
+    slug: 'supermercados',
+    category: 'supermercados',
+    aliases: ['supermercado'],
+    label: 'Supermercados',
+    description: 'supermercados e hipermercados',
+  },
+  {
+    slug: 'shopping',
     category: 'shopping',
-    aliases: ['shopping'],
-    label: 'Supermercado',
-    description: 'supermercados, tiendas y compras diarias',
+    label: 'Shopping',
+    description: 'shoppings y tiendas retail',
   },
   {
     slug: 'otros',

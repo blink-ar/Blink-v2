@@ -1300,7 +1300,7 @@ describe('merchant-first serverless helpers', () => {
     const merchant = {
       merchantId: 'merchant_1',
       merchantName: 'Coto',
-      categories: ['shopping'],
+      categories: ['supermercados'],
       banks: ['Banco Galicia'],
       searchProfile: {
         benefits: [{ bankName: 'Banco Galicia' }]
@@ -1337,17 +1337,17 @@ describe('merchant-first serverless helpers', () => {
 
     const req = {};
     const res = createResponseCapture();
-    const url = new URL('https://www.blinkapp.com.ar/api/categorias/supermercado');
+    const url = new URL('https://www.blinkapp.com.ar/api/categorias/supermercados');
 
-    await handleCategorySeoPage(req as never, res as never, url, db as never, 'supermercado', undefined, {
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'supermercados', undefined, {
       appShell: merchantSeoAppShell,
       siteUrl: 'https://www.blinkapp.com.ar'
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
-    expect(res.body).toContain('<title>Comercios de Supermercado con descuentos | Blink</title>');
-    expect(res.body).toContain('<h1>Comercios de Supermercado con descuentos</h1>');
+    expect(res.body).toContain('<title>Comercios de Supermercados con descuentos | Blink</title>');
+    expect(res.body).toContain('<h1>Comercios de Supermercados con descuentos</h1>');
     expect(res.body).toContain('href="/comercios/coto--merchant_1"');
     expect(res.body).toContain('Banco Galicia');
     expect(res.body).toContain('src="/assets/index-test.js"');
@@ -1356,7 +1356,7 @@ describe('merchant-first serverless helpers', () => {
       isActive: { $ne: false },
       merchantId: { $exists: true, $type: 'string' },
       benefitCount: { $gt: 0 },
-      categories: { $in: ['shopping'] }
+      categories: { $in: ['supermercados'] }
     });
   });
 
@@ -1406,12 +1406,12 @@ describe('merchant-first serverless helpers', () => {
 
     const req = {};
     const res = createResponseCapture();
-    const url = new URL('https://example.com/api/categorias/shopping');
+    const url = new URL('https://example.com/api/categorias/supermercado');
 
-    await handleCategorySeoPage(req as never, res as never, url, db as never, 'shopping');
+    await handleCategorySeoPage(req as never, res as never, url, db as never, 'supermercado');
 
     expect(res.statusCode).toBe(301);
-    expect(res.headers.Location).toBe('/categorias/supermercado');
+    expect(res.headers.Location).toBe('/categorias/supermercados');
   });
 
   it('handleCategorySeoPage returns 404 for out-of-range category pages', async () => {
