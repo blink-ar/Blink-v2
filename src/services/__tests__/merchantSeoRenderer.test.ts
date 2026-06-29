@@ -66,7 +66,8 @@ describe('merchant SEO renderer', () => {
       ],
     });
 
-    expect(html).toContain('<title>Coto &lt;Especial&gt; descuentos y promociones | Blink</title>');
+    expect(html).toContain('<title>Coto &lt;Especial&gt;: 35% OFF con Banco Galicia | Blink</title>');
+    expect(html).toContain('Destacado: 35% OFF con Banco Galicia');
     expect(html).toContain('<h1>Coto &lt;Especial&gt; descuentos y promociones</h1>');
     expect(html).toContain('Banco Galicia y BBVA');
     expect(html).toContain('Buenos Aires');
