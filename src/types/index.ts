@@ -142,7 +142,9 @@ export type Category =
   | 'jugueterias'
   | 'hogar'
   | 'electro'
-  | 'shopping';
+  | 'shopping'
+  | 'supermercados'
+  | 'combustible';
 
 export interface Benefit {
   id: string;
