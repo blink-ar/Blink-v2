@@ -58,14 +58,16 @@ function mapSearchResponseToBusinessesResponse(
     category?: string;
     bank?: string;
     search?: string;
+    includeExpired?: boolean;
   }
 ): BusinessesApiResponse {
   const businesses = normalizeBusinesses(
     (searchData.merchants || []).map((merchantHit) => ({
       ...merchantHit.business,
       aliases: merchantHit.aliases || [],
-    }))
-  ).filter((business) => business.benefits.length > 0);
+    })),
+    { includeExpired: options.includeExpired }
+  );
 
   return {
     success: searchData.success,
@@ -279,7 +281,8 @@ export async function fetchBusinessesPaginated(options: {
         offset,
         category,
         bank,
-        search
+        search,
+        includeExpired
       });
     } catch (error) {
       console.error('[API] fetchSearch failed, falling back to legacy businesses endpoint:', error);

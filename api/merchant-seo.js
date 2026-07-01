@@ -548,7 +548,7 @@ export function getMerchantSeoPathFromMerchant(merchant) {
 
 export function isMerchantBenefitActive(benefit, now = new Date()) {
   const validUntil = String(benefit?.validUntil || '').trim();
-  if (!validUntil) return true;
+  if (!validUntil) return false;
 
   if (DATE_ONLY_PATTERN.test(validUntil)) {
     return validUntil >= formatLocalDateOnly(now);
