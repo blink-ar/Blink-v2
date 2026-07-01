@@ -23,16 +23,16 @@ describe('benefit activity helpers', () => {
     expect(isBenefitActive(makeBenefit('2026-05-11'), now)).toBe(false);
   });
 
-  it('treats missing validUntil as active', () => {
-    expect(isBenefitActive(makeBenefit(null), now)).toBe(true);
-    expect(isBenefitActive(makeBenefit(undefined), now)).toBe(true);
+  it('treats missing validUntil as inactive', () => {
+    expect(isBenefitActive(makeBenefit(null), now)).toBe(false);
+    expect(isBenefitActive(makeBenefit(undefined), now)).toBe(false);
   });
 
-  it('filters only expired benefits out of a mixed list', () => {
+  it('filters benefits without validUntil out of a mixed list', () => {
     const active = makeBenefit('2026-05-12');
     const openEnded = makeBenefit(null);
     const expired = makeBenefit('2026-03-25');
 
-    expect(filterActiveBenefits([active, openEnded, expired], now)).toEqual([active, openEnded]);
+    expect(filterActiveBenefits([active, openEnded, expired], now)).toEqual([active]);
   });
 });

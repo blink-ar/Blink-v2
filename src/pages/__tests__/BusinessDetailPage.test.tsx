@@ -236,6 +236,7 @@ describe('BusinessDetailPage', () => {
           icon: 'credit_card',
           installments: 6,
           cuando: 'Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo',
+          validUntil: ACTIVE_VALID_UNTIL,
           eligibilities: [
             {
               bank: 'nacion',

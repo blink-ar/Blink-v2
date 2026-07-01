@@ -10,7 +10,7 @@ export const formatLocalDateOnly = (date: Date): string => [
 
 export const isBenefitActive = (benefit: Pick<BankBenefit, 'validUntil'>, now = new Date()): boolean => {
   const validUntil = benefit.validUntil?.trim();
-  if (!validUntil) return true;
+  if (!validUntil) return false;
 
   if (DATE_ONLY_PATTERN.test(validUntil)) {
     return validUntil >= formatLocalDateOnly(now);

@@ -39,6 +39,7 @@ import {
 import { getOptimizedImageUrl } from '../utils/images';
 import { hasInAppHistory } from '../utils/navigation';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { isBenefitActive } from '../utils/benefits';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L' },
@@ -52,22 +53,6 @@ const BENEFIT_DAYS = [
 
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
-
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const formatLocalDateOnly = (date: Date): string => [
-  date.getFullYear(),
-  String(date.getMonth() + 1).padStart(2, '0'),
-  String(date.getDate()).padStart(2, '0'),
-].join('-');
-
-const isBenefitActive = (validUntil: string | null | undefined, now = new Date()): boolean => {
-  const v = validUntil?.trim();
-  if (!v) return true;
-  if (DATE_ONLY_PATTERN.test(v)) return v >= formatLocalDateOnly(now);
-  const t = Date.parse(v);
-  return Number.isFinite(t) && t >= now.getTime();
-};
 
 const parseBenefitIndex = (benefitIndex?: string): number => {
   const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
@@ -416,7 +401,7 @@ function BenefitDetailPage() {
 
   const subscriptionName = getSubscriptionName(benefit.subscription);
   const subscription = getSubscriptionById(benefit.subscription);
-  const isExpired = !isBenefitActive(benefit.validUntil);
+  const isExpired = !isBenefitActive(benefit);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);

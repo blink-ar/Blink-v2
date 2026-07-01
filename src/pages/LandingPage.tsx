@@ -55,7 +55,7 @@ async function fetchLandingBusinesses(bank: string, category: string): Promise<B
       }
     }
 
-    if (!response.pagination.hasMore || pageItems.length === 0) {
+    if (!response.pagination.hasMore) {
       break;
     }
   }

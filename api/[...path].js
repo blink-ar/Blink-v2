@@ -509,8 +509,6 @@ function getActiveBenefitsMatch(searchParams, now = new Date()) {
         },
         in: {
           $or: [
-            { $eq: ['$$validUntilValue', null] },
-            { $eq: ['$$validUntilValue', ''] },
             {
               $and: [
                 { $eq: [{ $type: '$$validUntilValue' }, 'string'] },
