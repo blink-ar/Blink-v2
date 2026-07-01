@@ -58,6 +58,13 @@ const DESKTOP_CATEGORY_CARDS = [
     tone: { bg: '#F0FDF4', color: '#14532D', border: '#BBF7D0' },
   },
   {
+    token: 'combustible',
+    label: 'Combustible',
+    icon: 'local_gas_station',
+    description: 'Reintegros y beneficios para cargar nafta y diesel.',
+    tone: { bg: '#FFF7ED', color: '#9A3412', border: '#FED7AA' },
+  },
+  {
     token: 'viajes',
     label: 'Viajes',
     icon: 'flight',
