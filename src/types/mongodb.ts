@@ -89,7 +89,9 @@ export type Category =
     | 'jugueterias'
     | 'hogar'
     | 'electro'
-    | 'shopping';
+    | 'shopping'
+    | 'supermercados'
+    | 'combustible';
 
 /**
  * Raw MongoDB response structure (for internal API use)

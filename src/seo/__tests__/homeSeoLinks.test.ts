@@ -6,7 +6,7 @@ describe('home SEO links', () => {
     expect(HOME_CATEGORY_LINKS).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ href: '/categorias/gastronomia' }),
-        expect.objectContaining({ href: '/categorias/supermercado' }),
+        expect.objectContaining({ href: '/categorias/supermercados' }),
       ])
     );
     expect(HOME_DISCOUNT_LINKS).toEqual(

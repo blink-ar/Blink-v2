@@ -10,7 +10,7 @@ export const HOME_CATEGORY_LINKS: HomeSeoLink[] = SEO_CATEGORY_LINKS
   .filter((category) => [
     'gastronomia',
     'moda',
-    'supermercado',
+    'supermercados',
     'hogar',
     'deportes',
     'belleza',

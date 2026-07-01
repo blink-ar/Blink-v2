@@ -51,11 +51,18 @@ const DESKTOP_CATEGORY_CARDS = [
     tone: { bg: '#FCE7F3', color: '#9D174D', border: '#FBCFE8' },
   },
   {
-    token: 'shopping',
+    token: 'supermercados',
     label: 'Supermercado',
     icon: 'shopping_cart',
     description: 'Ahorros cotidianos en compras grandes y reposición semanal.',
     tone: { bg: '#F0FDF4', color: '#14532D', border: '#BBF7D0' },
+  },
+  {
+    token: 'combustible',
+    label: 'Combustible',
+    icon: 'local_gas_station',
+    description: 'Reintegros y beneficios para cargar nafta y diesel.',
+    tone: { bg: '#FFF7ED', color: '#9A3412', border: '#FED7AA' },
   },
   {
     token: 'viajes',
