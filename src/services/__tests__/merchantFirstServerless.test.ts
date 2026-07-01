@@ -1410,7 +1410,7 @@ describe('merchant-first serverless helpers', () => {
     expect(res.body).toContain('disambiguatingDescription');
     expect(res.body).toContain('FAQPage');
     expect(res.body).toContain('href="https://www.blinkapp.com.ar/search"');
-    expect(res.body).toContain('href="/categorias/supermercado"');
+    expect(res.body).toContain('href="/categorias/supermercados"');
     expect(res.body).toContain('src="/assets/index-test.js"');
   });
 
