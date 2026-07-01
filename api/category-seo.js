@@ -11,6 +11,12 @@ const DEFAULT_SITE_NAME = 'Blink';
 const DEFAULT_SITE_URL = 'https://www.blinkapp.com.ar';
 const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 const CATEGORY_PAGE_SIZE = 100;
+const CATEGORY_SEO_SORT = {
+  maxDiscountPercentage: -1,
+  activeBenefitCount: -1,
+  benefitCount: -1,
+  merchantName: 1,
+};
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -26,8 +32,8 @@ function escapeJsonForHtml(value) {
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/&/g, '\\u0026')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
+    .split(String.fromCharCode(0x2028)).join('\\' + 'u2028')
+    .split(String.fromCharCode(0x2029)).join('\\' + 'u2029');
 }
 
 function toAbsoluteUrl(siteUrl, pathOrUrl) {
@@ -307,7 +313,7 @@ export async function loadCategorySeoData({ db, merchantCollectionName, category
     isActive: { $ne: false },
     merchantId: { $exists: true, $type: 'string' },
     benefitCount: { $gt: 0 },
-    categories: { $in: [category.category] },
+    categories: category.category,
   };
   const projection = {
     _id: 0,
@@ -330,7 +336,7 @@ export async function loadCategorySeoData({ db, merchantCollectionName, category
 
   const merchants = await collection
     .find(query, { projection })
-    .sort({ activeBenefitCount: -1, benefitCount: -1, merchantName: 1 })
+    .sort(CATEGORY_SEO_SORT)
     .skip((safePage - 1) * CATEGORY_PAGE_SIZE)
     .limit(CATEGORY_PAGE_SIZE)
     .toArray();

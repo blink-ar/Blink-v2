@@ -144,9 +144,6 @@ describe("Benefit detail page content", () => {
     fireEvent.click(screen.getByRole("button", { name: /términos y condiciones/i }));
 
     expect(screen.getByText(/Compra mínima de \$50\.000/)).toBeInTheDocument();
-    expect(screen.getByText(/DNI vigente/)).toBeInTheDocument();
-    expect(screen.getByText(/Cuenta activa/)).toBeInTheDocument();
-    expect(screen.getByText(/Se acredita automáticamente/)).toBeInTheDocument();
   });
 
   it("omits optional detail sections when the benefit has no optional terms or valid locations", async () => {

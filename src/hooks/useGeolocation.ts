@@ -205,7 +205,7 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
       // request when the caller explicitly opted in.
       const stored = localStorage.getItem(STORAGE_KEYS.permission);
       if (stored === 'denied') {
-        setState({ position: null, error: 'Permission denied', loading: false, permissionDenied: true });
+        resolveDenied();
       } else if (autoRequest) {
         runRequest();
       } else {

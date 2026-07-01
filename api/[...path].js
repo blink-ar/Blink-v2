@@ -99,6 +99,7 @@ const BENEFIT_SUMMARY_PROJECTION = {
   _id: 1,
   id: 1,
   merchantId: 1,
+  merchantIds: 1,
   eligibilities: 1,
   benefitTitle: 1,
   availableDays: 1,
@@ -597,13 +598,254 @@ function combineQueriesWithAnd(...conditions) {
   };
 }
 
+function normalizeBenefitMerchantIds(value) {
+  if (!Array.isArray(value)) return [];
+
+  const ids = [];
+  const seen = new Set();
+  for (const entry of value) {
+    const merchantId = typeof entry === 'string' ? entry.trim() : String(entry || '').trim();
+    if (!merchantId || seen.has(merchantId)) continue;
+    seen.add(merchantId);
+    ids.push(merchantId);
+  }
+  return ids;
+}
+
+function toNonEmptyString(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function hasMeaningfulSingularMerchantField(value, field) {
+  const fieldValue = value?.[field];
+  if (fieldValue === null || fieldValue === undefined) return false;
+  if (field === 'merchantId') return Boolean(toNonEmptyString(fieldValue));
+  if (typeof fieldValue === 'object') return Object.keys(fieldValue).length > 0;
+  return Boolean(toNonEmptyString(fieldValue));
+}
+
+function trimMongoStringExpression(input) {
+  return {
+    $trim: {
+      input: {
+        $convert: {
+          input,
+          to: 'string',
+          onError: '',
+          onNull: ''
+        }
+      }
+    }
+  };
+}
+
+function normalizedMerchantIdsExpression(input = '$merchantIds') {
+  return {
+    $setUnion: [
+      {
+        $filter: {
+          input: {
+            $map: {
+              input: {
+                $cond: [{ $isArray: input }, input, []]
+              },
+              as: 'merchantId',
+              in: trimMongoStringExpression('$$merchantId')
+            }
+          },
+          as: 'merchantId',
+          cond: {
+            $ne: ['$$merchantId', '']
+          }
+        }
+      },
+      []
+    ]
+  };
+}
+
+function meaningfulSingularMerchantFieldExpression(path) {
+  return {
+    $let: {
+      vars: {
+        value: { $ifNull: [path, null] },
+        valueType: { $type: { $ifNull: [path, null] } }
+      },
+      in: {
+        $switch: {
+          branches: [
+            {
+              case: { $eq: ['$$valueType', 'null'] },
+              then: false
+            },
+            {
+              case: { $eq: ['$$valueType', 'object'] },
+              then: { $gt: [{ $size: { $objectToArray: '$$value' } }, 0] }
+            },
+            {
+              case: { $eq: ['$$valueType', 'array'] },
+              then: { $gt: [{ $size: '$$value' }, 0] }
+            }
+          ],
+          default: { $ne: [trimMongoStringExpression('$$value'), ''] }
+        }
+      }
+    }
+  };
+}
+
+function assertValidBenefitMerchantLinkage(benefit) {
+  const merchantIds = normalizeBenefitMerchantIds(benefit?.merchantIds);
+  if (merchantIds.length <= 1) return;
+
+  const singularFields = ['merchantId', 'merchant', 'merchantSnapshot'].filter((field) =>
+    hasMeaningfulSingularMerchantField(benefit, field)
+  );
+  if (singularFields.length === 0) return;
+
+  const id = benefit?.id || benefit?._id?.toString?.() || '(unknown)';
+  throw new Error(`Confirmed benefit ${id} has multiple merchantIds and singular merchant field(s): ${singularFields.join(', ')}`);
+}
+
+function getEffectiveBenefitMerchantIds(benefit) {
+  assertValidBenefitMerchantLinkage(benefit);
+
+  const merchantIds = normalizeBenefitMerchantIds(benefit?.merchantIds);
+  if (merchantIds.length > 0) return merchantIds;
+
+  const legacyMerchantId = typeof benefit?.merchantId === 'string' ? benefit.merchantId.trim() : '';
+  return legacyMerchantId ? [legacyMerchantId] : [];
+}
+
+function collectEffectiveBenefitMerchantIds(benefits) {
+  const ids = [];
+  const seen = new Set();
+  for (const benefit of benefits || []) {
+    for (const merchantId of getEffectiveBenefitMerchantIds(benefit)) {
+      if (seen.has(merchantId)) continue;
+      seen.add(merchantId);
+      ids.push(merchantId);
+    }
+  }
+  return ids;
+}
+
+function missingOrEmptyMerchantIdsQuery() {
+  return {
+    $expr: { $eq: [{ $size: normalizedMerchantIdsExpression('$merchantIds') }, 0] }
+  };
+}
+
+function buildBenefitMerchantLinkQueryForIds(merchantIds) {
+  const ids = Array.from(new Set((merchantIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
+  if (ids.length === 0) return { _id: { $exists: false } };
+
+  // Merchant hydration is a hot path; stored merchantIds are normalized before write.
+  return {
+    $or: [
+      { merchantIds: { $in: ids } },
+      {
+        $and: [
+          { merchantId: { $in: ids } },
+          missingOrEmptyMerchantIdsQuery()
+        ]
+      }
+    ]
+  };
+}
+
+function buildBenefitMerchantLinkQuery(merchantId) {
+  return buildBenefitMerchantLinkQueryForIds([merchantId]);
+}
+
+function invalidMultiMerchantBenefitQuery() {
+  return {
+    'merchantIds.1': { $exists: true },
+    $expr: { $gt: [{ $size: normalizedMerchantIdsExpression('$merchantIds') }, 1] },
+    $or: [
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchantId') },
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchant') },
+      { $expr: meaningfulSingularMerchantFieldExpression('$merchantSnapshot') }
+    ]
+  };
+}
+
+function effectiveMerchantIdsExpression() {
+  return {
+    $let: {
+      vars: {
+        merchantIds: normalizedMerchantIdsExpression('$merchantIds'),
+        legacyMerchantId: trimMongoStringExpression('$merchantId')
+      },
+      in: {
+        $cond: [
+          { $gt: [{ $size: '$$merchantIds' }, 0] },
+          '$$merchantIds',
+          {
+            $cond: [
+              { $ne: ['$$legacyMerchantId', ''] },
+              ['$$legacyMerchantId'],
+              []
+            ]
+          }
+        ]
+      }
+    }
+  };
+}
+
+async function assertNoInvalidMultiMerchantBenefits(collection, match = {}) {
+  const query = combineQueriesWithAnd(match, invalidMultiMerchantBenefitQuery());
+  const invalid = await collection.findOne(query, { projection: { _id: 1, id: 1 } });
+  if (!invalid) return;
+
+  throw new Error(`Confirmed benefit ${invalid.id || invalid._id?.toString?.() || '(unknown)'} has multiple merchantIds and singular merchant fields`);
+}
+
+async function countBenefitApplications(collection, match = {}) {
+  const [result] = await collection
+    .aggregate([
+      ...(Object.keys(match).length > 0 ? [{ $match: match }] : []),
+      { $project: { effectiveMerchantIds: effectiveMerchantIdsExpression() } },
+      { $unwind: '$effectiveMerchantIds' },
+      { $count: 'count' }
+    ])
+    .toArray();
+
+  return Number(result?.count || 0);
+}
+
+function groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, allowedMerchantIds = null) {
+  const allowed = allowedMerchantIds ? new Set(allowedMerchantIds) : null;
+  const grouped = new Map();
+
+  for (const benefit of rawBenefits || []) {
+    const summary = buildBusinessBenefitSummary(benefit, cardNameLookup);
+    for (const merchantId of getEffectiveBenefitMerchantIds(benefit)) {
+      if (allowed && !allowed.has(merchantId)) continue;
+      if (!grouped.has(merchantId)) {
+        grouped.set(merchantId, []);
+      }
+      grouped.get(merchantId).push(summary);
+    }
+  }
+
+  return grouped;
+}
+
 function rehydrateBenefitDoc(benefit, merchant) {
-  if (!merchant) {
-    return serializeDocWithId(benefit);
+  const merchantIds = getEffectiveBenefitMerchantIds(benefit);
+  if (!merchant || merchantIds.length !== 1) {
+    return serializeDocWithId({
+      ...benefit,
+      merchantIds
+    });
   }
 
   return serializeDocWithId({
     ...benefit,
+    merchantIds,
     merchant: {
       name: merchant.merchantName || benefit?.merchant?.name || 'Unknown Merchant'
     },
@@ -763,6 +1005,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
 
   return {
     id: benefit?.id || benefit?._id?.toString?.() || null,
+    merchantIds: getEffectiveBenefitMerchantIds(benefit),
     eligibilities,
     bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Proveedor',
     cardName: cardNames[0] || 'Tarjeta de credito',
@@ -1454,9 +1697,7 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     return merchants || [];
   }
 
-  const benefitQuery = {
-    merchantId: { $in: merchantIds }
-  };
+  let benefitQuery = buildBenefitMerchantLinkQueryForIds(merchantIds);
   const bank = searchParams.get('bank');
   const bankPatterns = buildProviderFilterRegexes(providerCatalog, bank);
 
@@ -1470,16 +1711,7 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     .sort({ 'eligibilities.bank': 1, benefitTitle: 1 })
     .toArray();
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
-  const benefitsByMerchant = new Map();
-
-  for (const benefit of rawBenefits) {
-    const key = benefit?.merchantId;
-    if (!key) continue;
-    if (!benefitsByMerchant.has(key)) {
-      benefitsByMerchant.set(key, []);
-    }
-    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
-  }
+  const benefitsByMerchant = groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, merchantIds);
 
   return merchants.map((merchant) => {
     if (!merchant?.merchantId) {
@@ -1989,7 +2221,7 @@ async function handleGetBenefits(req, res, url, db) {
   const limitNum = toPositiveInt(searchParams.get('limit'), 50, 100);
   const offsetNum = toPositiveInt(searchParams.get('offset'), 0);
 
-  const query = {};
+  let query = {};
 
   if (bank) {
     const bankPatterns = buildProviderFilterRegexes(providerCatalog, bank);
@@ -2035,7 +2267,7 @@ async function handleGetBenefits(req, res, url, db) {
         }
       });
     }
-    query.merchantId = { $in: merchantIds };
+    query = combineQueriesWithAnd(query, buildBenefitMerchantLinkQueryForIds(merchantIds));
   }
 
   applyActiveBenefitsFilter(query, searchParams);
@@ -2047,13 +2279,17 @@ async function handleGetBenefits(req, res, url, db) {
   ]);
   const merchantMap = await loadMerchantMapByIds(
     db,
-    benefits.map((benefit) => benefit.merchantId).filter(Boolean)
+    collectEffectiveBenefitMerchantIds(benefits)
   );
 
   setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
-    benefits: benefits.map((benefit) => rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))),
+    benefits: benefits.map((benefit) => {
+      const merchantIdsForBenefit = getEffectiveBenefitMerchantIds(benefit);
+      const merchant = merchantIdsForBenefit.length === 1 ? merchantMap.get(merchantIdsForBenefit[0]) : null;
+      return rehydrateBenefitDoc(benefit, merchant);
+    }),
     pagination: {
       total,
       limit: limitNum,
@@ -2094,11 +2330,13 @@ async function handleGetBenefitById(req, res, url, db, id) {
     });
   }
 
-  const merchantMap = await loadMerchantMapByIds(db, [benefit.merchantId].filter(Boolean));
+  const merchantIdsForBenefit = getEffectiveBenefitMerchantIds(benefit);
+  const merchantMap = await loadMerchantMapByIds(db, merchantIdsForBenefit);
+  const merchant = merchantIdsForBenefit.length === 1 ? merchantMap.get(merchantIdsForBenefit[0]) : null;
   setCacheControl(res, CC_CONTENT);
   return json(res, 200, {
     success: true,
-    benefit: rehydrateBenefitDoc(benefit, merchantMap.get(benefit.merchantId))
+    benefit: rehydrateBenefitDoc(benefit, merchant)
   });
 }
 
@@ -2185,6 +2423,7 @@ async function handleGetStats(req, res, url, db) {
   const collectionName = getCollectionName(searchParams);
   const collection = db.collection(collectionName);
   const activeMatch = getActiveBenefitsMatch(searchParams) || {};
+  await assertNoInvalidMultiMerchantBenefits(collection, activeMatch);
 
   const [
     totalBenefits,
@@ -2193,12 +2432,14 @@ async function handleGetStats(req, res, url, db) {
     topCategories,
     topBanks
   ] = await Promise.all([
-    collection.countDocuments(activeMatch),
-    collection.countDocuments({ ...activeMatch, online: true }),
-    collection.countDocuments({ ...activeMatch, online: false }),
+    countBenefitApplications(collection, activeMatch),
+    countBenefitApplications(collection, combineQueriesWithAnd(activeMatch, { online: true })),
+    countBenefitApplications(collection, combineQueriesWithAnd(activeMatch, { online: false })),
     collection
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
+        { $project: { categories: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
+        { $unwind: '$effectiveMerchantIds' },
         { $unwind: '$categories' },
         { $group: { _id: '$categories', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -2208,6 +2449,8 @@ async function handleGetStats(req, res, url, db) {
     collection
       .aggregate([
         ...(Object.keys(activeMatch).length > 0 ? [{ $match: activeMatch }] : []),
+        { $project: { eligibilities: 1, effectiveMerchantIds: effectiveMerchantIdsExpression() } },
+        { $unwind: '$effectiveMerchantIds' },
         { $unwind: '$eligibilities' },
         { $group: { _id: '$eligibilities.bank', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -2261,7 +2504,7 @@ async function loadCoreSeoSummary(db) {
       topCategories,
       topBanks
     ] = await Promise.all([
-      benefitsCollection.countDocuments(activeBenefitMatch),
+      countBenefitApplications(benefitsCollection, activeBenefitMatch),
       merchantCollection.countDocuments(indexableMerchantQuery),
       merchantCollection.countDocuments(activeMerchantQuery),
       merchantCollection
@@ -2695,9 +2938,7 @@ async function handleGetBusinesses(req, res, url, db) {
   }
 
   const merchantIds = pagedMerchants.map((merchant) => merchant.merchantId).filter(Boolean);
-  const benefitQuery = {
-    merchantId: { $in: merchantIds }
-  };
+  let benefitQuery = buildBenefitMerchantLinkQueryForIds(merchantIds);
 
   if (bankPatterns && bankPatterns.length > 0) {
     benefitQuery['eligibilities.bank'] = { $in: bankPatterns };
@@ -2717,15 +2958,7 @@ async function handleGetBusinesses(req, res, url, db) {
       .toArray()
     : [];
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
-  const benefitsByMerchant = new Map();
-  for (const benefit of rawBenefits) {
-    const key = benefit.merchantId;
-    if (!key) continue;
-    if (!benefitsByMerchant.has(key)) {
-      benefitsByMerchant.set(key, []);
-    }
-    benefitsByMerchant.get(key).push(buildBusinessBenefitSummary(benefit, cardNameLookup));
-  }
+  const benefitsByMerchant = groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, merchantIds);
 
   const businesses = pagedMerchants
     .map((merchant) => ({
@@ -2808,9 +3041,7 @@ async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
 
   const rawBenefits = await db.collection(DEFAULT_COLLECTION)
     .find(
-      {
-        merchantId: parsed.merchantId
-      },
+      buildBenefitMerchantLinkQuery(parsed.merchantId),
       {
         projection: BENEFIT_SUMMARY_PROJECTION
       }
@@ -3036,6 +3267,7 @@ export {
   handleGetBenefitById,
   handleGetBenefits,
   handleGetBanks,
+  handleGetStats,
   handleGetBusinesses,
   handleDiscountSearchGuideSeoPage,
   handleHomeSeoPage,
