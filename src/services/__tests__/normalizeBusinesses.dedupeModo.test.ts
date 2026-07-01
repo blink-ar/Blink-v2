@@ -157,4 +157,24 @@ describe('normalizeBusinesses Modo dedup activity bucketing', () => {
     expect(business.benefits[0].id).toBe('modo-promos-raw-active');
     expect(business.benefits[0].acceptsModo).toBeUndefined();
   });
+
+  it('dedups a Modo/bank pair even when the Modo side has no validUntil and the bank side is active', () => {
+    const raw = makeRawBusiness([
+      makeRawBenefit({
+        id: 'modo-promos-raw-open-ended',
+        validUntil: null,
+      }),
+      makeRawBenefit({
+        id: 'bbva-active',
+        validUntil: '2026-06-30',
+      }),
+    ]);
+
+    const [business] = normalizeBusinesses([raw], { includeExpired: true });
+
+    expect(business.benefits).toHaveLength(1);
+    expect(business.benefits[0].id).toBe('bbva-active');
+    expect(business.benefits[0].acceptsModo).toBe(true);
+    expect(business.benefits[0].validUntil).toBe('2026-06-30');
+  });
 });

@@ -181,16 +181,29 @@ export function normalizeBusinesses(
       })
       : [];
     const now = new Date();
-    const activeBenefits: BankBenefit[] = [];
-    const expiredBenefits: BankBenefit[] = [];
+    // Keep benefits with no validUntil grouped with active ones for dedup: a Modo
+    // entry with no end date and a bank entry with a future one are the same promo,
+    // and must be merged before we decide which bucket they land in. Benefits with a
+    // known past validUntil are kept apart so they can't absorb an active/open-ended match.
+    const definitelyExpired: BankBenefit[] = [];
+    const dedupeCandidates: BankBenefit[] = [];
     benefits.forEach((b) => {
-      if (isBenefitActive(b, now)) activeBenefits.push(b);
-      else expiredBenefits.push(b);
+      const hasKnownValidUntil = Boolean(b.validUntil?.trim());
+      if (hasKnownValidUntil && !isBenefitActive(b, now)) definitelyExpired.push(b);
+      else dedupeCandidates.push(b);
     });
-    const dedupedActive = dedupeModoBenefits(activeBenefits);
+
+    const dedupedCandidates = dedupeModoBenefits(dedupeCandidates);
+    const activeBenefits: BankBenefit[] = [];
+    const openEndedBenefits: BankBenefit[] = [];
+    dedupedCandidates.forEach((b) => {
+      if (isBenefitActive(b, now)) activeBenefits.push(b);
+      else openEndedBenefits.push(b);
+    });
+
     const visibleBenefits = options.includeExpired
-      ? [...dedupedActive, ...dedupeModoBenefits(expiredBenefits)]
-      : dedupedActive;
+      ? [...activeBenefits, ...openEndedBenefits, ...dedupeModoBenefits(definitelyExpired)]
+      : activeBenefits;
 
     const category = raw.category || raw.categories?.[0] || 'otros';
     const GENERIC_DEFAULT = 'https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg';

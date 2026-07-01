@@ -2783,8 +2783,6 @@ describe('merchant-first serverless helpers', () => {
           },
           in: {
             $or: [
-              { $eq: ['$$validUntilValue', null] },
-              { $eq: ['$$validUntilValue', ''] },
               {
                 $and: [
                   { $eq: [{ $type: '$$validUntilValue' }, 'string'] },
