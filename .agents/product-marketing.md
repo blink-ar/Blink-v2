@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-*Last updated: 2026-06-17*
+*Last updated: 2026-06-26*
 
 ## Product Overview
 **One-liner:** Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas y beneficios antes de pagar.
@@ -138,6 +138,41 @@
 **Style:** Conversacional, claro y accionable. Priorizar datos concretos: comercio, porcentaje, tope, día, vigencia, medio de pago y link.
 
 **Personality:** Práctico, confiable, cercano, rápido, transparente.
+
+## Visual Identity & Brand Palette
+**Source:** `/Users/tomas/Downloads/blink-paleta-marca.pdf`, paleta final de marca al 2026-06-26.
+
+**Marketing use:** Usar esta paleta para generación de imágenes promocionales, placas sociales, creatividades de campaña, assets de performance, landings, emails y cualquier otro elemento visual de marketing de Blink.
+
+**Color strategy:** La paleta combina el violeta y negro de "home" con el verde de "search". Cada color tiene un rol fijo: si algo comunica descuento, ahorro, éxito o "pagás menos", va en verde; si es una acción, CTA, link o elemento que debe asociarse a Blink, va en violeta.
+
+| Role | HEX | Use |
+|------|-----|-----|
+| Primario / Acción | `#4338CA` | Botones, CTAs, links y elementos que deben asociarse directamente a Blink. |
+| Acento / Brillo | `#676BF2` | Gradientes, estados hover y fondos vivos. No usar con texto chico encima. |
+| Ahorro / Éxito | `#059669` | Descuentos, números positivos, ahorro, "pagás menos", ticks y datos que deben cargar el significado del producto. |
+| Texto / Titulares | `#1C1C1E` | Texto principal y titulares. Usar este negro real en vez de `#000000`. |
+| Fondo suave | `#EEF2FF` | Fondos de placas, cards y secciones. |
+| Base | `#FFFFFF` | Fondo limpio, respiración y texto sobre violeta o verde cuando el contraste aplica. |
+
+**Composition rule:** Aplicar 60-30-10 en piezas promocionales. Usar 60% base (`#FFFFFF` o `#EEF2FF`) como lienzo; 30% estructura con primario (`#4338CA`) y texto (`#1C1C1E`); 10% acento con ahorro (`#059669`) o un toque de brillo (`#676BF2`). Para una placa de simulación de ahorro: fondo `#EEF2FF`, titular/texto `#1C1C1E`, CTA `#4338CA`, número de ahorro en `#059669`.
+
+**Safe contrast combinations:**
+- `#1C1C1E` sobre `#FFFFFF` o `#EEF2FF`: seguro para texto chico y grande.
+- `#FFFFFF` sobre `#4338CA`: seguro para botones y CTAs.
+- `#059669` sobre `#FFFFFF`: ideal para números, precios y mensajes de ahorro.
+- `#FFFFFF` sobre `#676BF2` o `#059669`: solo para texto grande, títulos o números gigantes; no usar para texto chico.
+
+**Avoid:**
+- No usar el verde `#059669` para algo que no sea ahorro, descuento, éxito o dato positivo.
+- No poner texto chico sobre `#676BF2`; para botones usar siempre `#4338CA`.
+- No usar texto `#676BF2` sobre `#EEF2FF`; tiene poco contraste.
+- No mezclar neutros cálidos como `#F7F6F4` con los lavanda fríos; Blink debe quedarse en el mundo frío.
+- No usar más de dos colores fuertes por placa; violeta + verde ya dan suficiente contraste.
+- No tratar `#7C86F7` como color de marca; queda reservado solo para degradés si hace falta.
+- No usar `#F1F3FE` ni `#E9EDFB` como fondos de marca porque son redundantes frente a `#EEF2FF`.
+
+**Image generation guidance:** Al pedir imágenes promocionales, especificar "Blink brand palette: primary violet `#4338CA`, savings green `#059669`, dark text `#1C1C1E`, soft lavender `#EEF2FF`, white `#FFFFFF`". Priorizar composiciones limpias, mucho aire, texto legible, números de ahorro en verde, CTAs en violeta y no más de dos colores fuertes.
 
 ## Proof Points
 **Metrics:**

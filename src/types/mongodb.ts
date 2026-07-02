@@ -5,6 +5,7 @@
 export interface Benefit {
     id: string;
     merchant: Merchant; // The business/store where you can use the benefit
+    merchantIds?: string[];
     eligibilities: BenefitEligibility[];
     network: string; // Payment network (e.g., "VISA", "Mastercard")
     benefitTitle: string;
@@ -88,7 +89,9 @@ export type Category =
     | 'jugueterias'
     | 'hogar'
     | 'electro'
-    | 'shopping';
+    | 'shopping'
+    | 'supermercados'
+    | 'combustible';
 
 /**
  * Raw MongoDB response structure (for internal API use)
@@ -120,10 +123,18 @@ export interface RawBankSubscription {
 
 export interface RawMongoBenefit {
     _id: MongoObjectId;
-    merchant: {
+    merchant?: {
         name: string;
         type: string;
     };
+    merchantId?: string | null;
+    merchantIds?: string[];
+    merchantSnapshot?: {
+        merchantId?: string;
+        merchantKey?: string;
+        merchantName?: string;
+        kind?: string;
+    } | null;
     bank: string;
     network: string;
     cardTypes: {
@@ -224,6 +235,20 @@ export interface MongoStatsResponse {
 export const extractId = (mongoId: MongoObjectId): string => mongoId.$oid;
 export const formatMongoDate = (mongoDate: MongoDate): Date => new Date(mongoDate.$date);
 
+const normalizeMerchantIds = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const entry of value) {
+        const merchantId = String(entry || '').trim();
+        if (!merchantId || seen.has(merchantId)) continue;
+        seen.add(merchantId);
+        ids.push(merchantId);
+    }
+    return ids;
+};
+
 // Safe date formatter that handles various date formats
 export const safeFormatDate = (dateValue: unknown): string => {
     try {
@@ -301,6 +326,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
                 name: rawBenefit.merchant?.name || 'Unknown Merchant',
                 type: (rawBenefit.merchant?.type as Merchant['type']) || 'business'
             },
+            merchantIds: normalizeMerchantIds(rawBenefit.merchantIds),
             eligibilities: Array.isArray(rawBenefit.eligibilities) ? rawBenefit.eligibilities : [],
             network: rawBenefit.network || 'Unknown Network',
             benefitTitle: rawBenefit.benefitTitle || 'Benefit Available',
@@ -310,7 +336,8 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
             installments: rawBenefit.installments || null,
             categories: (rawBenefit.categories || []).filter(cat =>
                 ['gastronomia', 'moda', 'entretenimiento', 'otros', 'deportes', 'regalos',
-                    'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping'].includes(cat)
+                    'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping',
+                    'supermercados', 'combustible'].includes(cat)
             ) as Category[],
             termsAndConditions: rawBenefit.termsAndConditions || null,
             locations: transformedLocations,
@@ -338,6 +365,7 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
                 name: rawBenefit.merchant?.name || 'Unknown Merchant',
                 type: 'business'
             },
+            merchantIds: normalizeMerchantIds(rawBenefit.merchantIds),
             eligibilities: [],
             network: rawBenefit.network || 'Unknown Network',
             benefitTitle: rawBenefit.benefitTitle || 'Benefit Available',

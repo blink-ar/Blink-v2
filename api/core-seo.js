@@ -25,7 +25,7 @@ const BLINK_KNOWS_ABOUT = [
 const FEATURED_CATEGORIES = [
   { label: 'Gastronomía', href: '/categorias/gastronomia' },
   { label: 'Moda', href: '/categorias/moda' },
-  { label: 'Supermercado', href: '/categorias/supermercado' },
+  { label: 'Supermercados', href: '/categorias/supermercados' },
   { label: 'Hogar', href: '/categorias/hogar' },
   { label: 'Deportes', href: '/categorias/deportes' },
   { label: 'Belleza', href: '/categorias/belleza' },

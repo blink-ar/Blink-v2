@@ -62,10 +62,18 @@ export interface MongoDate {
 
 export interface RawMongoBenefit {
   _id: MongoObjectId;
-  merchant: {
+  merchant?: {
     name: string;
     type: string;
   };
+  merchantId?: string | null;
+  merchantIds?: string[];
+  merchantSnapshot?: {
+    merchantId?: string;
+    merchantKey?: string;
+    merchantName?: string;
+    kind?: string;
+  } | null;
   bank: string;
   network: string;
   cardTypes: {
@@ -197,7 +205,8 @@ export const transformRawBenefitToBenefit = (rawBenefit: RawMongoBenefit): Benef
     installments: rawBenefit.installments || null,
     categories: (rawBenefit.categories || []).filter(cat =>
       ['gastronomia', 'moda', 'entretenimiento', 'otros', 'deportes', 'regalos',
-        'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping'].includes(cat)
+        'viajes', 'automotores', 'belleza', 'jugueterias', 'hogar', 'electro', 'shopping',
+        'supermercados', 'combustible'].includes(cat)
     ) as Category[],
     termsAndConditions: rawBenefit.termsAndConditions || null,
     locations: transformedLocations,

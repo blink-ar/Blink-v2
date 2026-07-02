@@ -14,7 +14,8 @@ const CATEGORIES = [
   { id: 'jugueterias', label: 'Jugueterías', emoji: '🧸', bg: '#EEF2FF', text: '#78350F' },
   { id: 'hogar', label: 'Hogar', emoji: '🏠', bg: '#ECFDF5', text: '#064E3B' },
   { id: 'electro', label: 'Electro', emoji: '💻', bg: '#EEF2FF', text: '#312E81' },
-  { id: 'shopping', label: 'Supermercado', emoji: '🛒', bg: '#F0FDF4', text: '#14532D' },
+  { id: 'supermercados', label: 'Supermercado', emoji: '🛒', bg: '#F0FDF4', text: '#14532D' },
+  { id: 'combustible', label: 'Combustible', emoji: '⛽', bg: '#FFF7ED', text: '#9A3412' },
   { id: 'otros', label: 'Otros', emoji: '📦', bg: '#F8FAFC', text: '#475569' },
 ];
 

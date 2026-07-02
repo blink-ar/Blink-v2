@@ -398,7 +398,7 @@ export class DataTransformationService extends AbstractBaseService {
         const validCategories: Category[] = [
             'gastronomia', 'moda', 'entretenimiento', 'otros', 'deportes',
             'regalos', 'viajes', 'automotores', 'belleza', 'jugueterias',
-            'hogar', 'electro', 'shopping'
+            'hogar', 'electro', 'shopping', 'supermercados', 'combustible'
         ];
 
         const normalizedCategory = category.toLowerCase().trim() as Category;

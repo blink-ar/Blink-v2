@@ -34,6 +34,7 @@ export interface BankBenefit {
   installments?: number | null;
   validUntil?: string | null;
   id?: string;
+  merchantIds?: string[];
   sourceCollection?: string | null;
   rawBenefitCollection?: string | null;
   source?: string | null;
@@ -141,7 +142,9 @@ export type Category =
   | 'jugueterias'
   | 'hogar'
   | 'electro'
-  | 'shopping';
+  | 'shopping'
+  | 'supermercados'
+  | 'combustible';
 
 export interface Benefit {
   id: string;

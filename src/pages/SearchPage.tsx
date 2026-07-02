@@ -204,7 +204,7 @@ function DesktopSearchFilters({
           <section>
             <SectionLabel icon="category" label="Categoria" />
             <div className="grid grid-cols-2 gap-2">
-              {CATEGORY_OPTIONS.slice(0, 10).map((option) => (
+              {CATEGORY_OPTIONS.map((option) => (
                 <Toggle
                   key={option.token}
                   active={selectedCategory === option.token}
