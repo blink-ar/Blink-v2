@@ -82,7 +82,7 @@ mobile/
 - Geolocation (browser API → Expo Location)
 - Caching (localStorage → AsyncStorage)
 - Scroll/list rendering (div → FlatList with infinite scroll)
-- Modals (CSS → React Native Modal)
+- Modals (CSS → .React Native Modal)
 
 ## Backend
 
