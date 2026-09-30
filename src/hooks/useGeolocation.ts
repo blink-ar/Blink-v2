@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseCoordinates } from '../../shared/coordinates.js';
 
 interface Coordinates {
   latitude: number;
@@ -55,8 +56,15 @@ const getCachedPosition = (): Coordinates | null => {
   const cached = localStorage.getItem(STORAGE_KEYS.position);
   const timestamp = localStorage.getItem(STORAGE_KEYS.timestamp);
   if (!cached || !timestamp) return null;
-  if (Date.now() - parseInt(timestamp) > CACHE_DURATION) return null;
-  return JSON.parse(cached);
+  const savedAt = Number(timestamp);
+  if (!Number.isFinite(savedAt) || Date.now() - savedAt > CACHE_DURATION) return null;
+  try {
+    const saved = JSON.parse(cached);
+    const coordinates = parseCoordinates(saved?.latitude, saved?.longitude);
+    return coordinates ? { latitude: coordinates.lat, longitude: coordinates.lng } : null;
+  } catch {
+    return null;
+  }
 };
 
 // Marks the permission as denied and broadcasts it to every instance.
@@ -82,9 +90,16 @@ const runRequest = () => {
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
+      const valid = parseCoordinates(pos.coords.latitude, pos.coords.longitude);
+      if (!valid) {
+        requestDispatched = false;
+        requestInFlight = false;
+        notifyListeners({ type: 'error', message: 'Invalid location coordinates' });
+        return;
+      }
       const coordinates = {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
+        latitude: valid.lat,
+        longitude: valid.lng,
       };
       localStorage.setItem(STORAGE_KEYS.position, JSON.stringify(coordinates));
       localStorage.setItem(STORAGE_KEYS.timestamp, Date.now().toString());

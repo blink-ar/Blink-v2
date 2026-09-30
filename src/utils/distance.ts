@@ -1,3 +1,5 @@
+import { calculateDistanceKm, normalizeDistanceKm } from '../../shared/coordinates.js';
+
 /**
  * Calculate distance between two coordinates using the Haversine formula
  * @param lat1 Latitude of first point
@@ -12,25 +14,7 @@ export const calculateDistance = (
   lat2: number,
   lon2: number
 ): number => {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return distance;
-};
-
-const toRad = (degrees: number): number => {
-  return degrees * (Math.PI / 180);
+  return calculateDistanceKm(lat1, lon1, lat2, lon2) ?? Number.NaN;
 };
 
 /**
@@ -38,7 +22,9 @@ const toRad = (degrees: number): number => {
  * @param km Distance in kilometers
  * @returns Formatted distance string
  */
-export const formatDistance = (km: number): string => {
+export const formatDistance = (value: unknown): string => {
+  const km = normalizeDistanceKm(value);
+  if (km === null) return '';
   if (km < 1) {
     return `${Math.round(km * 1000)}m`;
   }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchBusinessesPaginated } from '../api';
+import { fetchBusinessesPaginated, normalizeBusinesses } from '../api';
 
 describe('search request contract', () => {
   const fetchMock = vi.fn();
@@ -30,6 +30,20 @@ describe('search request contract', () => {
     fetchMock.mockRejectedValue(new DOMException('Cancelled', 'AbortError'));
     await expect(fetchBusinessesPaginated({ search: 'café', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, undefined, NaN, Infinity, -1])('normalizes invalid API distance %s without inventing zero', distance => {
+    const data = normalizeBusinesses([{ id: 'havanna', name: 'Havanna', distance, distanceText: 'NaNkm', isNearby: true, benefits: [{ rewardRate: '20%', validUntil: null }], locations: [{ formattedAddress: 'Tucumán' }] }]);
+    expect(data[0]).toMatchObject({ distance: undefined, distanceText: undefined, isNearby: false });
+    expect(data[0].location).toHaveLength(1);
+  });
+
+  it('retains server distance for both listing and text-search mappings', async () => {
+    const business = { id: 'distrito25', name: 'Distrito 25', distance: 1.935, distanceText: '1.9km', isNearby: true, location: [{ formattedAddress: 'Tucumán' }], benefits: [{ rewardRate: '20%', validUntil: null }] };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, businesses: [business], pagination: { total: 1, hasMore: false } }) });
+    expect((await fetchBusinessesPaginated()).businesses[0]).toMatchObject({ distance: 1.935, isNearby: true });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, merchants: [{ business }], pagination: { totalMerchants: 1, hasMore: false } }) });
+    expect((await fetchBusinessesPaginated({ search: 'Distrito25' })).businesses[0]).toMatchObject({ distance: 1.935, isNearby: true });
   });
 
   it('aborts an active legacy fallback rather than returning a failed result', async () => {

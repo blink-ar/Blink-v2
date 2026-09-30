@@ -1184,7 +1184,7 @@ function BenefitDetailPage() {
                         <p className="text-xs text-blink-muted">{cityLine}</p>
                       )}
                     </div>
-                    {dist !== null && (
+                    {dist !== null && Number.isFinite(dist) && dist >= 0 && (
                       <span className="text-xs font-semibold flex-shrink-0 mt-0.5 text-blink-muted">
                         {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
                       </span>

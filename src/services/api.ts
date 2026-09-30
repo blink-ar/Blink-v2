@@ -14,6 +14,8 @@ import {
 } from '../types/mongodb';
 import { isBenefitActive } from '../utils/benefits';
 import { dedupeModoBenefits } from '../utils/dedupeModoBenefits';
+import { normalizeDistanceKm } from '../../shared/coordinates.js';
+import { formatDistance } from '../utils/distance';
 
 declare global {
   // Extend the globalThis type to include allCategories
@@ -209,8 +211,12 @@ export function normalizeBusinesses(
         ? getCategoryDefaultImage(category)
         : rawImage;
 
+    const distance = normalizeDistanceKm(raw.distance) ?? undefined;
     const business = {
       ...raw,
+      distance,
+      distanceText: distance === undefined ? undefined : formatDistance(distance),
+      isNearby: distance !== undefined && distance <= 50,
       category,
       benefits: visibleBenefits,
       location: uniqueLocations,
