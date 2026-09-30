@@ -103,11 +103,12 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         queryKey: sortByDistance
             ? [...queryKeys.businesses, 'exact', position!.latitude, position!.longitude, filtersKey]
             : [...queryKeys.businesses, geohash, filtersKey],
-        queryFn: async ({ pageParam = 0 }) => {
+        queryFn: async ({ pageParam = 0, signal }) => {
             const offset = Number(pageParam) || 0;
             const response = await fetchBusinessesPaginated({
                 limit: ITEMS_PER_PAGE,
                 offset,
+                signal,
                 ...(sortByDistance && position
                     ? { lat: position.latitude, lng: position.longitude }
                     : geohash ? { geohash } : {}),

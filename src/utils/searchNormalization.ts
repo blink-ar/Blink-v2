@@ -79,3 +79,20 @@ export function matchesSearchPhrase(candidate: string | number | null | undefine
     candidateVariants.some((candidateVariant) => candidateVariant.includes(queryVariant)),
   );
 }
+
+// Keep weak lexical matches out of the primary list, while accepting the
+// endpoint's explicit evidence for product, category and intent searches.
+const RELEVANT_SEARCH_REASONS = new Set([
+  'merchant_exact', 'merchant_name_variant', 'merchant_name_tokens_exact',
+  'manual_alias_exact', 'alias_exact', 'product_tag_overlap', 'intent_overlap',
+  'intent_ref_boost', 'product_ref_boost', 'product_category_boost',
+]);
+
+export function matchesBusinessSearch(
+  business: { name: string; aliases?: string[]; searchMatchReasons?: string[] },
+  query: string,
+): boolean {
+  return matchesSearchPhrase(business.name, query) ||
+    Boolean(business.aliases?.some((alias) => matchesSearchPhrase(alias, query))) ||
+    Boolean(business.searchMatchReasons?.some((reason) => RELEVANT_SEARCH_REASONS.has(reason)));
+}

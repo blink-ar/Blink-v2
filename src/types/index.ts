@@ -65,6 +65,8 @@ export interface Business {
   banks?: string[];
   maxDiscountPercentage?: number;
   aliases?: string[];
+  /** Relevance evidence from /api/search for matches beyond merchant names. */
+  searchMatchReasons?: string[];
   // Enhanced fields for new functionality
   lastUpdated?: number;
   imageLoaded?: boolean;

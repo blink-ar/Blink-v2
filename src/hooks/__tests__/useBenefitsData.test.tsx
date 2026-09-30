@@ -154,4 +154,23 @@ describe('useBenefitsData', () => {
     expect(result.current.businesses).toEqual([mockBusiness]);
     expect(result.current.hasMore).toBe(false);
   });
+
+  it('aborts an obsolete query and keeps late responses from replacing the latest results', async () => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof fetchBusinessesPaginated>>) => void;
+    const response = (business: Business) => ({ success: true, businesses: [business], pagination: { total: 1, limit: 20, offset: 0, hasMore: false }, filters: {} });
+    const latest = { ...mockBusiness, id: 'blue-bell', name: 'Blue Bell' };
+    vi.mocked(fetchBusinessesPaginated)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce(response(latest));
+    const { result, rerender } = renderHook(({ query }) => useBenefitsData({ search: query }), { initialProps: { query: 'café' }, wrapper: createWrapper() });
+    await waitFor(() => expect(fetchBusinessesPaginated).toHaveBeenCalledTimes(1));
+    const oldSignal = vi.mocked(fetchBusinessesPaginated).mock.calls[0][0]!.signal!;
+    expect(oldSignal.aborted).toBe(false);
+    rerender({ query: 'heladerías' });
+    await waitFor(() => expect(result.current.businesses).toEqual([latest]));
+    expect(oldSignal.aborted).toBe(true);
+    await act(async () => { resolveOld(response(mockBusiness)); });
+    expect(result.current.businesses).toEqual([latest]);
+    expect(result.current.primarySearchError).toBeNull();
+  });
 });

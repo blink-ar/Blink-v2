@@ -29,7 +29,7 @@ import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
-import { matchesSearchPhrase } from '../utils/searchNormalization';
+import { matchesBusinessSearch } from '../utils/searchNormalization';
 import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
 import { getOptimizedImageUrl } from '../utils/images';
 
@@ -463,10 +463,7 @@ function SearchPage() {
   const strictMatches = useMemo(() => {
     const term = debouncedSearch.trim();
     if (!term) return enrichedBusinesses;
-    return enrichedBusinesses.filter((b) =>
-      matchesSearchPhrase(b.name, term) ||
-      b.aliases?.some((alias) => matchesSearchPhrase(alias, term))
-    );
+    return enrichedBusinesses.filter((business) => matchesBusinessSearch(business, term));
   }, [enrichedBusinesses, debouncedSearch]);
 
   const hasSelectedBanks = selectedBanks.length > 0;
