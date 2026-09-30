@@ -436,9 +436,11 @@ describe('handleSearch', () => {
     expect(benefitQueries[0]).toHaveProperty('$or', expect.arrayContaining([
       { benefitTitle: { $regex: expect.any(RegExp) } },
     ]));
-    expect(merchantQueries[0]).toHaveProperty('$and.1.$or', expect.arrayContaining([
-      { merchantId: { $in: ['merchant_freddo'] } },
-    ]));
+    expect(merchantQueries).toContainEqual(expect.objectContaining({
+      $and: expect.arrayContaining([expect.objectContaining({
+        $or: expect.arrayContaining([{ merchantId: { $in: ['merchant_freddo'] } }]),
+      })]),
+    }));
     expect(JSON.parse(res.body || '{}').merchants[0].business.benefits[0].id).toBe('freddo-helado');
   });
 
@@ -938,5 +940,205 @@ describe('handleSearch', () => {
     expect(payload.merchants[0].merchantName).toBe('Almacén de Pizzas');
     expect(payload.merchants[0].reasons).toContain(expectedReason);
     expect(meiliSearchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('search responsiveness and filter contracts', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+  });
+
+  function emptyDb(findSpy = vi.fn()) {
+    return { collection(name: string) { return { find(query: unknown, options?: unknown) {
+      findSpy(name, query, options);
+      return createCursor([]);
+    } }; } };
+  }
+
+  it('overlaps independent search sections with the merchant name rescue', async () => {
+    vi.useFakeTimers();
+    let rescuesStarted = 0;
+    meiliSearchMock.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { hits: [] };
+    });
+    const db = { collection(name: string) { return { find() {
+      const cursor = createCursor([]);
+      if (name === 'merchant_assets') {
+        cursor.toArray = async () => {
+          rescuesStarted += 1;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return [];
+        };
+      }
+      return cursor;
+    } }; } };
+    const res = createResponseCapture();
+    const started = Date.now();
+    try {
+      const pending = handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café'), db as never);
+      await vi.advanceTimersByTimeAsync(0);
+      const initialSections = meiliSearchMock.mock.calls.length;
+      const initialRescues = rescuesStarted;
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(initialSections).toBe(3);
+      expect(initialRescues).toBe(1);
+      expect(Date.now() - started).toBe(100);
+      expect(res.statusCode).toBe(200);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('applies online to merchants and benefits while leaving intent/product references searchable', async () => {
+    const findSpy = vi.fn();
+    const merchant = { ...buildMerchantDoc('cafe', 'Café', 1), online: true };
+    meiliSearchMock.mockResolvedValue({ hits: [] }).mockResolvedValueOnce({ hits: [merchant] });
+    const res = createResponseCapture();
+    await handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café&online=true'), emptyDb(findSpy) as never);
+    expect(meiliSearchMock.mock.calls[0][1].filter).toContain('online = true');
+    expect(meiliSearchMock.mock.calls[1][1].filter).not.toContain('online = true');
+    expect(meiliSearchMock.mock.calls[2][1].filter).not.toContain('online = true');
+    const merchantQuery = findSpy.mock.calls.find(([name]) => name === 'merchant_assets')![1];
+    expect(merchantQuery.$and).toContainEqual(expect.objectContaining({ hasOnlineBenefits: true }));
+    const benefitQuery = findSpy.mock.calls.find(([name]) => name === 'confirmed_benefits')![1];
+    expect(benefitQuery).toHaveProperty('online', true);
+    // No matching online benefits: summaries must not retain all-channel counts/discounts.
+    expect(JSON.parse(res.body || '{}').merchants[0].business).toMatchObject({ benefitCount: 0, maxDiscountPercentage: 0, banks: [] });
+  });
+
+  it('uses approximate Tucumán coordinates for text search distance scoring', async () => {
+    const doc = buildMerchantDoc('cafe', 'Café', 1);
+    const merchant = { ...doc, locations: [{ lat: -26.824, lng: -65.223 }], business: { ...doc.business, location: [{ lat: -26.824, lng: -65.223 }] } };
+    meiliSearchMock.mockResolvedValue({ hits: [] }).mockResolvedValueOnce({ hits: [merchant] });
+    const res = createResponseCapture();
+    await handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café&geohash=6e3h'), emptyDb() as never);
+    const result = JSON.parse(res.body || '{}');
+    expect(result.merchants[0].business.distance).toBeTypeOf('number');
+  });
+});
+
+describe('Mongo search fallback scheduling', () => {
+  it('overlaps dependent benefit/merchant retrieval with name rescue without changing results', async () => {
+    vi.resetAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+    isMeilisearchConfiguredMock.mockReturnValue(false);
+    vi.useFakeTimers();
+    const called = [] as string[];
+    const db = { collection(name: string) { return { find() {
+      const cursor = createCursor([]);
+      cursor.toArray = async () => {
+        if (name !== 'providers') { called.push(name); await new Promise(resolve => setTimeout(resolve, 50)); }
+        return [];
+      };
+      return cursor;
+    } }; } };
+    const res = createResponseCapture();
+    const started = Date.now();
+    try {
+      const pending = handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=heladerías'), db as never);
+      await vi.advanceTimersByTimeAsync(0);
+      const initialReads = [...called];
+      await vi.runAllTimersAsync();
+      await pending;
+      const elapsed = Date.now() - started;
+      console.info('Mongo fallback fixture elapsedMs:', elapsed);
+      expect(initialReads).toEqual(expect.arrayContaining(['confirmed_benefits', 'merchant_assets']));
+      expect(elapsed).toBe(100);
+      expect(JSON.parse(res.body || '{}')).toMatchObject({ success: true, source: 'mongodb_fallback', merchants: [], pagination: { totalMerchants: 0 } });
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+// Independent integration regressions for outage load and location/filter behavior.
+describe('integrated search failure and filter contracts', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    delete (globalThis as { __blinkProviderCatalog?: unknown }).__blinkProviderCatalog;
+    isMeilisearchConfiguredMock.mockReturnValue(true);
+  });
+
+  it('reuses pending exact/prefix rescue when an engine request fails', async () => {
+    vi.useFakeTimers();
+    let rescueReads = 0;
+    let pendingRescueReads = 0;
+    let peakPendingRescueReads = 0;
+    meiliSearchMock.mockRejectedValue(new Error('Engine unavailable'));
+    const db = { collection(name: string) { return { find(query: unknown) {
+      const cursor = createCursor([]);
+      const isRescue = name === 'merchant_assets' && JSON.stringify(query).includes('$elemMatch');
+      cursor.toArray = async () => {
+        if (isRescue) {
+          rescueReads += 1;
+          pendingRescueReads += 1;
+          peakPendingRescueReads = Math.max(peakPendingRescueReads, pendingRescueReads);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          pendingRescueReads -= 1;
+        }
+        return [];
+      };
+      return cursor;
+    } }; } };
+    const res = createResponseCapture();
+    try {
+      const pending = handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café'), db as never);
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(rescueReads).toBe(2);
+      expect(peakPendingRescueReads).toBe(1);
+      expect(meiliSearchMock).toHaveBeenCalledTimes(3);
+      expect(JSON.parse(res.body || '{}')).toMatchObject({ success: true, source: 'mongodb_fallback' });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('retains a fallback rescue retry when the primary rescue itself failed', async () => {
+    meiliSearchMock.mockResolvedValue({ hits: [] });
+    let rescueReads = 0;
+    const db = { collection(name: string) { return { find(query: unknown) {
+      const cursor = createCursor([]);
+      if (name === 'merchant_assets' && JSON.stringify(query).includes('$elemMatch')) {
+        cursor.toArray = async () => {
+          rescueReads += 1;
+          if (rescueReads === 1) throw new Error('Transient rescue read failed');
+          return [];
+        };
+      }
+      return cursor;
+    } }; } };
+    const res = createResponseCapture();
+    await handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café'), db as never);
+    expect(rescueReads).toBe(3);
+    expect(JSON.parse(res.body || '{}')).toMatchObject({ success: true, source: 'mongodb_fallback' });
+  });
+
+  it('retains online restrictions on both fallback candidates and hydration', async () => {
+    isMeilisearchConfiguredMock.mockReturnValue(false);
+    const queries: { name: string; query: unknown }[] = [];
+    const merchant = { ...buildMerchantDoc('fixture-cafe', 'Café'), hasOnlineBenefits: true };
+    const db = { collection(name: string) { return { find(query: unknown) {
+      queries.push({ name, query });
+      return createCursor(name === 'merchant_assets' ? [merchant] : []);
+    } }; } };
+    const res = createResponseCapture();
+    await handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café&online=true'), db as never);
+    const benefitQueries = queries.filter(entry => entry.name === 'confirmed_benefits');
+    expect(benefitQueries).toHaveLength(2);
+    for (const entry of benefitQueries) expect(entry.query).toHaveProperty('online', true);
+    for (const entry of queries.filter(entry => entry.name === 'merchant_assets')) {
+      expect(entry.query).toHaveProperty('$and', expect.arrayContaining([expect.objectContaining({ hasOnlineBenefits: true })]));
+    }
+    expect(JSON.parse(res.body || '{}').merchants[0].business).toMatchObject({ benefitCount: 0, maxDiscountPercentage: 0, banks: [] });
+  });
+
+  it('uses exact coordinates ahead of geohash in server distance scoring', async () => {
+    const doc = buildMerchantDoc('fixture-cafe', 'Café', 1);
+    const location = { lat: -26.824, lng: -65.223 };
+    const merchant = { ...doc, locations: [location], business: { ...doc.business, location: [location] } };
+    meiliSearchMock.mockResolvedValue({ hits: [] }).mockResolvedValueOnce({ hits: [merchant] });
+    const db = { collection() { return { find() { return createCursor([]); } }; } };
+    const res = createResponseCapture();
+    await handleSearch({ method: 'GET' } as never, res as never, new URL('https://example.com/api/search?q=café&lat=-26.824&lng=-65.223&geohash=6e3h'), db as never);
+    expect(JSON.parse(res.body || '{}').merchants[0].business.distance).toBe(0);
   });
 });

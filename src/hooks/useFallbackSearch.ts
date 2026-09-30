@@ -47,11 +47,13 @@ export function useFallbackSearch({
       'fallback_other_banks',
       ...baseQueryKey,
       searchIntentSignature,
+      Boolean(filters.onlineOnly),
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchBusinessesPaginated({
         limit: 10,
         offset: 0,
+        signal,
         search: filters.search,
         category: filters.category,
         ...(sortByDistance && position
@@ -75,10 +77,11 @@ export function useFallbackSearch({
       'fallback_popular',
       ...baseQueryKey,
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchBusinessesPaginated({
         limit: 10,
         offset: 0,
+        signal,
         ...(sortByDistance && position
           ? { lat: position.latitude, lng: position.longitude }
           : geohash ? { geohash } : {}),

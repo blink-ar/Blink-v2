@@ -64,6 +64,7 @@ function mapSearchResponseToBusinessesResponse(
     (searchData.merchants || []).map((merchantHit) => ({
       ...merchantHit.business,
       aliases: merchantHit.aliases || [],
+      searchMatchReasons: merchantHit.reasons || [],
     }))
   ).filter((business) => business.benefits.length > 0);
 
@@ -123,6 +124,9 @@ export async function fetchSearch(options: {
   lng?: number;
   debug?: boolean;
   view?: 'summary' | 'full';
+  online?: boolean;
+  geohash?: string;
+  signal?: AbortSignal;
 }): Promise<SearchApiResponse> {
   const params = new URLSearchParams();
   params.append('q', options.q);
@@ -131,14 +135,17 @@ export async function fetchSearch(options: {
   params.append('collection', COLLECTION);
   if (options.category) params.append('category', options.category);
   if (options.bank) params.append('bank', options.bank);
+  if (options.online) params.append('online', 'true');
   if (options.lat !== undefined && options.lng !== undefined) {
     params.append('lat', String(options.lat));
     params.append('lng', String(options.lng));
+  } else if (options.geohash) {
+    params.append('geohash', options.geohash);
   }
   if (options.debug) params.append('debug', '1');
   if (options.view) params.append('view', options.view);
 
-  const response = await fetch(`${BASE_URL}/api/search?${params.toString()}`);
+  const response = await fetch(`${BASE_URL}/api/search?${params.toString()}`, { signal: options.signal });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -236,6 +243,7 @@ export async function fetchBusinessesPaginated(options: {
   online?: boolean;
   includeExpired?: boolean;
   view?: 'summary' | 'full';
+  signal?: AbortSignal;
 } = {}): Promise<BusinessesApiResponse> {
   const {
     limit = 20,
@@ -250,7 +258,8 @@ export async function fetchBusinessesPaginated(options: {
     lng,
     online,
     includeExpired,
-    view
+    view,
+    signal
   } = options;
   const normalizedMerchantId = merchantId?.trim();
 
@@ -264,7 +273,10 @@ export async function fetchBusinessesPaginated(options: {
         bank,
         lat,
         lng,
-        view
+        view,
+        online,
+        geohash,
+        signal
       });
       return mapSearchResponseToBusinessesResponse(searchData, {
         limit,
@@ -274,6 +286,7 @@ export async function fetchBusinessesPaginated(options: {
         search
       });
     } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
       console.error('[API] fetchSearch failed, falling back to legacy businesses endpoint:', error);
     }
   }
@@ -301,7 +314,7 @@ export async function fetchBusinessesPaginated(options: {
   const url = `${BASE_URL}/api/businesses?${params.toString()}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -314,6 +327,7 @@ export async function fetchBusinessesPaginated(options: {
 
     return data;
   } catch (error) {
+    if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
     console.error('[API] fetchBusinessesPaginated failed:', error);
     return {
       success: false,

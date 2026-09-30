@@ -242,6 +242,22 @@ describe('SearchPage loading states', () => {
     );
   });
 
+  it.each([
+    ['heladerías', 'Blue Bell', 'intent_overlap'],
+    ['café', 'Havanna', 'product_tag_overlap'],
+    ['sanguches', 'El 10', 'product_ref_boost'],
+  ])('shows evidenced results for %s without a merchant-name match', async (query, name, reason) => {
+    const business = { ...mockBusiness, name, searchMatchReasons: [reason] };
+    vi.mocked(useBenefitsData).mockReturnValue({ businesses: [business], featuredBenefits: [], isLoading: false, isPrimarySearchLoading: false, isLoadingMore: false, error: null, primarySearchError: null, hasMore: false, loadMore: vi.fn(), refreshData: vi.fn(), totalBusinesses: 1, proximityUnavailable: false });
+    vi.mocked(useEnrichedBusinesses).mockReturnValue([{ ...business, hasOnline: false, distance: undefined, distanceText: undefined, isNearby: undefined }]);
+    vi.mocked(useFallbackSearch).mockReturnValue({ otherBanksBusinesses: [], resolvedTotalOtherBanks: 0, isOtherBanksLoading: false, isOtherBanksSearchLoading: false, relativeBusinesses: [], isRelativeLoading: false, isRelativeSearchLoading: false, isFallbackSearchLoading: false });
+    renderSearchPage(`/buscar?q=${encodeURIComponent(query)}`);
+    await waitFor(() => expect(trackSearchIntent).toHaveBeenCalledWith(expect.objectContaining({ searchTerm: query, resultsCount: 1 })));
+    expect(screen.queryByText(`No encontramos "${query}"`)).not.toBeInTheDocument();
+    expect(useFallbackSearch).toHaveBeenCalledWith(expect.objectContaining({ shouldFetchOtherBanks: false, shouldFetchRelative: false }));
+    expect(trackNoResults).not.toHaveBeenCalled();
+  });
+
   it('does not block the terminal state on unrelated featured-benefits loading', () => {
     vi.mocked(useBenefitsData).mockReturnValue({
       businesses: [],
