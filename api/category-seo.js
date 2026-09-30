@@ -320,8 +320,10 @@ export async function loadCategorySeoData({ db, merchantCollectionName, category
     merchantId: 1,
     merchantName: 1,
     categories: 1,
-    banks: 1,
-    locations: 1,
+    // Category cards show at most four banks and only the first location.
+    // Bound the Mongo response for chains with hundreds of branch records.
+    banks: { $slice: 4 },
+    locations: { $slice: 1 },
     benefitCount: 1,
     activeBenefitCount: 1,
     maxDiscountPercentage: 1,
