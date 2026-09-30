@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Business } from '../types';
-import { hasOnlineBenefits, calculateDistance, formatDistance } from '../utils/distance';
+import { hasOnlineBenefits, formatDistance } from '../utils/distance';
 import { useGeolocation } from './useGeolocation';
+import { calculateDistanceKm, normalizeDistanceKm } from '../../shared/coordinates.js';
 
 /**
  * Enriches businesses with online information and applies filters
@@ -35,18 +36,18 @@ export const useEnrichedBusinesses = (
     let result = businesses.map((business) => {
       const hasOnline = hasOnlineBenefits(business);
 
-      let distance = business.distance;
-      let distanceText = business.distanceText;
-      let isNearby = business.isNearby;
+      let distance = normalizeDistanceKm(business.distance) ?? undefined;
 
       if (position && business.location?.length > 0) {
         const distances = business.location.map((loc) =>
-          calculateDistance(position.latitude, position.longitude, loc.lat, loc.lng)
-        );
-        distance = Math.min(...distances);
-        distanceText = formatDistance(distance);
-        isNearby = distance <= 50;
+          calculateDistanceKm(position.latitude, position.longitude, loc?.lat, loc?.lng)
+        ).filter((value): value is number => value !== null);
+        // Summary locations intentionally omit coordinates. Preserve the server
+        // distance (computed from all branches) rather than a partial preview.
+        if (distance === undefined && distances.length > 0) distance = Math.min(...distances);
       }
+      const distanceText = distance === undefined ? undefined : formatDistance(distance);
+      const isNearby = distance !== undefined && distance <= 50;
 
       return {
         ...business,
@@ -57,11 +58,10 @@ export const useEnrichedBusinesses = (
       };
     });
 
-    // Apply distance filter (only if distance is available)
+    // An explicit radius requires a known distance.
     if (maxDistance !== undefined) {
       result = result.filter((b) => {
-        if (b.distance === undefined) return true; // Include businesses without distance info
-        return b.distance <= maxDistance;
+        return b.distance !== undefined && b.distance <= maxDistance;
       });
     }
 

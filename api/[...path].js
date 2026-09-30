@@ -1,4 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { calculateDistanceKm, normalizeDistanceKm, parseCoordinates } from '../shared/coordinates.js';
 import { createPublicKey, createVerify } from 'crypto';
 import { resolveCanonicalSiteUrl } from './canonical-site.js';
 import { buildSearchDatasetFromMerchantDocs } from './search/entities.js';
@@ -1209,16 +1210,11 @@ async function loadProviderCatalogForRequest(db) {
 }
 
 function haversineKm(lat1, lng1, lat2, lng2) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6371 * Math.asin(Math.sqrt(a));
+  return calculateDistanceKm(lat1, lng1, lat2, lng2);
 }
 
 function formatDistanceText(distance) {
-  if (!Number.isFinite(distance)) return null;
+  if (normalizeDistanceKm(distance) === null) return null;
   if (distance < 1) return `${Math.round(distance * 1000)}m`;
   if (distance < 10) return `${Math.round(distance * 10) / 10}km`;
   return `${Math.round(distance)}km`;
@@ -1257,7 +1253,7 @@ const MERCHANT_SEARCH_RESCUE_PROJECTION = {
 };
 
 function isFiniteDistanceKm(value) {
-  return Number.isFinite(value);
+  return normalizeDistanceKm(value) !== null;
 }
 
 // Scoring reasons that indicate the hit matches what the user explicitly typed
@@ -1311,22 +1307,16 @@ function applyLocalDistanceGuardrail(merchantHits, filters) {
 }
 
 function enrichBusinessWithDistance(business, userLat, userLng) {
-  if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
-    return business;
-  }
-
   const locations = Array.isArray(business.location) ? business.location : [];
   const validDistances = locations
-    .filter((location) => Number.isFinite(location?.lat) && Number.isFinite(location?.lng))
-    .map((location) => haversineKm(userLat, userLng, Number(location.lat), Number(location.lng)));
-
-  if (validDistances.length === 0) return business;
-  const distance = Math.min(...validDistances);
+    .map((location) => haversineKm(userLat, userLng, location?.lat, location?.lng))
+    .filter((distance) => distance !== null);
+  const distance = validDistances.length > 0 ? Math.min(...validDistances) : null;
   return {
     ...business,
     distance,
     distanceText: formatDistanceText(distance),
-    isNearby: distance <= 50
+    isNearby: distance !== null && distance <= 50
   };
 }
 
@@ -1336,9 +1326,8 @@ function parseSearchFilters(searchParams, providerCatalog) {
   const category = searchParams.get('category') || undefined;
   const latParam = searchParams.get('lat');
   const lngParam = searchParams.get('lng');
-  const lat = latParam != null ? Number.parseFloat(latParam) : null;
-  const lng = lngParam != null ? Number.parseFloat(lngParam) : null;
-  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  const coordinates = parseCoordinates(latParam, lngParam);
+  const hasLocation = coordinates !== null;
   const geohash = searchParams.get('geohash');
   const decoded = !hasLocation && geohash ? decodeGeohash(geohash) : null;
   return {
@@ -1346,8 +1335,8 @@ function parseSearchFilters(searchParams, providerCatalog) {
     hasUnresolvedBank: hasProviderFilterParam(rawBank) && !bank,
     category,
     onlineOnly: searchParams.get('online') === 'true',
-    lat: hasLocation ? lat : (decoded?.latitude ?? null),
-    lng: hasLocation ? lng : (decoded?.longitude ?? null)
+    lat: hasLocation ? coordinates.lat : (decoded?.latitude ?? null),
+    lng: hasLocation ? coordinates.lng : (decoded?.longitude ?? null)
   };
 }
 
@@ -2023,6 +2012,9 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
 
 async function handleSearch(req, res, url, db) {
   const searchParams = url.searchParams;
+  if ((searchParams.has('lat') || searchParams.has('lng')) && !parseCoordinates(searchParams.get('lat'), searchParams.get('lng'))) {
+    return json(res, 400, { success: false, error: 'Invalid coordinates' });
+  }
   const q = searchParams.get('q');
   if (!q || !q.trim()) {
     return json(res, 400, {
@@ -2910,6 +2902,9 @@ async function handleGetNearbyBenefits(req, res, url, db) {
 
 async function handleGetBusinesses(req, res, url, db) {
   const searchParams = url.searchParams;
+  if ((searchParams.has('lat') || searchParams.has('lng')) && !parseCoordinates(searchParams.get('lat'), searchParams.get('lng'))) {
+    return json(res, 400, { success: false, error: 'Invalid coordinates' });
+  }
   const collectionName = getCollectionName(searchParams);
   const includeExpired = shouldIncludeExpired(searchParams);
   const providerCatalog = await loadProviderCatalogForRequest(db);
@@ -2931,15 +2926,14 @@ async function handleGetBusinesses(req, res, url, db) {
   // Exact lat/lng (precise sort, bypasses CDN) takes priority over geohash (CDN-cached, approximate)
   const rawLat = searchParams.get('lat');
   const rawLng = searchParams.get('lng');
-  const exactLat = rawLat ? Number.parseFloat(rawLat) : null;
-  const exactLng = rawLng ? Number.parseFloat(rawLng) : null;
-  const hasExact = exactLat !== null && exactLng !== null && Number.isFinite(exactLat) && Number.isFinite(exactLng);
+  const exact = parseCoordinates(rawLat, rawLng);
+  const hasExact = exact !== null;
 
   const geohash = searchParams.get('geohash');
   const decoded = !hasExact && geohash ? decodeGeohash(geohash) : null;
 
-  const userLat = hasExact ? exactLat : (decoded?.latitude ?? null);
-  const userLng = hasExact ? exactLng : (decoded?.longitude ?? null);
+  const userLat = hasExact ? exact.lat : (decoded?.latitude ?? null);
+  const userLng = hasExact ? exact.lng : (decoded?.longitude ?? null);
   const hasLocation = userLat !== null && userLng !== null;
 
   const bankPatterns = bank ? buildProviderFilterRegexes(providerCatalog, bank) : null;
@@ -3062,12 +3056,11 @@ async function handleGetBusinesses(req, res, url, db) {
           .toArray()
         : [];
 
-      const merchantsWithDistance = withGeo.map((merchant) => ({
-        ...merchant,
-        distance: Number(merchant.distanceMeters) / 1000,
-        distanceText: formatDistanceText(Number(merchant.distanceMeters) / 1000),
-        isNearby: Number(merchant.distanceMeters) / 1000 <= 50
-      }));
+      const merchantsWithDistance = withGeo.map((merchant) => {
+        const meters = normalizeDistanceKm(merchant.distanceMeters);
+        const distance = meters === null ? null : meters / 1000;
+        return { ...merchant, distance, distanceText: formatDistanceText(distance), isNearby: distance !== null && distance <= 50 };
+      });
       const merchantsWithoutDistance = withoutGeo.map((merchant) => ({
         ...merchant,
         distance: null,
@@ -3091,13 +3084,13 @@ async function handleGetBusinesses(req, res, url, db) {
       pagedMerchants = merchants
         .map((merchant) => {
           const validDistances = (Array.isArray(merchant.locations) ? merchant.locations : [])
-            .filter((location) => Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng)))
             .map((location) => haversineKm(
               userLat,
               userLng,
-              Number(location.lat),
-              Number(location.lng)
-            ));
+              location?.lat,
+              location?.lng
+            ))
+            .filter((distance) => distance !== null);
 
           if (validDistances.length === 0) {
             return {

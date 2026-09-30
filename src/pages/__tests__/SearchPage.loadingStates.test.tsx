@@ -249,7 +249,7 @@ describe('SearchPage loading states', () => {
   ])('shows evidenced results for %s without a merchant-name match', async (query, name, reason) => {
     const business = { ...mockBusiness, name, searchMatchReasons: [reason] };
     vi.mocked(useBenefitsData).mockReturnValue({ businesses: [business], featuredBenefits: [], isLoading: false, isPrimarySearchLoading: false, isLoadingMore: false, error: null, primarySearchError: null, hasMore: false, loadMore: vi.fn(), refreshData: vi.fn(), totalBusinesses: 1, proximityUnavailable: false });
-    vi.mocked(useEnrichedBusinesses).mockReturnValue([{ ...business, hasOnline: false, distance: undefined, distanceText: undefined, isNearby: undefined }]);
+    vi.mocked(useEnrichedBusinesses).mockReturnValue([{ ...business, hasOnline: false, distance: undefined, distanceText: undefined, isNearby: false }]);
     vi.mocked(useFallbackSearch).mockReturnValue({ otherBanksBusinesses: [], resolvedTotalOtherBanks: 0, isOtherBanksLoading: false, isOtherBanksSearchLoading: false, relativeBusinesses: [], isRelativeLoading: false, isRelativeSearchLoading: false, isFallbackSearchLoading: false });
     renderSearchPage(`/buscar?q=${encodeURIComponent(query)}`);
     await waitFor(() => expect(trackSearchIntent).toHaveBeenCalledWith(expect.objectContaining({ searchTerm: query, resultsCount: 1 })));

@@ -602,11 +602,11 @@ function HomePage() {
                   <div className="p-3 bg-white">
                     <h3 className="font-semibold text-sm text-blink-ink mb-0.5 flex items-center gap-1 min-w-0">
                       <span className="truncate">{item.business.name}</span>
-                      {(item.business.distanceText || item.business.distance !== undefined) && (
+                      {formatDistance(item.business.distance) && (
                         <>
                           <span className="shrink-0 font-normal text-blink-muted">·</span>
                           <span className="shrink-0 text-[11px] font-normal text-blink-muted">
-                            {item.business.distanceText || formatDistance(item.business.distance!)}
+                            {formatDistance(item.business.distance)}
                           </span>
                         </>
                       )}

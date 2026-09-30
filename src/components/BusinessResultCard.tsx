@@ -76,6 +76,7 @@ function BusinessResultCard({
   showDistance = true,
   variant = 'list',
 }: BusinessResultCardProps) {
+  const distanceText = formatDistance(business.distance);
   const bankBadges = getBusinessBankBadges(badgeSource ?? business);
   const visibleBadges = bankBadges.slice(0, 3);
   const remaining = bankBadges.length - 3;
@@ -120,11 +121,11 @@ function BusinessResultCard({
       <div className="flex-1 min-w-0">
         <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
           <span className="truncate">{business.name}</span>
-          {showDistance && (business.distanceText || business.distance !== undefined) && (
+          {showDistance && distanceText && (
             <>
               <span className="shrink-0 font-normal text-blink-muted">·</span>
               <span className="shrink-0 text-[11px] font-normal text-blink-muted">
-                {business.distanceText || formatDistance(business.distance!)}
+                {distanceText}
               </span>
             </>
           )}
@@ -208,11 +209,11 @@ function BusinessResultCard({
         <div className="min-w-0">
           <h2 className="flex min-w-0 items-center gap-1 text-base font-bold leading-snug text-blink-ink">
             <span className="truncate">{business.name}</span>
-            {showDistance && (business.distanceText || business.distance !== undefined) && (
+            {showDistance && distanceText && (
               <>
                 <span className="shrink-0 font-normal text-blink-muted">·</span>
                 <span className="shrink-0 text-xs font-normal text-blink-muted">
-                  {business.distanceText || formatDistance(business.distance!)}
+                  {distanceText}
                 </span>
               </>
             )}
