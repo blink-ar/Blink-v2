@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadCategorySeoData, renderCategorySeoHtml, resolveSeoCategory } from '../../../api/category-seo.js';
 
-const category = resolveSeoCategory('gastronomia');
+const category = resolveSeoCategory('gastronomia')!;
 const appShell = '<html><head><title>Blink</title></head><body><div id="root"></div></body></html>';
 
 // Model Mongo's inclusion/$slice projection to exercise what the renderer receives.
@@ -27,7 +27,7 @@ function fixtureDb(docs: MerchantFixture[], total = docs.length) {
           .map(([key, value]) => [key, typeof value === 'object'
             ? Array.isArray(doc[key]) ? doc[key].slice(0, value.$slice) : doc[key]
             : doc[key]])
-      )),
+      ) as MerchantFixture),
     };
     return cursor;
   });

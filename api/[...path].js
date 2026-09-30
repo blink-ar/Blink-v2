@@ -1914,7 +1914,7 @@ function mapProductHit(hit) {
   };
 }
 
-async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams, providerCatalog) {
+async function searchFromMongoFallback(db, collectionName, query, limitNum, offsetNum, filters, searchParams, providerCatalog, pendingRescue) {
   const expandedTokens = buildExpandedQueryTokens(query);
   const regexSource = expandedTokens.map(escapeRegex).join('|') || escapeRegex(query);
   const regex = new RegExp(regexSource, 'i');
@@ -1963,13 +1963,12 @@ async function searchFromMongoFallback(db, collectionName, query, limitNum, offs
         .toArray();
       return fallbackMerchants;
     })(),
-    loadMerchantNameRescueDocs(
-      db,
-      normalizeSearchText(query),
-      filters,
-      searchParams,
-      providerCatalog
-    )
+    // An engine failure can happen while the primary path's rescue is still
+    // running. Reuse that read instead of repeating exact/prefix queries.
+    // If rescue itself failed, retain the fallback's existing retry behavior.
+    pendingRescue
+      ? pendingRescue.catch(() => loadMerchantNameRescueDocs(db, normalizeSearchText(query), filters, searchParams, providerCatalog))
+      : loadMerchantNameRescueDocs(db, normalizeSearchText(query), filters, searchParams, providerCatalog)
   ]);
 
   const dataset = buildSearchDatasetFromMerchantDocs(
@@ -2053,6 +2052,7 @@ async function handleSearch(req, res, url, db) {
     expandedTokens,
     mode: 'meilisearch'
   };
+  let pendingRescue;
 
   try {
     if (!isMeilisearchConfigured()) {
@@ -2078,7 +2078,7 @@ async function handleSearch(req, res, url, db) {
         filter: buildMeiliFilter('product', filters),
         showRankingScore: true
       }),
-      loadMerchantNameRescueDocs(db, normalized, filters, searchParams, providerCatalog)
+      pendingRescue = loadMerchantNameRescueDocs(db, normalized, filters, searchParams, providerCatalog)
     ]);
 
     const seedMerchantIds = collectSeedMerchantIds(intentSearch.hits || [], productSearch.hits || []);
@@ -2205,7 +2205,8 @@ async function handleSearch(req, res, url, db) {
       offsetNum,
       filters,
       searchParams,
-      providerCatalog
+      providerCatalog,
+      pendingRescue
     );
     const merchants = await hydrateSearchMerchantsWithBenefits(
       db,

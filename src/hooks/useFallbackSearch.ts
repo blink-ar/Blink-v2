@@ -47,6 +47,7 @@ export function useFallbackSearch({
       'fallback_other_banks',
       ...baseQueryKey,
       searchIntentSignature,
+      Boolean(filters.onlineOnly),
     ],
     queryFn: ({ signal }) =>
       fetchBusinessesPaginated({
