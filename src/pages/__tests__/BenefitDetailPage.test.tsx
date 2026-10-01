@@ -98,7 +98,7 @@ describe('BenefitDetailPage', () => {
     });
   });
 
-  it('shows full terms inside Blink without a source link or invented payment requirement', async () => {
+  it('starts terms closed below the calculator and locations, preserving content without source links', async () => {
     const business = makeBusiness({ benefits: [{
       bankName: 'Club La Gaceta', cardName: '', cardTypes: [], benefit: 'Porter Brew House',
       rewardRate: '15%', color: '', icon: '',
@@ -107,11 +107,16 @@ describe('BenefitDetailPage', () => {
     }] });
     vi.mocked(fetchBusinessById).mockResolvedValue(business);
     render(<BenefitDetailPage />);
+    const toggle = await screen.findByRole('button', { name: /Términos y condiciones/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(business.benefits[0].condicion!)).not.toBeInTheDocument();
+    expect(screen.getByText('Simulación de ahorro').compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Disponible en:').compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(toggle);
     const terms = await screen.findByText(business.benefits[0].condicion!);
     expect(terms).toBeVisible();
     expect(screen.queryByText('Pagando con')).not.toBeInTheDocument();
     expect(screen.queryByText(/Tarjeta de Cr[eé]dito/i)).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: /Términos y condiciones/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByRole('link', { name: 'Ver beneficio en la fuente original' })).not.toBeInTheDocument();
     expect(screen.queryByText(business.benefits[0].textoAplicacion!)).not.toBeInTheDocument();
@@ -128,6 +133,7 @@ describe('BenefitDetailPage', () => {
       condicion: terms, textoAplicacion: 'Presentar documento y tarjeta de socio.',
     }] }));
     render(<BenefitDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Términos y condiciones/ }));
     const text = await screen.findByText(/Una vez por día/);
     expect(text).toHaveTextContent(terms);
     expect(text).toHaveTextContent('Presentar documento y tarjeta de socio.');
@@ -151,6 +157,7 @@ describe('BenefitDetailPage', () => {
       textoAplicacion: 'javascript:alert(1)',
     }] }));
     render(<BenefitDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Términos y condiciones/ }));
     expect(await screen.findByText('javascript:alert(1)')).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Ver beneficio en la fuente original' })).not.toBeInTheDocument();
   });

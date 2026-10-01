@@ -191,7 +191,7 @@ function BenefitDetailPage() {
   const [locationSearch, setLocationSearch] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const { position: userPosition } = useGeolocation();
-  const [showTerms, setShowTerms] = useState(true);
+  const [showTerms, setShowTerms] = useState(false);
   const [showAllEligibleBanks, setShowAllEligibleBanks] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState('');
   const viewedBenefitSignatureRef = useRef('');
@@ -933,39 +933,6 @@ function BenefitDetailPage() {
             </div>
           )}
 
-          {/* ── Términos y condiciones ── */}
-          {termsText ? (
-            <div
-              className="bg-white rounded-2xl overflow-hidden"
-              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
-            >
-              <button
-                onClick={() => setShowTerms(!showTerms)}
-                aria-expanded={showTerms}
-                aria-controls="benefit-terms"
-                className="w-full px-5 py-4 flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
-                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
-                  </div>
-                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
-                </div>
-                <span
-                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
-                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
-                >
-                  expand_more
-                </span>
-              </button>
-              {showTerms && (
-                <div id="benefit-terms" className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
-                  {termsText && <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>}
-                </div>
-              )}
-            </div>
-          ) : null}
-
           {/* ── Savings Simulator (discount, optionally with installments) ── */}
           {discount > 0 && (
             <SavingsSimulator
@@ -1037,6 +1004,38 @@ function BenefitDetailPage() {
           )}
 
 
+          {/* ── Términos y condiciones ── */}
+          {termsText ? (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <button
+                onClick={() => setShowTerms(!showTerms)}
+                aria-expanded={showTerms}
+                aria-controls="benefit-terms"
+                className="w-full px-5 py-4 flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
+                  </div>
+                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
+                </div>
+                <span
+                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
+                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+              {showTerms && (
+                <div id="benefit-terms" className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  {termsText && <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>}
+                </div>
+              )}
+            </div>
+          ) : null}
 
         </div>
       </main>
