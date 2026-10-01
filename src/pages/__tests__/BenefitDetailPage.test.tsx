@@ -98,6 +98,39 @@ describe('BenefitDetailPage', () => {
     });
   });
 
+  it('shows full terms and a safe source link before the calculator without inventing a payment method', async () => {
+    const business = makeBusiness({ benefits: [{
+      bankName: 'Club La Gaceta', cardName: '', cardTypes: [], benefit: 'Porter Brew House',
+      rewardRate: '15%', color: '', icon: '',
+      condicion: 'Presentar tarjeta de socio y documento. Avisar antes de pedir la factura.',
+      textoAplicacion: 'https://club.lagaceta.com.ar/beneficio/7421/porter-brew-house',
+    }] });
+    vi.mocked(fetchBusinessById).mockResolvedValue(business);
+    render(<BenefitDetailPage />);
+    const terms = await screen.findByText(business.benefits[0].condicion!);
+    expect(terms).toBeVisible();
+    expect(screen.queryByText('Pagando con')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tarjeta de Cr[eé]dito/i)).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /Términos y condiciones/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const link = screen.getByRole('link', { name: 'Ver beneficio en la fuente original' });
+    expect(link).toHaveAttribute('href', business.benefits[0].textoAplicacion);
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(link).toBeVisible();
+  });
+
+  it('keeps non-URL application text as visible terms without creating unsafe links', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({ benefits: [{
+      bankName: 'Club', cardName: '', benefit: 'Oferta', rewardRate: '15%', color: '', icon: '',
+      textoAplicacion: 'javascript:alert(1)',
+    }] }));
+    render(<BenefitDetailPage />);
+    expect(await screen.findByText('javascript:alert(1)')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Ver beneficio en la fuente original' })).not.toBeInTheDocument();
+  });
+
   it('loads direct benefit URLs by exact merchant id when route state is missing', async () => {
     vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness());
 

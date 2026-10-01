@@ -63,6 +63,32 @@ describe('useBenefitsData', () => {
     vi.mocked(getRawBenefits).mockResolvedValue([]);
   });
 
+  it('keeps exact merchant scope across URL changes, refresh and failures', async () => {
+    vi.mocked(fetchBusinessesPaginated).mockImplementation(async (options) => ({
+      success: options?.merchantId !== 'missing',
+      businesses: options?.merchantId === 'missing' ? [] : [{ ...mockBusiness, id: options?.merchantId || 'general' }],
+      pagination: { total: 1, limit: 1, offset: 0, hasMore: false }, filters: {},
+    }));
+    const { result, rerender } = renderHook(({ merchantId }) => useBenefitsData({
+      merchantId, search: 'unrelated', category: 'moda', onlineOnly: true, sortByDistance: true,
+    }), { initialProps: { merchantId: 'porter' }, wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.businesses[0]?.id).toBe('porter'));
+    expect(fetchBusinessesPaginated).toHaveBeenLastCalledWith(expect.objectContaining({ merchantId: 'porter', limit: 1, view: 'full', includeExpired: true }));
+    expect(vi.mocked(fetchBusinessesPaginated).mock.calls[0][0]).not.toHaveProperty('search');
+    expect(vi.mocked(fetchBusinessesPaginated).mock.calls[0][0]).not.toHaveProperty('category');
+    expect(vi.mocked(fetchBusinessesPaginated).mock.calls[0][0]).not.toHaveProperty('online');
+    rerender({ merchantId: 'other' });
+    await waitFor(() => expect(result.current.businesses[0]?.id).toBe('other'));
+    rerender({ merchantId: 'porter' });
+    await waitFor(() => expect(result.current.businesses[0]?.id).toBe('porter'));
+    await act(() => result.current.refreshData());
+    expect(fetchBusinessesPaginated).toHaveBeenLastCalledWith(expect.objectContaining({ merchantId: 'porter' }));
+    rerender({ merchantId: 'missing' });
+    await waitFor(() => expect(result.current.primarySearchError).toBe('Business search failed'));
+    expect(result.current.businesses).toEqual([]);
+    expect(vi.mocked(fetchBusinessesPaginated).mock.calls.every(([options]) => options?.merchantId)).toBe(true);
+  });
+
   it('surfaces unsuccessful business responses as primary search errors', async () => {
     vi.mocked(fetchBusinessesPaginated).mockResolvedValue({
       success: false,

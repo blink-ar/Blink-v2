@@ -191,7 +191,7 @@ function BenefitDetailPage() {
   const [locationSearch, setLocationSearch] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const { position: userPosition } = useGeolocation();
-  const [showTerms, setShowTerms] = useState(false);
+  const [showTerms, setShowTerms] = useState(true);
   const [showAllEligibleBanks, setShowAllEligibleBanks] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState('');
   const viewedBenefitSignatureRef = useRef('');
@@ -204,7 +204,7 @@ function BenefitDetailPage() {
 
   useSEO({
     title: business && benefit
-      ? `${business.name}: ${benefit.benefit} | Blink`
+      ? `${business.name}: ${benefit.benefit === business.name ? `${benefit.rewardRate} con ${benefitProviderName}` : benefit.benefit} | Blink`
       : 'Detalle de beneficio bancario | Blink',
     description: business && benefit
       ? `${benefitDiscount ? `${benefitDiscount}% de ahorro` : 'Beneficio bancario'} en ${business.name}. Revisa vigencia, condiciones y sucursales adheridas.`
@@ -454,7 +454,16 @@ function BenefitDetailPage() {
   const dayAvailability = parseDayAvailability(benefit.cuando);
   const hasDayData = !!benefit.cuando;
 
-  const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
+  const sourceUrl = (() => {
+    try {
+      const url = new URL(benefit.textoAplicacion || '');
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const termsText = [benefit.condicion, sourceUrl ? null : benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
     .filter(Boolean)
     .join('\n\n');
 
@@ -924,6 +933,44 @@ function BenefitDetailPage() {
             </div>
           )}
 
+          {/* ── Términos y condiciones ── */}
+          {termsText || sourceUrl ? (
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
+            >
+              <button
+                onClick={() => setShowTerms(!showTerms)}
+                aria-expanded={showTerms}
+                aria-controls="benefit-terms"
+                className="w-full px-5 py-4 flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
+                  </div>
+                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
+                </div>
+                <span
+                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
+                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+              {sourceUrl && (
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="mx-5 mb-4 inline-flex text-sm font-semibold text-primary underline underline-offset-2">
+                  Ver beneficio en la fuente original
+                </a>
+              )}
+              {showTerms && (
+                <div id="benefit-terms" className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
+                  {termsText && <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {/* ── Savings Simulator (discount, optionally with installments) ── */}
           {discount > 0 && (
             <SavingsSimulator
@@ -994,36 +1041,7 @@ function BenefitDetailPage() {
             </div>
           )}
 
-          {/* ── Términos y condiciones ── */}
-          {termsText ? (
-            <div
-              className="bg-white rounded-2xl overflow-hidden"
-              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
-            >
-              <button
-                onClick={() => setShowTerms(!showTerms)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#EEF2FF' }}>
-                    <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>gavel</span>
-                  </div>
-                  <p className="font-bold text-[15px] text-blink-ink">Términos y condiciones</p>
-                </div>
-                <span
-                  className="material-symbols-outlined text-blink-muted transition-transform duration-200 flex-shrink-0"
-                  style={{ fontSize: 20, transform: showTerms ? 'rotate(180deg)' : 'none' }}
-                >
-                  expand_more
-                </span>
-              </button>
-              {showTerms && (
-                <div className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
-                  <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>
-                </div>
-              )}
-            </div>
-          ) : null}
+
 
         </div>
       </main>

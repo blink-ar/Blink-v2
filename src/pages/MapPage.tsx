@@ -17,6 +17,8 @@ import {
   trackSelectBusiness,
 } from '../analytics/intentTracking';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { hasInAppHistory } from '../utils/navigation';
+import { filterActiveBenefits } from '../utils/benefits';
 import { getOptimizedImageUrl } from '../utils/images';
 
 const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 };
@@ -100,7 +102,7 @@ function MapPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isDesktop } = useResponsive();
-  const focusBusinessId = searchParams.get('business');
+  const focusBusinessId = searchParams.get('business')?.trim() || null;
 
   // Auto-request location only on the general map (where the user's intent is
   // "show me nearby places"). In single-business mode (?business=...) the map
@@ -126,7 +128,10 @@ function MapPage() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const filters: BenefitsFilters = useMemo(() => ({
+  const filters: BenefitsFilters = useMemo(() => focusBusinessId ? {
+    merchantId: focusBusinessId,
+    dataView: 'full',
+  } : ({
     search: debouncedSearch.trim() || undefined,
     category: activeChip !== 'nearby' ? activeChip : undefined,
     minDiscount,
@@ -138,11 +143,11 @@ function MapPage() {
     onlineOnly,
     sortByDistance: true,
     dataView: 'full',
-  }), [debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments, onlineOnly]);
+  }), [focusBusinessId, debouncedSearch, activeChip, minDiscount, maxDistance, availableDay, network, cardMode, hasInstallments, onlineOnly]);
 
-  const { businesses: rawBusinesses, isLoading } = useBenefitsData(filters);
+  const { businesses: rawBusinesses, isLoading, primarySearchError } = useBenefitsData(filters);
 
-  const businesses = useEnrichedBusinesses(rawBusinesses, {
+  const enrichedBusinesses = useEnrichedBusinesses(rawBusinesses, {
     minDiscount,
     maxDistance,
     availableDay,
@@ -150,6 +155,10 @@ function MapPage() {
     cardMode,
     hasInstallments,
   });
+
+  const businesses = useMemo(() => focusBusinessId
+    ? rawBusinesses.filter(b => b.id === focusBusinessId)
+    : enrichedBusinesses, [focusBusinessId, rawBusinesses, enrichedBusinesses]);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -240,9 +249,15 @@ function MapPage() {
     return businesses.find((b) => b.id === focusBusinessId) || null;
   }, [focusBusinessId, businesses]);
 
+  const handleBack = () => {
+    if (hasInAppHistory()) navigate(-1);
+    else if (focusedBusiness) navigate(getMerchantSeoPath(focusedBusiness), { replace: true });
+    else navigate('/search', { replace: true });
+  };
+
   const mapMarkers: MapMarker[] = useMemo(() => {
-    const source = isSingleBusinessMode && focusedBusiness
-      ? [focusedBusiness]
+    const source = isSingleBusinessMode
+      ? focusedBusiness ? [focusedBusiness] : []
       : businesses;
 
     const markers: MapMarker[] = [];
@@ -323,7 +338,10 @@ function MapPage() {
     : hasSearchQuery
       ? `${resultRows.length} ${resultRows.length === 1 ? 'resultado' : 'resultados'}`
       : `${mapMarkers.length} lugares`;
-  const emptyResultsLabel = hasSearchQuery ? 'Sin resultados' : 'Sin resultados en esta zona';
+  const emptyResultsLabel = isSingleBusinessMode
+    ? primarySearchError ? 'No se pudieron cargar las sucursales de este comercio. Volvé a intentar.'
+      : focusedBusiness ? 'Este comercio no tiene ubicaciones disponibles en el mapa.' : 'No encontramos este comercio.'
+    : hasSearchQuery ? 'Sin resultados' : 'Sin resultados en esta zona';
 
   useEffect(() => {
     if (!hasInitializedFiltersRef.current) {
@@ -387,7 +405,7 @@ function MapPage() {
 
   const getMaxDiscount = useCallback((biz: Business) => {
     let max = 0;
-    biz.benefits.forEach((b) => {
+    filterActiveBenefits(biz.benefits).forEach((b) => {
       const m = b.rewardRate.match(/(\d+)%/);
       if (m) max = Math.max(max, parseInt(m[1]));
     });
@@ -395,18 +413,22 @@ function MapPage() {
   }, []);
 
   const getBestBenefitLabel = useCallback((biz: Business) => {
+    const activeBenefits = filterActiveBenefits(biz.benefits);
+    if (activeBenefits.length === 0) return 'Sin beneficios vigentes';
     const max = getMaxDiscount(biz);
     if (max > 0) return `Hasta ${max}% OFF`;
-    const withInstallments = biz.benefits.find((b) => b.installments && b.installments > 0);
+    const withInstallments = activeBenefits.find((b) => b.installments && b.installments > 0);
     if (withInstallments) return `${withInstallments.installments} cuotas s/int.`;
-    return `${biz.benefits.length} beneficios`;
+    return `${activeBenefits.length} beneficios`;
   }, [getMaxDiscount]);
 
   const getShortBenefitForTooltip = useCallback((biz: Business) => {
+    const activeBenefits = filterActiveBenefits(biz.benefits);
+    if (activeBenefits.length === 0) return 'Sin beneficios vigentes';
     const max = getMaxDiscount(biz);
-    const bank = biz.benefits[0]?.bankName?.replace(/banco\s*/i, '').substring(0, 8) || '';
+    const bank = activeBenefits[0]?.bankName?.replace(/banco\s*/i, '').substring(0, 8) || '';
     if (max > 0) return `${max}% OFF${bank ? ` · ${bank}` : ''}`;
-    const withInstallments = biz.benefits.find((b) => b.installments && b.installments > 0);
+    const withInstallments = activeBenefits.find((b) => b.installments && b.installments > 0);
     if (withInstallments) return `${withInstallments.installments} cuotas${bank ? ` · ${bank}` : ''}`;
     return bank || 'Ver beneficios';
   }, [getMaxDiscount]);
@@ -657,7 +679,6 @@ function MapPage() {
             setSelectedBusiness(focusedBusiness);
             setSelectedMarkerIdx(0);
             setSelectedMarkerKey(getMarkerKey(mapMarkers[0]));
-            mapRef.current.panTo([mapMarkers[0].lat, mapMarkers[0].lng]);
           }
           hasFitInitialBoundsRef.current = true;
         }
@@ -687,6 +708,17 @@ function MapPage() {
   useEffect(() => {
     hasFitInitialBoundsRef.current = false;
   }, [activeChip, debouncedSearch, isSingleBusinessMode, maxDistance, minDiscount, onlineOnly, availableDay, cardMode, network, hasInstallments, position]);
+
+  useEffect(() => {
+    hasFitInitialBoundsRef.current = false;
+    clearOverlays();
+    selectedBusinessRef.current = null;
+    selectedMarkerIdxRef.current = null;
+    selectedMarkerKeyRef.current = null;
+    setSelectedBusiness(null);
+    setSelectedMarkerIdx(null);
+    setSelectedMarkerKey(null);
+  }, [focusBusinessId, clearOverlays]);
 
   useEffect(() => {
     if (!isLoading) initMap();
@@ -727,7 +759,7 @@ function MapPage() {
         <div className="pointer-events-auto flex items-center gap-2.5">
           {/* Back */}
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="flex items-center justify-center w-11 h-11 rounded-2xl active:scale-95 transition-all shrink-0"
             style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid rgba(232,230,225,0.8)' }}
           >
@@ -859,7 +891,7 @@ function MapPage() {
               </p>
             </div>
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="flex h-10 w-10 items-center justify-center rounded-xl bg-blink-bg text-blink-muted transition-colors hover:bg-gray-100"
               aria-label="Volver"
             >

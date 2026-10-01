@@ -1063,7 +1063,7 @@ async function resolveCardNameLookup(db, benefits) {
       .toArray()
       .then((cards) => new Map(
         cards.map((card) => {
-          const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim() || 'Tarjeta de credito';
+          const name = [card.issuer, card.tier].filter(Boolean).join(' ').trim();
           return [card._id.toString(), name];
         })
       ))
@@ -1142,7 +1142,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     id: benefit?.id || benefit?._id?.toString?.() || null,
     eligibilities,
     bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Proveedor',
-    cardName: cardNames[0] || 'Tarjeta de credito',
+    cardName: cardNames[0] || '',
     cardTypes: cardNames,
     benefit: benefit?.benefitTitle || 'Beneficio',
     rewardRate: value || 'Beneficio',
@@ -1154,7 +1154,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
         ? benefit.caps[0].amount
         : null,
     condicion: benefit?.termsAndConditions || null,
-    requisitos: cardNames.length > 0 ? cardNames : ['Tarjeta de credito'],
+    requisitos: cardNames,
     usos: benefit?.online ? ['online', 'presencial'] : ['presencial'],
     textoAplicacion: benefit?.link || null,
     description: benefit?.description || '',

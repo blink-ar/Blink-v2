@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BenefitDetailPage from "../BenefitDetailPage";
 import { Business } from "../../types";
@@ -141,7 +141,7 @@ describe("Benefit detail page content", () => {
     expect(screen.getByText("Disponible en:")).toBeInTheDocument();
     expect(screen.getByText("Test Street 123")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /términos y condiciones/i }));
+    expect(screen.getByRole("button", { name: /términos y condiciones/i })).toHaveAttribute("aria-expanded", "true");
 
     expect(screen.getByText(/Compra mínima de \$50\.000/)).toBeInTheDocument();
   });

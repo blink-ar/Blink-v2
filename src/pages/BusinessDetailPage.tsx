@@ -534,6 +534,7 @@ function BusinessDetailPage() {
           <div className="flex gap-2 min-w-max items-center">
             <button
               onClick={() => setFilterToday(f => !f)}
+              aria-pressed={filterToday}
               className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
                 filterToday
                   ? 'bg-primary text-white'
@@ -575,6 +576,22 @@ function BusinessDetailPage() {
         className="flex-1 overflow-y-auto pb-4 lg:min-w-0 lg:overflow-visible lg:pb-0"
         style={{ overscrollBehavior: 'contain' }}
       >
+
+        {filterToday && (
+          <div className="mx-4 mt-3 rounded-2xl border border-blink-border bg-white p-4" role="status">
+            <p className="text-sm text-blink-muted">
+              {filteredSortedBenefits.length} de {activeBenefitCount} beneficios activos disponibles hoy.
+            </p>
+            {filteredSortedBenefits.length === 0 && (
+              <>
+                <p className="mt-2 text-sm font-semibold text-blink-ink">No hay beneficios disponibles para hoy.</p>
+                <button onClick={() => setFilterToday(false)} className="mt-3 text-sm font-semibold text-primary underline underline-offset-2">
+                  Ver todos los beneficios activos
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Grouped by bank — default view */}
         {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (

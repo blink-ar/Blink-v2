@@ -195,7 +195,7 @@ function enrichMerchantAccumulator(accumulator, benefit, options = {}) {
     id: benefit.id || benefit._id?.toString?.() || null,
     eligibilities: getBenefitEligibilities(benefit),
     bankName: providerNames.length > 0 ? providerNames.join(', ') : 'Proveedor',
-    cardName: cardNames[0] || 'Tarjeta de credito',
+    cardName: cardNames[0] || '',
     cardTypes: cardNames,
     benefit: benefit.benefitTitle || 'Beneficio',
     rewardRate,
