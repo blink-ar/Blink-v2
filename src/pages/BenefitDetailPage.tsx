@@ -454,16 +454,16 @@ function BenefitDetailPage() {
   const dayAvailability = parseDayAvailability(benefit.cuando);
   const hasDayData = !!benefit.cuando;
 
-  const sourceUrl = (() => {
+  const applicationIsSourceUrl = (() => {
     try {
       const url = new URL(benefit.textoAplicacion || '');
-      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+      return ['http:', 'https:'].includes(url.protocol) ? true : false;
     } catch {
       return null;
     }
   })();
 
-  const termsText = [benefit.condicion, sourceUrl ? null : benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
+  const termsText = [benefit.condicion, applicationIsSourceUrl ? null : benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
     .filter(Boolean)
     .join('\n\n');
 
@@ -934,7 +934,7 @@ function BenefitDetailPage() {
           )}
 
           {/* ── Términos y condiciones ── */}
-          {termsText || sourceUrl ? (
+          {termsText ? (
             <div
               className="bg-white rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #E8E6E1' }}
@@ -958,11 +958,6 @@ function BenefitDetailPage() {
                   expand_more
                 </span>
               </button>
-              {sourceUrl && (
-                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="mx-5 mb-4 inline-flex text-sm font-semibold text-primary underline underline-offset-2">
-                  Ver beneficio en la fuente original
-                </a>
-              )}
               {showTerms && (
                 <div id="benefit-terms" className="px-5 pb-5" style={{ borderTop: '1px solid #E8E6E1' }}>
                   {termsText && <p className="text-sm text-blink-muted leading-relaxed whitespace-pre-wrap pt-4">{termsText}</p>}

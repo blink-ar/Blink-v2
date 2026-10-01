@@ -98,7 +98,7 @@ describe('BenefitDetailPage', () => {
     });
   });
 
-  it('shows full terms and a safe source link before the calculator without inventing a payment method', async () => {
+  it('shows full terms inside Blink without a source link or invented payment requirement', async () => {
     const business = makeBusiness({ benefits: [{
       bankName: 'Club La Gaceta', cardName: '', cardTypes: [], benefit: 'Porter Brew House',
       rewardRate: '15%', color: '', icon: '',
@@ -113,12 +113,36 @@ describe('BenefitDetailPage', () => {
     expect(screen.queryByText(/Tarjeta de Cr[eé]dito/i)).not.toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /Términos y condiciones/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    const link = screen.getByRole('link', { name: 'Ver beneficio en la fuente original' });
-    expect(link).toHaveAttribute('href', business.benefits[0].textoAplicacion);
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByRole('link', { name: 'Ver beneficio en la fuente original' })).not.toBeInTheDocument();
+    expect(screen.queryByText(business.benefits[0].textoAplicacion!)).not.toBeInTheDocument();
+    expect(business.benefits[0].textoAplicacion).toBe('https://club.lagaceta.com.ar/beneficio/7421/porter-brew-house');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(link).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Ver beneficio en la fuente original' })).not.toBeInTheDocument();
+  });
+
+  it('preserves substantive terms with embedded URLs as plain text', async () => {
+    const terms = 'Una vez por día. Consultar https://club.lagaceta.com.ar/condiciones. No acumulable.';
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({ benefits: [{
+      bankName: 'Club', cardName: '', benefit: 'Oferta', rewardRate: '15%', color: '', icon: '',
+      condicion: terms, textoAplicacion: 'Presentar documento y tarjeta de socio.',
+    }] }));
+    render(<BenefitDetailPage />);
+    const text = await screen.findByText(/Una vez por día/);
+    expect(text).toHaveTextContent(terms);
+    expect(text).toHaveTextContent('Presentar documento y tarjeta de socio.');
+    expect(text.querySelector('a')).toBeNull();
+    expect(document.querySelector('a[href^="https://club.lagaceta.com.ar"]')).toBeNull();
+  });
+
+  it('does not show an empty terms panel when only a provenance URL exists', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(makeBusiness({ benefits: [{
+      bankName: 'Club', cardName: '', benefit: 'Oferta', rewardRate: '15%', color: '', icon: '',
+      textoAplicacion: 'https://club.lagaceta.com.ar/beneficio/7421/porter-brew-house',
+    }] }));
+    render(<BenefitDetailPage />);
+    await screen.findByText('Oferta');
+    expect(screen.queryByRole('button', { name: /Términos y condiciones/ })).not.toBeInTheDocument();
   });
 
   it('keeps non-URL application text as visible terms without creating unsafe links', async () => {
