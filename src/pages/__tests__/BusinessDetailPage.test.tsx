@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
@@ -103,6 +103,20 @@ describe('BusinessDetailPage', () => {
   afterEach(() => {
     document.getElementById('blink-merchant-bootstrap')?.remove();
     vi.useRealTimers();
+  });
+
+  it('explains an empty today filter and restores all active benefits', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({ ...mockBusiness, benefits: [{
+      ...mockBusiness.benefits[0], cuando: 'Lunes, Martes, Miercoles', validUntil: ACTIVE_VALID_UNTIL,
+    }] });
+    render(<BusinessDetailPage />);
+    await screen.findByText('Mostaza');
+    fireEvent.click(screen.getByRole('button', { name: /Hoy/ }));
+    expect(screen.getByText('No hay beneficios disponibles para hoy.')).toBeVisible();
+    expect(screen.getByText('0 de 1 beneficios activos disponibles hoy.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver todos los beneficios activos' }));
+    expect(screen.queryByText('No hay beneficios disponibles para hoy.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hoy/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('loads the business by exact merchant id when route state is missing', async () => {

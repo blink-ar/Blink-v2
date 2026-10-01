@@ -1288,6 +1288,26 @@ describe('merchant-first serverless helpers', () => {
     expect(summary.source).toBe('modo');
   });
 
+  it('does not invent payment cards for unresolved membership eligibility', () => {
+    const summary = buildBusinessBenefitSummary({
+      id: 'lagaceta-7421',
+      eligibilities: [{ bank: 'lagaceta', bankDisplayName: 'Club La Gaceta', cardTypes: [], cardResolutionStatus: 'unresolved' }],
+      termsAndConditions: 'Presentar tarjeta de socio y documento.',
+    }, new Map());
+    expect(summary.cardName).toBe('');
+    expect(summary.cardTypes).toEqual([]);
+    expect(summary.requisitos).toEqual([]);
+    expect(summary.condicion).toBe('Presentar tarjeta de socio y documento.');
+  });
+
+  it('preserves verified card requirements', () => {
+    const summary = buildBusinessBenefitSummary({
+      eligibilities: [{ bank: 'bbva', bankDisplayName: 'BBVA', cardTypes: ['visa-credit'], cardResolutionStatus: 'resolved' }],
+    }, new Map([['visa-credit', 'Visa Crédito']]));
+    expect(summary.cardName).toBe('Visa Crédito');
+    expect(summary.requisitos).toEqual(['Visa Crédito']);
+  });
+
   it('buildBusinessBenefitSummary keeps source markers for id-ambiguous Modo promos', () => {
     const summary = buildBusinessBenefitSummary(
       {

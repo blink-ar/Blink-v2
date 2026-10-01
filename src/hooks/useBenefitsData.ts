@@ -34,6 +34,7 @@ interface UseBenefitsDataReturn {
 }
 
 export interface BenefitsFilters {
+    merchantId?: string; // Exact merchant scope for map links; never fall back to a general listing.
     search?: string;
     category?: string;
     bank?: string;
@@ -67,11 +68,12 @@ const requireSuccessfulBusinessesResponse = (
  */
 export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataReturn {
     const { position, loading: positionLoading } = useGeolocation();
-    const wantsSortByDistance = filters?.sortByDistance ?? false;
+    const merchantId = filters?.merchantId?.trim();
+    const wantsSortByDistance = !merchantId && (filters?.sortByDistance ?? false);
     // Only use proximity sort when the filter is active AND we have real coordinates.
     // If position is null (geolocation denied/unavailable) we fall back to geohash.
     const sortByDistance = wantsSortByDistance && position !== null;
-    const geohash = !sortByDistance && position
+    const geohash = !merchantId && !sortByDistance && position
         ? encodeGeohash(position.latitude, position.longitude)
         : undefined;
     const needsCompleteBenefitSet = Boolean(
@@ -81,7 +83,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         filters?.cardMode !== undefined ||
         filters?.hasInstallments !== undefined
     );
-    const dataView = filters?.dataView === 'full' || needsCompleteBenefitSet ? 'full' : 'summary';
+    const dataView = merchantId || filters?.dataView === 'full' || needsCompleteBenefitSet ? 'full' : 'summary';
 
     // Fetch businesses with infinite query for pagination.
     // sortByDistance=true → sends exact lat/lng to server (precise sort, bypasses CDN cache).
@@ -106,17 +108,18 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         queryFn: async ({ pageParam = 0, signal }) => {
             const offset = Number(pageParam) || 0;
             const response = await fetchBusinessesPaginated({
-                limit: ITEMS_PER_PAGE,
+                limit: merchantId ? 1 : ITEMS_PER_PAGE,
                 offset,
+                ...(merchantId && { merchantId, includeExpired: true }),
                 signal,
                 ...(sortByDistance && position
                     ? { lat: position.latitude, lng: position.longitude }
                     : geohash ? { geohash } : {}),
-                ...(filters?.search && { search: filters.search }),
-                ...(filters?.category && filters.category !== 'all' && { category: filters.category }),
-                ...(filters?.bank && { bank: filters.bank }),
-                ...(filters?.subscription && { subscription: filters.subscription }),
-                ...(filters?.onlineOnly && { online: true }),
+                ...(!merchantId && filters?.search && { search: filters.search }),
+                ...(!merchantId && filters?.category && filters.category !== 'all' && { category: filters.category }),
+                ...(!merchantId && filters?.bank && { bank: filters.bank }),
+                ...(!merchantId && filters?.subscription && { subscription: filters.subscription }),
+                ...(!merchantId && filters?.onlineOnly && { online: true }),
                 view: dataView,
             });
             return requireSuccessfulBusinessesResponse(response, offset === 0);
@@ -137,7 +140,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         // null (denied). In that case sortByDistance stays false (see above), so we fall
         // back to the geohash/no-location key instead of the 'exact' key, preventing
         // pollution of the proximity-sorted cache entry.
-        enabled: !positionLoading,
+        enabled: Boolean(merchantId) || !positionLoading,
         staleTime: 0,
     });
 
@@ -169,7 +172,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
 
-    const isPrimarySearchLoading = positionLoading || isLoadingBusinesses;
+    const isPrimarySearchLoading = (!merchantId && positionLoading) || isLoadingBusinesses;
     const isLoading = isPrimarySearchLoading || isLoadingFeatured;
     const isLoadingMore = isFetchingNextPage;
 
