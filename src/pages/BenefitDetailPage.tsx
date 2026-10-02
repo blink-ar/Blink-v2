@@ -41,7 +41,7 @@ import { hasInAppHistory } from '../utils/navigation';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { useToast } from '../components/ui/Toast';
 import { SAVED_BENEFITS_STORAGE_KEY } from '../utils/savedBenefits';
-import { getTodayAvailability } from '../utils/benefitAvailability';
+import { getTodayAvailability, normalizeCuando } from '../utils/benefitAvailability';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L', label: 'Lunes' },
@@ -470,7 +470,7 @@ function BenefitDetailPage() {
   };
 
   const validUntilFormatted = formatDate(benefit.validUntil);
-  const dayAvailability = parseDayAvailability(benefit.cuando);
+  const dayAvailability = parseDayAvailability(normalizeCuando(benefit.cuando));
   const hasDayData = !!benefit.cuando;
 
   const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
@@ -478,7 +478,9 @@ function BenefitDetailPage() {
     .join('\n\n');
 
   const locations = (() => {
-    const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+    // Address-only locations arrive without lat/lng; 0,0 is a placeholder.
+    const valid = business.location.filter((l) =>
+      Number.isFinite(l.lat) && Number.isFinite(l.lng) && !(l.lat === 0 && l.lng === 0));
     if (!userPosition) return valid;
     return [...valid].sort((a, b) =>
       calculateDistance(userPosition.latitude, userPosition.longitude, a.lat, a.lng) -

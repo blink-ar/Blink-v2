@@ -50,3 +50,15 @@ describe('isAvailableOnDay', () => {
     expect(isAvailableOnDay('promo vigente', 'monday')).toBe(false);
   });
 });
+
+describe('canonical English day values from the API', () => {
+  it('are understood by both helpers', () => {
+    expect(isAvailableOnDay('monday, tuesday', 'monday')).toBe(true);
+    expect(isAvailableOnDay('monday, tuesday', 'friday')).toBe(false);
+    expect(getTodayAvailability({ cuando: 'thursday', validUntil: null }, THURSDAY)).toEqual({ status: 'today' });
+    expect(getTodayAvailability({ cuando: 'friday', validUntil: null }, THURSDAY)).toEqual({
+      status: 'other-day',
+      nextDayLabel: 'mañana',
+    });
+  });
+});

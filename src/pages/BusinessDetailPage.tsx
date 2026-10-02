@@ -16,6 +16,7 @@ import BankLogo from '../components/BankLogos/BankLogo';
 import { getOptimizedImageUrl } from '../utils/images';
 import { hasInAppHistory } from '../utils/navigation';
 import { useToast } from '../components/ui/Toast';
+import { normalizeCuando } from '../utils/benefitAvailability';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -50,14 +51,14 @@ const formatPastValidity = (validUntil: string): string => {
 
 const isAllDays = (cuando?: string): boolean => {
   if (!cuando) return true;
-  const lower = cuando.toLowerCase();
+  const lower = (normalizeCuando(cuando) ?? '').toLowerCase();
   const found = new Set(ALL_DAYS.filter(d => lower.includes(d)).map(d => DAY_ABBR[d]));
   return found.size >= 7;
 };
 
 const getActiveDays = (cuando?: string): Set<string> => {
   if (!cuando) return new Set(DAY_ORDER);
-  const lower = cuando.toLowerCase();
+  const lower = (normalizeCuando(cuando) ?? '').toLowerCase();
   return new Set(ALL_DAYS.filter(d => lower.includes(d)).map(d => DAY_ABBR[d]));
 };
 
@@ -119,6 +120,10 @@ const formatInstallmentDays = (days: Set<string>): string => {
 const INITIAL_SHOW = 2;
 
 type ViewMode = 'por-banco' | 'por-beneficio' | 'sucursal';
+
+// Address-only locations arrive without lat/lng (undefined), and 0,0 is a placeholder.
+const hasValidCoordinates = (loc: { lat?: number; lng?: number }): loc is { lat: number; lng: number } =>
+  Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && !(loc.lat === 0 && loc.lng === 0);
 
 const getDirectionsUrl = (lat: number, lng: number): string =>
   `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
@@ -933,13 +938,13 @@ function BusinessDetailPage() {
                     const city = loc.addressComponents
                       ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
                       : loc.formattedAddress ?? '';
-                    const hasCoords = loc.lat !== 0 || loc.lng !== 0;
+                    const hasCoords = hasValidCoordinates(loc);
                     const content = (
                       <>
                         <span className="material-symbols-outlined mt-0.5 shrink-0 text-blink-muted" aria-hidden="true" style={{ fontSize: 18 }}>location_on</span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium leading-tight text-blink-ink">{street}</span>
-                          {city && <span className="mt-0.5 block text-xs text-blink-muted">{city}</span>}
+                          {city && city !== street && <span className="mt-0.5 block text-xs text-blink-muted">{city}</span>}
                         </span>
                         {hasCoords && (
                           <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">

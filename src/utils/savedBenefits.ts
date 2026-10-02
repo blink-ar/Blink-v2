@@ -20,11 +20,13 @@ export const readSavedBenefitKeys = (): string[] => {
   }
 };
 
-export const writeSavedBenefitKeys = (keys: string[]): void => {
+/** Returns false when storage is blocked or full, so callers don't confirm a change that wasn't saved. */
+export const writeSavedBenefitKeys = (keys: string[]): boolean => {
   try {
     window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(keys));
+    return true;
   } catch {
-    // ignore quota / privacy-mode errors
+    return false;
   }
 };
 

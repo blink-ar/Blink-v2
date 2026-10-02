@@ -167,7 +167,8 @@ function HomePage() {
   const showBell = iosNotInstalled || isSupported;
   const { user } = useAuth();
   const [mobileSearchTerm, setMobileSearchTerm] = useState('');
-  const [todayKey] = useState(() => WEEKDAY_KEYS[new Date().getDay()]);
+  // Computed on every render so a PWA tab left open past midnight doesn't keep yesterday's day.
+  const todayKey = WEEKDAY_KEYS[new Date().getDay()];
   const mobileQuickFilters = useMemo(() => buildMobileQuickFilters(todayKey), [todayKey]);
   const [desktopSearchTerm, setDesktopSearchTerm] = useState('');
   const { businesses, isLoading } = useBenefitsData({});
@@ -290,7 +291,7 @@ function HomePage() {
     }
 
     return selected;
-  }, [businesses]);
+  }, [businesses, todayKey]); // todayKey: re-rank when the day rolls over
 
   // Available banks come solely from /api/banks, which excludes Modo-sourced
   // benefits and keeps only banks with 5+ benefits. Deriving from loaded

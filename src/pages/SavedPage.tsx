@@ -167,7 +167,10 @@ function SavedPage() {
   const removeSavedBenefits = (keys: string[]) => {
     const toRemove = new Set(keys);
     const next = savedKeys.filter((value) => !toRemove.has(value));
-    writeSavedBenefitKeys(next);
+    if (!writeSavedBenefitKeys(next)) {
+      showToast('No pudimos guardar el cambio en este navegador');
+      return;
+    }
     setSavedKeys(next);
     showToast('Quitado de guardados', { icon: 'heart_minus' });
   };

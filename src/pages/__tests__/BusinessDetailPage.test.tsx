@@ -177,6 +177,29 @@ describe('BusinessDetailPage', () => {
     );
   });
 
+  it('does not offer directions for address-only branches', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness,
+      location: [
+        { ...mockBusiness.location[0], lat: undefined, lng: undefined } as unknown as Business['location'][number],
+      ],
+    });
+    routerMocks.mockUseParams.mockReturnValue({
+      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+
+    render(<BusinessDetailPage />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sucursales' }));
+
+    expect(screen.getByText('Store 1')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Cómo llegar/ })).not.toBeInTheDocument();
+  });
+
   it('renders a not found state when the business id does not resolve', async () => {
     vi.mocked(fetchBusinessById).mockResolvedValue(null);
 

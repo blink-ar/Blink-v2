@@ -15,6 +15,23 @@ const WEEKDAYS: { key: WeekdayKey; label: string }[] = [
   { key: 'saturday', label: 'sábado' },
 ];
 
+const ENGLISH_DAY_NAMES: [RegExp, string][] = [
+  [/\bmonday\b/gi, 'lunes'],
+  [/\btuesday\b/gi, 'martes'],
+  [/\bwednesday\b/gi, 'miércoles'],
+  [/\bthursday\b/gi, 'jueves'],
+  [/\bfriday\b/gi, 'viernes'],
+  [/\bsaturday\b/gi, 'sábado'],
+  [/\bsunday\b/gi, 'domingo'],
+];
+
+/**
+ * The API builds `cuando` by joining `availableDays`, which can hold canonical English values
+ * ("monday, tuesday"). Translate them so the Spanish-oriented day parser understands them.
+ */
+export const normalizeCuando = (cuando: string | undefined): string | undefined =>
+  cuando ? ENGLISH_DAY_NAMES.reduce((text, [pattern, spanish]) => text.replace(pattern, spanish), cuando) : cuando;
+
 export type TodayAvailability =
   | { status: 'today' }
   | { status: 'other-day'; nextDayLabel: string }
@@ -31,9 +48,10 @@ export const getTodayAvailability = (
   now: Date = new Date(),
 ): TodayAvailability => {
   if (!isBenefitActive(benefit, now)) return { status: 'expired' };
-  if (!benefit.cuando?.trim()) return { status: 'today' };
+  const cuando = normalizeCuando(benefit.cuando);
+  if (!cuando?.trim()) return { status: 'today' };
 
-  const availability = parseDayAvailability(benefit.cuando);
+  const availability = parseDayAvailability(cuando);
   if (!availability) return { status: 'today' };
   if (availability.allDays) return { status: 'today' };
 
@@ -72,8 +90,9 @@ const isWeekdayKey = (value: string): value is WeekdayKey => value in DAY_KEYWOR
  * Uses the day parser so exclusions ("No válido los lunes") and ranges ("de lunes a viernes")
  * are honored; only text the parser can't map to any day falls back to a keyword match.
  */
-export const isAvailableOnDay = (cuando: string | undefined, day: string, now: Date = new Date()): boolean => {
+export const isAvailableOnDay = (rawCuando: string | undefined, day: string, now: Date = new Date()): boolean => {
   const dayKey = day === 'today' ? WEEKDAYS[now.getDay()].key : day;
+  const cuando = normalizeCuando(rawCuando);
   if (!isWeekdayKey(dayKey)) return true;
   if (!cuando?.trim()) return true;
 

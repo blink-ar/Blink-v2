@@ -56,7 +56,7 @@ describe('saved benefit helpers', () => {
   });
 
   it('round-trips keys through localStorage and ignores malformed data', () => {
-    writeSavedBenefitKeys(['merchant_1:b-1']);
+    expect(writeSavedBenefitKeys(['merchant_1:b-1'])).toBe(true);
     expect(readSavedBenefitKeys()).toEqual(['merchant_1:b-1']);
 
     window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, '{not json');
@@ -64,5 +64,10 @@ describe('saved benefit helpers', () => {
 
     window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(['ok', 3]));
     expect(readSavedBenefitKeys()).toEqual(['ok']);
+  });
+
+  it('reports a failed write instead of swallowing it', () => {
+    vi.mocked(window.localStorage.setItem).mockImplementationOnce(() => { throw new Error('QuotaExceededError'); });
+    expect(writeSavedBenefitKeys(['merchant_1:b-1'])).toBe(false);
   });
 });
