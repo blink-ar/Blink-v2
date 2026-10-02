@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import type { BankFilterOption } from './BankFilterSheet';
 import { CATEGORY_OPTIONS } from './CategoryFilterSheet';
+import BankLogo from '../BankLogos/BankLogo';
 
 export const DISCOUNT_OPTIONS = [
   { value: 10, label: '10%+' },
@@ -41,10 +42,14 @@ interface UnifiedFilterSheetProps {
 
 const UnifiedFilterSheet = ({
   isOpen,
+  onClose,
   bankOptions,
   values,
   onApply,
 }: UnifiedFilterSheetProps) => {
+  // Callers pass inline closures; keep the latest without re-binding the Escape listener.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [draft, setDraft] = useState<UnifiedFilterValues>(values);
   const [bankSearch, setBankSearch] = useState('');
 
@@ -58,7 +63,15 @@ const UnifiedFilterSheet = ({
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    // Escape discards the draft, same as the close button and the backdrop.
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   const filteredBankOptions = useMemo(() => {
@@ -135,9 +148,12 @@ const UnifiedFilterSheet = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
-      <button aria-label="Cerrar filtros" tabIndex={-1} className="absolute inset-0" onClick={() => onApply(draft)} />
+      <button aria-label="Cerrar filtros sin aplicar" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unified-filter-title"
         className="relative flex h-[92vh] w-full flex-col rounded-t-[24px] bg-white lg:h-auto lg:max-h-[82vh] lg:max-w-3xl lg:rounded-2xl"
         style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }}
       >
@@ -152,7 +168,7 @@ const UnifiedFilterSheet = ({
           style={{ borderBottom: '1px solid #E8E6E1' }}
         >
           <div className="flex items-center gap-2.5">
-            <h2 className="font-semibold text-lg text-blink-ink">Filtros</h2>
+            <h2 id="unified-filter-title" className="font-semibold text-lg text-blink-ink">Filtros</h2>
             {activeCount > 0 && (
               <span className="bg-primary text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                 {activeCount}
@@ -160,17 +176,9 @@ const UnifiedFilterSheet = ({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {activeCount > 0 && (
-              <button
-                onClick={clearAll}
-                className="text-sm text-primary font-medium hover:text-primary/70 transition-colors"
-              >
-                Limpiar
-              </button>
-            )}
             <button
-              onClick={() => onApply(draft)}
-              aria-label="Cerrar filtros"
+              onClick={onClose}
+              aria-label="Cerrar filtros sin aplicar"
               className="w-9 h-9 bg-blink-bg border border-blink-border rounded-xl flex items-center justify-center text-blink-ink hover:bg-gray-100 transition-colors"
             >
               <span className="material-symbols-outlined text-lg">close</span>
@@ -206,6 +214,7 @@ const UnifiedFilterSheet = ({
                   return (
                     <button
                       key={option.token}
+                      aria-pressed={isSelected}
                       onClick={() => toggleBank(option.token)}
                       className={`py-3 relative rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
                         isSelected
@@ -213,10 +222,9 @@ const UnifiedFilterSheet = ({
                           : 'bg-blink-bg border border-blink-border hover:border-primary/30'
                       }`}
                     >
-                      <span className={`font-bold text-base tracking-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}>
-                        {option.code}
-                      </span>
-                      <span className={`text-[11px] font-medium text-center leading-tight ${isSelected ? 'text-primary/80' : 'text-blink-muted'}`}>
+                      {/* Logo + real name first: invented codes like "COMA" or "SUPE" are not recognizable. */}
+                      <BankLogo bankName={option.token} size={28} />
+                      <span className={`mt-1 px-1 text-xs font-semibold text-center leading-tight line-clamp-2 ${isSelected ? 'text-primary' : 'text-blink-ink'}`}>
                         {option.label}
                       </span>
                       {isSelected && (
@@ -394,6 +402,24 @@ const UnifiedFilterSheet = ({
           </div>
         </div>
 
+        {/* Explicit apply: closing (X, backdrop, Escape) discards the draft. */}
+        <div className="flex shrink-0 gap-3 border-t border-blink-border bg-white px-5 py-3 pb-safe">
+          <button
+            type="button"
+            onClick={clearAll}
+            disabled={activeCount === 0}
+            className="h-12 rounded-xl border border-blink-border px-4 text-sm font-semibold text-blink-ink transition-all active:scale-95 disabled:opacity-40"
+          >
+            Limpiar
+          </button>
+          <button
+            type="button"
+            onClick={() => onApply(draft)}
+            className="h-12 flex-1 rounded-xl bg-primary text-sm font-bold text-white transition-all active:scale-[0.98]"
+          >
+            {activeCount > 0 ? `Aplicar filtros (${activeCount})` : 'Aplicar'}
+          </button>
+        </div>
       </div>
     </div>
   );

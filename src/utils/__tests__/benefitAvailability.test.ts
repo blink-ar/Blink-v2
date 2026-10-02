@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest';
+import { getTodayAvailability, isAvailableToday } from '../benefitAvailability';
+
+// Thursday, 1 Oct 2026, local noon.
+const THURSDAY = new Date(2026, 9, 1, 12, 0, 0);
+
+describe('getTodayAvailability', () => {
+  it('treats benefits without days as valid today', () => {
+    expect(getTodayAvailability({ cuando: undefined, validUntil: null }, THURSDAY)).toEqual({ status: 'today' });
+  });
+
+  it('detects benefits valid on the current weekday', () => {
+    expect(getTodayAvailability({ cuando: 'jueves', validUntil: null }, THURSDAY)).toEqual({ status: 'today' });
+    expect(getTodayAvailability({ cuando: 'todos los días', validUntil: null }, THURSDAY)).toEqual({ status: 'today' });
+  });
+
+  it('returns the next valid day otherwise', () => {
+    expect(getTodayAvailability({ cuando: 'viernes', validUntil: null }, THURSDAY)).toEqual({
+      status: 'other-day',
+      nextDayLabel: 'mañana',
+    });
+    expect(getTodayAvailability({ cuando: 'lunes y martes', validUntil: null }, THURSDAY)).toEqual({
+      status: 'other-day',
+      nextDayLabel: 'lunes',
+    });
+  });
+
+  it('reports expired benefits before looking at days', () => {
+    expect(getTodayAvailability({ cuando: 'jueves', validUntil: '2020-01-01' }, THURSDAY)).toEqual({ status: 'expired' });
+    expect(isAvailableToday({ cuando: 'jueves', validUntil: '2020-01-01' }, THURSDAY)).toBe(false);
+  });
+});

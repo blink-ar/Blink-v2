@@ -41,6 +41,7 @@ import { hasInAppHistory } from '../utils/navigation';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { useToast } from '../components/ui/Toast';
 import { SAVED_BENEFITS_STORAGE_KEY } from '../utils/savedBenefits';
+import { getTodayAvailability } from '../utils/benefitAvailability';
 
 const BENEFIT_DAYS = [
   { key: 'monday' as const, abbr: 'L', label: 'Lunes' },
@@ -142,6 +143,9 @@ const parseTopeAmount = (tope: unknown): number | null => {
 
 const formatArgentinePeso = (amount: number): string =>
   '$' + Math.round(amount).toLocaleString('es-AR');
+
+const getDirectionsUrl = (lat: number, lng: number): string =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
 const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
   return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
@@ -423,6 +427,7 @@ function BenefitDetailPage() {
   const subscriptionName = getSubscriptionName(benefit.subscription);
   const subscription = getSubscriptionById(benefit.subscription);
   const isExpired = !isBenefitActive(benefit.validUntil);
+  const todayAvailability = getTodayAvailability(benefit);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);
@@ -477,6 +482,8 @@ function BenefitDetailPage() {
     );
   })();
   const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
+
+  const hasPhysicalLocations = locations.length > 0;
 
   const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
     ? benefit.cardTypes
@@ -593,14 +600,36 @@ function BenefitDetailPage() {
               )}
             </div>
 
+            {/* "¿Lo puedo usar hoy?" answered up front instead of buried in Condiciones. */}
+            {todayAvailability.status === 'today' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-blink-positive ring-1 ring-emerald-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>check_circle</span>
+                Válido hoy{validUntilFormatted ? ` · hasta ${validUntilFormatted}` : ''}
+              </span>
+            )}
+            {todayAvailability.status === 'other-day' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>schedule</span>
+                Hoy no aplica · próximo: {todayAvailability.nextDayLabel}
+              </span>
+            )}
+            {todayAvailability.status === 'expired' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>event_busy</span>
+                Vencido
+              </span>
+            )}
+
             <div className="mt-6 hidden w-full max-w-xs flex-col gap-2 lg:flex">
-              <button
-                onClick={handleOpenMap}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
-                Ver ubicacion
-              </button>
+              {hasPhysicalLocations && (
+                <button
+                  onClick={handleOpenMap}
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>map</span>
+                  Ver sucursales en el mapa
+                </button>
+              )}
               <button
                 onClick={() => void handleShare()}
                 className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-blink-border bg-white/70 text-sm font-semibold transition-all active:scale-[0.98]"
@@ -977,9 +1006,17 @@ function BenefitDetailPage() {
                       : loc.formattedAddress ?? '';
 
                     return (
-                      <div key={i} className="flex items-start gap-3 py-3">
+                      <a
+                        key={i}
+                        href={getDirectionsUrl(loc.lat, loc.lng)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Cómo llegar a ${streetLine}`}
+                        className="flex items-start gap-3 py-3 active:bg-gray-50"
+                      >
                         <span
                           className="material-symbols-outlined flex-shrink-0 mt-0.5"
+                          aria-hidden="true"
                           style={{ fontSize: 18, color: '#9CA3AF' }}
                         >
                           location_on
@@ -990,7 +1027,11 @@ function BenefitDetailPage() {
                             <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
                           )}
                         </div>
-                      </div>
+                        <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">
+                          Cómo llegar
+                          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>directions</span>
+                        </span>
+                      </a>
                     );
                   })}
                 </div>
@@ -1052,21 +1093,35 @@ function BenefitDetailPage() {
           borderTop: '1px solid #E8E6E1',
         }}
       >
-        <button
-          onClick={handleOpenMap}
-          className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
-          Ver ubicación
-        </button>
-        <button
-          onClick={() => void handleShare()}
-          aria-label="Compartir beneficio"
-          className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>share</span>
-        </button>
+        {hasPhysicalLocations ? (
+          <>
+            <button
+              onClick={handleOpenMap}
+              className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>map</span>
+              {locations.length > 1 ? `Ver ${locations.length} sucursales` : 'Ver sucursal'}
+            </button>
+            <button
+              onClick={() => void handleShare()}
+              aria-label="Compartir beneficio"
+              className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>share</span>
+            </button>
+          </>
+        ) : (
+          // No physical branches (online-only): a map button would lead nowhere.
+          <button
+            onClick={() => void handleShare()}
+            className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>share</span>
+            Compartir beneficio
+          </button>
+        )}
       </div>
     </div>
 
@@ -1180,7 +1235,14 @@ function BenefitDetailPage() {
                 const isNearest = !q && userPosition && i === 0;
 
                 return (
-                  <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                  <a
+                    key={i}
+                    href={getDirectionsUrl(loc.lat, loc.lng)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Cómo llegar a ${streetLine}`}
+                    className="flex items-start gap-3 px-5 py-3.5 active:bg-gray-50"
+                  >
                     <div
                       className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: '#F3F4F6' }}
@@ -1202,12 +1264,15 @@ function BenefitDetailPage() {
                         <p className="text-xs text-blink-muted">{cityLine}</p>
                       )}
                     </div>
-                    {dist !== null && (
-                      <span className="text-xs font-semibold flex-shrink-0 mt-0.5 text-blink-muted">
-                        {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
-                      </span>
-                    )}
-                  </div>
+                    <span className="flex shrink-0 flex-col items-end gap-0.5 mt-0.5">
+                      {dist !== null && (
+                        <span className="text-xs font-semibold text-blink-muted">
+                          {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
+                        </span>
+                      )}
+                      <span className="material-symbols-outlined text-primary" aria-hidden="true" style={{ fontSize: 18 }}>directions</span>
+                    </span>
+                  </a>
                 );
               });
             })()}

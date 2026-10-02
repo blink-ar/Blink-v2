@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import BankLogo from '../BankLogos/BankLogo';
 
 export interface BankFilterOption {
@@ -46,8 +46,12 @@ const BankFilterSheet = ({
   isOpen,
   options,
   selectedTokens,
+  onClose,
   onApply,
 }: BankFilterSheetProps) => {
+  // Callers pass inline closures; keep the latest without re-binding the Escape listener.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [searchTerm, setSearchTerm] = useState('');
   const [draftTokens, setDraftTokens] = useState<string[]>(selectedTokens);
 
@@ -61,8 +65,14 @@ const BankFilterSheet = ({
     if (!isOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Escape discards the draft, same as the close button and the backdrop.
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -92,14 +102,17 @@ const BankFilterSheet = ({
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
       {/* Backdrop tap to close */}
       <button
-        aria-label="Cerrar selector de bancos"
+        aria-label="Cerrar selector de bancos sin aplicar"
         tabIndex={-1}
         className="absolute inset-0"
-        onClick={() => onApply(draftTokens)}
+        onClick={onClose}
       />
 
       {/* Sheet */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bank-filter-title"
         className="relative flex h-[85vh] w-full flex-col rounded-t-[24px] bg-white lg:h-auto lg:max-h-[82vh] lg:max-w-2xl lg:rounded-2xl"
         style={{
           boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
@@ -112,10 +125,10 @@ const BankFilterSheet = ({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
-          <h2 className="font-semibold text-lg text-blink-ink">Seleccionar bancos</h2>
+          <h2 id="bank-filter-title" className="font-semibold text-lg text-blink-ink">Seleccionar bancos</h2>
           <button
-            onClick={() => onApply(draftTokens)}
-            aria-label="Cerrar selector de bancos"
+            onClick={onClose}
+            aria-label="Cerrar selector de bancos sin aplicar"
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -162,6 +175,7 @@ const BankFilterSheet = ({
               return (
                 <button
                   key={option.token}
+                  aria-pressed={isSelected}
                   onClick={() => toggleToken(option.token)}
                   className="aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 active:scale-95"
                   style={isSelected ? {
@@ -175,7 +189,7 @@ const BankFilterSheet = ({
                 >
                   <BankLogo bankName={option.token} size={40} />
                   <span
-                    className="text-[10px] font-medium mt-1.5 text-center leading-tight"
+                    className="text-[11px] font-medium mt-1.5 text-center leading-tight"
                     style={{ color: isSelected ? brand.color : `${brand.color}CC` }}
                   >
                     {option.label}
@@ -192,9 +206,21 @@ const BankFilterSheet = ({
               );
             })}
           </div>
-          <div className="h-20" />
+          <div className="h-4" />
         </div>
 
+        {/* Explicit apply: closing (X, backdrop, Escape) discards the draft. */}
+        <div className="shrink-0 border-t border-blink-border bg-white px-5 py-3 pb-safe">
+          <button
+            type="button"
+            onClick={() => onApply(draftTokens)}
+            className="h-12 w-full rounded-xl bg-primary text-sm font-bold text-white transition-all active:scale-[0.98]"
+          >
+            {draftTokens.length > 0
+              ? `Aplicar (${draftTokens.length} banco${draftTokens.length !== 1 ? 's' : ''})`
+              : 'Ver todos los bancos'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -118,7 +118,10 @@ const formatInstallmentDays = (days: Set<string>): string => {
 
 const INITIAL_SHOW = 2;
 
-type ViewMode = 'por-beneficio' | 'sucursal' | null;
+type ViewMode = 'por-banco' | 'por-beneficio' | 'sucursal';
+
+const getDirectionsUrl = (lat: number, lng: number): string =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
 
 function BusinessDetailPage() {
@@ -146,7 +149,7 @@ function BusinessDetailPage() {
       : '/business';
   const canonicalBusinessPath = business ? getMerchantSeoPath({ id: business.id, name: business.name }) : routePath;
 
-  const [viewMode, setViewMode] = useState<ViewMode>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('por-banco');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [filterToday, setFilterToday] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -453,7 +456,10 @@ function BusinessDetailPage() {
 
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-[17px] text-blink-ink leading-tight truncate">{business.name}</h1>
-            <p className="text-xs text-blink-muted capitalize mt-0.5">{business.category || 'Comercio'}</p>
+            <p className="text-xs text-blink-muted mt-0.5">
+              <span className="capitalize">{business.category || 'Comercio'}</span>
+              {(distanceText || branchLabel) && ` · ${[distanceText, branchLabel].filter(Boolean).join(' · ')}`}
+            </p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeBenefitCount > 0 ? 'bg-green-500' : 'bg-amber-500'}`} />
               <span className="text-xs font-medium text-blink-muted">
@@ -500,43 +506,45 @@ function BusinessDetailPage() {
 
         </div>
 
-        {/* Filter pills */}
-        <div className="w-full overflow-x-auto no-scrollbar py-3 px-4" style={{ borderTop: '1px solid #E8E6E1' }}>
-          <div className="flex gap-2 min-w-max items-center">
+        {/* View tabs + "Hoy" filter */}
+        <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: '1px solid #E8E6E1' }}>
+          <div role="tablist" aria-label="Ver beneficios" className="flex flex-1 rounded-xl bg-blink-bg p-1">
+            {([
+              // Short labels so the tabs and the "Hoy" toggle fit a 360px-wide screen.
+              { id: 'por-banco', label: 'Bancos' },
+              { id: 'por-beneficio', label: 'Descuento' },
+              { id: 'sucursal', label: 'Sucursales' },
+            ] as { id: ViewMode; label: string }[]).map((tab) => {
+              const selected = viewMode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setViewMode(tab.id)}
+                  className={`h-8 flex-1 whitespace-nowrap rounded-lg px-2 text-[13px] font-semibold transition-all ${
+                    selected ? 'bg-white text-blink-ink shadow-soft' : 'text-blink-muted'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          {viewMode !== 'sucursal' && (
             <button
               onClick={() => setFilterToday(f => !f)}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
+              aria-pressed={filterToday}
+              className={`flex h-10 shrink-0 items-center gap-1 rounded-xl px-3 text-sm font-medium transition-all duration-150 active:scale-95 ${
                 filterToday
                   ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink'
+                  : 'bg-white border border-blink-border text-blink-ink'
               }`}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>today</span>
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>today</span>
               Hoy
             </button>
-            <button
-              onClick={() => setViewMode(v => v === 'por-beneficio' ? null : 'por-beneficio')}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                viewMode === 'por-beneficio'
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
-              Por beneficio
-            </button>
-            <button
-              onClick={() => setViewMode(v => v === 'sucursal' ? null : 'sucursal')}
-              className={`flex items-center h-9 gap-1.5 px-3 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 ${
-                viewMode === 'sucursal'
-                  ? 'bg-primary text-white'
-                  : 'bg-blink-bg border border-blink-border text-blink-ink'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>storefront</span>
-              Sucursal
-            </button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -548,7 +556,7 @@ function BusinessDetailPage() {
       >
 
         {/* Grouped by bank — default view */}
-        {viewMode !== 'por-beneficio' && viewMode !== 'sucursal' && (
+        {viewMode === 'por-banco' && (
           <div className="space-y-3 pt-3 px-4">
 
             {Object.entries(filteredGroupedBenefits).map(([bankName, bankBenefits]) => {
@@ -596,15 +604,6 @@ function BusinessDetailPage() {
                             <p className="font-bold text-[15px] text-blink-ink leading-tight mb-1">
                               {benefit.benefit || benefit.cardName}
                             </p>
-
-                            {(distanceText || branchLabel) && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 12 }}>location_on</span>
-                                <span className="text-xs text-blink-muted">
-                                  {[distanceText, branchLabel].filter(Boolean).join(' • ')}
-                                </span>
-                              </div>
-                            )}
 
                             {benefit.cardName && (
                               <p className="text-xs text-blink-muted mb-2">{benefit.cardName}</p>
@@ -909,26 +908,68 @@ function BusinessDetailPage() {
           </section>
         )}
 
-        {/* Sucursal — map CTA */}
+        {/* Sucursales — list with directions, plus the map */}
         {viewMode === 'sucursal' && (
-          <div className="flex flex-col items-center gap-5 pt-14 px-6">
-            <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: 40 }}>map</span>
-            </div>
-            <div className="text-center">
-              <h3 className="font-bold text-lg text-blink-ink mb-1">
-                {branchCount} sucursal{branchCount !== 1 ? 'es' : ''}
-              </h3>
-              <p className="text-sm text-blink-muted">Encontrá la sucursal más cercana</p>
-            </div>
-            <button
-              onClick={handleOpenMap}
-              className="w-full text-white font-semibold py-4 rounded-2xl text-base active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
-              Ver en el mapa
-            </button>
+          <div className="space-y-3 px-4 pt-3">
+            {branchCount === 0 ? (
+              <p className="rounded-2xl border border-blink-border bg-white px-4 py-6 text-center text-sm text-blink-muted">
+                {business.hasOnline ? 'Este comercio opera online: no tiene sucursales físicas cargadas.' : 'No tenemos sucursales cargadas para este comercio.'}
+              </p>
+            ) : (
+              <>
+                <button
+                  onClick={handleOpenMap}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>map</span>
+                  Ver todas en el mapa
+                </button>
+                <ul className="divide-y divide-blink-border overflow-hidden rounded-2xl border border-blink-border bg-white">
+                  {business.location.map((loc, index) => {
+                    const street = loc.addressComponents?.route
+                      ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ` ${loc.addressComponents.streetNumber}` : ''}`
+                      : loc.name || loc.formattedAddress?.split(',')[0] || 'Dirección no disponible';
+                    const city = loc.addressComponents
+                      ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
+                      : loc.formattedAddress ?? '';
+                    const hasCoords = loc.lat !== 0 || loc.lng !== 0;
+                    const content = (
+                      <>
+                        <span className="material-symbols-outlined mt-0.5 shrink-0 text-blink-muted" aria-hidden="true" style={{ fontSize: 18 }}>location_on</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium leading-tight text-blink-ink">{street}</span>
+                          {city && <span className="mt-0.5 block text-xs text-blink-muted">{city}</span>}
+                        </span>
+                        {hasCoords && (
+                          <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">
+                            Cómo llegar
+                            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>directions</span>
+                          </span>
+                        )}
+                      </>
+                    );
+                    return (
+                      <li key={`${street}-${index}`}>
+                        {hasCoords ? (
+                          <a
+                            href={getDirectionsUrl(loc.lat, loc.lng)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Cómo llegar a ${street}`}
+                            className="flex items-start gap-3 px-4 py-3 active:bg-gray-50"
+                          >
+                            {content}
+                          </a>
+                        ) : (
+                          <div className="flex items-start gap-3 px-4 py-3">{content}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
           </div>
         )}
 

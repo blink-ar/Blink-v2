@@ -1,5 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { type FormEvent, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import BottomNav from '../components/neo/BottomNav';
@@ -21,6 +20,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getOptimizedImageUrl } from '../utils/images';
 import { HOME_CATEGORY_LINKS, HOME_DISCOUNT_LINKS, HOME_GUIDE_LINKS } from '../seo/homeSeoLinks';
 import BankLogo from '../components/BankLogos/BankLogo';
+import { isAvailableToday } from '../utils/benefitAvailability';
 
 type NavigatorWithStandalone = Navigator & {
   standalone?: boolean;
@@ -94,6 +94,22 @@ const DESKTOP_QUICK_FILTERS = [
   { label: 'Online', icon: 'language', path: '/search?online=1', filterType: 'channel', filterValue: 'online' },
 ];
 
+interface MobileQuickFilter {
+  label: string;
+  icon: string;
+  path: string;
+  filterType: string;
+  filterValue: string;
+}
+
+// Same keys SearchPage uses for its "Hoy" pill, so the pill shows as active on arrival.
+const WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+const buildMobileQuickFilters = (todayKey: string): MobileQuickFilter[] => [
+  { label: 'Hoy', icon: 'today', path: `/search?day=${todayKey}`, filterType: 'day', filterValue: todayKey },
+  ...DESKTOP_QUICK_FILTERS,
+];
+
 const BLINK_ENTITY_DESCRIPTION =
   'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
 
@@ -151,10 +167,10 @@ function HomePage() {
   const [iosNotInstalled] = useState<boolean>(isIOSBrowser);
   const showBell = iosNotInstalled || isSupported;
   const { user } = useAuth();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [homeSearchTerm, setHomeSearchTerm] = useState('');
+  const [mobileSearchTerm, setMobileSearchTerm] = useState('');
+  const [todayKey] = useState(() => WEEKDAY_KEYS[new Date().getDay()]);
+  const mobileQuickFilters = useMemo(() => buildMobileQuickFilters(todayKey), [todayKey]);
   const [desktopSearchTerm, setDesktopSearchTerm] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const { businesses, isLoading } = useBenefitsData({});
   const { data: statsResponse } = useQuery({
     queryKey: ['home-ticker-active-benefits-count'],
@@ -177,57 +193,29 @@ function HomePage() {
     navigate(`/search?bank=${entity.token}`);
   };
 
-  const closeSearchOverlay = useCallback(() => {
-    setIsSearchOpen(false);
-    searchInputRef.current?.blur();
-  }, []);
-
-  const focusSearchInput = useCallback(() => {
-    const input = searchInputRef.current;
-    if (!input) return;
-    input.focus();
-    const valueLength = input.value.length;
-    input.setSelectionRange(valueLength, valueLength);
-  }, []);
-
-  const openSearchOverlay = () => {
-    focusSearchInput();
-    flushSync(() => {
-      setHomeSearchTerm('');
-      setIsSearchOpen(true);
-    });
-    focusSearchInput();
+  const goToSearch = (term: string) => {
+    const confirmedSearch = term.trim();
+    navigate(confirmedSearch ? `/search?${new URLSearchParams({ q: confirmedSearch }).toString()}` : '/search');
   };
 
-  const confirmHomeSearch = () => {
-    const confirmedSearch = (searchInputRef.current?.value ?? homeSearchTerm).trim();
-    closeSearchOverlay();
-
-    if (!confirmedSearch) {
-      navigate('/search');
-      return;
-    }
-
-    const params = new URLSearchParams({ q: confirmedSearch });
-    navigate(`/search?${params.toString()}`);
-  };
-
-  const handleHomeSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleMobileSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    confirmHomeSearch();
+    goToSearch(mobileSearchTerm);
+  };
+
+  const handleMobileQuickFilterClick = (filter: MobileQuickFilter) => {
+    trackFilterApply({
+      source: 'home_mobile_quick_filter',
+      filterType: filter.filterType,
+      filterValue: filter.filterValue,
+      activeFilterCount: 1,
+    });
+    navigate(filter.path);
   };
 
   const handleDesktopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const confirmedSearch = desktopSearchTerm.trim();
-
-    if (!confirmedSearch) {
-      navigate('/search');
-      return;
-    }
-
-    const params = new URLSearchParams({ q: confirmedSearch });
-    navigate(`/search?${params.toString()}`);
+    goToSearch(desktopSearchTerm);
   };
 
   const handleDesktopCategoryClick = (categoryToken: string) => {
@@ -249,31 +237,6 @@ function HomePage() {
     });
     navigate(filter.path);
   };
-
-  useEffect(() => {
-    if (!isSearchOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const frame = window.requestAnimationFrame(() => {
-      focusSearchInput();
-    });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeSearchOverlay();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [closeSearchOverlay, focusSearchInput, isSearchOpen]);
 
   const handleTopBenefitClick = (
     businessId: string,
@@ -302,10 +265,12 @@ function HomePage() {
       discount: number;
     }[] = [];
 
+    const now = new Date();
     businesses.forEach((business) => {
       business.benefits.forEach((b, bIdx) => {
         const match = String(b.rewardRate).match(/(\d+)%/);
-        if (match) {
+        // "Top 5 hoy" must be usable today: skip benefits limited to other weekdays.
+        if (match && isAvailableToday(b, now)) {
           allBenefits.push({ business, benefit: b, benefitIndex: bIdx, discount: parseInt(match[1]) });
         }
       });
@@ -353,22 +318,13 @@ function HomePage() {
         <div className="h-14 flex items-center justify-between px-4">
           <div className="font-bold text-xl tracking-tight text-blink-ink">Blink</div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openSearchOverlay}
-              aria-label="Buscar beneficios"
-              aria-expanded={isSearchOpen}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors active:scale-95"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>search</span>
-            </button>
             {showBell && (
               <button
                 onClick={() => navigate('/notifications')}
                 aria-label="Ver notificaciones"
                 className="relative w-9 h-9 rounded-xl flex items-center justify-center text-blink-muted hover:bg-blink-bg transition-colors"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
                   notifications
                 </span>
               </button>
@@ -382,7 +338,7 @@ function HomePage() {
               {user ? (
                 <span className="text-white text-sm font-bold uppercase">{user.name.charAt(0)}</span>
               ) : (
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>person</span>
+                <span className="material-symbols-outlined text-white" aria-hidden="true" style={{ fontSize: 18 }}>person</span>
               )}
             </Link>
           </div>
@@ -391,61 +347,11 @@ function HomePage() {
         <Ticker count={activeBenefitsCount} />
       </header>
 
-      <div
-        className={`fixed inset-0 z-[80] flex items-center justify-center px-4 pb-20 transition-opacity duration-200 ${
-          isSearchOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        aria-hidden={!isSearchOpen}
-      >
-        <button
-          type="button"
-          aria-label="Cerrar búsqueda"
-          tabIndex={isSearchOpen ? 0 : -1}
-          onClick={closeSearchOverlay}
-          className="absolute inset-0 h-full w-full bg-white/35 backdrop-blur-[2px]"
-        />
-        <form
-          role="search"
-          onSubmit={handleHomeSearchSubmit}
-          className={`relative z-10 flex h-14 w-full max-w-[22rem] items-center gap-3 rounded-2xl px-4 transition-all duration-300 ease-out ${
-            isSearchOpen
-              ? 'translate-x-0 translate-y-0 scale-100 opacity-100'
-              : 'translate-x-[34vw] -translate-y-[36vh] scale-[0.18] opacity-0'
-          }`}
-          style={{
-            background: 'rgba(255,255,255,0.96)',
-            border: '1px solid rgba(232,230,225,0.95)',
-            boxShadow: '0 18px 46px rgba(28,28,30,0.16)',
-            transformOrigin: 'calc(100% - 18px) -40px',
-          }}
-        >
-          <span className="material-symbols-outlined shrink-0 text-blink-muted" style={{ fontSize: 22 }}>search</span>
-          <input
-            ref={searchInputRef}
-            value={homeSearchTerm}
-            onChange={(event) => setHomeSearchTerm(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                confirmHomeSearch();
-              }
-            }}
-            type="search"
-            inputMode="search"
-            enterKeyHint="search"
-            autoComplete="off"
-            tabIndex={isSearchOpen ? 0 : -1}
-            className="min-w-0 flex-1 appearance-none bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
-            placeholder="Buscar beneficios..."
-          />
-        </form>
-      </div>
-
-      <main className="flex-1 flex flex-col gap-8 pb-32 lg:hidden">
-        {/* Hero Section */}
-        <section className="px-4 pt-6">
-          <h1 className="text-[2rem] font-bold leading-tight text-blink-ink text-center mb-2">
-            Todos tus descuentos<br />
+      <main className="flex-1 flex flex-col gap-7 pb-32 lg:hidden">
+        {/* Hero: search first, so the first screen is about finding a discount */}
+        <section className="px-4 pt-5">
+          <h1 className="text-[1.65rem] font-bold leading-tight text-blink-ink mb-1">
+            Todos tus descuentos{' '}
             <span
               className="text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
@@ -453,77 +359,61 @@ function HomePage() {
               en un solo lugar
             </span>
           </h1>
-          <p className="text-center text-blink-muted text-sm mb-5">
-            Bancos - Billeteras - Clubes - Suscripciones
+          <p className="text-blink-muted text-sm mb-4">
+            Bancos, billeteras, clubes y suscripciones.
           </p>
 
-          {/* CTA Button */}
-          <button
-            onClick={() => navigate('/search')}
-            className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 px-5 transition-all duration-150 active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)',
-              boxShadow: '0 4px 20px rgba(99,102,241,0.35)',
-            }}
+          <form
+            role="search"
+            onSubmit={handleMobileSearchSubmit}
+            className="flex h-14 items-center gap-2 rounded-2xl border border-blink-border bg-white pl-4 pr-2 shadow-soft focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15"
           >
-            <span className="font-semibold text-base text-white tracking-tight">Buscá beneficios</span>
-            <span
-              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(255,255,255,0.20)' }}
+            <span className="material-symbols-outlined shrink-0 text-blink-muted" aria-hidden="true" style={{ fontSize: 22 }}>search</span>
+            <input
+              value={mobileSearchTerm}
+              onChange={(event) => setMobileSearchTerm(event.target.value)}
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label="Buscar comercio, rubro o beneficio"
+              className="min-w-0 flex-1 appearance-none bg-transparent text-base text-blink-ink placeholder-blink-muted focus:outline-none"
+              placeholder="Comercio o rubro"
+            />
+            <button
+              type="submit"
+              className="flex h-10 shrink-0 items-center rounded-xl px-4 text-sm font-semibold text-white transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>arrow_forward</span>
-            </span>
-          </button>
+              Buscar
+            </button>
+          </form>
 
-          {/* Indexed Entities */}
-          <div
-            className="mt-4 rounded-[28px] px-4 py-4"
-            style={{
-              background: 'linear-gradient(180deg, rgba(238,242,255,0.9) 0%, rgba(255,255,255,0.96) 100%)',
-              border: '1px solid rgba(99,102,241,0.18)',
-              boxShadow: '0 10px 28px rgba(99,102,241,0.08)',
-            }}
-          >
-            <p className="text-center text-[15px] font-semibold leading-snug text-blink-ink mb-4">
-              Estos son los emisores disponibles hoy en Blink.
-            </p>
-            {isBanksLoading ? (
-              <SkeletonAvailableBanks />
-            ) : (
-              <div className="flex flex-wrap justify-center gap-2">
-                {indexedEntities.map((entity) => (
-                  <button
-                    key={entity.token}
-                    onClick={() => handleEntityClick(entity)}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-blink-ink transition-all duration-150 active:scale-95"
-                    style={{ background: '#FFFFFF', border: '1.5px solid #E8E6E1' }}
-                  >
-                    {entity.label}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto no-scrollbar px-4">
+            {mobileQuickFilters.map((filter) => (
+              <button
+                key={filter.label}
+                type="button"
+                onClick={() => handleMobileQuickFilterClick(filter)}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-blink-border bg-white px-3 text-sm font-medium text-blink-ink transition-all active:scale-95"
+              >
+                <span className="material-symbols-outlined text-primary" aria-hidden="true" style={{ fontSize: 17 }}>{filter.icon}</span>
+                {filter.label}
+              </button>
+            ))}
           </div>
         </section>
 
-        {/* Install banner */}
-        <section className="px-4 -mt-4">
-          <InstallPWABanner />
-        </section>
-
-        {/* Top 5 Hoy - Bento Cards */}
+        {/* Top 5 hoy */}
         <section className="flex flex-col gap-3">
           <div className="px-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-base text-blink-ink">Top 5 hoy</h2>
-              <span className="text-base">🔥</span>
-            </div>
-            <button
-              onClick={() => navigate('/search')}
+            <h2 className="font-semibold text-base text-blink-ink">Mejores descuentos de hoy</h2>
+            <Link
+              to={`/search?day=${todayKey}`}
               className="text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
             >
-              Ver todo →
-            </button>
+              Ver todos
+            </Link>
           </div>
 
           {/* Horizontal Scroll */}
@@ -533,11 +423,17 @@ function HomePage() {
                 <div
                   key={i}
                   className="flex-shrink-0 w-[240px] h-[200px] rounded-2xl animate-pulse"
-                  style={{ background: '#D1D5DB' }}
+                  style={{ background: '#E5E7EB' }}
                 />
               ))
-              : top5.map((item, idx) => (
-                <article
+              : top5.length === 0 ? (
+                <div className="w-full rounded-2xl border border-blink-border bg-white px-4 py-6 text-center text-sm text-blink-muted">
+                  No encontramos descuentos destacados para hoy.{' '}
+                  <Link to="/search" className="font-semibold text-primary">Ver todos los beneficios</Link>
+                </div>
+              ) : top5.map((item, idx) => (
+                <button
+                  type="button"
                   key={`${item.business.id}-${idx}`}
                   onClick={() => handleTopBenefitClick(
                     item.business.id,
@@ -547,7 +443,7 @@ function HomePage() {
                     item.benefit,
                     item.business,
                   )}
-                  className="group relative flex-shrink-0 w-[240px] snap-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.97]"
+                  className="group relative flex-shrink-0 w-[240px] snap-center rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.97]"
                   style={{
                     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
                     border: '1px solid #E8E6E1',
@@ -560,7 +456,7 @@ function HomePage() {
                   >
                     {item.business.image && (
                       <img
-                        alt={item.business.name}
+                        alt=""
                         className="absolute inset-0 w-full h-full object-cover"
                         src={getOptimizedImageUrl(item.business.image, { width: 480 })}
                         loading="lazy"
@@ -583,13 +479,6 @@ function HomePage() {
                         <span className="text-xs font-semibold text-white/80">OFF</span>
                       </div>
                     </div>
-                    {/* Rank */}
-                    <div
-                      className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center"
-                      style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)' }}
-                    >
-                      <span className="text-xs font-bold text-white">#{idx + 1}</span>
-                    </div>
                   </div>
 
                   {/* Card content */}
@@ -608,18 +497,55 @@ function HomePage() {
                     <p className="text-xs text-blink-muted truncate mb-2">
                       {getBenefitProviderDisplayName(item.benefit)} · {item.benefit.cardName}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-blink-muted">
-                        {item.benefit.cuando ? String(item.benefit.cuando).substring(0, 20) : 'Disponible hoy'}
-                      </span>
-                      <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 18 }}>
-                        bookmark
-                      </span>
-                    </div>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-blink-positive">
+                      <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 13 }}>check_circle</span>
+                      Válido hoy
+                    </span>
                   </div>
-                </article>
+                </button>
               ))}
           </div>
+        </section>
+
+        {/* Issuers: one scrollable row instead of a wall of pills */}
+        <section className="flex flex-col gap-3">
+          <div className="px-4 flex items-center justify-between">
+            <h2 className="font-semibold text-base text-blink-ink">
+              Emisores en Blink
+              {indexedEntities.length > 0 && (
+                <span className="ml-1.5 text-sm font-normal text-blink-muted">({indexedEntities.length})</span>
+              )}
+            </h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-1">
+            {isBanksLoading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                  <div className="h-12 w-12 animate-pulse rounded-full bg-gray-200" />
+                  <div className="h-3 w-12 animate-pulse rounded bg-gray-100" />
+                </div>
+              ))
+              : indexedEntities.map((entity) => (
+                <button
+                  key={entity.token}
+                  type="button"
+                  onClick={() => handleEntityClick(entity)}
+                  className="flex w-16 shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-blink-border bg-white shadow-soft">
+                    <BankLogo bankName={entity.token} size={34} />
+                  </span>
+                  <span className="w-full truncate text-center text-[11px] font-medium text-blink-ink">
+                    {entity.name}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </section>
+
+        {/* Install banner */}
+        <section className="px-4">
+          <InstallPWABanner />
         </section>
 
         {/* Category Marquee */}
