@@ -54,3 +54,36 @@ export const isAvailableToday = (
   benefit: Pick<BankBenefit, 'cuando' | 'validUntil'>,
   now: Date = new Date(),
 ): boolean => getTodayAvailability(benefit, now).status === 'today';
+
+const DAY_KEYWORDS: Record<WeekdayKey, string[]> = {
+  monday: ['lunes', 'lun'],
+  tuesday: ['martes', 'mar'],
+  wednesday: ['miércoles', 'miercoles', 'mié', 'mie'],
+  thursday: ['jueves', 'jue'],
+  friday: ['viernes', 'vie'],
+  saturday: ['sábado', 'sabado', 'sáb', 'sab'],
+  sunday: ['domingo', 'dom'],
+};
+
+const isWeekdayKey = (value: string): value is WeekdayKey => value in DAY_KEYWORDS;
+
+/**
+ * Whether a benefit's `cuando` allows the given weekday ('monday'…'sunday', or 'today').
+ * Uses the day parser so exclusions ("No válido los lunes") and ranges ("de lunes a viernes")
+ * are honored; only text the parser can't map to any day falls back to a keyword match.
+ */
+export const isAvailableOnDay = (cuando: string | undefined, day: string, now: Date = new Date()): boolean => {
+  const dayKey = day === 'today' ? WEEKDAYS[now.getDay()].key : day;
+  if (!isWeekdayKey(dayKey)) return true;
+  if (!cuando?.trim()) return true;
+
+  const availability = parseDayAvailability(cuando);
+  if (!availability || availability.allDays) return true;
+  if (availability[dayKey]) return true;
+
+  const parsedAnyDay = WEEKDAYS.some(({ key }) => availability[key]);
+  if (parsedAnyDay) return false;
+
+  const text = cuando.toLowerCase();
+  return DAY_KEYWORDS[dayKey].some((keyword) => text.includes(keyword));
+};

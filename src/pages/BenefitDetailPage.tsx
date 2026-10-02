@@ -342,21 +342,25 @@ function BenefitDetailPage() {
       const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
-      if (savedSet.has(benefitId) || savedSet.has(legacyBenefitId)) {
+      const wasSaved = savedSet.has(benefitId) || savedSet.has(legacyBenefitId);
+      if (wasSaved) {
         savedSet.delete(benefitId);
         savedSet.delete(legacyBenefitId);
-        setIsSaved(false);
+      } else {
+        savedSet.add(benefitId);
+      }
+      // Persist first: only confirm (state, toast, tracking) once the write succeeded.
+      window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
+      setIsSaved(!wasSaved);
+      if (wasSaved) {
         showToast('Quitado de guardados', { icon: 'heart_minus' });
         trackUnsaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       } else {
-        savedSet.add(benefitId);
-        setIsSaved(true);
         showToast('Guardado en Guardados', { icon: 'favorite' });
         trackSaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       }
-      window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
     } catch {
-      setIsSaved(false);
+      showToast('No pudimos guardar el cambio en este navegador');
     }
   };
 

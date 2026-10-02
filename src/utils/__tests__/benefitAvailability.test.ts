@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getTodayAvailability, isAvailableToday } from '../benefitAvailability';
+import { getTodayAvailability, isAvailableOnDay, isAvailableToday } from '../benefitAvailability';
 
 // Thursday, 1 Oct 2026, local noon.
 const THURSDAY = new Date(2026, 9, 1, 12, 0, 0);
@@ -28,5 +28,25 @@ describe('getTodayAvailability', () => {
   it('reports expired benefits before looking at days', () => {
     expect(getTodayAvailability({ cuando: 'jueves', validUntil: '2020-01-01' }, THURSDAY)).toEqual({ status: 'expired' });
     expect(isAvailableToday({ cuando: 'jueves', validUntil: '2020-01-01' }, THURSDAY)).toBe(false);
+  });
+});
+
+describe('isAvailableOnDay', () => {
+  it('honors explicit weekday exclusions', () => {
+    expect(isAvailableOnDay('No válido los lunes', 'monday')).toBe(false);
+    expect(isAvailableOnDay('Todos los días excepto lunes', 'monday')).toBe(false);
+    expect(isAvailableOnDay('No válido los lunes', 'tuesday')).toBe(true);
+  });
+
+  it('understands day ranges that a substring match would miss', () => {
+    expect(isAvailableOnDay('Válido de lunes a viernes', 'wednesday')).toBe(true);
+    expect(isAvailableOnDay('Válido de lunes a viernes', 'saturday')).toBe(false);
+  });
+
+  it('resolves "today" and treats missing or unparseable schedules leniently', () => {
+    expect(isAvailableOnDay('jueves', 'today', THURSDAY)).toBe(true);
+    expect(isAvailableOnDay('lunes', 'today', THURSDAY)).toBe(false);
+    expect(isAvailableOnDay(undefined, 'monday')).toBe(true);
+    expect(isAvailableOnDay('promo vigente', 'monday')).toBe(false);
   });
 });
