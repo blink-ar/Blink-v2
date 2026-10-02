@@ -525,7 +525,9 @@ function BenefitDetailPage() {
   })();
   const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
 
-  const hasPhysicalLocations = locations.length > 0;
+  // The map needs coordinates: address-only branches are listed but can't open it.
+  const mappableLocationCount = locations.filter(hasValidCoordinates).length;
+  const hasMappableLocations = mappableLocationCount > 0;
 
   const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
     ? benefit.cardTypes
@@ -663,7 +665,7 @@ function BenefitDetailPage() {
             )}
 
             <div className="mt-6 hidden w-full max-w-xs flex-col gap-2 lg:flex">
-              {hasPhysicalLocations && (
+              {hasMappableLocations && (
                 <button
                   onClick={handleOpenMap}
                   className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
@@ -1130,7 +1132,7 @@ function BenefitDetailPage() {
           borderTop: '1px solid #E8E6E1',
         }}
       >
-        {hasPhysicalLocations ? (
+        {hasMappableLocations ? (
           <>
             <button
               onClick={handleOpenMap}
@@ -1138,7 +1140,7 @@ function BenefitDetailPage() {
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
             >
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>map</span>
-              {locations.length > 1 ? `Ver ${locations.length} sucursales` : 'Ver sucursal'}
+              {mappableLocationCount > 1 ? `Ver ${mappableLocationCount} sucursales` : 'Ver sucursal'}
             </button>
             <button
               onClick={() => void handleShare()}
@@ -1149,7 +1151,7 @@ function BenefitDetailPage() {
             </button>
           </>
         ) : (
-          // No physical branches (online-only): a map button would lead nowhere.
+          // Nothing to put on a map (online-only or address-only branches): share instead.
           <button
             onClick={() => void handleShare()}
             className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"

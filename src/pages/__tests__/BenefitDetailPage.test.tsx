@@ -129,7 +129,9 @@ describe('BenefitDetailPage', () => {
     expect(await screen.findByText('Disponible en:')).toBeInTheDocument();
     expect(screen.getByText('Av. Rivadavia 5108')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Cómo llegar/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver sucursal' })).toBeInTheDocument();
+    // The map can't place an address-only branch, so the main action is sharing.
+    expect(screen.queryByRole('button', { name: /Ver sucursal/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Compartir beneficio/ }).length).toBeGreaterThan(0);
   });
 
   it('selects a benefit by stable benefit id instead of array position', async () => {

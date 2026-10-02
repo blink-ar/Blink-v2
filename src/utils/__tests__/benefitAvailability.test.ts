@@ -62,3 +62,18 @@ describe('canonical English day values from the API', () => {
     });
   });
 });
+
+describe('holiday-only exceptions', () => {
+  it('do not invert weekday ranges', () => {
+    expect(isAvailableOnDay('Válido de lunes a viernes, excepto feriados', 'monday')).toBe(true);
+    expect(isAvailableOnDay('Válido de lunes a viernes, excepto feriados', 'friday')).toBe(true);
+    expect(isAvailableOnDay('Válido de lunes a viernes, excepto feriados', 'saturday')).toBe(false);
+    expect(isAvailableOnDay('Martes y jueves. No válido feriados', 'tuesday')).toBe(true);
+    expect(isAvailableOnDay('Martes y jueves. No válido feriados', 'monday')).toBe(false);
+    expect(getTodayAvailability({ cuando: 'lunes a viernes, excepto feriados', validUntil: null }, THURSDAY)).toEqual({ status: 'today' });
+  });
+
+  it('keep real weekday exclusions working', () => {
+    expect(isAvailableOnDay('Todos los días excepto lunes', 'monday')).toBe(false);
+  });
+});

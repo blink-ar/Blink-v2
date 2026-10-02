@@ -247,7 +247,8 @@ function MapPage() {
     const markers: MapMarker[] = [];
     source.forEach((biz) => {
       biz.location.forEach((loc) => {
-        if (loc.lat !== 0 || loc.lng !== 0) {
+        // Address-only locations have no lat/lng; a marker with undefined coords breaks Leaflet.
+        if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && (loc.lat !== 0 || loc.lng !== 0)) {
           markers.push({
             business: biz,
             lat: loc.lat,

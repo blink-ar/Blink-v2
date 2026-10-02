@@ -924,14 +924,16 @@ function BusinessDetailPage() {
               </p>
             ) : (
               <>
-                <button
-                  onClick={handleOpenMap}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>map</span>
-                  Ver todas en el mapa
-                </button>
+                {branchLocations.some(hasValidCoordinates) && (
+                  <button
+                    onClick={handleOpenMap}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                    style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>map</span>
+                    Ver todas en el mapa
+                  </button>
+                )}
                 <ul className="divide-y divide-blink-border overflow-hidden rounded-2xl border border-blink-border bg-white">
                   {branchLocations.map((loc, index) => {
                     const street = loc.addressComponents?.route

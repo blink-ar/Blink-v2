@@ -29,8 +29,15 @@ const ENGLISH_DAY_NAMES: [RegExp, string][] = [
  * The API builds `cuando` by joining `availableDays`, which can hold canonical English values
  * ("monday, tuesday"). Translate them so the Spanish-oriented day parser understands them.
  */
-export const normalizeCuando = (cuando: string | undefined): string | undefined =>
-  cuando ? ENGLISH_DAY_NAMES.reduce((text, [pattern, spanish]) => text.replace(pattern, spanish), cuando) : cuando;
+// "excepto feriados" / "No válido feriados" exclude holidays, not weekdays, but the day parser reads any
+// "excepto"/"no válido" as a weekday exclusion and inverts ranges like "lunes a viernes". Drop those clauses.
+const HOLIDAY_EXCEPTION = /[,.;]?\s*(?:excepto|salvo|no\s+v[aá]lid[oa])\s+(?:(?:los|en|para)\s+)?(?:d[ií]as\s+)?(?:feriados?|festivos?)\b\.?/gi;
+
+export const normalizeCuando = (cuando: string | undefined): string | undefined => {
+  if (!cuando) return cuando;
+  const translated = ENGLISH_DAY_NAMES.reduce((text, [pattern, spanish]) => text.replace(pattern, spanish), cuando);
+  return translated.replace(HOLIDAY_EXCEPTION, '').trim();
+};
 
 export type TodayAvailability =
   | { status: 'today' }
