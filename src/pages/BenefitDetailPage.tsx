@@ -752,7 +752,6 @@ function BenefitDetailPage() {
                           <div
                             key={day.key}
                             title={day.label}
-                            aria-label={`${day.label}: ${isActive ? 'disponible' : 'no disponible'}`}
                             className="w-7 h-7 flex items-center justify-center rounded-lg font-semibold text-[11px]"
                             style={
                               isActive
@@ -760,7 +759,8 @@ function BenefitDetailPage() {
                                 : { background: '#F3F4F6', color: '#9CA3AF' }
                             }
                           >
-                            {day.abbr}
+                            <span aria-hidden="true">{day.abbr}</span>
+                            <span className="sr-only">{`${day.label}: ${isActive ? 'disponible' : 'no disponible'}`}</span>
                           </div>
                         );
                       })}

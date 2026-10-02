@@ -147,10 +147,27 @@ const MarqueeRow: React.FC<MarqueeRowProps> = ({ items, reverse = false, classNa
   );
 };
 
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+const getReducedMotionQuery = () =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(REDUCED_MOTION_QUERY)
+    : null;
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = React.useState(() => getReducedMotionQuery()?.matches ?? false);
+
+  useEffect(() => {
+    const query = getReducedMotionQuery();
+    if (!query) return undefined;
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+
+  return reduced;
+}
 
 const StaticRow: React.FC<{ items: typeof CATEGORIES; onCategoryClick: (id: string) => void }> = ({ items, onCategoryClick }) => (
   <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-4 py-1">
@@ -169,7 +186,7 @@ const StaticRow: React.FC<{ items: typeof CATEGORIES; onCategoryClick: (id: stri
 
 const CategoryMarquee: React.FC = () => {
   const navigate = useNavigate();
-  const [reducedMotion] = React.useState(prefersReducedMotion);
+  const reducedMotion = useReducedMotion();
 
   const handleClick = (categoryId: string) => {
     trackFilterApply({

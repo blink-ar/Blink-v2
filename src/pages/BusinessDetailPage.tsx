@@ -631,9 +631,13 @@ function BusinessDetailPage() {
                                 </span>
                               ) : activeDays.size > 0 ? (
                                 <div className="flex gap-0.5">
+                                  <span className="sr-only">
+                                    {`Días: ${DAY_ORDER.filter((d) => activeDays.has(d)).map((d) => DAY_FULL_LABEL[d]).join(', ')}`}
+                                  </span>
                                   {DAY_ORDER.map(d => (
                                     <span
                                       key={d}
+                                      aria-hidden="true"
                                       title={DAY_FULL_LABEL[d]}
                                       className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold"
                                       style={

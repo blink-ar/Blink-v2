@@ -129,28 +129,44 @@ function SavedPage() {
   });
   const isLoadingSavedBenefits = benefitBusinessQueries.some((query) => query.isLoading);
 
-  const savedBenefits = useMemo(() => {
+  const { savedBenefits, unavailableKeys, hasLoadErrors } = useMemo(() => {
+    // Only a successful fetch can prove a saved benefit is gone; failed fetches are kept for a retry.
+    const fetchedBusinessIds = new Set<string>();
     const businessById = new Map<string, Business>();
-    benefitBusinessQueries.forEach((query) => {
-      if (query.data) businessById.set(query.data.id, query.data);
+    let errors = false;
+    savedBusinessIds.forEach((businessId, index) => {
+      const query = benefitBusinessQueries[index];
+      if (query?.isError) errors = true;
+      if (query?.isSuccess) {
+        fetchedBusinessIds.add(businessId);
+        if (query.data) businessById.set(businessId, query.data);
+      }
     });
 
     const now = new Date();
     const items: SavedBenefitItem[] = [];
+    const missing: string[] = [];
     savedRefs.forEach((ref) => {
       const business = businessById.get(ref.businessId);
-      if (!business) return;
-      const resolved = resolveSavedBenefit(business, ref.benefitRef);
-      if (!resolved) return;
-      items.push({ ref, business, ...resolved, active: isBenefitActive(resolved.benefit, now) });
+      const resolved = business ? resolveSavedBenefit(business, ref.benefitRef) : null;
+      if (business && resolved) {
+        items.push({ ref, business, ...resolved, active: isBenefitActive(resolved.benefit, now) });
+      } else if (fetchedBusinessIds.has(ref.businessId)) {
+        missing.push(ref.key);
+      }
     });
 
     // Active first, keep save order otherwise.
-    return items.sort((a, b) => Number(b.active) - Number(a.active));
-  }, [benefitBusinessQueries, savedRefs]);
+    return {
+      savedBenefits: items.sort((a, b) => Number(b.active) - Number(a.active)),
+      unavailableKeys: missing,
+      hasLoadErrors: errors,
+    };
+  }, [benefitBusinessQueries, savedBusinessIds, savedRefs]);
 
-  const removeSavedBenefit = (key: string) => {
-    const next = savedKeys.filter((value) => value !== key);
+  const removeSavedBenefits = (keys: string[]) => {
+    const toRemove = new Set(keys);
+    const next = savedKeys.filter((value) => !toRemove.has(value));
     writeSavedBenefitKeys(next);
     setSavedKeys(next);
     showToast('Quitado de guardados', { icon: 'heart_minus' });
@@ -247,9 +263,9 @@ function SavedPage() {
                   Array.from({ length: Math.min(savedRefs.length, 3) }).map((_, index) => (
                     <div key={index} className="h-[76px] animate-pulse rounded-2xl bg-white" />
                   ))
-                ) : savedBenefits.length === 0 ? (
+                ) : savedBenefits.length === 0 && hasLoadErrors ? (
                   <p className="px-1 text-sm text-blink-muted">
-                    Los beneficios que guardaste ya no están disponibles.
+                    No pudimos cargar tus beneficios guardados. Probá de nuevo en un rato.
                   </p>
                 ) : (
                   savedBenefits.map((item) => (
@@ -260,9 +276,25 @@ function SavedPage() {
                         buildBenefitPath(item.business.id, item.benefit, item.position),
                         { state: { business: item.business } },
                       )}
-                      onRemove={() => removeSavedBenefit(item.ref.key)}
+                      onRemove={() => removeSavedBenefits([item.ref.key])}
                     />
                   ))
+                )}
+                {!isLoadingSavedBenefits && unavailableKeys.length > 0 && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-dashed border-blink-border px-4 py-3">
+                    <p className="flex-1 text-sm text-blink-muted">
+                      {unavailableKeys.length === 1
+                        ? '1 beneficio guardado ya no está disponible.'
+                        : `${unavailableKeys.length} beneficios guardados ya no están disponibles.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removeSavedBenefits(unavailableKeys)}
+                      className="shrink-0 text-sm font-semibold text-primary"
+                    >
+                      Quitar
+                    </button>
+                  </div>
                 )}
               </section>
             )}
