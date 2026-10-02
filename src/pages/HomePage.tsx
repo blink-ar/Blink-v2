@@ -160,7 +160,7 @@ function HomePage() {
     queryKey: ['home-ticker-active-benefits-count'],
     queryFn: fetchMongoStats,
   });
-  const { data: availableBankNames = [], isLoading: isBanksLoading, isError: isBanksError } = useQuery({
+  const { data: availableBankNames = [], isLoading: isBanksLoading } = useQuery({
     queryKey: ['availableBanks'],
     queryFn: fetchBanks,
     staleTime: 1000 * 60 * 30,
@@ -626,8 +626,9 @@ function HomePage() {
         <CategoryMarquee />
 
         {/* Coming Soon Banks */}
-        {/* Wait for real issuers: an empty list would mislabel available banks as "Próximamente". */}
-        {!isBanksLoading && !isBanksError && <ComingSoonSection availableBanks={indexedEntities} />}
+        {/* Only with real issuers: while loading, or when fetchBanks swallows a failure and resolves [],
+            an empty list would mislabel available banks as "Próximamente". */}
+        {indexedEntities.length > 0 && <ComingSoonSection availableBanks={indexedEntities} />}
 
         <section className="px-4">
           <div className="border-t border-blink-border pt-5">
