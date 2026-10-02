@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface CategoryOption {
   token: string;
@@ -37,37 +37,41 @@ interface CategoryFilterSheetProps {
 const CategoryFilterSheet = ({
   isOpen,
   selected,
+  onClose,
   onApply,
 }: CategoryFilterSheetProps) => {
-  const [draft, setDraft] = useState(selected);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setDraft(selected);
-  }, [isOpen, selected]);
-
+  // Callers pass inline closures; keep the latest without re-binding the Escape listener.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!isOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const toggle = (token: string) => {
-    setDraft((current) => (current === token ? '' : token));
-  };
+  // Single choice: picking applies right away (tapping the active one clears it); closing changes nothing.
+  const choose = (token: string) => onApply(selected === token ? '' : token);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
       {/* Backdrop */}
-      <button aria-label="Cerrar selector de categorías" className="absolute inset-0" onClick={() => onApply(draft)} />
+      <button aria-label="Cerrar selector de categorías" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
 
       {/* Sheet */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="category-filter-title"
         className="relative flex h-[85vh] w-full flex-col rounded-t-[24px] bg-white lg:h-auto lg:max-h-[82vh] lg:max-w-2xl lg:rounded-2xl"
         style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }}
       >
@@ -78,9 +82,10 @@ const CategoryFilterSheet = ({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #E8E6E1' }}>
-          <h2 className="font-semibold text-lg text-blink-ink">Categoría</h2>
+          <h2 id="category-filter-title" className="font-semibold text-lg text-blink-ink">Categoría</h2>
           <button
-            onClick={() => onApply(draft)}
+            onClick={onClose}
+            aria-label="Cerrar selector de categorías"
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -91,11 +96,12 @@ const CategoryFilterSheet = ({
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-3 gap-2.5">
             {CATEGORY_OPTIONS.map((option) => {
-              const isSelected = draft === option.token;
+              const isSelected = selected === option.token;
               return (
                 <button
                   key={option.token}
-                  onClick={() => toggle(option.token)}
+                  aria-pressed={isSelected}
+                  onClick={() => choose(option.token)}
                   className="aspect-square relative rounded-2xl flex flex-col items-center justify-center p-2 gap-1.5 transition-all duration-150 active:scale-95"
                   style={isSelected ? {
                     backgroundColor: option.bg,
@@ -107,10 +113,10 @@ const CategoryFilterSheet = ({
                   }}
                 >
                   {/* Emoji icon */}
-                  <span style={{ fontSize: 28, lineHeight: 1 }}>{option.emoji}</span>
+                  <span aria-hidden="true" style={{ fontSize: 28, lineHeight: 1 }}>{option.emoji}</span>
 
                   <span
-                    className="text-[10px] font-semibold text-center leading-tight"
+                    className="text-[11px] font-semibold text-center leading-tight"
                     style={{ color: option.color }}
                   >
                     {option.label}

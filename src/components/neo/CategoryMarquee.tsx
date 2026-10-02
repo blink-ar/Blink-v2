@@ -107,6 +107,9 @@ const MarqueeRow: React.FC<MarqueeRowProps> = ({ items, reverse = false, classNa
     items.map((cat) => (
       <button
         key={`${cat.id}${suffix}`}
+        // The duplicated set only exists for the seamless loop; hide it from AT and tab order.
+        aria-hidden={suffix ? true : undefined}
+        tabIndex={suffix ? -1 : undefined}
         onPointerDown={() => { dragRef.current.hasMoved = false; }}
         onClick={() => {
           if (dragRef.current.hasMoved) return;
@@ -130,6 +133,10 @@ const MarqueeRow: React.FC<MarqueeRowProps> = ({ items, reverse = false, classNa
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onMouseEnter={() => { isPausedRef.current = true; }}
+      onMouseLeave={() => { isPausedRef.current = false; }}
+      onFocus={() => { isPausedRef.current = true; }}
+      onBlur={() => { isPausedRef.current = false; }}
     >
       {/* inline-flex so offsetWidth = full content width (used for seamless loop) */}
       <div ref={trackRef} className="inline-flex gap-2.5 py-1">
@@ -140,8 +147,46 @@ const MarqueeRow: React.FC<MarqueeRowProps> = ({ items, reverse = false, classNa
   );
 };
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+const getReducedMotionQuery = () =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(REDUCED_MOTION_QUERY)
+    : null;
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = React.useState(() => getReducedMotionQuery()?.matches ?? false);
+
+  useEffect(() => {
+    const query = getReducedMotionQuery();
+    if (!query) return undefined;
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+
+  return reduced;
+}
+
+const StaticRow: React.FC<{ items: typeof CATEGORIES; onCategoryClick: (id: string) => void }> = ({ items, onCategoryClick }) => (
+  <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-4 py-1">
+    {items.map((cat) => (
+      <button
+        key={cat.id}
+        onClick={() => onCategoryClick(cat.id)}
+        className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-150 active:scale-95"
+        style={{ backgroundColor: cat.bg, color: cat.text, border: `1px solid ${cat.text}20` }}
+      >
+        {cat.emoji} {cat.label}
+      </button>
+    ))}
+  </div>
+);
+
 const CategoryMarquee: React.FC = () => {
   const navigate = useNavigate();
+  const reducedMotion = useReducedMotion();
 
   const handleClick = (categoryId: string) => {
     trackFilterApply({
@@ -160,8 +205,17 @@ const CategoryMarquee: React.FC = () => {
         background: 'linear-gradient(180deg, #F7F6F4 0%, #FFFFFF 50%, #F7F6F4 100%)',
       }}
     >
-      <MarqueeRow items={row1} reverse={false} className="mb-2.5" onCategoryClick={handleClick} />
-      <MarqueeRow items={row2} reverse={true} onCategoryClick={handleClick} />
+      {reducedMotion ? (
+        <div className="space-y-2.5">
+          <StaticRow items={row1} onCategoryClick={handleClick} />
+          <StaticRow items={row2} onCategoryClick={handleClick} />
+        </div>
+      ) : (
+        <>
+          <MarqueeRow items={row1} reverse={false} className="mb-2.5" onCategoryClick={handleClick} />
+          <MarqueeRow items={row2} reverse={true} onCategoryClick={handleClick} />
+        </>
+      )}
     </section>
   );
 };

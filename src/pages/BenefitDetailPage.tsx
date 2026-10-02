@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
@@ -39,18 +39,20 @@ import {
 import { getOptimizedImageUrl } from '../utils/images';
 import { hasInAppHistory } from '../utils/navigation';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { useToast } from '../components/ui/Toast';
+import { SAVED_BENEFITS_STORAGE_KEY } from '../utils/savedBenefits';
+import { getTodayAvailability, normalizeCuando } from '../utils/benefitAvailability';
 
 const BENEFIT_DAYS = [
-  { key: 'monday' as const, abbr: 'L' },
-  { key: 'tuesday' as const, abbr: 'M' },
-  { key: 'wednesday' as const, abbr: 'M' },
-  { key: 'thursday' as const, abbr: 'J' },
-  { key: 'friday' as const, abbr: 'V' },
-  { key: 'saturday' as const, abbr: 'S' },
-  { key: 'sunday' as const, abbr: 'D' },
+  { key: 'monday' as const, abbr: 'L', label: 'Lunes' },
+  { key: 'tuesday' as const, abbr: 'M', label: 'Martes' },
+  { key: 'wednesday' as const, abbr: 'X', label: 'Miércoles' },
+  { key: 'thursday' as const, abbr: 'J', label: 'Jueves' },
+  { key: 'friday' as const, abbr: 'V', label: 'Viernes' },
+  { key: 'saturday' as const, abbr: 'S', label: 'Sábado' },
+  { key: 'sunday' as const, abbr: 'D', label: 'Domingo' },
 ];
 
-const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -142,6 +144,41 @@ const parseTopeAmount = (tope: unknown): number | null => {
 const formatArgentinePeso = (amount: number): string =>
   '$' + Math.round(amount).toLocaleString('es-AR');
 
+const getDirectionsUrl = (lat: number, lng: number): string =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+// Address-only locations arrive without lat/lng, and 0,0 is a placeholder: show them, but without directions.
+const hasValidCoordinates = (loc: { lat?: number; lng?: number }): loc is { lat: number; lng: number } =>
+  Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && !(loc.lat === 0 && loc.lng === 0);
+
+const hasDisplayableAddress = (loc: { formattedAddress?: string; name?: string; addressComponents?: unknown }) =>
+  Boolean(loc.formattedAddress || loc.name || loc.addressComponents);
+
+function LocationRow({
+  loc,
+  label,
+  className,
+  children,
+}: {
+  loc: { lat?: number; lng?: number };
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!hasValidCoordinates(loc)) return <div className={className}>{children}</div>;
+  return (
+    <a
+      href={getDirectionsUrl(loc.lat, loc.lng)}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Cómo llegar a ${label}`}
+      className={`${className} active:bg-gray-50`}
+    >
+      {children}
+    </a>
+  );
+}
+
 const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
   return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
 };
@@ -196,6 +233,7 @@ function BenefitDetailPage() {
   const [bankSearchQuery, setBankSearchQuery] = useState('');
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
+  const showToast = useToast();
   const benefitPath = id
     ? `/benefit/${encodeURIComponent(id)}/${encodeURIComponent(decodeBenefitRouteRef(benefitIndex) ?? '0')}`
     : '/benefit';
@@ -336,19 +374,25 @@ function BenefitDetailPage() {
       const stored = window.localStorage.getItem(SAVED_BENEFITS_STORAGE_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       const savedSet = Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
-      if (savedSet.has(benefitId) || savedSet.has(legacyBenefitId)) {
+      const wasSaved = savedSet.has(benefitId) || savedSet.has(legacyBenefitId);
+      if (wasSaved) {
         savedSet.delete(benefitId);
         savedSet.delete(legacyBenefitId);
-        setIsSaved(false);
-        trackUnsaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       } else {
         savedSet.add(benefitId);
-        setIsSaved(true);
+      }
+      // Persist first: only confirm (state, toast, tracking) once the write succeeded.
+      window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
+      setIsSaved(!wasSaved);
+      if (wasSaved) {
+        showToast('Quitado de guardados', { icon: 'heart_minus' });
+        trackUnsaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
+      } else {
+        showToast('Guardado en Guardados', { icon: 'favorite' });
         trackSaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       }
-      window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
     } catch {
-      setIsSaved(false);
+      showToast('No pudimos guardar el cambio en este navegador');
     }
   };
 
@@ -388,9 +432,11 @@ function BenefitDetailPage() {
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
+        showToast('Link copiado', { icon: 'link' });
         trackShareBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id, channel: 'clipboard' });
         return;
       }
+      showToast('No pudimos compartir desde este navegador');
       trackShareBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id, channel: 'unsupported' });
     } catch (error) {
       const channel = error instanceof DOMException && error.name === 'AbortError' ? 'dismissed' : 'share_error';
@@ -417,6 +463,7 @@ function BenefitDetailPage() {
   const subscriptionName = getSubscriptionName(benefit.subscription);
   const subscription = getSubscriptionById(benefit.subscription);
   const isExpired = !isBenefitActive(benefit.validUntil);
+  const todayAvailability = getTodayAvailability(benefit);
   const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);
@@ -455,7 +502,7 @@ function BenefitDetailPage() {
   };
 
   const validUntilFormatted = formatDate(benefit.validUntil);
-  const dayAvailability = parseDayAvailability(benefit.cuando);
+  const dayAvailability = parseDayAvailability(normalizeCuando(benefit.cuando));
   const hasDayData = !!benefit.cuando;
 
   const termsText = [benefit.condicion, benefit.textoAplicacion, ...(benefit.requisitos || []), ...(benefit.usos || [])]
@@ -463,14 +510,24 @@ function BenefitDetailPage() {
     .join('\n\n');
 
   const locations = (() => {
-    const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
+    // Explicit 0,0 is a placeholder ("Multiple locations"), never a branch. Address-only branches
+    // (no lat/lng at all) are kept: they are still physical stores, just without directions.
+    const valid = business.location.filter((l) => {
+      if (l.lat === 0 && l.lng === 0) return false;
+      return hasValidCoordinates(l) || hasDisplayableAddress(l);
+    });
     if (!userPosition) return valid;
-    return [...valid].sort((a, b) =>
-      calculateDistance(userPosition.latitude, userPosition.longitude, a.lat, a.lng) -
-      calculateDistance(userPosition.latitude, userPosition.longitude, b.lat, b.lng)
-    );
+    // Nearest first; branches without coordinates go last.
+    const distanceTo = (l: (typeof valid)[number]) => (hasValidCoordinates(l)
+      ? calculateDistance(userPosition.latitude, userPosition.longitude, l.lat, l.lng)
+      : Number.POSITIVE_INFINITY);
+    return [...valid].sort((a, b) => distanceTo(a) - distanceTo(b));
   })();
   const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
+
+  // The map needs coordinates: address-only branches are listed but can't open it.
+  const mappableLocationCount = locations.filter(hasValidCoordinates).length;
+  const hasMappableLocations = mappableLocationCount > 0;
 
   const cards = (benefit.cardTypes && benefit.cardTypes.length > 0
     ? benefit.cardTypes
@@ -498,6 +555,7 @@ function BenefitDetailPage() {
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
             <button
               onClick={handleBack}
+              aria-label="Volver"
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{ background: 'rgba(0,0,0,0.07)', border: `1px solid ${bankAccent.border}` }}
             >
@@ -505,6 +563,8 @@ function BenefitDetailPage() {
             </button>
             <button
               onClick={handleToggleSave}
+              aria-label={isSaved ? 'Quitar de guardados' : 'Guardar beneficio'}
+              aria-pressed={isSaved}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{
                 background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(0,0,0,0.07)',
@@ -584,14 +644,36 @@ function BenefitDetailPage() {
               )}
             </div>
 
+            {/* "¿Lo puedo usar hoy?" answered up front instead of buried in Condiciones. */}
+            {todayAvailability.status === 'today' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-blink-positive ring-1 ring-emerald-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>check_circle</span>
+                Válido hoy{validUntilFormatted ? ` · hasta ${validUntilFormatted}` : ''}
+              </span>
+            )}
+            {todayAvailability.status === 'other-day' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>schedule</span>
+                Hoy no aplica · próximo: {todayAvailability.nextDayLabel}
+              </span>
+            )}
+            {todayAvailability.status === 'expired' && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200">
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>event_busy</span>
+                Vencido
+              </span>
+            )}
+
             <div className="mt-6 hidden w-full max-w-xs flex-col gap-2 lg:flex">
-              <button
-                onClick={handleOpenMap}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>location_on</span>
-                Ver ubicacion
-              </button>
+              {hasMappableLocations && (
+                <button
+                  onClick={handleOpenMap}
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-indigo text-sm font-semibold text-white shadow-soft transition-all active:scale-[0.98]"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>map</span>
+                  Ver sucursales en el mapa
+                </button>
+              )}
               <button
                 onClick={() => void handleShare()}
                 className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-blink-border bg-white/70 text-sm font-semibold transition-all active:scale-[0.98]"
@@ -742,6 +824,7 @@ function BenefitDetailPage() {
                         return (
                           <div
                             key={day.key}
+                            title={day.label}
                             className="w-7 h-7 flex items-center justify-center rounded-lg font-semibold text-[11px]"
                             style={
                               isActive
@@ -749,7 +832,8 @@ function BenefitDetailPage() {
                                 : { background: '#F3F4F6', color: '#9CA3AF' }
                             }
                           >
-                            {day.abbr}
+                            <span aria-hidden="true">{day.abbr}</span>
+                            <span className="sr-only">{`${day.label}: ${isActive ? 'disponible' : 'no disponible'}`}</span>
                           </div>
                         );
                       })}
@@ -966,20 +1050,27 @@ function BenefitDetailPage() {
                       : loc.formattedAddress ?? '';
 
                     return (
-                      <div key={i} className="flex items-start gap-3 py-3">
+                      <LocationRow key={i} loc={loc} label={streetLine} className="flex items-start gap-3 py-3">
                         <span
                           className="material-symbols-outlined flex-shrink-0 mt-0.5"
+                          aria-hidden="true"
                           style={{ fontSize: 18, color: '#9CA3AF' }}
                         >
                           location_on
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-blink-ink leading-tight">{streetLine}</p>
-                          {cityLine && (
+                          {cityLine && cityLine !== streetLine && (
                             <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
                           )}
                         </div>
-                      </div>
+                        {hasValidCoordinates(loc) && (
+                          <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">
+                            Cómo llegar
+                            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>directions</span>
+                          </span>
+                        )}
+                      </LocationRow>
                     );
                   })}
                 </div>
@@ -1041,20 +1132,35 @@ function BenefitDetailPage() {
           borderTop: '1px solid #E8E6E1',
         }}
       >
-        <button
-          onClick={handleOpenMap}
-          className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>location_on</span>
-          Ver ubicación
-        </button>
-        <button
-          onClick={() => void handleShare()}
-          className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>share</span>
-        </button>
+        {hasMappableLocations ? (
+          <>
+            <button
+              onClick={handleOpenMap}
+              className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>map</span>
+              {mappableLocationCount > 1 ? `Ver ${mappableLocationCount} sucursales` : 'Ver sucursal'}
+            </button>
+            <button
+              onClick={() => void handleShare()}
+              aria-label="Compartir beneficio"
+              className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>share</span>
+            </button>
+          </>
+        ) : (
+          // Nothing to put on a map (online-only or address-only branches): share instead.
+          <button
+            onClick={() => void handleShare()}
+            className="flex-1 text-white font-semibold py-4 rounded-2xl text-base transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.30)' }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>share</span>
+            Compartir beneficio
+          </button>
+        )}
       </div>
     </div>
 
@@ -1089,12 +1195,14 @@ function BenefitDetailPage() {
                   if (showLocationSearch) { setLocationSearch(''); }
                   setShowLocationSearch(!showLocationSearch);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors text-base"
+                aria-label="Buscar sucursal"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
               >
-                🔍
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>search</span>
               </button>
               <button
                 onClick={() => setShowLocationPopup(false)}
+                aria-label="Cerrar ubicaciones"
                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
@@ -1159,14 +1267,14 @@ function BenefitDetailPage() {
                   ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
                   : loc.formattedAddress ?? '';
 
-                const dist = userPosition
+                const dist = userPosition && hasValidCoordinates(loc)
                   ? calculateDistance(userPosition.latitude, userPosition.longitude, loc.lat, loc.lng)
                   : null;
 
                 const isNearest = !q && userPosition && i === 0;
 
                 return (
-                  <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                  <LocationRow key={i} loc={loc} label={streetLine} className="flex items-start gap-3 px-5 py-3.5">
                     <div
                       className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: '#F3F4F6' }}
@@ -1184,16 +1292,21 @@ function BenefitDetailPage() {
                           </span>
                         )}
                       </div>
-                      {cityLine && (
+                      {cityLine && cityLine !== streetLine && (
                         <p className="text-xs text-blink-muted">{cityLine}</p>
                       )}
                     </div>
-                    {dist !== null && (
-                      <span className="text-xs font-semibold flex-shrink-0 mt-0.5 text-blink-muted">
-                        {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
-                      </span>
-                    )}
-                  </div>
+                    <span className="flex shrink-0 flex-col items-end gap-0.5 mt-0.5">
+                      {dist !== null && (
+                        <span className="text-xs font-semibold text-blink-muted">
+                          {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
+                        </span>
+                      )}
+                      {hasValidCoordinates(loc) && (
+                        <span className="material-symbols-outlined text-primary" aria-hidden="true" style={{ fontSize: 18 }}>directions</span>
+                      )}
+                    </span>
+                  </LocationRow>
                 );
               });
             })()}
@@ -1236,6 +1349,7 @@ function BenefitDetailPage() {
                 setShowAllEligibleBanks(false);
                 setBankSearchQuery('');
               }}
+              aria-label="Cerrar bancos adheridos"
               className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>

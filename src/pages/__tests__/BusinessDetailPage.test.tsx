@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
@@ -153,6 +153,53 @@ describe('BusinessDetailPage', () => {
     });
   });
 
+  it('lists branches with directions in the Sucursales tab', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue(mockBusiness);
+    routerMocks.mockUseParams.mockReturnValue({
+      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+
+    render(<BusinessDetailPage />);
+
+    const branchesTab = await screen.findByRole('tab', { name: 'Sucursales' });
+    expect(screen.getByRole('tab', { name: 'Bancos' })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(branchesTab);
+
+    expect(branchesTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('link', { name: 'Cómo llegar a Store 1' })).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/dir/?api=1&destination=-34.6,-58.38',
+    );
+  });
+
+  it('does not offer directions for address-only branches', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness,
+      location: [
+        { ...mockBusiness.location[0], lat: undefined, lng: undefined } as unknown as Business['location'][number],
+      ],
+    });
+    routerMocks.mockUseParams.mockReturnValue({
+      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+    routerMocks.mockUseLocation.mockReturnValue({
+      state: null,
+      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
+    });
+
+    render(<BusinessDetailPage />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sucursales' }));
+
+    expect(screen.getByText('Store 1')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Cómo llegar/ })).not.toBeInTheDocument();
+  });
+
   it('renders a not found state when the business id does not resolve', async () => {
     vi.mocked(fetchBusinessById).mockResolvedValue(null);
 
@@ -183,7 +230,7 @@ describe('BusinessDetailPage', () => {
 
     expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
     expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
-    expect(screen.getByText(`Venció: ${EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
+    expect(screen.getByText('Venció el 01/01/2020')).toBeInTheDocument();
   });
 
   it('shows lower-installment rows from the same bank when validity differs', async () => {

@@ -251,7 +251,7 @@ function LandingPage() {
               aria-label="Abrir filtros"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
-              <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+              <span className="absolute -top-1 -right-1 bg-white text-primary text-[11px] font-bold h-5 w-5 flex items-center justify-center rounded-full">
                 {city ? 3 : 2}
               </span>
             </Link>

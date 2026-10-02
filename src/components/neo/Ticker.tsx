@@ -16,7 +16,8 @@ const Ticker: React.FC<TickerProps> = ({ count }) => {
       }}
     >
       <span className="text-xs font-medium text-primary/80 tracking-wide">
-        ✦ {formattedCount} beneficios activos
+        {/* Keep the bar's height while stats load instead of flashing "0 beneficios". */}
+        {count > 0 ? `✦ ${formattedCount} beneficios activos` : '✦ Descuentos de bancos y billeteras'}
       </span>
     </div>
   );

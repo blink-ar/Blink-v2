@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Business } from '../types';
 import { hasOnlineBenefits, calculateDistance, formatDistance } from '../utils/distance';
 import { useGeolocation } from './useGeolocation';
+import { isAvailableOnDay } from '../utils/benefitAvailability';
 
 /**
  * Enriches businesses with online information and applies filters
@@ -83,32 +84,9 @@ export const useEnrichedBusinesses = (
 
     // Apply available day filter using benefit.cuando field
     if (availableDay !== undefined) {
-      const dayMap: Record<string, string[]> = {
-        monday: ['lunes', 'lun'],
-        tuesday: ['martes', 'mar'],
-        wednesday: ['miércoles', 'miercoles', 'mié', 'mie'],
-        thursday: ['jueves', 'jue'],
-        friday: ['viernes', 'vie'],
-        saturday: ['sábado', 'sabado', 'sáb', 'sab'],
-        sunday: ['domingo', 'dom'],
-      };
-
-      let dayToCheck = availableDay;
-      if (availableDay === 'today') {
-        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        dayToCheck = days[new Date().getDay()];
-      }
-
-      const keywords = dayMap[dayToCheck] || [];
-
+      const now = new Date();
       result = result.filter((b) =>
-        b.benefits.some((benefit) => {
-          if (!benefit.cuando) return true; // No schedule info = assume always available
-          const cuando = benefit.cuando.toLowerCase();
-          // "todos los días" means every day
-          if (cuando.includes('todos los d') || cuando.includes('todos los dias')) return true;
-          return keywords.some((kw) => cuando.includes(kw));
-        }),
+        b.benefits.some((benefit) => isAvailableOnDay(benefit.cuando, availableDay, now)),
       );
     }
 

@@ -247,7 +247,8 @@ function MapPage() {
     const markers: MapMarker[] = [];
     source.forEach((biz) => {
       biz.location.forEach((loc) => {
-        if (loc.lat !== 0 || loc.lng !== 0) {
+        // Address-only locations have no lat/lng; a marker with undefined coords breaks Leaflet.
+        if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && (loc.lat !== 0 || loc.lng !== 0)) {
           markers.push({
             business: biz,
             lat: loc.lat,
@@ -783,7 +784,7 @@ function MapPage() {
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: activeFilterCount > 0 ? 'white' : '#6B7280' }}>tune</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-white rounded-full text-primary text-[9px] font-bold flex items-center justify-center" style={{ width: 18, height: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
+                  <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-white rounded-full text-primary text-[11px] font-bold flex items-center justify-center" style={{ width: 18, height: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
                     {activeFilterCount}
                   </span>
                 )}

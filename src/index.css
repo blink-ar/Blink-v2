@@ -35,6 +35,16 @@
     visibility: hidden;
   }
 
+  /* iOS Safari zooms into focused fields under 16px. Pinch-zoom stays enabled
+     (no maximum-scale in the viewport meta), so keep fields at 16px there. */
+  @supports (-webkit-touch-callout: none) {
+    input,
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
+
   /* Soft selection highlight */
   ::selection {
     @apply bg-primary/20 text-blink-ink;
