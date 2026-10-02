@@ -93,6 +93,7 @@ const BankFilterSheet = ({
       {/* Backdrop tap to close */}
       <button
         aria-label="Cerrar selector de bancos"
+        tabIndex={-1}
         className="absolute inset-0"
         onClick={() => onApply(draftTokens)}
       />
@@ -114,6 +115,7 @@ const BankFilterSheet = ({
           <h2 className="font-semibold text-lg text-blink-ink">Seleccionar bancos</h2>
           <button
             onClick={() => onApply(draftTokens)}
+            aria-label="Cerrar selector de bancos"
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>

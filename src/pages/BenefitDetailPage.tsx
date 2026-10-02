@@ -39,18 +39,19 @@ import {
 import { getOptimizedImageUrl } from '../utils/images';
 import { hasInAppHistory } from '../utils/navigation';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
+import { useToast } from '../components/ui/Toast';
+import { SAVED_BENEFITS_STORAGE_KEY } from '../utils/savedBenefits';
 
 const BENEFIT_DAYS = [
-  { key: 'monday' as const, abbr: 'L' },
-  { key: 'tuesday' as const, abbr: 'M' },
-  { key: 'wednesday' as const, abbr: 'M' },
-  { key: 'thursday' as const, abbr: 'J' },
-  { key: 'friday' as const, abbr: 'V' },
-  { key: 'saturday' as const, abbr: 'S' },
-  { key: 'sunday' as const, abbr: 'D' },
+  { key: 'monday' as const, abbr: 'L', label: 'Lunes' },
+  { key: 'tuesday' as const, abbr: 'M', label: 'Martes' },
+  { key: 'wednesday' as const, abbr: 'X', label: 'Miércoles' },
+  { key: 'thursday' as const, abbr: 'J', label: 'Jueves' },
+  { key: 'friday' as const, abbr: 'V', label: 'Viernes' },
+  { key: 'saturday' as const, abbr: 'S', label: 'Sábado' },
+  { key: 'sunday' as const, abbr: 'D', label: 'Domingo' },
 ];
 
-const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -196,6 +197,7 @@ function BenefitDetailPage() {
   const [bankSearchQuery, setBankSearchQuery] = useState('');
   const viewedBenefitSignatureRef = useRef('');
   const { getSubscriptionName, getSubscriptionById } = useSubscriptions();
+  const showToast = useToast();
   const benefitPath = id
     ? `/benefit/${encodeURIComponent(id)}/${encodeURIComponent(decodeBenefitRouteRef(benefitIndex) ?? '0')}`
     : '/benefit';
@@ -340,10 +342,12 @@ function BenefitDetailPage() {
         savedSet.delete(benefitId);
         savedSet.delete(legacyBenefitId);
         setIsSaved(false);
+        showToast('Quitado de guardados', { icon: 'heart_minus' });
         trackUnsaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       } else {
         savedSet.add(benefitId);
         setIsSaved(true);
+        showToast('Guardado en Guardados', { icon: 'favorite' });
         trackSaveBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id });
       }
       window.localStorage.setItem(SAVED_BENEFITS_STORAGE_KEY, JSON.stringify(Array.from(savedSet)));
@@ -388,9 +392,11 @@ function BenefitDetailPage() {
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
+        showToast('Link copiado', { icon: 'link' });
         trackShareBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id, channel: 'clipboard' });
         return;
       }
+      showToast('No pudimos compartir desde este navegador');
       trackShareBenefit({ source: 'benefit_detail_page', benefitId, businessId: business.id, channel: 'unsupported' });
     } catch (error) {
       const channel = error instanceof DOMException && error.name === 'AbortError' ? 'dismissed' : 'share_error';
@@ -498,6 +504,7 @@ function BenefitDetailPage() {
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-6 z-20">
             <button
               onClick={handleBack}
+              aria-label="Volver"
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{ background: 'rgba(0,0,0,0.07)', border: `1px solid ${bankAccent.border}` }}
             >
@@ -505,6 +512,8 @@ function BenefitDetailPage() {
             </button>
             <button
               onClick={handleToggleSave}
+              aria-label={isSaved ? 'Quitar de guardados' : 'Guardar beneficio'}
+              aria-pressed={isSaved}
               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
               style={{
                 background: isSaved ? 'rgba(251,113,133,0.85)' : 'rgba(0,0,0,0.07)',
@@ -742,6 +751,8 @@ function BenefitDetailPage() {
                         return (
                           <div
                             key={day.key}
+                            title={day.label}
+                            aria-label={`${day.label}: ${isActive ? 'disponible' : 'no disponible'}`}
                             className="w-7 h-7 flex items-center justify-center rounded-lg font-semibold text-[11px]"
                             style={
                               isActive
@@ -1051,6 +1062,7 @@ function BenefitDetailPage() {
         </button>
         <button
           onClick={() => void handleShare()}
+          aria-label="Compartir beneficio"
           className="w-14 bg-blink-bg border border-blink-border text-blink-muted rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 hover:bg-gray-100"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>share</span>
@@ -1089,12 +1101,14 @@ function BenefitDetailPage() {
                   if (showLocationSearch) { setLocationSearch(''); }
                   setShowLocationSearch(!showLocationSearch);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors text-base"
+                aria-label="Buscar sucursal"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
               >
-                🔍
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>search</span>
               </button>
               <button
                 onClick={() => setShowLocationPopup(false)}
+                aria-label="Cerrar ubicaciones"
                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
@@ -1236,6 +1250,7 @@ function BenefitDetailPage() {
                 setShowAllEligibleBanks(false);
                 setBankSearchQuery('');
               }}
+              aria-label="Cerrar bancos adheridos"
               className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>

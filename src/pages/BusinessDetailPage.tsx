@@ -15,6 +15,7 @@ import { getBenefitProviderDisplayName, getBenefitProviderSummary } from '../uti
 import BankLogo from '../components/BankLogos/BankLogo';
 import { getOptimizedImageUrl } from '../utils/images';
 import { hasInAppHistory } from '../utils/navigation';
+import { useToast } from '../components/ui/Toast';
 
 const ALL_DAYS = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
 const DAY_ABBR: Record<string, string> = {
@@ -25,22 +26,27 @@ const DAY_ORDER = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const DAY_FULL_LABEL: Record<string, string> = {
   L: 'Lunes',
   M: 'Martes',
-  X: 'Miercoles',
+  X: 'Miércoles',
   J: 'Jueves',
   V: 'Viernes',
-  S: 'Sabado',
+  S: 'Sábado',
   D: 'Domingo',
 };
 const DAY_SHORT_LABEL: Record<string, string> = {
   L: 'Lun',
   M: 'Mar',
-  X: 'Mie',
+  X: 'Mié',
   J: 'Jue',
   V: 'Vie',
-  S: 'Sab',
+  S: 'Sáb',
   D: 'Dom',
 };
 const DAY_TEXT_MAX_LENGTH = 24;
+
+const formatPastValidity = (validUntil: string): string => {
+  const dateOnly = validUntil.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return dateOnly ? `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}` : validUntil;
+};
 
 const isAllDays = (cuando?: string): boolean => {
   if (!cuando) return true;
@@ -145,6 +151,7 @@ function BusinessDetailPage() {
   const [filterToday, setFilterToday] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isAuthenticated } = useAuth();
+  const showToast = useToast();
 
   const sortedBenefits = useMemo(() => {
     if (!business) return [];
@@ -427,6 +434,7 @@ function BusinessDetailPage() {
         <div className="flex items-center gap-3 px-4 py-4">
           <button
             onClick={handleBack}
+            aria-label="Volver"
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-blink-ink" style={{ fontSize: 22 }}>arrow_back</span>
@@ -460,10 +468,15 @@ function BusinessDetailPage() {
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full active:bg-gray-100 transition-colors"
             onClick={() => {
               if (!isAuthenticated) {
+                showToast('Iniciá sesión para guardar comercios', { icon: 'login' });
                 navigate('/login');
                 return;
               }
+              const wasFavorite = isFavorite(business.id);
               toggleFavorite(business);
+              showToast(wasFavorite ? 'Quitado de guardados' : 'Comercio guardado', {
+                icon: wasFavorite ? 'heart_minus' : 'favorite',
+              });
             }}
             aria-label={
               !isAuthenticated
@@ -612,7 +625,7 @@ function BusinessDetailPage() {
                               {allDays ? (
                                 <span
                                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wide"
-                                  style={{ border: '1px solid #DC2626', color: '#DC2626' }}
+                                  style={{ border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#047857' }}
                                 >
                                   Todos los días
                                 </span>
@@ -621,7 +634,8 @@ function BusinessDetailPage() {
                                   {DAY_ORDER.map(d => (
                                     <span
                                       key={d}
-                                      className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[8px] font-bold"
+                                      title={DAY_FULL_LABEL[d]}
+                                      className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold"
                                       style={
                                         activeDays.has(d)
                                           ? { background: accent.text, color: '#fff' }
@@ -677,7 +691,7 @@ function BusinessDetailPage() {
                     <button
                       onClick={() => toggleGroup(bankName)}
                       className="w-full py-3 text-sm font-semibold flex items-center justify-center gap-1"
-                      style={{ color: '#DC2626', borderTop: '1px solid #E8E6E1' }}
+                      style={{ color: '#4338CA', borderTop: '1px solid #E8E6E1' }}
                     >
                       Ver otros {hiddenCount} beneficio{hiddenCount !== 1 ? 's' : ''} ↓
                     </button>
@@ -694,7 +708,7 @@ function BusinessDetailPage() {
               >
                 <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: '#EEF2FF' }}>
                   <div
-                    className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-black text-white flex-shrink-0"
                     style={{ background: '#4338CA' }}
                   >
                     CI
@@ -734,7 +748,7 @@ function BusinessDetailPage() {
                                     <BankLogo bankName={providerName} size={20} />
                                     {providerSummary && (
                                       <span
-                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
+                                        className="text-[11px] font-bold px-1.5 py-0.5 rounded-md border"
                                         style={{ background: 'transparent', borderColor: getBankAccent(providerName).border, color: getBankAccent(providerName).text }}
                                       >
                                         {providerSummary}
@@ -742,7 +756,7 @@ function BusinessDetailPage() {
                                     )}
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       {allDays ? (
-                                        <span className="text-[10px] font-bold text-[#DC2626]">
+                                        <span className="text-[10px] font-bold text-blink-positive">
                                           Todos los días
                                         </span>
                                       ) : (
@@ -798,7 +812,7 @@ function BusinessDetailPage() {
                       </p>
                       {providerSummary && (
                         <span
-                          className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md border mt-1"
+                          className="inline-block text-[11px] font-bold px-1.5 py-0.5 rounded-md border mt-1"
                           style={{ background: 'transparent', borderColor: accent.border, color: accent.text }}
                         >
                           {providerSummary}
@@ -864,12 +878,12 @@ function BusinessDetailPage() {
                         {benefit.benefit || benefit.cardName}
                       </p>
                       {providerSummary && (
-                        <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400 border border-gray-200 mt-1">
+                        <span className="inline-block text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400 border border-gray-200 mt-1">
                           {providerSummary}
                         </span>
                       )}
                       <p className="text-[10px] text-gray-400 mt-0.5">
-                        {benefit.validUntil ? `Venció: ${benefit.validUntil}` : 'Promoción anterior'}
+                        {benefit.validUntil ? `Venció el ${formatPastValidity(benefit.validUntil)}` : 'Promoción anterior'}
                       </p>
                     </div>
                   </div>

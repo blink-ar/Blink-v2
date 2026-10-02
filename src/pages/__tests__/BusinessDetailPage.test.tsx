@@ -183,7 +183,7 @@ describe('BusinessDetailPage', () => {
 
     expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
     expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
-    expect(screen.getByText(`Venció: ${EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
+    expect(screen.getByText('Venció el 01/01/2020')).toBeInTheDocument();
   });
 
   it('shows lower-installment rows from the same bank when validity differs', async () => {

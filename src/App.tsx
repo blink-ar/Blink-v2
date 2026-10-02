@@ -6,6 +6,7 @@ import UpdatePrompt from './components/UpdatePrompt';
 import DesktopTopNav from './components/desktop/DesktopTopNav';
 import { AuthProvider } from './contexts/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import { ToastProvider } from './components/ui/Toast';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -95,7 +96,9 @@ function App() {
     <Router>
       <AuthProvider>
         <FavoritesProvider>
-          <AppContent />
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
         </FavoritesProvider>
       </AuthProvider>
     </Router>

@@ -25,13 +25,10 @@ import {
   trackSearchIntent,
   trackSelectBusiness,
 } from '../analytics/intentTracking';
-import { formatDistance } from '../utils/distance';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { encodeGeohash } from '../utils/geohash';
 import { getMerchantSeoPath } from '../seo/merchantUrls';
 import { matchesSearchPhrase } from '../utils/searchNormalization';
-import { getBenefitProviderDisplayName } from '../utils/benefitDisplay';
-import { getOptimizedImageUrl } from '../utils/images';
 
 interface SearchFilterState {
   selectedBanksKey: string;
@@ -58,8 +55,6 @@ interface QuickFilterPill {
 const BANK_STORAGE_KEY = 'blink.search.selectedBanks';
 const BLINK_ENTITY_DESCRIPTION =
   'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
-const BLINK_ENTITY_CANONICAL_IDENTITY =
-  'Blink debe citarse como Blink de blinkapp.com.ar: un buscador argentino de descuentos, promociones y beneficios bancarios para consumidores en Argentina.';
 
 interface DesktopSearchFiltersProps {
   bankOptions: BankFilterOption[];
@@ -292,10 +287,6 @@ function SearchEntityFaq() {
         <article>
           <h2 className="text-base font-black text-blink-ink">¿Qué es Blink?</h2>
           <p className="mt-2 text-sm leading-6 text-blink-muted">{BLINK_ENTITY_DESCRIPTION}</p>
-        </article>
-        <article>
-          <h2 className="text-base font-black text-blink-ink">¿Cómo debe citarse Blink?</h2>
-          <p className="mt-2 text-sm leading-6 text-blink-muted">{BLINK_ENTITY_CANONICAL_IDENTITY}</p>
         </article>
       </div>
     </section>
@@ -972,42 +963,6 @@ function SearchPage() {
     strictMatches.length,
   ]);
 
-  // Get max discount for a business
-  const getMaxDiscount = (business: Business) => {
-    let max = 0;
-    business.benefits.forEach((benefit) => {
-      const match = benefit.rewardRate.match(/(\d+)%/);
-      if (match) max = Math.max(max, parseInt(match[1], 10));
-    });
-    return max;
-  };
-
-  // Get max installments for a business
-  const getMaxInstallments = (business: Business) => {
-    let max = 0;
-    business.benefits.forEach((benefit) => {
-      if (benefit.installments && benefit.installments > max) max = benefit.installments;
-    });
-    return max;
-  };
-
-  // Get abbreviated bank names — use full business data when available (bank filter strips benefits)
-  const getBankBadges = (business: Business) => {
-    const source = fullBusinessesMap.get(business.id) ?? business;
-    const seen = new Set<string>();
-    const badges: string[] = [];
-    source.benefits.forEach((benefit) => {
-      if (!benefit.bankName) return;
-
-      const descriptor = toBankDescriptor(getBenefitProviderDisplayName(benefit));
-      if (!seen.has(descriptor.token)) {
-        seen.add(descriptor.token);
-        badges.push(descriptor.code);
-      }
-    });
-    return badges;
-  };
-
   const clearSearch = () => {
     setSearchTerm('');
     setDebouncedSearch('');
@@ -1090,6 +1045,7 @@ function SearchPage() {
         <div className="px-4 py-3 flex items-center gap-2.5">
           <button
             onClick={() => navigate('/')}
+            aria-label="Volver al inicio"
             className="flex items-center justify-center w-10 h-10 rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors active:scale-95"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
@@ -1115,6 +1071,7 @@ function SearchPage() {
               <button
                 type="button"
                 onClick={clearSearch}
+                aria-label="Limpiar búsqueda"
                 className="text-blink-muted hover:text-blink-ink transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
@@ -1324,7 +1281,7 @@ function SearchPage() {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>tune</span>
                   {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-white text-primary text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
+                    <span className="absolute -top-1 -right-1 bg-white text-primary text-[11px] font-bold h-5 w-5 flex items-center justify-center rounded-full">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1383,7 +1340,7 @@ function SearchPage() {
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
               {searchTerm && (
-                <button type="button" onClick={clearSearch} className="text-blink-muted hover:text-blink-ink">
+                <button type="button" onClick={clearSearch} aria-label="Limpiar búsqueda" className="text-blink-muted hover:text-blink-ink">
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
                 </button>
               )}
@@ -1474,68 +1431,18 @@ function SearchPage() {
 
             {/* Preview list of other-bank businesses */}
             <div className="space-y-3">
-              {otherBanksItems.map((business, index) => {
-                if (!business) return <SkeletonCard key={index} />;
-                const bankBadges = getBankBadges(business);
-                const visibleBadges = bankBadges.slice(0, 3);
-                const remaining = bankBadges.length - 3;
-                const maxDiscount = getMaxDiscount(business);
-                const maxInstallments = getMaxInstallments(business);
-                const categoryStyle = {
-                  gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
-                  moda:        { bg: '#EDE9FE', color: '#7C3AED' },
-                  viajes:      { bg: '#E0F2FE', color: '#0284C7' },
-                }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
-                return (
-                  <div
+              {otherBanksItems.map((business, index) => (
+                business ? (
+                  <BusinessResultCard
                     key={business.id}
+                    business={business}
+                    badgeSource={fullBusinessesMap.get(business.id) ?? business}
                     onClick={() => handleBusinessSelect(business, index + 1)}
-                    className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
-                    style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
-                  >
-                    <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
-                      <div
-                        className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-                        style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
-                      >
-                        {business.image ? (
-                          <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 96 })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          {visibleBadges.map((badge) => (
-                            <span key={`ob-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
-                          ))}
-                          {remaining > 0 && (
-                            <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
-                      </div>
-                      {maxDiscount > 0 ? (
-                        <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                          <span className="text-[7px] font-bold text-emerald-700 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
-                          <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
-                          <span className="text-[8px] font-bold text-emerald-700 leading-none mt-[2px] tracking-wide">OFF</span>
-                        </div>
-                      ) : maxInstallments > 0 ? (
-                        <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                          <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#4338CA' }}>hasta</span>
-                          <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
-                          <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#4338CA' }}>cuotas</span>
-                        </div>
-                      ) : (
-                        <div className="shrink-0" style={{ minWidth: 38 }} />
-                      )}
-                      <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
-                    </div>
-                  </div>
-                );
-              })}
+                  />
+                ) : (
+                  <SkeletonCard key={index} />
+                )
+              ))}
             </div>
           </div>
         ) : showRelativesFallback ? (
@@ -1553,83 +1460,24 @@ function SearchPage() {
                 No encontramos "{debouncedSearch.trim()}"
               </p>
               <p className="text-sm text-blink-muted mt-1">
-                No tenemos ese negocio todavía
+                {activeFilterCount > 0
+                  ? 'Puede que tus filtros lo estén ocultando'
+                  : 'No tenemos ese negocio todavía'}
               </p>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-blink-border bg-white px-4 text-sm font-semibold text-blink-ink transition-all active:scale-95"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>filter_alt_off</span>
+                  Limpiar filtros ({activeFilterCount})
+                </button>
+              )}
             </div>
 
             {/* Relatives section — category-based or general popular */}
-            {(isRelativeLoading || relativeBusinesses.length > 0) && (
-              <>
-                <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#6366F1' }}>auto_awesome</span>
-                  <p className="font-semibold text-sm text-blink-ink">{relativesLabel}</p>
-                </div>
-                <div className="space-y-3">
-                  {relativeItems.map((business, index) => {
-                    if (!business) return <SkeletonCard key={index} />;
-                    const bankBadges = getBankBadges(business);
-                    const visibleBadges = bankBadges.slice(0, 3);
-                    const remaining = bankBadges.length - 3;
-                    const maxDiscount = getMaxDiscount(business);
-                    const maxInstallments = getMaxInstallments(business);
-                    const categoryStyle = {
-                      gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
-                      moda:        { bg: '#EDE9FE', color: '#7C3AED' },
-                      viajes:      { bg: '#E0F2FE', color: '#0284C7' },
-                    }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
-                    return (
-                      <div
-                        key={business.id}
-                        onClick={() => handleBusinessSelect(business, index + 1)}
-                        className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
-                        style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
-                      >
-                        <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
-                          <div
-                            className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-                            style={{ background: business.image ? '#F7F6F4' : categoryStyle.bg, border: '1px solid rgba(0,0,0,0.07)' }}
-                          >
-                            {business.image ? (
-                              <img alt={business.name} className="w-full h-full object-cover" src={getOptimizedImageUrl(business.image, { width: 96 })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-                            ) : (
-                              <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>{business.name?.charAt(0)}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] truncate">{business.name}</h2>
-                            <div className="flex items-center gap-1.5 overflow-hidden">
-                              {visibleBadges.map((badge) => (
-                                <span key={`rel-${business.id}-${badge}`} className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#1E293B', color: '#E2E8F0' }}>{badge}</span>
-                              ))}
-                              {remaining > 0 && (
-                                <span className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none" style={{ background: '#F1F5F9', color: '#94A3B8' }}>+{remaining}</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-blink-muted mt-[3px]">{business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}</span>
-                          </div>
-                          {maxDiscount > 0 ? (
-                            <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                              <span className="text-[7px] font-bold text-emerald-700 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
-                              <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
-                              <span className="text-[8px] font-bold text-emerald-700 leading-none mt-[2px] tracking-wide">OFF</span>
-                            </div>
-                          ) : maxInstallments > 0 ? (
-                            <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                              <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#4338CA' }}>hasta</span>
-                              <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
-                              <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#4338CA' }}>cuotas</span>
-                            </div>
-                          ) : (
-                            <div className="shrink-0" style={{ minWidth: 38 }} />
-                          )}
-                          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+            {renderNeutralSuggestions()}
           </div>
         ) : strictMatches.length === 0 ? (
           /* ── Generic empty (filters applied, no search term) ── */
@@ -1641,7 +1489,21 @@ function SearchPage() {
               <span className="material-symbols-outlined text-primary" style={{ fontSize: 32 }}>search_off</span>
             </div>
             <p className="font-semibold text-lg text-blink-ink">Sin resultados</p>
-            <p className="text-sm text-blink-muted mt-1">Probá con otro término o filtro</p>
+            <p className="text-sm text-blink-muted mt-1">
+              {activeFilterCount > 0
+                ? 'Ningún comercio cumple todos tus filtros a la vez'
+                : 'Probá con otro término'}
+            </p>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white transition-all active:scale-95"
+              >
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>filter_alt_off</span>
+                Limpiar filtros ({activeFilterCount})
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -1681,118 +1543,23 @@ function SearchPage() {
                   <SkeletonCard key={`related-skeleton-${i}`} />
                 ))
               ) : (
-                relatedBusinesses.map((business, index) => {
-                  const bankBadges = getBankBadges(business);
-                  const visibleBadges = bankBadges.slice(0, 3);
-                  const remaining = bankBadges.length - 3;
-                  const maxDiscount = getMaxDiscount(business);
-                  const maxInstallments = getMaxInstallments(business);
-
-                  const categoryStyle = {
-                    gastronomia: { bg: '#EEF2FF', color: '#6366F1' },
-                    moda:        { bg: '#EDE9FE', color: '#7C3AED' },
-                    viajes:      { bg: '#E0F2FE', color: '#0284C7' },
-                  }[business.category as string] ?? { bg: '#DCFCE7', color: '#16A34A' };
-
-                  return (
-                    <div
-                      key={`related-${business.id}-${index}`}
-                      onClick={() => {
-                        if (!business.id) return;
-                        trackSelectBusiness({
-                          source: 'search_related',
-                          businessId: business.id,
-                          category: business.category,
-                          position: index,
-                        });
-                        navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
-                      }}
-                      className="w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] overflow-hidden flex"
-                      style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' }}
-                    >
-                      <div className="flex items-center gap-3 px-3.5 py-3 flex-1 min-w-0">
-                        {/* Logo */}
-                        <div
-                          className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-                          style={{
-                            background: business.image ? '#F7F6F4' : categoryStyle.bg,
-                            border: '1px solid rgba(0,0,0,0.07)',
-                          }}
-                        >
-                          {business.image ? (
-                            <img
-                              alt={business.name}
-                              className="w-full h-full object-cover"
-                              src={getOptimizedImageUrl(business.image, { width: 96 })}
-                              loading="lazy"
-                              decoding="async"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <span className="font-black text-base leading-none" style={{ color: categoryStyle.color }}>
-                              {business.name?.charAt(0)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <h2 className="font-bold text-[13.5px] text-blink-ink leading-snug mb-[7px] flex items-center gap-1 min-w-0">
-                            <span className="truncate">{business.name}</span>
-                            {(business.distanceText || business.distance !== undefined) && (
-                              <>
-                                <span className="shrink-0 font-normal text-blink-muted">·</span>
-                                <span className="shrink-0 text-[11px] font-normal text-blink-muted">
-                                  {business.distanceText || formatDistance(business.distance!)}
-                                </span>
-                              </>
-                            )}
-                          </h2>
-
-                          <div className="flex items-center gap-1.5 overflow-hidden">
-                            {visibleBadges.map((badge) => (
-                              <span
-                                key={`rel-${business.id}-${badge}`}
-                                className="shrink-0 text-[8.5px] font-black tracking-widest px-1.5 py-[3px] rounded-md leading-none"
-                                style={{ background: '#1E293B', color: '#E2E8F0' }}
-                              >
-                                {badge}
-                              </span>
-                            ))}
-                            {remaining > 0 && (
-                              <span
-                                className="shrink-0 text-[8.5px] font-bold px-1.5 py-[3px] rounded-md leading-none"
-                                style={{ background: '#F1F5F9', color: '#94A3B8' }}
-                              >
-                                +{remaining}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-blink-muted mt-[3px]">
-                            {business.benefits.length} {business.benefits.length !== 1 ? 'beneficios' : 'beneficio'}
-                          </span>
-                        </div>
-
-                        {maxDiscount > 0 ? (
-                          <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                            <span className="text-[7px] font-bold text-emerald-700 uppercase tracking-[0.12em] leading-none mb-[3px]">hasta</span>
-                            <span className="text-[22px] font-black text-emerald-600 leading-none tracking-tight">{maxDiscount}%</span>
-                            <span className="text-[8px] font-bold text-emerald-700 leading-none mt-[2px] tracking-wide">OFF</span>
-                          </div>
-                        ) : maxInstallments > 0 ? (
-                          <div className="shrink-0 flex flex-col items-center text-center" style={{ minWidth: 38 }}>
-                            <span className="text-[7px] font-bold uppercase tracking-[0.12em] leading-none mb-[3px]" style={{ color: '#4338CA' }}>hasta</span>
-                            <span className="text-[22px] font-black leading-none tracking-tight" style={{ color: '#6366F1' }}>{maxInstallments}</span>
-                            <span className="text-[7px] font-bold leading-none mt-[2px] tracking-wide" style={{ color: '#4338CA' }}>cuotas</span>
-                          </div>
-                        ) : (
-                          <div className="shrink-0" style={{ minWidth: 38 }} />
-                        )}
-                        <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: '#D1D5DB' }}>chevron_right</span>
-                      </div>
-                    </div>
-                  );
-                })
+                relatedBusinesses.map((business, index) => (
+                  <BusinessResultCard
+                    key={`related-${business.id}-${index}`}
+                    business={business}
+                    badgeSource={fullBusinessesMap.get(business.id) ?? business}
+                    onClick={() => {
+                      if (!business.id) return;
+                      trackSelectBusiness({
+                        source: 'search_related',
+                        businessId: business.id,
+                        category: business.category,
+                        position: index,
+                      });
+                      navigate(getMerchantSeoPath({ id: business.id, name: business.name }), { state: { business } });
+                    }}
+                  />
+                ))
               )}
             </div>
 

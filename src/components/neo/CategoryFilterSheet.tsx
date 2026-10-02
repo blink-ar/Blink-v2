@@ -64,7 +64,7 @@ const CategoryFilterSheet = ({
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
       {/* Backdrop */}
-      <button aria-label="Cerrar selector de categorías" className="absolute inset-0" onClick={() => onApply(draft)} />
+      <button aria-label="Cerrar selector de categorías" tabIndex={-1} className="absolute inset-0" onClick={() => onApply(draft)} />
 
       {/* Sheet */}
       <div
@@ -81,6 +81,7 @@ const CategoryFilterSheet = ({
           <h2 className="font-semibold text-lg text-blink-ink">Categoría</h2>
           <button
             onClick={() => onApply(draft)}
+            aria-label="Cerrar selector de categorías"
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-blink-bg text-blink-muted hover:bg-gray-100 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>

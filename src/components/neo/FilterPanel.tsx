@@ -122,7 +122,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end bg-black/40 backdrop-blur-sm lg:items-center lg:justify-center lg:p-6">
-      <button aria-label="Cerrar filtros" className="absolute inset-0" onClick={onClose} />
+      <button aria-label="Cerrar filtros" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
 
       <div
         className="relative flex max-h-[92vh] w-full flex-col rounded-t-[24px] bg-white lg:max-h-[82vh] lg:max-w-2xl lg:rounded-2xl"
@@ -154,6 +154,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Cerrar filtros"
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-blink-border bg-blink-bg text-blink-ink transition-colors hover:bg-gray-100"
             >
               <span className="material-symbols-outlined text-lg">close</span>

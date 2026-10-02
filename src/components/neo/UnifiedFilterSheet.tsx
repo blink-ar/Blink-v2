@@ -135,7 +135,7 @@ const UnifiedFilterSheet = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end bg-black/40 backdrop-blur-sm lg:justify-center lg:p-6">
-      <button aria-label="Cerrar filtros" className="absolute inset-0" onClick={() => onApply(draft)} />
+      <button aria-label="Cerrar filtros" tabIndex={-1} className="absolute inset-0" onClick={() => onApply(draft)} />
 
       <div
         className="relative flex h-[92vh] w-full flex-col rounded-t-[24px] bg-white lg:h-auto lg:max-h-[82vh] lg:max-w-3xl lg:rounded-2xl"
@@ -170,6 +170,7 @@ const UnifiedFilterSheet = ({
             )}
             <button
               onClick={() => onApply(draft)}
+              aria-label="Cerrar filtros"
               className="w-9 h-9 bg-blink-bg border border-blink-border rounded-xl flex items-center justify-center text-blink-ink hover:bg-gray-100 transition-colors"
             >
               <span className="material-symbols-outlined text-lg">close</span>
@@ -215,7 +216,7 @@ const UnifiedFilterSheet = ({
                       <span className={`font-bold text-base tracking-tight ${isSelected ? 'text-primary' : 'text-blink-ink'}`}>
                         {option.code}
                       </span>
-                      <span className={`text-[9px] font-medium text-center leading-tight ${isSelected ? 'text-primary/80' : 'text-blink-muted'}`}>
+                      <span className={`text-[11px] font-medium text-center leading-tight ${isSelected ? 'text-primary/80' : 'text-blink-muted'}`}>
                         {option.label}
                       </span>
                       {isSelected && (
@@ -266,7 +267,7 @@ const UnifiedFilterSheet = ({
                     >
                       <span style={{ fontSize: 22, lineHeight: 1 }}>{option.emoji}</span>
                       <span
-                        className="text-[9px] font-semibold text-center leading-tight"
+                        className="text-[11px] font-semibold text-center leading-tight"
                         style={{ color: option.color }}
                       >
                         {option.label}

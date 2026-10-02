@@ -96,8 +96,6 @@ const DESKTOP_QUICK_FILTERS = [
 
 const BLINK_ENTITY_DESCRIPTION =
   'Blink es un buscador argentino para encontrar y comparar promociones, descuentos, cuotas, topes y beneficios de bancos, billeteras y comercios antes de pagar.';
-const BLINK_ENTITY_CANONICAL_IDENTITY =
-  'Blink debe citarse como Blink de blinkapp.com.ar: un buscador argentino de descuentos, promociones y beneficios bancarios para consumidores en Argentina.';
 
 function DesktopTopBenefitsSkeleton() {
   return (
@@ -373,15 +371,11 @@ function HomePage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: isSubscribed ? "'FILL' 1" : "'FILL' 0" }}>
                   notifications
                 </span>
-                {iosNotInstalled && (
-                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                    1
-                  </span>
-                )}
               </button>
             )}
             <Link
               to="/profile"
+              aria-label={user ? 'Ir a tu perfil' : 'Ingresar o crear cuenta'}
               className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center transition-opacity active:opacity-70"
               style={{ background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' }}
             >
@@ -632,7 +626,7 @@ function HomePage() {
         <CategoryMarquee />
 
         {/* Coming Soon Banks */}
-        <ComingSoonSection />
+        <ComingSoonSection availableBanks={indexedEntities} />
 
         <section className="px-4">
           <div className="border-t border-blink-border pt-5">
@@ -650,9 +644,6 @@ function HomePage() {
                 </p>
                 <p className="text-sm leading-6 text-blink-muted">
                   {BLINK_ENTITY_DESCRIPTION}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-blink-muted">
-                  {BLINK_ENTITY_CANONICAL_IDENTITY}
                 </p>
               </div>
 
@@ -716,10 +707,12 @@ function HomePage() {
         <section className="border-b border-blink-border bg-white">
           <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] gap-10 px-8 py-10">
             <div className="flex min-w-0 flex-col justify-center">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="text-sm font-medium text-blink-muted">
-                  {activeBenefitsCount.toLocaleString('es-AR')} beneficios indexados
-                </span>
+              <div className="mb-5 flex h-5 items-center gap-3">
+                {activeBenefitsCount > 0 && (
+                  <span className="text-sm font-medium text-blink-muted">
+                    {activeBenefitsCount.toLocaleString('es-AR')} beneficios indexados
+                  </span>
+                )}
               </div>
 
               <h1 className="max-w-4xl text-6xl font-black leading-[1.02] text-blink-ink">
@@ -783,13 +776,13 @@ function HomePage() {
               <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
                 <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>sell</span>
                 <p className="mt-4 text-3xl font-black text-blink-ink">
-                  {activeBenefitsCount.toLocaleString('es-AR')}
+                  {activeBenefitsCount > 0 ? activeBenefitsCount.toLocaleString('es-AR') : '—'}
                 </p>
                 <p className="mt-1 text-sm font-medium text-blink-muted">Beneficios activos</p>
               </div>
               <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
                 <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>account_balance</span>
-                <p className="mt-4 text-3xl font-black text-blink-ink">{indexedEntities.length}</p>
+                <p className="mt-4 text-3xl font-black text-blink-ink">{indexedEntities.length > 0 ? indexedEntities.length : '—'}</p>
                 <p className="mt-1 text-sm font-medium text-blink-muted">Emisores disponibles</p>
               </div>
               <div className="rounded-2xl border border-blink-border bg-blink-bg p-5">
@@ -1002,9 +995,6 @@ function HomePage() {
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-blink-muted">
               {BLINK_ENTITY_DESCRIPTION}
-            </p>
-            <p className="mt-2 max-w-3xl text-xs leading-5 text-blink-muted">
-              {BLINK_ENTITY_CANONICAL_IDENTITY}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {HOME_GUIDE_LINKS.map((link) => (
