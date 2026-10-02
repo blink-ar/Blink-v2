@@ -5,7 +5,6 @@ import BottomNav from '../components/neo/BottomNav';
 import Ticker from '../components/neo/Ticker';
 import { useAuth } from '../contexts/AuthContext';
 import CategoryMarquee from '../components/neo/CategoryMarquee';
-import ComingSoonSection from '../components/ComingSoonSection';
 import { useBenefitsData } from '../hooks/useBenefitsData';
 import { SkeletonAvailableBanks } from '../components/skeletons';
 import { fetchBanks, fetchMongoStats } from '../services/api';
@@ -551,10 +550,6 @@ function HomePage() {
         {/* Category Marquee */}
         <CategoryMarquee />
 
-        {/* Coming Soon Banks */}
-        {/* Only with real issuers: while loading, or when fetchBanks swallows a failure and resolves [],
-            an empty list would mislabel available banks as "Próximamente". */}
-        {indexedEntities.length > 0 && <ComingSoonSection availableBanks={indexedEntities} />}
 
         <section className="px-4">
           <div className="border-t border-blink-border pt-5">
