@@ -115,6 +115,23 @@ describe('BenefitDetailPage', () => {
     expect(screen.getByText('30% OFF')).toBeInTheDocument();
   });
 
+  it('keeps address-only branches as physical locations without directions', async () => {
+    const business = makeBusiness();
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...business,
+      location: [
+        { ...business.location[0], lat: undefined, lng: undefined } as unknown as Business['location'][number],
+      ],
+    });
+
+    render(<BenefitDetailPage />);
+
+    expect(await screen.findByText('Disponible en:')).toBeInTheDocument();
+    expect(screen.getByText('Av. Rivadavia 5108')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Cómo llegar/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver sucursal' })).toBeInTheDocument();
+  });
+
   it('selects a benefit by stable benefit id instead of array position', async () => {
     routerMocks.mockUseParams.mockReturnValue({
       id: 'merchant_69a6f51cb7ff0ecb9e33bdf3',

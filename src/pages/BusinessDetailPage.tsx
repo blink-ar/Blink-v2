@@ -428,7 +428,9 @@ function BusinessDetailPage() {
   }
 
   const distanceText = formatDistanceText(business);
-  const branchCount = business.location.length;
+  // Explicit 0,0 entries are placeholders ("Multiple locations"), not branches.
+  const branchLocations = business.location.filter((loc) => !(loc.lat === 0 && loc.lng === 0));
+  const branchCount = branchLocations.length;
   const branchLabel = branchCount > 1 ? `${branchCount} sucursales` : branchCount === 1 ? '1 sucursal' : '';
 
   return (
@@ -931,7 +933,7 @@ function BusinessDetailPage() {
                   Ver todas en el mapa
                 </button>
                 <ul className="divide-y divide-blink-border overflow-hidden rounded-2xl border border-blink-border bg-white">
-                  {business.location.map((loc, index) => {
+                  {branchLocations.map((loc, index) => {
                     const street = loc.addressComponents?.route
                       ? `${loc.addressComponents.route}${loc.addressComponents.streetNumber ? ` ${loc.addressComponents.streetNumber}` : ''}`
                       : loc.name || loc.formattedAddress?.split(',')[0] || 'Dirección no disponible';

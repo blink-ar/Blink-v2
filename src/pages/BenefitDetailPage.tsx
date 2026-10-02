@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
@@ -146,6 +146,38 @@ const formatArgentinePeso = (amount: number): string =>
 
 const getDirectionsUrl = (lat: number, lng: number): string =>
   `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+// Address-only locations arrive without lat/lng, and 0,0 is a placeholder: show them, but without directions.
+const hasValidCoordinates = (loc: { lat?: number; lng?: number }): loc is { lat: number; lng: number } =>
+  Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && !(loc.lat === 0 && loc.lng === 0);
+
+const hasDisplayableAddress = (loc: { formattedAddress?: string; name?: string; addressComponents?: unknown }) =>
+  Boolean(loc.formattedAddress || loc.name || loc.addressComponents);
+
+function LocationRow({
+  loc,
+  label,
+  className,
+  children,
+}: {
+  loc: { lat?: number; lng?: number };
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!hasValidCoordinates(loc)) return <div className={className}>{children}</div>;
+  return (
+    <a
+      href={getDirectionsUrl(loc.lat, loc.lng)}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Cómo llegar a ${label}`}
+      className={`${className} active:bg-gray-50`}
+    >
+      {children}
+    </a>
+  );
+}
 
 const getBenefitTrackingId = (business: Business, benefit: BankBenefit, position: number): string => {
   return `${business.id}:${getBenefitRouteRef(benefit, position)}`;
@@ -478,14 +510,18 @@ function BenefitDetailPage() {
     .join('\n\n');
 
   const locations = (() => {
-    // Address-only locations arrive without lat/lng; 0,0 is a placeholder.
-    const valid = business.location.filter((l) =>
-      Number.isFinite(l.lat) && Number.isFinite(l.lng) && !(l.lat === 0 && l.lng === 0));
+    // Explicit 0,0 is a placeholder ("Multiple locations"), never a branch. Address-only branches
+    // (no lat/lng at all) are kept: they are still physical stores, just without directions.
+    const valid = business.location.filter((l) => {
+      if (l.lat === 0 && l.lng === 0) return false;
+      return hasValidCoordinates(l) || hasDisplayableAddress(l);
+    });
     if (!userPosition) return valid;
-    return [...valid].sort((a, b) =>
-      calculateDistance(userPosition.latitude, userPosition.longitude, a.lat, a.lng) -
-      calculateDistance(userPosition.latitude, userPosition.longitude, b.lat, b.lng)
-    );
+    // Nearest first; branches without coordinates go last.
+    const distanceTo = (l: (typeof valid)[number]) => (hasValidCoordinates(l)
+      ? calculateDistance(userPosition.latitude, userPosition.longitude, l.lat, l.lng)
+      : Number.POSITIVE_INFINITY);
+    return [...valid].sort((a, b) => distanceTo(a) - distanceTo(b));
   })();
   const displayLocations = locations.slice(0, LOCATIONS_PREVIEW_COUNT);
 
@@ -1012,14 +1048,7 @@ function BenefitDetailPage() {
                       : loc.formattedAddress ?? '';
 
                     return (
-                      <a
-                        key={i}
-                        href={getDirectionsUrl(loc.lat, loc.lng)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Cómo llegar a ${streetLine}`}
-                        className="flex items-start gap-3 py-3 active:bg-gray-50"
-                      >
+                      <LocationRow key={i} loc={loc} label={streetLine} className="flex items-start gap-3 py-3">
                         <span
                           className="material-symbols-outlined flex-shrink-0 mt-0.5"
                           aria-hidden="true"
@@ -1029,15 +1058,17 @@ function BenefitDetailPage() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-blink-ink leading-tight">{streetLine}</p>
-                          {cityLine && (
+                          {cityLine && cityLine !== streetLine && (
                             <p className="text-xs text-blink-muted mt-0.5">{cityLine}</p>
                           )}
                         </div>
-                        <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">
-                          Cómo llegar
-                          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>directions</span>
-                        </span>
-                      </a>
+                        {hasValidCoordinates(loc) && (
+                          <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary">
+                            Cómo llegar
+                            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>directions</span>
+                          </span>
+                        )}
+                      </LocationRow>
                     );
                   })}
                 </div>
@@ -1234,21 +1265,14 @@ function BenefitDetailPage() {
                   ? [loc.addressComponents.locality, loc.addressComponents.adminAreaLevel1].filter(Boolean).join(', ')
                   : loc.formattedAddress ?? '';
 
-                const dist = userPosition
+                const dist = userPosition && hasValidCoordinates(loc)
                   ? calculateDistance(userPosition.latitude, userPosition.longitude, loc.lat, loc.lng)
                   : null;
 
                 const isNearest = !q && userPosition && i === 0;
 
                 return (
-                  <a
-                    key={i}
-                    href={getDirectionsUrl(loc.lat, loc.lng)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Cómo llegar a ${streetLine}`}
-                    className="flex items-start gap-3 px-5 py-3.5 active:bg-gray-50"
-                  >
+                  <LocationRow key={i} loc={loc} label={streetLine} className="flex items-start gap-3 px-5 py-3.5">
                     <div
                       className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: '#F3F4F6' }}
@@ -1266,7 +1290,7 @@ function BenefitDetailPage() {
                           </span>
                         )}
                       </div>
-                      {cityLine && (
+                      {cityLine && cityLine !== streetLine && (
                         <p className="text-xs text-blink-muted">{cityLine}</p>
                       )}
                     </div>
@@ -1276,9 +1300,11 @@ function BenefitDetailPage() {
                           {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
                         </span>
                       )}
-                      <span className="material-symbols-outlined text-primary" aria-hidden="true" style={{ fontSize: 18 }}>directions</span>
+                      {hasValidCoordinates(loc) && (
+                        <span className="material-symbols-outlined text-primary" aria-hidden="true" style={{ fontSize: 18 }}>directions</span>
+                      )}
                     </span>
-                  </a>
+                  </LocationRow>
                 );
               });
             })()}
