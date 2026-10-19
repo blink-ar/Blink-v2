@@ -22,12 +22,12 @@ estructura antes de escribir el fetcher.
 REA (`rea-agents`, `https://github.com/morluto/rea`) expone herramientas
 MCP como `capture_browser_scenario`, `inspect_web_network_capture` y
 `analyze_web_bundle`. En la nube se maneja con el cliente stdio
-`.claude/skills/agregar-banco/scripts/mcp-call.mjs` (desde la raíz de Blink-v2):
+`<skill>/scripts/mcp-call.mjs`:
 
 ```bash
 npm install --global rea-agents          # si falta
-node .claude/skills/agregar-banco/scripts/mcp-call.mjs tools/list > tools.json
-node .claude/skills/agregar-banco/scripts/mcp-call.mjs tools/call '{"name":"capture_browser_scenario","arguments":{...}}'
+node <skill>/scripts/mcp-call.mjs tools/list > tools.json
+node <skill>/scripts/mcp-call.mjs tools/call '{"name":"capture_browser_scenario","arguments":{...}}'
 ```
 
 **El Chromium que lanza REA no usa el proxy del sandbox.** Workaround:

@@ -115,8 +115,8 @@ axios 1.13 no funciona con el proxy del sandbox (405). Solo para correr en la
 nube, sin cambiar el repo:
 
 ```bash
-NODE_USE_ENV_PROXY=1 node --no-warnings -r /home/user/Blink-v2/.claude/skills/agregar-banco/scripts/axios-noproxy.cjs src/<Banco>/fetcher.test.js
-DRY_RUN=1 NODE_USE_ENV_PROXY=1 node --no-warnings -r /home/user/Blink-v2/.claude/skills/agregar-banco/scripts/axios-noproxy.cjs -e \
+NODE_USE_ENV_PROXY=1 node --no-warnings -r <skill>/scripts/axios-noproxy.cjs src/<Banco>/fetcher.test.js
+DRY_RUN=1 NODE_USE_ENV_PROXY=1 node --no-warnings -r <skill>/scripts/axios-noproxy.cjs -e \
   "require('./src/<Banco>/fetcher').run().then(d=>{require('fs').writeFileSync('<scratchpad>/docs.json',JSON.stringify(d,null,1));process.exit(0)})"
 ```
 

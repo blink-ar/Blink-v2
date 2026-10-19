@@ -20,7 +20,10 @@ Leé la guía de referencia de cada fase antes de empezarla:
 | 7. Lanzamiento | `references/7-lanzamiento.md` |
 
 Scripts auxiliares en `scripts/`: cliente del MCP de REA, arreglo del proxy
-para axios y plantilla del script de filas de referencia.
+para axios y plantilla del script de filas de referencia. En las guías,
+`<skill>` es la carpeta de esta skill (donde está este `SKILL.md`); si la
+skill vino adjunta o subida a la cuenta, ubicá esa carpeta y copiá `scripts/`
+al scratchpad antes de usarlos.
 
 ## Arquitectura (para ubicarte)
 
