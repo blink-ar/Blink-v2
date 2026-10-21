@@ -65,13 +65,11 @@ const formatDistanceText = (business: Business): string => {
   return `${km.toFixed(1)} km`;
 };
 
-const TODAY_ABBR = (() => {
+const isBenefitAvailableToday = (b: BankBenefit): boolean => {
   const names = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  return DAY_ABBR[names[new Date().getDay()]] || '';
-})();
-
-const isBenefitAvailableToday = (b: BankBenefit): boolean =>
-  isAllDays(b.cuando) || getActiveDays(b.cuando).has(TODAY_ABBR);
+  const todayAbbr = DAY_ABBR[names[new Date().getDay()]] || '';
+  return isAllDays(b.cuando) || getActiveDays(b.cuando).has(todayAbbr);
+};
 
 const hasPercentDiscount = (benefit: BankBenefit): boolean => {
   const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
