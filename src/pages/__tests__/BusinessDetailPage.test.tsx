@@ -119,6 +119,27 @@ describe('BusinessDetailPage', () => {
     expect(screen.getByRole('button', { name: /Hoy/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it.each([
+    ['2026-05-18T12:00:00.000Z', 1], // Monday: the benefit applies.
+    ['2026-05-22T12:00:00.000Z', 0], // Friday: the benefit does not apply.
+  ])('uses the current date after module import for the today filter (%s)', async (date, availableCount) => {
+    vi.setSystemTime(new Date(date));
+    vi.mocked(fetchBusinessById).mockResolvedValue({ ...mockBusiness, benefits: [{
+      ...mockBusiness.benefits[0], cuando: 'Lunes, Martes, Miercoles', validUntil: ACTIVE_VALID_UNTIL,
+    }] });
+
+    render(<BusinessDetailPage />);
+    await screen.findByText('Mostaza');
+    fireEvent.click(screen.getByRole('button', { name: /Hoy/ }));
+
+    expect(screen.getByText(`${availableCount} de 1 beneficios activos disponibles hoy.`)).toBeVisible();
+    if (availableCount === 0) {
+      expect(screen.getByText('No hay beneficios disponibles para hoy.')).toBeVisible();
+    } else {
+      expect(screen.queryByText('No hay beneficios disponibles para hoy.')).not.toBeInTheDocument();
+    }
+  });
+
   it('loads the business by exact merchant id when route state is missing', async () => {
     vi.mocked(fetchBusinessById).mockResolvedValue(mockBusiness);
 
