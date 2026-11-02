@@ -191,3 +191,35 @@ describe('merchant SEO renderer', () => {
     expect(offer?.offeredBy?.name).toBe('MODO');
   });
 });
+
+
+describe('merchant SEO factual promotion claims', () => {
+  it('does not advertise a raffle or stale summary as a discount in HTML or schema', () => {
+    const html = renderMerchantSeoHtml({ appShell, siteUrl: 'https://www.blinkapp.com.ar',
+      merchant: { merchantId: 'm1', merchantName: 'Coto', maxDiscountPercentage: 100 },
+      benefits: [{ benefit: 'Sorteo Mega Martes', rewardRate: '100%', tipo: 'descuento', validUntil: '2099-12-31' }],
+    });
+    expect(html).toContain('Sorteo Mega Martes');
+    expect(html).not.toContain('100% OFF');
+    expect(html).not.toContain('hasta 100%');
+  });
+
+  it('keeps expired discounts out of current description and maximum benefit', () => {
+    const html = renderMerchantSeoHtml({ appShell, siteUrl: 'https://www.blinkapp.com.ar',
+      merchant: { merchantId: 'm1', merchantName: 'Comercio', maxDiscountPercentage: 90 },
+      benefits: [{ benefit: '90% OFF', rewardRate: '90%', validUntil: '2020-01-01' }],
+    });
+    expect(html).not.toContain('hasta 90%');
+    expect(html).toContain('<dt>Mayor beneficio</dt><dd>Promociones bancarias</dd>');
+    expect(html).toContain('https://schema.org/Discontinued');
+  });
+
+  it('labels reimbursement as reimbursement', () => {
+    const html = renderMerchantSeoHtml({ appShell, siteUrl: 'https://www.blinkapp.com.ar',
+      merchant: { merchantId: 'm1', merchantName: 'Comercio' },
+      benefits: [{ benefit: 'Reintegro', rewardRate: '30%', validUntil: '2099-12-31' }],
+    });
+    expect(html).toContain('30% de reintegro');
+    expect(html).not.toContain('30% OFF');
+  });
+});

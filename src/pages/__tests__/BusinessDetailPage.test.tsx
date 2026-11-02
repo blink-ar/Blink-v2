@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
@@ -190,27 +190,31 @@ describe('BusinessDetailPage', () => {
     });
   });
 
-  it('reuses the server-rendered business on canonical merchant URLs', async () => {
-    routerMocks.mockUseParams.mockReturnValue({
-      slugId: 'mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
-    });
-    routerMocks.mockUseLocation.mockReturnValue({
-      state: null,
-      pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
-    });
+  it.each(['updated', 'failed', 'empty'] as const)('paints bootstrap immediately and safely handles %s revalidation', async (outcome) => {
+    routerMocks.mockUseParams.mockReturnValue({ slugId: 'mostaza--' + mockBusiness.id });
+    routerMocks.mockUseLocation.mockReturnValue({ state: null, pathname: '/comercios/mostaza--' + mockBusiness.id });
     const bootstrap = document.createElement('script');
     bootstrap.id = 'blink-merchant-bootstrap';
     bootstrap.type = 'application/json';
-    bootstrap.textContent = JSON.stringify({
-      merchantId: mockBusiness.id,
-      business: mockBusiness,
-    });
+    bootstrap.textContent = JSON.stringify({ merchantId: mockBusiness.id, business: mockBusiness });
     document.head.appendChild(bootstrap);
+    let resolve!: (value: Business | null) => void;
+    let reject!: (reason: Error) => void;
+    vi.mocked(fetchBusinessById).mockReturnValue(new Promise((res, rej) => { resolve = res; reject = rej; }));
 
     render(<BusinessDetailPage />);
-
-    expect(await screen.findByText('Mostaza')).toBeInTheDocument();
-    expect(fetchBusinessById).not.toHaveBeenCalled();
+    expect(screen.getByText('Mostaza')).toBeInTheDocument();
+    expect(fetchBusinessById).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      if (outcome === 'failed') reject(new Error('offline'));
+      else resolve(outcome === 'empty' ? null : { ...mockBusiness, category: 'categoria actualizada' });
+    });
+    if (outcome === 'updated') expect(await screen.findByText('categoria actualizada')).toBeInTheDocument();
+    else {
+      // A transient failure or missing catalog response must not destroy useful SSR.
+      await waitFor(() => expect(screen.getByText('Mostaza')).toBeInTheDocument());
+      expect(screen.queryByText('Error al cargar')).not.toBeInTheDocument();
+    }
     expect(routerMocks.mockNavigate).not.toHaveBeenCalled();
   });
 

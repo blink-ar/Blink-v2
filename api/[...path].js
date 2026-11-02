@@ -1,3 +1,4 @@
+import { renderAppSeoHtml } from './app-seo.js';
 import { MongoClient, ObjectId } from 'mongodb';
 import { calculateDistanceKm, normalizeDistanceKm, parseCoordinates } from '../shared/coordinates.js';
 import { createPublicKey, createVerify } from 'crypto';
@@ -3604,6 +3605,16 @@ export default async function handler(req, res) {
       }
 
       return await handleSearchSeoPage(req, res, url, coreSeoDb);
+    }
+
+    // App routes need no database and must expose noindex before JavaScript.
+    if (isReadMethod(req) && path.startsWith('/api/__app/')) {
+      const page = path.slice('/api/__app/'.length);
+      const rendered = renderAppSeoHtml(readViteAppShell(), page, getCanonicalSiteUrl(url));
+      if (!rendered) return handleStaticNotFound(req, res, url);
+      res.setHeader('X-Robots-Tag', page === 'map' ? 'noindex, follow' : 'noindex, nofollow');
+      setCacheControl(res, 'private, no-store');
+      return html(res, 200, rendered);
     }
 
     const db = await getDb();

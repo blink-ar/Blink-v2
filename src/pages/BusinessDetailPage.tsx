@@ -297,15 +297,10 @@ function BusinessDetailPage() {
   });
 
   useEffect(() => {
-    if (bootstrapBusiness) {
-      setBusiness(bootstrapBusiness);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    if (routePassedBusiness) {
-      setBusiness(routePassedBusiness);
+    // Paint SSR immediately, but always revalidate: CDN HTML can outlive a benefit.
+    const fallbackBusiness = bootstrapBusiness || routePassedBusiness;
+    if (fallbackBusiness) {
+      setBusiness(fallbackBusiness);
       setError(null);
       setLoading(false);
     }
@@ -321,9 +316,9 @@ function BusinessDetailPage() {
       }
 
       try {
-        setLoading(!routePassedBusiness);
+        setLoading(!fallbackBusiness);
         setError(null);
-        if (!routePassedBusiness) {
+        if (!fallbackBusiness) {
           setBusiness(null);
         }
 
@@ -332,12 +327,12 @@ function BusinessDetailPage() {
 
         if (resolvedBusiness) {
           setBusiness(resolvedBusiness);
-        } else if (!routePassedBusiness) {
+        } else if (!fallbackBusiness) {
           setError('Comercio no encontrado');
         }
       } catch {
         if (cancelled) return;
-        if (!routePassedBusiness) {
+        if (!fallbackBusiness) {
           setBusiness(null);
           setError('Error al cargar');
         }

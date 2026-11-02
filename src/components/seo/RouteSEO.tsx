@@ -322,11 +322,12 @@ function RouteSEO() {
       ],
       structuredData: buildDiscountSearchGuideStructuredData(),
     };
-  } else if (location.pathname === '/map') {
+  } else if (normalizedPathname === '/map') {
     seoConfig = {
       title: `Mapa de descuentos bancarios cercanos | ${SITE_NAME}`,
       description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicación.',
       path: '/map',
+      robots: 'noindex, follow',
     };
   } else if (location.pathname.startsWith('/descuentos/')) {
     seoConfig = {
@@ -360,7 +361,7 @@ function RouteSEO() {
       path: location.pathname,
       type: 'article',
     };
-  } else if (normalizedPathname === '/saved' || normalizedPathname === '/profile') {
+  } else if (['/saved', '/profile', '/login', '/signup', '/notifications', '/auth/callback'].includes(normalizedPathname)) {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
@@ -371,7 +372,8 @@ function RouteSEO() {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
-      path: '/',
+      path: normalizedPathname,
+      robots: 'noindex, follow',
     };
   }
 

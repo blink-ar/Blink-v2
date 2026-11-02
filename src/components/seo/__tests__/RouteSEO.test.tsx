@@ -21,7 +21,7 @@ describe('RouteSEO', () => {
     vi.mocked(useSEO).mockClear();
   });
 
-  it.each(['/profile/', '/saved/'])('marks private trailing slash route %s as noindex', (pathname) => {
+  it.each(['/profile/', '/saved/', '/login', '/signup/', '/notifications', '/auth/callback/'])('marks private trailing slash route %s as noindex', (pathname) => {
     renderRouteSEO(pathname);
 
     expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
@@ -30,6 +30,11 @@ describe('RouteSEO', () => {
         robots: 'noindex, nofollow',
       })
     );
+  });
+
+  it.each(['/map', '/map/', '/nonexistent'])('excludes %s without canonicalizing to home', (pathname) => {
+    renderRouteSEO(pathname);
+    expect(useSEO).toHaveBeenCalledWith(expect.objectContaining({ path: pathname.replace(/\/+$/, ''), robots: 'noindex, follow' }));
   });
 
   it('adds Blink entity disambiguation structured data on home', () => {

@@ -1,0 +1,446 @@
+{
+  "origin": "https://www.blinkapp.com.ar",
+  "captured_at_utc": "2026-11-02T13:46:52.336676+00:00",
+  "method": "GET without JS; not Googlebot; warm/cold cache not forced",
+  "results": [
+    {
+      "path": "/",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/",
+      "observed_at_utc": "2026-11-02T13:46:52.335932+00:00",
+      "elapsed_ms": 5102,
+      "headers": {
+        "age": "0",
+        "cache-control": "max-age=600",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"3463-9YAmVzdxEZPyoXN2GAREZP/UL08\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::iad1::gj7zc-1793627207551-8ebe235fb1b8"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "9bff09ee960c8f4c29934798fadd031a509050cfc901f7d3193482ff4a207472",
+      "bytes": 13411,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/search",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/search",
+      "observed_at_utc": "2026-11-02T13:46:49.755588+00:00",
+      "elapsed_ms": 2522,
+      "headers": {
+        "age": "0",
+        "cache-control": "max-age=600",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"3522-gcCL9mW2CzgLxZZU8H61+H/OIQ0\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::iad1::qjw6d-1793627207535-274b92a37596"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/search\" />"
+      ],
+      "title": [
+        "Buscar descuentos y promociones bancarias | Blink"
+      ],
+      "sha256": "3ff6a4bc10f8fb709e37491823371f9a23456c9ffbe712f521ab3b0a1bc73308",
+      "bytes": 13602,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/map",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/map",
+      "observed_at_utc": "2026-11-02T13:46:47.803785+00:00",
+      "elapsed_ms": 570,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::nb2t8-1793627207551-60e49f58c87b"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/map/",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/map/",
+      "observed_at_utc": "2026-11-02T13:46:48.018711+00:00",
+      "elapsed_ms": 214,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::zhqzj-1793627207975-d7c108af4f1c"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/profile",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/profile",
+      "observed_at_utc": "2026-11-02T13:46:48.231317+00:00",
+      "elapsed_ms": 213,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::2lx8f-1793627208191-74a8616a2a60"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/saved/",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/saved/",
+      "observed_at_utc": "2026-11-02T13:46:48.518513+00:00",
+      "elapsed_ms": 287,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::nmhfw-1793627208479-a9ea3ccd2b9e"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/login",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/login",
+      "observed_at_utc": "2026-11-02T13:46:48.746905+00:00",
+      "elapsed_ms": 228,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::n4vw6-1793627208707-9fe6221f3868"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/signup",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/signup",
+      "observed_at_utc": "2026-11-02T13:46:48.971374+00:00",
+      "elapsed_ms": 224,
+      "headers": {
+        "age": "1",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::m7ccd-1793627208923-8b5060006c7d"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/notifications",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/notifications",
+      "observed_at_utc": "2026-11-02T13:46:49.203746+00:00",
+      "elapsed_ms": 232,
+      "headers": {
+        "age": "1",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::tsbjd-1793627209167-91e212f3b14c"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/auth/callback",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/auth/callback",
+      "observed_at_utc": "2026-11-02T13:46:49.430956+00:00",
+      "elapsed_ms": 227,
+      "headers": {
+        "age": "1",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::dbtn7-1793627209384-32b8c63467e1"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/seo-recovery-nonexistent-20261102",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/seo-recovery-nonexistent-20261102",
+      "observed_at_utc": "2026-11-02T13:46:49.651719+00:00",
+      "elapsed_ms": 221,
+      "headers": {
+        "age": "1",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"7346c60677010a61ea1634cb84948697\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::rxkkk-1793627209607-bfdd88667fcc"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/\" />"
+      ],
+      "title": [
+        "Descuentos bancarios en Argentina | Blink"
+      ],
+      "sha256": "c5fb004aff949c902f9c83e0955b8d8e251cd33ee3c0d45de1dc514810f844ac",
+      "bytes": 2384,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/categorias/no-existe-20261102",
+      "status": 404,
+      "url": "https://www.blinkapp.com.ar/categorias/no-existe-20261102",
+      "observed_at_utc": "2026-11-02T13:46:49.977555+00:00",
+      "elapsed_ms": 326,
+      "headers": {
+        "age": "0",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"4e-b+y749/hMSXCfWujJnpQzow5BpI\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::iad1::c5svw-1793627209812-66e9b4a9b00d"
+      },
+      "seo_tags": [],
+      "title": [],
+      "sha256": "2836e9397b923dbb423f64a5c02fc6f88d9f5fc3bd8be4203db2d532c5743d59",
+      "bytes": 78,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/categorias/gastronomia",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/categorias/gastronomia",
+      "observed_at_utc": "2026-11-02T13:46:51.400798+00:00",
+      "elapsed_ms": 1645,
+      "headers": {
+        "age": "0",
+        "cache-control": "max-age=600",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"b689-FfK1EFRhWPzwTGMxRPs7YjkUVSY\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::iad1::n4vw6-1793627209927-878e83354244"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/categorias/gastronomia\" />"
+      ],
+      "title": [
+        "Comercios de Gastronomia con descuentos | Blink"
+      ],
+      "sha256": "df351dbeab23b98683041615180a79d9ac673d622caf834ee0fd945c23db8774",
+      "bytes": 46729,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/comercios/coto--merchant_69a6ed2cb7ff0ecb9e33b0ee",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/comercios/coto--merchant_69a6ed2cb7ff0ecb9e33b0ee",
+      "observed_at_utc": "2026-11-02T13:46:52.275602+00:00",
+      "elapsed_ms": 2298,
+      "headers": {
+        "age": "0",
+        "cache-control": "max-age=600",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"aa97f-ZLaCyYTZx5O2/a6MfLPGiLWSwJc\"",
+        "x-vercel-cache": "MISS",
+        "x-vercel-id": "gru1::iad1::vvql6-1793627210159-752445ad2613"
+      },
+      "seo_tags": [
+        "<meta name=\"robots\" content=\"index, follow\" />",
+        "<link rel=\"canonical\" href=\"https://www.blinkapp.com.ar/comercios/coto--merchant_69a6ed2cb7ff0ecb9e33b0ee\" />"
+      ],
+      "title": [
+        "Coto descuentos y promociones | Blink"
+      ],
+      "sha256": "c05e1eb36dbce84dcae0ee3e96cea0cffa999d7e3efef971a148296dfb2ec0ab",
+      "bytes": 698751,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": true
+    },
+    {
+      "path": "/robots.txt",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/robots.txt",
+      "observed_at_utc": "2026-11-02T13:46:51.627110+00:00",
+      "elapsed_ms": 226,
+      "headers": {
+        "age": "178951",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "\"e83fb88283bc79821554f30366e3af86\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::hzhsc-1793627211583-b3c80011797a"
+      },
+      "seo_tags": [],
+      "title": [],
+      "sha256": "2322d690bf4f64c4aee5351106ba444528cf90acb3842253702c0a61ec1e1dc0",
+      "bytes": 887,
+      "sitemap_url_count": null,
+      "map_in_sitemap": null,
+      "child_sitemaps": [],
+      "bootstrap_present": false
+    },
+    {
+      "path": "/sitemap.xml",
+      "status": 200,
+      "url": "https://www.blinkapp.com.ar/sitemap.xml",
+      "observed_at_utc": "2026-11-02T13:46:51.825316+00:00",
+      "elapsed_ms": 198,
+      "headers": {
+        "age": "2377",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-type": "application/xml",
+        "etag": "\"b51f9262737d33a502caf5ff1d96b718\"",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "gru1::c68qc-1793627211788-42379eb81372"
+      },
+      "seo_tags": [],
+      "title": [],
+      "sha256": "c00d957f0b672cb0dc8d52f1e9ebdd84d9b5786fad59b671fd9959a8bae89e1c",
+      "bytes": 532,
+      "sitemap_url_count": 0,
+      "map_in_sitemap": false,
+      "child_sitemaps": [
+        "https://www.blinkapp.com.ar/sitemap-1.xml",
+        "https://www.blinkapp.com.ar/sitemap-2.xml",
+        "https://www.blinkapp.com.ar/sitemap-3.xml",
+        "https://www.blinkapp.com.ar/sitemap-4.xml",
+        "https://www.blinkapp.com.ar/sitemap-5.xml"
+      ],
+      "bootstrap_present": false
+    }
+  ]
+}

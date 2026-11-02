@@ -167,7 +167,15 @@ function getBenefitTitle(benefit) {
   return String(benefit?.benefit || benefit?.benefitTitle || benefit?.rewardRate || 'Beneficio').trim() || 'Beneficio';
 }
 
+function getPromotionKind(benefit) {
+  const text = normalizeText([benefit?.tipo, benefit?.claseDeBeneficio, getBenefitTitle(benefit), benefit?.otherDiscounts].filter(Boolean).join(' '));
+  if (/sorteo|sorteamos|participa.*gan/.test(text)) return 'sorteo';
+  if (/reintegro|cashback/.test(text)) return 'reintegro';
+  return 'descuento';
+}
+
 function extractDiscountPercentage(benefit) {
+  if (getPromotionKind(benefit) === 'sorteo') return null;
   if (Number.isFinite(Number(benefit?.discountPercentage)) && Number(benefit.discountPercentage) > 0) {
     return Number(benefit.discountPercentage);
   }
@@ -178,11 +186,8 @@ function extractDiscountPercentage(benefit) {
 }
 
 function getMaxDiscountPercentage(merchant, benefits) {
-  if (Number.isFinite(Number(merchant?.maxDiscountPercentage)) && Number(merchant.maxDiscountPercentage) > 0) {
-    return Number(merchant.maxDiscountPercentage);
-  }
-
   const percentages = (benefits || [])
+    .filter((benefit) => getPromotionKind(benefit) === 'descuento')
     .map((benefit) => extractDiscountPercentage(benefit))
     .filter((value) => Number.isFinite(value) && value > 0);
 
@@ -199,8 +204,10 @@ function sortBenefitsForSeo(benefits) {
 }
 
 function formatBenefitValue(benefit) {
+  const kind = getPromotionKind(benefit);
+  if (kind === 'sorteo') return getBenefitTitle(benefit);
   const discount = extractDiscountPercentage(benefit);
-  if (discount) return `${discount}% OFF`;
+  if (discount) return kind === 'reintegro' ? `${discount}% de reintegro` : `${discount}% OFF`;
   if (Number.isFinite(Number(benefit?.installments)) && Number(benefit.installments) > 0) {
     return `${Number(benefit.installments)} cuotas sin interes`;
   }
@@ -281,7 +288,7 @@ function buildAddressSchema(merchant) {
 }
 
 function buildOfferSchema(benefits, merchantName, absoluteUrl, availability) {
-  return benefits.map((benefit) => {
+  return benefits.filter((benefit) => getPromotionKind(benefit) !== 'sorteo').map((benefit) => {
     const offer = {
       '@context': 'https://schema.org',
       '@type': 'Offer',
@@ -317,7 +324,7 @@ function buildStructuredData({ merchant, activeBenefits, pastBenefits, faqItems,
     name,
     image: toAbsoluteUrl(new URL(absoluteUrl).origin, image),
     url: absoluteUrl,
-    description: buildMerchantDescription(merchant, [...activeBenefits, ...pastBenefits]),
+    description: buildMerchantDescription(merchant, activeBenefits),
     address: buildAddressSchema(merchant)
   };
 
@@ -419,7 +426,7 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     ]).slice(0, 5),
     'bancos participantes'
   );
-  const maxDiscount = getMaxDiscountPercentage(merchant, [...activeBenefits, ...pastBenefits]);
+  const maxDiscount = getMaxDiscountPercentage(merchant, activeBenefits);
   const maxDiscountText = maxDiscount ? `${maxDiscount}% OFF` : 'Promociones bancarias';
 
   return [
@@ -626,7 +633,7 @@ export function renderMerchantSeoHtml({
   const allBenefits = sortBenefitsForSeo(benefits);
   const { activeBenefits, pastBenefits } = splitMerchantSeoBenefits(allBenefits, now);
   const title = `${getMerchantName(merchant)} descuentos y promociones | ${DEFAULT_SITE_NAME}`;
-  const description = buildMerchantDescription(merchant, allBenefits);
+  const description = buildMerchantDescription(merchant, activeBenefits);
   const faqItems = buildFaqItems(merchant, activeBenefits, pastBenefits, description);
   const imageUrl = toAbsoluteUrl(siteUrl, getMerchantImage(merchant));
   const structuredData = buildStructuredData({
