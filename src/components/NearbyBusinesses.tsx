@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import React from "react";
 import { MapPin } from "lucide-react";
 import { Business } from "../types/index";
@@ -16,24 +17,22 @@ const NearbyBusinesses: React.FC<NearbyBusinessesProps> = ({
   const getDiscountPercentage = (business: Business): string => {
     const discounts = business.benefits
       .map((benefit) => {
-        const match = benefit.rewardRate.match(/(\d+)%/);
-        return match ? parseInt(match[1]) : 0;
+        return getBenefitDiscountPercentage(benefit) || 0;
       })
       .filter((discount) => discount > 0);
 
-    const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 10;
-    return `${maxDiscount}% OFF`;
+    const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 0;
+    return maxDiscount > 0 ? `${maxDiscount}% OFF` : "Ver beneficios";
   };
 
   const getDiscountColor = (business: Business): string => {
     const discounts = business.benefits
       .map((benefit) => {
-        const match = benefit.rewardRate.match(/(\d+)%/);
-        return match ? parseInt(match[1]) : 0;
+        return getBenefitDiscountPercentage(benefit) || 0;
       })
       .filter((discount) => discount > 0);
 
-    const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 10;
+    const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 0;
 
     if (maxDiscount >= 20) return "bg-red-500";
     if (maxDiscount >= 15) return "bg-green-500";
@@ -41,7 +40,7 @@ const NearbyBusinesses: React.FC<NearbyBusinessesProps> = ({
   };
 
   const formatDistance = (distance?: number): string => {
-    if (!distance) return "A 200m de tu ubicación";
+    if (distance == null || !Number.isFinite(distance) || distance < 0) return "Distancia no disponible";
 
     if (distance < 1) {
       return `A ${Math.round(distance * 1000)}m de tu ubicación`;
@@ -76,10 +75,8 @@ const NearbyBusinesses: React.FC<NearbyBusinessesProps> = ({
     }
   };
 
-  const getLocationText = (): string => {
-    const locations = ["Av. Santa Fe 1234", "Av. Córdoba 5678"];
-    return locations[Math.floor(Math.random() * locations.length)];
-  };
+  const getLocationText = (business: Business): string =>
+    business.location?.[0]?.formattedAddress || 'Ubicación no disponible';
 
   return (
     <div className="px-4 sm:px-6 mb-8">
@@ -135,7 +132,7 @@ const NearbyBusinesses: React.FC<NearbyBusinessesProps> = ({
                     </div>
                     <div className="flex items-center text-gray-500 text-sm">
                       <MapPin className="w-4 h-4 mr-1" />
-                      <span>{getLocationText()}</span>
+                      <span>{getLocationText(business)}</span>
                     </div>
                   </div>
 

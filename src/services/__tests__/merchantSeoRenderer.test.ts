@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMerchantSeoHtml } from '../../../api/merchant-seo.js';
+import { isMerchantBenefitActive, renderMerchantSeoHtml } from '../../../api/merchant-seo.js';
 
 const appShell = [
   '<!doctype html>',
@@ -222,4 +222,18 @@ describe('merchant SEO factual promotion claims', () => {
     expect(html).toContain('30% de reintegro');
     expect(html).not.toContain('30% OFF');
   });
+});
+
+
+it('SSR shares Argentina-inclusive date-only expiry with the backend', () => {
+  const benefit = { validUntil: '2026-10-31' };
+  expect(isMerchantBenefitActive(benefit, new Date('2026-11-01T02:59:59Z'))).toBe(true);
+  expect(isMerchantBenefitActive(benefit, new Date('2026-11-01T03:00:00Z'))).toBe(false);
+});
+
+it('SSR respects canonical null and never infers a discount from title text', () => {
+  const html = renderMerchantSeoHtml({ appShell, siteUrl: 'https://www.blinkapp.com.ar', merchant: { merchantId: 'm', merchantName: 'Comercio' }, benefits: [{ benefit: '100% financiado', rewardRate: '100%', discountPercentage: null, installments: 6 }] });
+  expect(html).not.toContain('100% OFF');
+  expect(html).not.toContain('hasta 100%');
+  expect(html).toContain('6 cuotas sin interes');
 });

@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { Link } from 'react-router-dom';
 import { Business } from '../types';
 import { formatDistance } from '../utils/distance';
@@ -25,11 +26,10 @@ const getCategoryStyle = (category: string) => {
 };
 
 const getBusinessMaxDiscount = (business: Business) => {
-  let max = business.maxDiscountPercentage || 0;
+  let max = 0;
 
   business.benefits.forEach((benefit) => {
-    const match = benefit.rewardRate.match(/(\d+)%/);
-    if (match) max = Math.max(max, parseInt(match[1], 10));
+    max = Math.max(max, getBenefitDiscountPercentage(benefit) || 0);
   });
 
   return max;

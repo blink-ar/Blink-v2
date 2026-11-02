@@ -2935,3 +2935,17 @@ describe('merchant-first serverless helpers', () => {
     });
   });
 });
+
+
+describe('canonical percentage in frontend API summaries', () => {
+  it.each([null, 0, 25])('preserves canonical %s instead of inferring from other text', (discountPercentage) => {
+    const summary = buildBusinessBenefitSummary({ discountPercentage, benefitTitle: 'Promoción', otherDiscounts: '100% financiado' }, new Map());
+    expect(summary).toHaveProperty('discountPercentage', discountPercentage);
+  });
+});
+
+
+it('frontend API uses the Argentine date at the UTC midnight boundary', () => {
+  const query = getActiveBenefitsMatch(new URLSearchParams(), new Date('2026-11-01T02:59:59Z'));
+  expect(JSON.stringify(query)).toContain('2026-10-31');
+});

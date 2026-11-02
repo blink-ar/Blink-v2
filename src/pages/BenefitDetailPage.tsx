@@ -1,3 +1,5 @@
+import { isBenefitActive as isActiveBenefit } from '../utils/benefits';
+import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -53,21 +55,8 @@ const BENEFIT_DAYS = [
 const SAVED_BENEFITS_STORAGE_KEY = 'blink.savedBenefits';
 const LOCATIONS_PREVIEW_COUNT = 4;
 
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const formatLocalDateOnly = (date: Date): string => [
-  date.getFullYear(),
-  String(date.getMonth() + 1).padStart(2, '0'),
-  String(date.getDate()).padStart(2, '0'),
-].join('-');
-
-const isBenefitActive = (validUntil: string | null | undefined, now = new Date()): boolean => {
-  const v = validUntil?.trim();
-  if (!v) return true;
-  if (DATE_ONLY_PATTERN.test(v)) return v >= formatLocalDateOnly(now);
-  const t = Date.parse(v);
-  return Number.isFinite(t) && t >= now.getTime();
-};
+const isBenefitActive = (validUntil: string | null | undefined, now = new Date()): boolean =>
+  isActiveBenefit({ validUntil }, now);
 
 const parseBenefitIndex = (benefitIndex?: string): number => {
   const parsedIndex = benefitIndex !== undefined ? Number.parseInt(benefitIndex, 10) : 0;
@@ -199,7 +188,7 @@ function BenefitDetailPage() {
   const benefitPath = id
     ? `/benefit/${encodeURIComponent(id)}/${encodeURIComponent(decodeBenefitRouteRef(benefitIndex) ?? '0')}`
     : '/benefit';
-  const benefitDiscount = benefit?.rewardRate.match(/(\d+)%/)?.[1];
+  const benefitDiscount = getBenefitPercentage(benefit);
   const benefitProviderName = benefit ? getBenefitProviderDisplayName(benefit) : null;
 
   useSEO({
@@ -207,7 +196,7 @@ function BenefitDetailPage() {
       ? `${business.name}: ${benefit.benefit === business.name ? `${benefit.rewardRate} con ${benefitProviderName}` : benefit.benefit} | Blink`
       : 'Detalle de beneficio bancario | Blink',
     description: business && benefit
-      ? `${benefitDiscount ? `${benefitDiscount}% de ahorro` : 'Beneficio bancario'} en ${business.name}. Revisa vigencia, condiciones y sucursales adheridas.`
+      ? `${benefitDiscount ? `${benefitDiscount}% ${getPromotionKind(benefit) === 'reintegro' ? 'de reintegro' : 'de ahorro'}` : 'Beneficio bancario'} en ${business.name}. Revisa vigencia, condiciones y sucursales adheridas.`
       : 'Revisa condiciones, vigencia y ubicaciones de cada beneficio bancario.',
     path: business && benefit ? buildBenefitPath(business.id, benefit, benefitPosition) : benefitPath,
     type: 'article',
@@ -417,7 +406,7 @@ function BenefitDetailPage() {
   const subscriptionName = getSubscriptionName(benefit.subscription);
   const subscription = getSubscriptionById(benefit.subscription);
   const isExpired = !isBenefitActive(benefit.validUntil);
-  const discount = parseInt(benefit.rewardRate.match(/(\d+)%/)?.[1] || '0');
+  const discount = getBenefitPercentage(benefit) || 0;
   const providerName = benefitProviderName || getBenefitProviderDisplayName(benefit);
   const providerSummary = getBenefitProviderSummary(benefit);
   const hasMultipleProviders = hasMultipleBenefitProviders(benefit);
@@ -646,10 +635,10 @@ function BenefitDetailPage() {
                     <span className="font-black" style={{ fontSize: 96, lineHeight: 0.85, color: '#6366F1' }}>{discount}</span>
                     <div className="flex flex-col items-start mb-1">
                       <span className="font-black leading-none" style={{ fontSize: 34, color: '#818CF8' }}>%</span>
-                      <span className="font-bold text-[11px] tracking-[0.14em] uppercase text-blink-muted">OFF</span>
+                      <span className="font-bold text-[11px] tracking-[0.14em] uppercase text-blink-muted">{getPromotionKind(benefit) === 'reintegro' ? 'REINTEGRO' : 'OFF'}</span>
                     </div>
                   </div>
-                  <p className="text-sm font-medium text-blink-muted mt-3">de ahorro</p>
+                  <p className="text-sm font-medium text-blink-muted mt-3">{getPromotionKind(benefit) === 'reintegro' ? 'de reintegro' : 'de ahorro'}</p>
                   {benefit.installments != null && benefit.installments > 0 && (
                     <p className="text-xs font-semibold mt-2" style={{ color: '#059669' }}>
                       + {benefit.installments} cuotas sin interés

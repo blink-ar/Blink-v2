@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import BusinessCard from "../BusinessCard";
 import { AuthProvider } from "../../contexts/AuthContext";
@@ -88,7 +88,7 @@ const mockBusiness: Business = {
       rewardRate: "20%",
       bankName: "BBVA",
       category: "gastronomia",
-      validUntil: "2024-12-31",
+      validUntil: "2099-12-31",
       terms: "Test terms",
     },
   ],
@@ -123,6 +123,18 @@ describe("BusinessCard", () => {
     expect(screen.getByText("123 Test Street")).toBeInTheDocument();
     expect(screen.getByText("hasta 20% OFF")).toBeInTheDocument();
     expect(screen.getByText("+1")).toBeInTheDocument();
+  });
+
+  it.each([null, 0])('does not advertise stale summary or text when canonical percentage is %s', (discountPercentage) => {
+    renderBusinessCard({ business: { ...mockBusiness, maxDiscountPercentage: 100, benefits: [{ ...mockBusiness.benefits[0], discountPercentage, rewardRate: '100%', benefit: 'Sorteo Mega Martes' }] } });
+    expect(screen.getByText('Ver beneficios')).toBeInTheDocument();
+    expect(screen.queryByText(/100% OFF/)).not.toBeInTheDocument();
+  });
+
+  it('does not advertise an expired percentage', () => {
+    renderBusinessCard({ business: { ...mockBusiness, benefits: [{ ...mockBusiness.benefits[0], validUntil: '2020-01-01' }] } });
+    expect(screen.getByText('Ver beneficios')).toBeInTheDocument();
+    expect(screen.queryByText(/20% OFF/)).not.toBeInTheDocument();
   });
 
   it("calls onClick when clicked", () => {

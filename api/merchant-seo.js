@@ -1,3 +1,5 @@
+import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
+import { getPromotionKind, getBenefitPercentage as extractDiscountPercentage } from '../shared/benefit-presentation.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,14 +12,6 @@ const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 let cachedAppShell = null;
-
-function formatLocalDateOnly(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-');
-}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -165,24 +159,6 @@ function getBenefitBankSummary(benefit) {
 
 function getBenefitTitle(benefit) {
   return String(benefit?.benefit || benefit?.benefitTitle || benefit?.rewardRate || 'Beneficio').trim() || 'Beneficio';
-}
-
-function getPromotionKind(benefit) {
-  const text = normalizeText([benefit?.tipo, benefit?.claseDeBeneficio, getBenefitTitle(benefit), benefit?.otherDiscounts].filter(Boolean).join(' '));
-  if (/sorteo|sorteamos|participa.*gan/.test(text)) return 'sorteo';
-  if (/reintegro|cashback/.test(text)) return 'reintegro';
-  return 'descuento';
-}
-
-function extractDiscountPercentage(benefit) {
-  if (getPromotionKind(benefit) === 'sorteo') return null;
-  if (Number.isFinite(Number(benefit?.discountPercentage)) && Number(benefit.discountPercentage) > 0) {
-    return Number(benefit.discountPercentage);
-  }
-
-  const rawValue = `${benefit?.rewardRate || ''} ${benefit?.valor || ''} ${benefit?.benefit || ''}`;
-  const match = rawValue.match(/(\d+(?:[.,]\d+)?)\s*%/);
-  return match ? Number(match[1].replace(',', '.')) : null;
 }
 
 function getMaxDiscountPercentage(merchant, benefits) {
@@ -571,7 +547,7 @@ export function isMerchantBenefitActive(benefit, now = new Date()) {
   if (!validUntil) return true;
 
   if (DATE_ONLY_PATTERN.test(validUntil)) {
-    return validUntil >= formatLocalDateOnly(now);
+    return validUntil >= getArgentinaDateOnly(now);
   }
 
   const parsedTime = Date.parse(validUntil);

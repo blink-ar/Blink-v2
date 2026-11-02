@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate, Link } from 'react-router-dom';
@@ -306,9 +307,9 @@ function HomePage() {
 
     businesses.forEach((business) => {
       business.benefits.forEach((b, bIdx) => {
-        const match = String(b.rewardRate).match(/(\d+)%/);
-        if (match) {
-          allBenefits.push({ business, benefit: b, benefitIndex: bIdx, discount: parseInt(match[1]) });
+        const discount = getBenefitDiscountPercentage(b);
+        if (discount) {
+          allBenefits.push({ business, benefit: b, benefitIndex: bIdx, discount });
         }
       });
     });

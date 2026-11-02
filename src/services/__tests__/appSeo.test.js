@@ -20,12 +20,12 @@ describe('server app routes', () => {
   });
 
   it.each(['GET', 'HEAD'])('serves noindex through the real %s handler without a DB connection', async (method) => {
-    const res = { headers: {} as Record<string, string>, statusCode: 0, body: '',
-      setHeader(name: string, value: string) { this.headers[name] = value; },
-      status(code: number) { this.statusCode = code; return this; },
-      send(body: string) { this.body = body; return this; },
+    const res = { headers: {}, statusCode: 0, body: '',
+      setHeader(name, value) { this.headers[name] = value; },
+      status(code) { this.statusCode = code; return this; },
+      send(body) { this.body = body; return this; },
     };
-    await handler({ method, url: '/map?path=__app/map', headers: { host: 'www.blinkapp.com.ar' } } as never, res as never);
+    await handler({ method, url: '/map?path=__app/map', headers: { host: 'www.blinkapp.com.ar' } }, res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['X-Robots-Tag']).toBe('noindex, follow');
     expect(res.headers['Cache-Control']).toBe('private, no-store');

@@ -1,3 +1,4 @@
+import { getArgentinaDateOnly } from '../../shared/benefit-dates.js';
 import { BankBenefit, Business } from '../types';
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -13,7 +14,7 @@ export const isBenefitActive = (benefit: Pick<BankBenefit, 'validUntil'>, now = 
   if (!validUntil) return true;
 
   if (DATE_ONLY_PATTERN.test(validUntil)) {
-    return validUntil >= formatLocalDateOnly(now);
+    return validUntil >= getArgentinaDateOnly(now);
   }
 
   const parsedTime = Date.parse(validUntil);

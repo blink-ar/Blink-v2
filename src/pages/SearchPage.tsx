@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -1055,8 +1056,7 @@ function SearchPage() {
   const getMaxDiscount = (business: Business) => {
     let max = 0;
     business.benefits.forEach((benefit) => {
-      const match = benefit.rewardRate.match(/(\d+)%/);
-      if (match) max = Math.max(max, parseInt(match[1], 10));
+      max = Math.max(max, getBenefitDiscountPercentage(benefit) || 0);
     });
     return max;
   };

@@ -1,3 +1,5 @@
+import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
+import { getBenefitDiscountPercentage } from '../shared/benefit-presentation.js';
 import { renderAppSeoHtml } from './app-seo.js';
 import { MongoClient, ObjectId } from 'mongodb';
 import { calculateDistanceKm, normalizeDistanceKm, parseCoordinates } from '../shared/coordinates.js';
@@ -499,14 +501,6 @@ function toPositiveInt(value, fallback, max) {
   return typeof max === 'number' ? Math.min(safe, max) : safe;
 }
 
-function formatLocalDateOnly(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-');
-}
-
 function shouldIncludeExpired(searchParams) {
   return searchParams.get('includeExpired') === 'true';
 }
@@ -516,7 +510,7 @@ function getActiveBenefitsMatch(searchParams, now = new Date()) {
     return null;
   }
 
-  const todayLocal = formatLocalDateOnly(now);
+  const todayLocal = getArgentinaDateOnly(now);
   return {
     $expr: {
       $let: {
@@ -865,8 +859,7 @@ function sortBenefitSummariesForDisplay(benefits) {
 }
 
 function getBenefitSummaryDiscount(summary) {
-  const match = String(summary?.rewardRate || '').match(/(\d+(?:[.,]\d+)?)%/);
-  return match ? Number(match[1].replace(',', '.')) : 0;
+  return getBenefitDiscountPercentage(summary) || 0;
 }
 
 function getBenefitSummaryProviderNames(benefits) {
@@ -909,6 +902,7 @@ function selectListingBenefitSummaries(benefits, limit = LISTING_BENEFIT_LIMIT) 
       valor: benefit.valor,
       tope: benefit.tope,
       installments: benefit.installments,
+      discountPercentage: benefit.discountPercentage,
       validUntil: benefit.validUntil,
       subscriptionIds: benefit.subscriptionIds,
       ...(benefit.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
@@ -1147,6 +1141,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     cardTypes: cardNames,
     benefit: benefit?.benefitTitle || 'Beneficio',
     rewardRate: value || 'Beneficio',
+    discountPercentage: Number.isFinite(benefit?.discountPercentage) ? benefit.discountPercentage : null,
     tipo: 'descuento',
     cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
     valor: value,

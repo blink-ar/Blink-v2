@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { Business } from '../types';
 
 export interface LandingBank {
@@ -119,10 +120,7 @@ export function businessMatchesBank(business: Business, bank: LandingBank): bool
 export function getMaxDiscount(business: Business): number {
   let max = 0;
   for (const benefit of business.benefits) {
-    const match = benefit.rewardRate.match(/(\d+)%/);
-    if (match) {
-      max = Math.max(max, Number.parseInt(match[1], 10));
-    }
+    max = Math.max(max, getBenefitDiscountPercentage(benefit) || 0);
   }
   return max;
 }

@@ -36,3 +36,10 @@ describe('benefit activity helpers', () => {
     expect(filterActiveBenefits([active, openEnded, expired], now)).toEqual([active, openEnded]);
   });
 });
+
+
+it('expires date-only benefits at Argentine midnight, consistently with SSR and backend', () => {
+  const benefit = makeBenefit('2026-10-31');
+  expect(isBenefitActive(benefit, new Date('2026-11-01T02:59:59Z'))).toBe(true);
+  expect(isBenefitActive(benefit, new Date('2026-11-01T03:00:00Z'))).toBe(false);
+});

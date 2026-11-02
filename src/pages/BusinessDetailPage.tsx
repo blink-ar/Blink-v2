@@ -1,3 +1,4 @@
+import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
@@ -72,8 +73,8 @@ const isBenefitAvailableToday = (b: BankBenefit): boolean => {
 };
 
 const hasPercentDiscount = (benefit: BankBenefit): boolean => {
-  const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-  return !!(discount && parseInt(discount) > 0);
+  const discount = getBenefitPercentage(benefit);
+  return !!(discount && discount > 0);
 };
 
 const normalizeValidityDate = (validUntil?: string | null): string => {
@@ -182,8 +183,8 @@ function BusinessDetailPage() {
   const sortedBenefits = useMemo(() => {
     if (!business) return [];
     return [...business.benefits].sort((a, b) => {
-      const dA = parseInt(a.rewardRate.match(/(\d+)%/)?.[1] || '0');
-      const dB = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
+      const dA = getBenefitPercentage(a) || 0;
+      const dB = getBenefitPercentage(b) || 0;
       if (dB !== dA) return dB - dA;
       return (b.installments || 0) - (a.installments || 0);
     });
@@ -381,7 +382,7 @@ function BusinessDetailPage() {
   const groupedBenefits = useMemo(() => {
     return activeBenefits
       .filter((b) => {
-        const discount = parseInt(b.rewardRate.match(/(\d+)%/)?.[1] || '0');
+        const discount = getBenefitPercentage(b) || 0;
         return !((b.installments ?? 0) > 0 && discount === 0);
       })
       .reduce((acc, benefit) => {
@@ -613,8 +614,8 @@ function BusinessDetailPage() {
 
                   {/* Benefit rows */}
                   {visible.map((benefit, i) => {
-                    const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-                    const hasDiscount = !!(discount && parseInt(discount) > 0);
+                    const discount = getBenefitPercentage(benefit);
+                    const hasDiscount = !!(discount && discount > 0);
                     const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
                     const allDays = isAllDays(benefit.cuando);
                     const activeDays = !allDays ? getActiveDays(benefit.cuando) : new Set<string>();
@@ -695,7 +696,7 @@ function BusinessDetailPage() {
                               {hasDiscount ? (
                                 <>
                                   <p className="font-black text-[26px] leading-tight text-blink-ink">{discount}%</p>
-                                  <p className="text-[11px] text-blink-muted -mt-0.5">de ahorro</p>
+                                  <p className="text-[11px] text-blink-muted -mt-0.5">{getPromotionKind(benefit) === 'reintegro' ? 'de reintegro' : 'de ahorro'}</p>
                                   {benefit.tope && !String(benefit.tope).toUpperCase().includes('SIN TOPE') && (
                                     <p className="text-[10px] text-blink-muted mt-0.5 leading-tight">
                                       Tope: {benefit.tope}
@@ -828,8 +829,8 @@ function BusinessDetailPage() {
         {viewMode === 'por-beneficio' && (
           <div className="space-y-2 pt-3 px-4">
             {filteredSortedBenefits.map((benefit, idx) => {
-              const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-              const hasDiscount = !!(discount && parseInt(discount) > 0);
+              const discount = getBenefitPercentage(benefit);
+              const hasDiscount = !!(discount && discount > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
               const providerName = getBenefitProviderDisplayName(benefit);
               const providerSummary = getBenefitProviderSummary(benefit);
@@ -896,8 +897,8 @@ function BusinessDetailPage() {
           <section className="space-y-2 pt-3 px-4">
             <h2 className="font-semibold text-base text-gray-400">Beneficios anteriores</h2>
             {pastBenefits.map((benefit, idx) => {
-              const discount = benefit.rewardRate.match(/(\d+)%/)?.[1];
-              const hasDiscount = !!(discount && parseInt(discount) > 0);
+              const discount = getBenefitPercentage(benefit);
+              const hasDiscount = !!(discount && discount > 0);
               const hasInstallments = !hasDiscount && (benefit.installments ?? 0) > 0;
               const benefitIdx = business.benefits.indexOf(benefit);
               const providerName = getBenefitProviderDisplayName(benefit);
