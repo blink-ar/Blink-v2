@@ -17,6 +17,7 @@ function ScrollToTop() {
   return null;
 }
 
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const DiscountSearchGuidePage = lazy(() => import('./pages/DiscountSearchGuidePage'));
@@ -84,6 +85,7 @@ function AppContent() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/descuentos/:bank/:category" element={<LandingPage />} />
           <Route path="/descuentos/:bank/:category/:city" element={<LandingPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </>

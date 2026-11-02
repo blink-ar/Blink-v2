@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { type FormEvent, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import L, { type Layer, type Map as LeafletMap } from 'leaflet';
@@ -406,8 +407,7 @@ function MapPage() {
   const getMaxDiscount = useCallback((biz: Business) => {
     let max = 0;
     filterActiveBenefits(biz.benefits).forEach((b) => {
-      const m = b.rewardRate.match(/(\d+)%/);
-      if (m) max = Math.max(max, parseInt(m[1]));
+      max = Math.max(max, getBenefitDiscountPercentage(b) || 0);
     });
     return max;
   }, []);

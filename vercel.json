@@ -66,36 +66,44 @@
       "dest": "/api/[...path]?path=__page/home"
     },
     {
-      "src": "/search",
+      "src": "/search/?",
       "dest": "/api/[...path]?path=__page/search"
     },
     {
-      "src": "/buscador-de-descuentos-bancarios",
+      "src": "/buscador-de-descuentos-bancarios/?",
       "dest": "/api/[...path]?path=__page/buscador-de-descuentos-bancarios"
     },
     {
-      "src": "/business/([^/]+)",
+      "src": "/business/([^/]+)/?",
       "dest": "/api/[...path]?path=business/$1"
     },
     {
-      "src": "/categorias/([^/]+)/page/([0-9]+)",
+      "src": "/categorias/([^/]+)/page/([0-9]+)/?",
       "dest": "/api/[...path]?path=categorias/$1/page/$2"
     },
     {
-      "src": "/categorias/([^/]+)",
+      "src": "/categorias/([^/]+)/?",
       "dest": "/api/[...path]?path=categorias/$1"
     },
     {
-      "src": "/descuentos/([^/]+)/([^/]+)/([^/]+)",
+      "src": "/descuentos/([^/]+)/([^/]+)/([^/]+)/?",
       "dest": "/api/[...path]?path=descuentos/$1/$2/$3"
     },
     {
-      "src": "/descuentos/([^/]+)/([^/]+)",
+      "src": "/descuentos/([^/]+)/([^/]+)/?",
       "dest": "/api/[...path]?path=descuentos/$1/$2"
     },
     {
-      "src": "/comercios/([^/]+)",
+      "src": "/comercios/([^/]+)/?",
       "dest": "/api/[...path]?path=comercios/$1"
+    },
+    {
+      "src": "/(map|profile|saved|login|signup|notifications|auth/callback)/?",
+      "dest": "/api/[...path]?path=__app/$1"
+    },
+    {
+      "src": "/(?:home|benefit/[^/]+(?:/[^/]+)?)/?",
+      "dest": "/index.html"
     },
     {
       "handle": "filesystem"
@@ -106,7 +114,7 @@
     },
     {
       "src": "/.*",
-      "dest": "/index.html"
+      "dest": "/api/[...path]?path=__not_found"
     }
   ]
 }

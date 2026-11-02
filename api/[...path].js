@@ -1,3 +1,6 @@
+import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
+import { getBenefitDiscountPercentage, getPromotionKind } from '../shared/benefit-presentation.js';
+import { renderAppSeoHtml } from './app-seo.js';
 import { MongoClient, ObjectId } from 'mongodb';
 import { calculateDistanceKm, normalizeDistanceKm, parseCoordinates } from '../shared/coordinates.js';
 import { createPublicKey, createVerify } from 'crypto';
@@ -127,6 +130,7 @@ const BENEFIT_LISTING_PROJECTION = {
   benefitTitle: 1,
   availableDays: 1,
   discountPercentage: 1,
+  otherDiscounts: 1,
   caps: 1,
   online: 1,
   installments: 1,
@@ -498,14 +502,6 @@ function toPositiveInt(value, fallback, max) {
   return typeof max === 'number' ? Math.min(safe, max) : safe;
 }
 
-function formatLocalDateOnly(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-');
-}
-
 function shouldIncludeExpired(searchParams) {
   return searchParams.get('includeExpired') === 'true';
 }
@@ -515,7 +511,7 @@ function getActiveBenefitsMatch(searchParams, now = new Date()) {
     return null;
   }
 
-  const todayLocal = formatLocalDateOnly(now);
+  const todayLocal = getArgentinaDateOnly(now);
   return {
     $expr: {
       $let: {
@@ -864,8 +860,7 @@ function sortBenefitSummariesForDisplay(benefits) {
 }
 
 function getBenefitSummaryDiscount(summary) {
-  const match = String(summary?.rewardRate || '').match(/(\d+(?:[.,]\d+)?)%/);
-  return match ? Number(match[1].replace(',', '.')) : 0;
+  return getBenefitDiscountPercentage(summary) || 0;
 }
 
 function getBenefitSummaryProviderNames(benefits) {
@@ -904,10 +899,12 @@ function selectListingBenefitSummaries(benefits, limit = LISTING_BENEFIT_LIMIT) 
       benefit: benefit.benefit,
       rewardRate: benefit.rewardRate,
       tipo: benefit.tipo,
+      otherDiscounts: benefit.otherDiscounts,
       cuando: benefit.cuando,
       valor: benefit.valor,
       tope: benefit.tope,
       installments: benefit.installments,
+      discountPercentage: benefit.discountPercentage,
       validUntil: benefit.validUntil,
       subscriptionIds: benefit.subscriptionIds,
       ...(benefit.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
@@ -1146,7 +1143,8 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     cardTypes: cardNames,
     benefit: benefit?.benefitTitle || 'Beneficio',
     rewardRate: value || 'Beneficio',
-    tipo: 'descuento',
+    discountPercentage: Number.isFinite(benefit?.discountPercentage) ? benefit.discountPercentage : null,
+    tipo: getPromotionKind(benefit),
     cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
     valor: value,
     tope:
@@ -3604,6 +3602,16 @@ export default async function handler(req, res) {
       }
 
       return await handleSearchSeoPage(req, res, url, coreSeoDb);
+    }
+
+    // App routes need no database and must expose noindex before JavaScript.
+    if (isReadMethod(req) && path.startsWith('/api/__app/')) {
+      const page = path.slice('/api/__app/'.length);
+      const rendered = renderAppSeoHtml(readViteAppShell(), page, getCanonicalSiteUrl(url));
+      if (!rendered) return handleStaticNotFound(req, res, url);
+      res.setHeader('X-Robots-Tag', page === 'map' ? 'noindex, follow' : 'noindex, nofollow');
+      setCacheControl(res, 'private, no-store');
+      return html(res, 200, rendered);
     }
 
     const db = await getDb();

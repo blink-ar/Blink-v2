@@ -125,8 +125,9 @@ describe("Benefit detail page content", () => {
     expect(await screen.findByText("Test Business")).toBeInTheDocument();
     expect(screen.getByText("Banco Test · Visa Gold")).toBeInTheDocument();
     expect(screen.getByText("25% reintegro")).toBeInTheDocument();
-    expect(screen.getByText("OFF")).toBeInTheDocument();
-    expect(screen.getByText("de ahorro")).toBeInTheDocument();
+    expect(screen.getByText("REINTEGRO")).toBeInTheDocument();
+    expect(screen.queryByText("OFF")).not.toBeInTheDocument();
+    expect(screen.getByText("de reintegro")).toBeInTheDocument();
     expect(screen.getByText("Condiciones")).toBeInTheDocument();
     expect(screen.getByText("Tope descuento")).toBeInTheDocument();
     expect(screen.getByText("$100.000")).toBeInTheDocument();

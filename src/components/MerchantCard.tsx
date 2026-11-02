@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Business } from '../types';
@@ -23,8 +24,7 @@ const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
 const getMaxDiscount = (benefits: Business['benefits']) => {
   let max = 0;
   benefits.forEach((b) => {
-    const match = b.rewardRate.match(/(\d+)%/);
-    if (match) max = Math.max(max, parseInt(match[1], 10));
+    max = Math.max(max, getBenefitDiscountPercentage(b) || 0);
   });
   return max;
 };
@@ -67,7 +67,7 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
   const bankBadges = getBankBadges(activeBenefits, business.banks);
   const visibleBadges = bankBadges.slice(0, 3);
   const remaining = bankBadges.length - 3;
-  const maxDiscount = business.maxDiscountPercentage || getMaxDiscount(activeBenefits);
+  const maxDiscount = getMaxDiscount(activeBenefits);
   const maxInstallments = getMaxInstallments(activeBenefits);
   const categoryStyle = CATEGORY_STYLE[business.category] ?? { bg: '#DCFCE7', color: '#16A34A' };
   const imageSrc = getOptimizedImageUrl(business.image, { width: 96 });

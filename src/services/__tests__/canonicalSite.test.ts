@@ -108,11 +108,12 @@ describe('Vercel host redirect config', () => {
     const staticNotFoundIndex = vercelConfig.routes.findIndex(
       (route: { dest?: string }) => route.dest === '/api/[...path]?path=__not_found'
     );
-    const spaFallbackIndex = vercelConfig.routes.findIndex((route: { dest?: string }) => route.dest === '/index.html');
+    const spaFallbackIndex = vercelConfig.routes.length - 1;
 
     expect(filesystemIndex).toBeGreaterThan(-1);
     expect(staticNotFoundIndex).toBeGreaterThan(filesystemIndex);
     expect(staticNotFoundIndex).toBeLessThan(spaFallbackIndex);
+    expect(vercelConfig.routes[spaFallbackIndex]).toEqual({ src: '/.*', dest: '/api/[...path]?path=__not_found' });
     expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('txt');
     expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('md');
     expect(vercelConfig.routes[staticNotFoundIndex].src).toContain('ya?ml');
@@ -125,9 +126,9 @@ describe('Vercel host redirect config', () => {
     );
 
     const guideRouteIndex = vercelConfig.routes.findIndex(
-      (route: { src?: string }) => route.src === '/buscador-de-descuentos-bancarios'
+      (route: { src?: string }) => route.src === '/buscador-de-descuentos-bancarios/?'
     );
-    const spaFallbackIndex = vercelConfig.routes.findIndex((route: { dest?: string }) => route.dest === '/index.html');
+    const spaFallbackIndex = vercelConfig.routes.length - 1;
 
     expect(guideRouteIndex).toBeGreaterThan(-1);
     expect(guideRouteIndex).toBeLessThan(spaFallbackIndex);
@@ -170,5 +171,28 @@ describe('AI-readable static files', () => {
 
     expect(sitemap).toContain('https://www.blinkapp.com.ar/buscador-de-descuentos-bancarios');
     expect(sitemap).toContain('<changefreq>weekly</changefreq>');
+  });
+});
+
+
+describe('SEO routing regression matrix', () => {
+  const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+  const routes = config.routes.filter((r: { src?: string }) => r.src);
+  const destination = (pathname: string) => routes.find((r: { src: string }) => new RegExp(`^${r.src}$`).test(pathname))?.dest;
+
+  it.each(['/', '/search', '/search/', '/buscador-de-descuentos-bancarios/', '/business/merchant_1/', '/comercios/coto--merchant_1/', '/categorias/moda/', '/categorias/moda/page/2/', '/descuentos/galicia/gastronomia/', '/descuentos/galicia/gastronomia/buenos-aires/'])('preserves public SSR route %s', (pathname) => {
+    expect(destination(pathname)).toMatch(/^\/api\/\[\.\.\.path\]\?path=(?!__not_found)/);
+  });
+
+  it.each(['/map', '/map/', '/login', '/profile/', '/notifications', '/auth/callback/'])('routes app screen %s to server noindex', (pathname) => {
+    expect(destination(pathname)).toContain('path=__app/');
+  });
+
+  it.each(['/home', '/benefit/id', '/benefit/id/', '/benefit/merchant_1/benefit-galicia', '/benefit/merchant_1/0', '/benefit/merchant_1/benefit-galicia/'])('preserves SPA route %s', (pathname) => {
+    expect(destination(pathname)).toBe('/index.html');
+  });
+
+  it.each(['/made-up', '/map/fake', '/login/fake', '/comercios/id/extra', '/comercios', '/unknown.js'])('returns a real 404 for unrecognized %s', (pathname) => {
+    expect(destination(pathname)).toContain('path=__not_found');
   });
 });

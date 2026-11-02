@@ -1,3 +1,5 @@
+import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
+import { getPromotionKind, getBenefitPercentage as extractDiscountPercentage } from '../shared/benefit-presentation.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,14 +12,6 @@ const DEFAULT_OG_IMAGE = '/pwa-512x512.png';
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 let cachedAppShell = null;
-
-function formatLocalDateOnly(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-');
-}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -167,22 +161,9 @@ function getBenefitTitle(benefit) {
   return String(benefit?.benefit || benefit?.benefitTitle || benefit?.rewardRate || 'Beneficio').trim() || 'Beneficio';
 }
 
-function extractDiscountPercentage(benefit) {
-  if (Number.isFinite(Number(benefit?.discountPercentage)) && Number(benefit.discountPercentage) > 0) {
-    return Number(benefit.discountPercentage);
-  }
-
-  const rawValue = `${benefit?.rewardRate || ''} ${benefit?.valor || ''} ${benefit?.benefit || ''}`;
-  const match = rawValue.match(/(\d+(?:[.,]\d+)?)\s*%/);
-  return match ? Number(match[1].replace(',', '.')) : null;
-}
-
 function getMaxDiscountPercentage(merchant, benefits) {
-  if (Number.isFinite(Number(merchant?.maxDiscountPercentage)) && Number(merchant.maxDiscountPercentage) > 0) {
-    return Number(merchant.maxDiscountPercentage);
-  }
-
   const percentages = (benefits || [])
+    .filter((benefit) => getPromotionKind(benefit) === 'descuento')
     .map((benefit) => extractDiscountPercentage(benefit))
     .filter((value) => Number.isFinite(value) && value > 0);
 
@@ -199,8 +180,10 @@ function sortBenefitsForSeo(benefits) {
 }
 
 function formatBenefitValue(benefit) {
+  const kind = getPromotionKind(benefit);
+  if (kind === 'sorteo') return getBenefitTitle(benefit);
   const discount = extractDiscountPercentage(benefit);
-  if (discount) return `${discount}% OFF`;
+  if (discount) return kind === 'reintegro' ? `${discount}% de reintegro` : `${discount}% OFF`;
   if (Number.isFinite(Number(benefit?.installments)) && Number(benefit.installments) > 0) {
     return `${Number(benefit.installments)} cuotas sin interes`;
   }
@@ -281,7 +264,7 @@ function buildAddressSchema(merchant) {
 }
 
 function buildOfferSchema(benefits, merchantName, absoluteUrl, availability) {
-  return benefits.map((benefit) => {
+  return benefits.filter((benefit) => getPromotionKind(benefit) !== 'sorteo').map((benefit) => {
     const offer = {
       '@context': 'https://schema.org',
       '@type': 'Offer',
@@ -317,7 +300,7 @@ function buildStructuredData({ merchant, activeBenefits, pastBenefits, faqItems,
     name,
     image: toAbsoluteUrl(new URL(absoluteUrl).origin, image),
     url: absoluteUrl,
-    description: buildMerchantDescription(merchant, [...activeBenefits, ...pastBenefits]),
+    description: buildMerchantDescription(merchant, activeBenefits),
     address: buildAddressSchema(merchant)
   };
 
@@ -419,7 +402,7 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     ]).slice(0, 5),
     'bancos participantes'
   );
-  const maxDiscount = getMaxDiscountPercentage(merchant, [...activeBenefits, ...pastBenefits]);
+  const maxDiscount = getMaxDiscountPercentage(merchant, activeBenefits);
   const maxDiscountText = maxDiscount ? `${maxDiscount}% OFF` : 'Promociones bancarias';
 
   return [
@@ -564,7 +547,7 @@ export function isMerchantBenefitActive(benefit, now = new Date()) {
   if (!validUntil) return true;
 
   if (DATE_ONLY_PATTERN.test(validUntil)) {
-    return validUntil >= formatLocalDateOnly(now);
+    return validUntil >= getArgentinaDateOnly(now);
   }
 
   const parsedTime = Date.parse(validUntil);
@@ -626,7 +609,7 @@ export function renderMerchantSeoHtml({
   const allBenefits = sortBenefitsForSeo(benefits);
   const { activeBenefits, pastBenefits } = splitMerchantSeoBenefits(allBenefits, now);
   const title = `${getMerchantName(merchant)} descuentos y promociones | ${DEFAULT_SITE_NAME}`;
-  const description = buildMerchantDescription(merchant, allBenefits);
+  const description = buildMerchantDescription(merchant, activeBenefits);
   const faqItems = buildFaqItems(merchant, activeBenefits, pastBenefits, description);
   const imageUrl = toAbsoluteUrl(siteUrl, getMerchantImage(merchant));
   const structuredData = buildStructuredData({

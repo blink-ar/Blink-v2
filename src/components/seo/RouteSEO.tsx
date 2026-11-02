@@ -274,7 +274,7 @@ function RouteSEO() {
 
   let seoConfig: SEOConfig;
 
-  if (location.pathname === '/' || location.pathname === '/home') {
+  if (normalizedPathname === '/' || normalizedPathname === '/home') {
     seoConfig = {
       title: `Descuentos bancarios en Argentina | ${SITE_NAME}`,
       description: baseDescription,
@@ -287,7 +287,7 @@ function RouteSEO() {
       ],
       structuredData: buildCoreEntityStructuredData(),
     };
-  } else if (location.pathname === '/search') {
+  } else if (normalizedPathname === '/search') {
     const hasSearchTerm = searchTerm.length > 0;
     const title = hasSearchTerm
       ? `${searchTerm} - descuentos y beneficios bancarios | ${SITE_NAME}`
@@ -302,7 +302,7 @@ function RouteSEO() {
       description,
       path: '/search',
       keywords: selectedCategory ? [`descuentos ${selectedCategory}`, 'promociones bancarias'] : undefined,
-      structuredData: buildCoreEntityStructuredData(location.pathname + location.search).map((item) => (
+      structuredData: buildCoreEntityStructuredData(normalizedPathname + location.search).map((item) => (
         item['@type'] === 'SearchResultsPage'
           ? { ...item, name: title }
           : item
@@ -322,11 +322,12 @@ function RouteSEO() {
       ],
       structuredData: buildDiscountSearchGuideStructuredData(),
     };
-  } else if (location.pathname === '/map') {
+  } else if (normalizedPathname === '/map') {
     seoConfig = {
       title: `Mapa de descuentos bancarios cercanos | ${SITE_NAME}`,
       description: 'Explora descuentos bancarios cercanos en el mapa y encuentra beneficios por ubicación.',
       path: '/map',
+      robots: 'noindex, follow',
     };
   } else if (location.pathname.startsWith('/descuentos/')) {
     seoConfig = {
@@ -360,7 +361,7 @@ function RouteSEO() {
       path: location.pathname,
       type: 'article',
     };
-  } else if (normalizedPathname === '/saved' || normalizedPathname === '/profile') {
+  } else if (['/saved', '/profile', '/login', '/signup', '/notifications', '/auth/callback'].includes(normalizedPathname)) {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
@@ -371,7 +372,8 @@ function RouteSEO() {
     seoConfig = {
       title: `${SITE_NAME}`,
       description: baseDescription,
-      path: '/',
+      path: normalizedPathname,
+      robots: 'noindex, follow',
     };
   }
 

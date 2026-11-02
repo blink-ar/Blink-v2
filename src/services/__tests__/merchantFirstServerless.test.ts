@@ -1,3 +1,4 @@
+import { getBenefitDiscountPercentage, getBenefitPercentage } from '../../../shared/benefit-presentation.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildBusinessBenefitSummary,
@@ -2934,4 +2935,41 @@ describe('merchant-first serverless helpers', () => {
       }
     });
   });
+});
+
+
+describe('canonical percentage in frontend API summaries', () => {
+  it.each([null, 0, 25])('preserves canonical %s instead of inferring from other text', (discountPercentage) => {
+    const summary = buildBusinessBenefitSummary({ discountPercentage, benefitTitle: 'Promoción', otherDiscounts: '100% financiado' }, new Map());
+    expect(summary).toHaveProperty('discountPercentage', discountPercentage);
+  });
+});
+
+
+it('frontend API uses the Argentine date at the UTC midnight boundary', () => {
+  const query = getActiveBenefitsMatch(new URLSearchParams(), new Date('2026-11-01T02:59:59Z'));
+  expect(JSON.stringify(query)).toContain('2026-10-31');
+});
+
+
+it.each(['summary', 'full'])('preserves reimbursement classification through real %s response projection and compaction', async (view) => {
+  const merchant = { merchantId: 'merchant_rebate', merchantName: 'Comercio', categories: ['otros'], locations: [], banks: [], benefitCount: 1, activeBenefitCount: 1 };
+  const raw = { id: 'rebate', merchantId: merchant.merchantId, benefitTitle: 'Promoción especial', discountPercentage: 30, otherDiscounts: '30% de reintegro', validUntil: '2099-12-31', eligibilities: [] };
+  const db = { collection(name: string) {
+    if (name === 'merchant_assets') return { countDocuments: async () => 1, find: () => createCursor([merchant]) };
+    if (name === 'confirmed_benefits') return { find(_query: unknown, options: { projection: Record<string, unknown> }) {
+      // Model Mongo projection instead of returning every fixture field.
+      const projected = Object.fromEntries(Object.entries(raw).filter(([key]) => options.projection[key] === 1));
+      return createCursor([projected]);
+    } };
+    if (name === 'bank_cards') return { find: () => createCursor([]) };
+    throw new Error('Unexpected collection: ' + name);
+  } };
+  const res = createResponseCapture();
+  await handleGetBusinesses({} as never, res as never, new URL('https://example.com/api/businesses?view=' + view), db as never);
+  const benefit = JSON.parse(res.body || '{}').businesses[0].benefits[0];
+  expect(benefit.tipo).toBe('reintegro');
+  expect(benefit.otherDiscounts).toBe('30% de reintegro');
+  expect(getBenefitPercentage(benefit)).toBe(30);
+  expect(getBenefitDiscountPercentage(benefit)).toBeNull();
 });

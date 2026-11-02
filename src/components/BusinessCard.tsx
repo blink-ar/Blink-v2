@@ -1,3 +1,5 @@
+import { filterActiveBenefits } from '../utils/benefits';
+import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
@@ -71,15 +73,10 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   };
 
   const getDiscountPercentage = (business: Business): string => {
-    if (business.maxDiscountPercentage && business.maxDiscountPercentage > 0) {
-      return `hasta ${business.maxDiscountPercentage}% OFF`;
-    }
-    const benefits = business.benefits || [];
+    const benefits = filterActiveBenefits(business.benefits || []);
     const discounts = benefits
       .map((benefit) => {
-        const rate = benefit?.rewardRate || '';
-        const match = rate.match(/(\d+)%/);
-        return match ? parseInt(match[1]) : 0;
+        return getBenefitDiscountPercentage(benefit) || 0;
       })
       .filter((discount) => discount > 0);
 

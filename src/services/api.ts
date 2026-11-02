@@ -1,3 +1,4 @@
+import { getPromotionKind } from '../../shared/benefit-presentation.js';
 // Removed mockBusinesses import - using only real MongoDB data
 import { Business, BankBenefit, SearchApiResponse } from "../types";
 import { getCategoryDefaultImage } from '../utils/categoryImages';
@@ -725,7 +726,9 @@ export async function fetchBusinesses(options: {
           rewardRate: discountPct > 0 ? `${discountPct}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
-          tipo: 'descuento',
+          discountPercentage: benefit.discountPercentage ?? null,
+          tipo: getPromotionKind(benefit),
+          otherDiscounts: benefit.otherDiscounts ?? null,
           cuando: formatDays(benefit.availableDays),
           valor: discountPct > 0 ? `${discountPct}%` : undefined,
           installments: benefit.installments || null,
@@ -762,7 +765,9 @@ export async function fetchBusinesses(options: {
           rewardRate: discountPct2 > 0 ? `${discountPct2}%` : (benefit.installments && benefit.installments > 0 ? `${benefit.installments} cuotas s/int` : benefit.benefitTitle),
           color: 'bg-blue-500',
           icon: 'CreditCard',
-          tipo: 'descuento',
+          discountPercentage: benefit.discountPercentage ?? null,
+          tipo: getPromotionKind(benefit),
+          otherDiscounts: benefit.otherDiscounts ?? null,
           cuando: formatDays(benefit.availableDays),
           valor: discountPct2 > 0 ? `${discountPct2}%` : undefined,
           installments: benefit.installments || null,

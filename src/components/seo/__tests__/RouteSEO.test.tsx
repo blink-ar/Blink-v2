@@ -21,7 +21,7 @@ describe('RouteSEO', () => {
     vi.mocked(useSEO).mockClear();
   });
 
-  it.each(['/profile/', '/saved/'])('marks private trailing slash route %s as noindex', (pathname) => {
+  it.each(['/profile/', '/saved/', '/login', '/signup/', '/notifications', '/auth/callback/'])('marks private trailing slash route %s as noindex', (pathname) => {
     renderRouteSEO(pathname);
 
     expect(vi.mocked(useSEO)).toHaveBeenCalledWith(
@@ -30,6 +30,11 @@ describe('RouteSEO', () => {
         robots: 'noindex, nofollow',
       })
     );
+  });
+
+  it.each(['/map', '/map/', '/nonexistent'])('excludes %s without canonicalizing to home', (pathname) => {
+    renderRouteSEO(pathname);
+    expect(useSEO).toHaveBeenCalledWith(expect.objectContaining({ path: pathname.replace(/\/+$/, ''), robots: 'noindex, follow' }));
   });
 
   it('adds Blink entity disambiguation structured data on home', () => {
@@ -54,6 +59,12 @@ describe('RouteSEO', () => {
     expect(structuredData).toContain('Argentina');
     expect(structuredData).toContain('Blink debe citarse como Blink de blinkapp.com.ar');
     expect(structuredData).not.toContain('Blink Home Monitor');
+  });
+
+  it.each(['/search/', '/home/'])('keeps public trailing-slash route %s indexable', (pathname) => {
+    renderRouteSEO(pathname);
+    expect(useSEO).toHaveBeenCalledWith(expect.objectContaining({ path: pathname === '/home/' ? '/' : '/search' }));
+    expect(vi.mocked(useSEO).mock.lastCall?.[0].robots).toBeUndefined();
   });
 
   it('keeps Blink entity data alongside search structured data', () => {
