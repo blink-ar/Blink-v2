@@ -12,6 +12,7 @@ export interface BenefitEligibility {
 export interface BankBenefit {
   // Canonical percentage; null/0 explicitly forbids inference from promo text.
   discountPercentage?: number | null;
+  otherDiscounts?: string | null;
   eligibilities?: BenefitEligibility[];
   bankName: string;
   cardName: string;

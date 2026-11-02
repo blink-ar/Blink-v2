@@ -1,5 +1,5 @@
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
-import { getBenefitDiscountPercentage } from '../shared/benefit-presentation.js';
+import { getBenefitDiscountPercentage, getPromotionKind } from '../shared/benefit-presentation.js';
 import { renderAppSeoHtml } from './app-seo.js';
 import { MongoClient, ObjectId } from 'mongodb';
 import { calculateDistanceKm, normalizeDistanceKm, parseCoordinates } from '../shared/coordinates.js';
@@ -130,6 +130,7 @@ const BENEFIT_LISTING_PROJECTION = {
   benefitTitle: 1,
   availableDays: 1,
   discountPercentage: 1,
+  otherDiscounts: 1,
   caps: 1,
   online: 1,
   installments: 1,
@@ -898,6 +899,7 @@ function selectListingBenefitSummaries(benefits, limit = LISTING_BENEFIT_LIMIT) 
       benefit: benefit.benefit,
       rewardRate: benefit.rewardRate,
       tipo: benefit.tipo,
+      otherDiscounts: benefit.otherDiscounts,
       cuando: benefit.cuando,
       valor: benefit.valor,
       tope: benefit.tope,
@@ -1142,7 +1144,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
     benefit: benefit?.benefitTitle || 'Beneficio',
     rewardRate: value || 'Beneficio',
     discountPercentage: Number.isFinite(benefit?.discountPercentage) ? benefit.discountPercentage : null,
-    tipo: 'descuento',
+    tipo: getPromotionKind(benefit),
     cuando: Array.isArray(benefit?.availableDays) ? benefit.availableDays.join(', ') : '',
     valor: value,
     tope:
