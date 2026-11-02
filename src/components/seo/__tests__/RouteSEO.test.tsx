@@ -61,6 +61,12 @@ describe('RouteSEO', () => {
     expect(structuredData).not.toContain('Blink Home Monitor');
   });
 
+  it.each(['/search/', '/home/'])('keeps public trailing-slash route %s indexable', (pathname) => {
+    renderRouteSEO(pathname);
+    expect(useSEO).toHaveBeenCalledWith(expect.objectContaining({ path: pathname === '/home/' ? '/' : '/search' }));
+    expect(vi.mocked(useSEO).mock.lastCall?.[0].robots).toBeUndefined();
+  });
+
   it('keeps Blink entity data alongside search structured data', () => {
     renderRouteSEO('/search?q=galicia');
 

@@ -188,7 +188,7 @@ describe('SEO routing regression matrix', () => {
     expect(destination(pathname)).toContain('path=__app/');
   });
 
-  it.each(['/home', '/benefit/id', '/benefit/id/'])('preserves SPA route %s', (pathname) => {
+  it.each(['/home', '/benefit/id', '/benefit/id/', '/benefit/merchant_1/benefit-galicia', '/benefit/merchant_1/0', '/benefit/merchant_1/benefit-galicia/'])('preserves SPA route %s', (pathname) => {
     expect(destination(pathname)).toBe('/index.html');
   });
 

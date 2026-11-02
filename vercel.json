@@ -102,7 +102,7 @@
       "dest": "/api/[...path]?path=__app/$1"
     },
     {
-      "src": "/(?:home|benefit/[^/]+)/?",
+      "src": "/(?:home|benefit/[^/]+(?:/[^/]+)?)/?",
       "dest": "/index.html"
     },
     {

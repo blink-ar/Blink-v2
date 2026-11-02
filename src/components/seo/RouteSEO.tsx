@@ -274,7 +274,7 @@ function RouteSEO() {
 
   let seoConfig: SEOConfig;
 
-  if (location.pathname === '/' || location.pathname === '/home') {
+  if (normalizedPathname === '/' || normalizedPathname === '/home') {
     seoConfig = {
       title: `Descuentos bancarios en Argentina | ${SITE_NAME}`,
       description: baseDescription,
@@ -287,7 +287,7 @@ function RouteSEO() {
       ],
       structuredData: buildCoreEntityStructuredData(),
     };
-  } else if (location.pathname === '/search') {
+  } else if (normalizedPathname === '/search') {
     const hasSearchTerm = searchTerm.length > 0;
     const title = hasSearchTerm
       ? `${searchTerm} - descuentos y beneficios bancarios | ${SITE_NAME}`
@@ -302,7 +302,7 @@ function RouteSEO() {
       description,
       path: '/search',
       keywords: selectedCategory ? [`descuentos ${selectedCategory}`, 'promociones bancarias'] : undefined,
-      structuredData: buildCoreEntityStructuredData(location.pathname + location.search).map((item) => (
+      structuredData: buildCoreEntityStructuredData(normalizedPathname + location.search).map((item) => (
         item['@type'] === 'SearchResultsPage'
           ? { ...item, name: title }
           : item

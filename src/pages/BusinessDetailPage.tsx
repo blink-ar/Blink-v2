@@ -157,7 +157,7 @@ function BusinessDetailPage() {
     () => readMerchantBootstrap(routeMerchantId),
     [routeMerchantId],
   );
-  const initialBusiness = bootstrapBusiness || routePassedBusiness;
+  const initialBusiness = routePassedBusiness || bootstrapBusiness;
   const [business, setBusiness] = useState<Business | null>(initialBusiness || null);
   const [loading, setLoading] = useState(!initialBusiness);
   const [error, setError] = useState<string | null>(null);
@@ -298,7 +298,8 @@ function BusinessDetailPage() {
 
   useEffect(() => {
     // Paint SSR immediately, but always revalidate: CDN HTML can outlive a benefit.
-    const fallbackBusiness = bootstrapBusiness || routePassedBusiness;
+    // Canonical navigation carries fresh API data; never replace it with old SSR.
+    const fallbackBusiness = routePassedBusiness || bootstrapBusiness;
     if (fallbackBusiness) {
       setBusiness(fallbackBusiness);
       setError(null);

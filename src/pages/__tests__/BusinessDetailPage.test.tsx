@@ -218,6 +218,33 @@ describe('BusinessDetailPage', () => {
     expect(routerMocks.mockNavigate).not.toHaveBeenCalled();
   });
 
+  it('keeps fresh API data when a merchant rename navigates to its new canonical slug', async () => {
+    const refreshed = { ...mockBusiness, name: 'Mostaza Nuevo' };
+    const oldPath = '/comercios/mostaza--' + mockBusiness.id;
+    const newPath = '/comercios/mostaza-nuevo--' + mockBusiness.id;
+    routerMocks.mockUseParams.mockReturnValue({ slugId: 'mostaza--' + mockBusiness.id });
+    routerMocks.mockUseLocation.mockReturnValue({ state: null, pathname: oldPath });
+    const bootstrap = document.createElement('script');
+    bootstrap.id = 'blink-merchant-bootstrap';
+    bootstrap.type = 'application/json';
+    bootstrap.textContent = JSON.stringify({ merchantId: mockBusiness.id, business: mockBusiness });
+    document.head.appendChild(bootstrap);
+    vi.mocked(fetchBusinessById).mockResolvedValue(refreshed);
+    const view = render(<BusinessDetailPage />);
+    expect(await screen.findByText('Mostaza Nuevo')).toBeInTheDocument();
+    await waitFor(() => expect(routerMocks.mockNavigate).toHaveBeenCalledWith(newPath, { replace: true, state: { business: refreshed } }));
+    routerMocks.mockNavigate.mockClear();
+    routerMocks.mockUseParams.mockReturnValue({ slugId: 'mostaza-nuevo--' + mockBusiness.id });
+    routerMocks.mockUseLocation.mockReturnValue({ state: { business: refreshed }, pathname: newPath });
+    // Hold the second request: a slow refresh must not restore old bootstrap/name.
+    vi.mocked(fetchBusinessById).mockReturnValue(new Promise(() => {}));
+    view.rerender(<BusinessDetailPage />);
+    await act(async () => {});
+    expect(screen.getByText('Mostaza Nuevo')).toBeInTheDocument();
+    expect(screen.queryByText('Mostaza')).not.toBeInTheDocument();
+    expect(routerMocks.mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('ignores server-rendered data for a different merchant', async () => {
     const bootstrap = document.createElement('script');
     bootstrap.id = 'blink-merchant-bootstrap';
