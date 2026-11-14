@@ -1,3 +1,4 @@
+import { handleDni34Directory } from './dni34-directory.js';
 import { observeBranchScopeShadow } from './branch-scope-shadow.js';
 import { quarantineReadDb, quarantineEnabled, isQuarantinedBenefit } from './benefit-quarantine.js';
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
@@ -3598,6 +3599,7 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (path === '/api/cuenta-dni/fuente-34' || path === '/api/cuenta-dni/fuente-34/page') return await handleDni34Directory(req, res, url, {format:path.endsWith('/page')?'html':'json'});
     if (isReadMethod(req) && path === '/api/__not_found') {
       return handleStaticNotFound(req, res, url);
     }
