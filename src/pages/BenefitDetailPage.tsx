@@ -1,6 +1,7 @@
+import { quarantineBusiness } from '../utils/benefitQuarantine';
 import { isBenefitActive as isActiveBenefit } from '../utils/benefits';
 import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Business, BankBenefit } from '../types';
@@ -169,7 +170,8 @@ function BenefitDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDesktop } = useResponsive();
-  const passedBusiness = (location.state as { business?: Business } | null)?.business;
+  const rawPassedBusiness = (location.state as { business?: Business } | null)?.business;
+  const passedBusiness = useMemo(() => rawPassedBusiness ? quarantineBusiness(rawPassedBusiness) : undefined, [rawPassedBusiness]);
   const [business, setBusiness] = useState<Business | null>(passedBusiness || null);
   const [benefit, setBenefit] = useState<BankBenefit | null>(null);
   const [loading, setLoading] = useState(!passedBusiness);

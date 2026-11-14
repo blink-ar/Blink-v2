@@ -1,3 +1,4 @@
+import { isQuarantinedBenefit } from './benefitQuarantine';
 import { getArgentinaDateOnly } from '../../shared/benefit-dates.js';
 import { BankBenefit, Business } from '../types';
 
@@ -10,6 +11,7 @@ export const formatLocalDateOnly = (date: Date): string => [
 ].join('-');
 
 export const isBenefitActive = (benefit: Pick<BankBenefit, 'validUntil'>, now = new Date()): boolean => {
+  if(isQuarantinedBenefit(benefit)) return false;
   const validUntil = benefit.validUntil?.trim();
   if (!validUntil) return true;
 

@@ -98,6 +98,7 @@ function getMerchantDisplayBankNames(merchant) {
 }
 
 function getMerchantBanks(merchant) {
+  if(merchant?.summaryUnavailable) return 'Consultar beneficios verificados';
   const banks = getMerchantDisplayBankNames(merchant);
   if (banks.length === 0 && Array.isArray(merchant?.banks)) {
     banks.push(...merchant.banks);
@@ -119,6 +120,7 @@ function getMerchantLocation(merchant) {
 }
 
 function getMerchantDiscountText(merchant) {
+  if(merchant?.summaryUnavailable) return 'Resumen temporalmente no disponible';
   const discount = Number(merchant?.maxDiscountPercentage || 0);
   if (Number.isFinite(discount) && discount > 0) {
     return `hasta ${discount}% OFF`;
@@ -307,7 +309,7 @@ function buildBodyHtml({ bank, category, city, merchants, resultCount, descripti
     `    <a class="blink-landing-search" href="/search?bank=${escapeHtml(encodeURIComponent(bank.slug))}&category=${escapeHtml(encodeURIComponent(category.slug))}">Ver en buscador</a>`,
     '  </section>',
     '  <section class="blink-landing-section">',
-    `    <h2>${escapeHtml(resultCount.toLocaleString('es-AR'))} comercios encontrados</h2>`,
+    `    <h2>${resultCount===null?'Cantidad temporalmente no disponible':escapeHtml(resultCount.toLocaleString('es-AR'))+' comercios encontrados'}</h2>`,
     renderMerchantLinks(merchants),
     renderRelatedLinks(relatedLinks),
     '  </section>',

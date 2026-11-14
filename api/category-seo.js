@@ -77,6 +77,7 @@ function injectBody(shell, bodyHtml) {
 }
 
 function getMerchantBanks(merchant) {
+  if(merchant?.summaryUnavailable) return 'Consultar beneficios verificados';
   const banks = Array.isArray(merchant?.banks) ? merchant.banks : [];
   return banks.filter(Boolean).slice(0, 4).join(', ') || 'bancos participantes';
 }
@@ -94,6 +95,7 @@ function getMerchantLocation(merchant) {
 }
 
 function getMerchantDiscountText(merchant) {
+  if(merchant?.summaryUnavailable) return 'Resumen temporalmente no disponible';
   const discount = Number(merchant?.maxDiscountPercentage || 0);
   if (Number.isFinite(discount) && discount > 0) {
     return `hasta ${discount}% OFF`;
@@ -190,7 +192,7 @@ function renderMerchantLinks(merchants) {
   ].join('\n');
 }
 
-function renderPagination({ category, page, totalPages }) {
+function renderPagination({ category, page, totalPages, totalKnown=true }) {
   if (totalPages <= 1) return '';
 
   const previousPage = page > 1
@@ -203,7 +205,7 @@ function renderPagination({ category, page, totalPages }) {
   return [
     '<nav class="blink-category-pagination" aria-label="Paginacion de comercios">',
     previousPage,
-    `<span>Pagina ${page} de ${totalPages}</span>`,
+    `<span>Pagina ${page}${totalKnown ? ` de ${totalPages}` : ''}</span>`,
     nextPage,
     '</nav>',
   ].join('\n');
@@ -222,9 +224,9 @@ function buildBodyHtml({ category, merchants, total, page, totalPages }) {
     `    <a class="blink-category-search" href="${escapeHtml(searchPath)}">Ver ${escapeHtml(category.label.toLowerCase())} con filtros</a>`,
     '  </section>',
     '  <section class="blink-category-section">',
-    `    <h2>${escapeHtml(total.toLocaleString('es-AR'))} comercios encontrados</h2>`,
+    `    <h2>${total===null?'Cantidad temporalmente no disponible':escapeHtml(total.toLocaleString('es-AR'))+' comercios encontrados'}</h2>`,
     renderMerchantLinks(merchants),
-    renderPagination({ category, page, totalPages }),
+    renderPagination({ category, page, totalPages, totalKnown:total!==null }),
     '  </section>',
     '</main>',
   ].join('\n');
@@ -269,11 +271,12 @@ export function renderCategorySeoHtml({
   category,
   merchants,
   total,
+  navigationTotal = total,
   page,
   path,
   siteUrl,
 }) {
-  const totalPages = Math.max(1, Math.ceil(total / CATEGORY_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(navigationTotal / CATEGORY_PAGE_SIZE));
   const absoluteUrl = toAbsoluteUrl(siteUrl, path);
   const title = page > 1
     ? `Comercios de ${category.label} con descuentos - pagina ${page} | ${DEFAULT_SITE_NAME}`
