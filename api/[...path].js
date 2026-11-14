@@ -1,3 +1,4 @@
+import { observeBranchScopeShadow } from './branch-scope-shadow.js';
 import { quarantineReadDb, quarantineEnabled, isQuarantinedBenefit } from './benefit-quarantine.js';
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
 import { getBenefitDiscountPercentage, getPromotionKind } from '../shared/benefit-presentation.js';
@@ -1862,6 +1863,7 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
   const benefitsByMerchant = groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, merchantIds);
   const hasBenefitFilter = quarantineEnabled() || bankPatterns.length > 0 || searchParams.get('online') === 'true';
 
+  await observeBranchScopeShadow(db, merchants);
   return merchants.map((merchant) => {
     if (!merchant?.merchantId) {
       return merchant;
@@ -3168,6 +3170,7 @@ async function handleGetBusinesses(req, res, url, db) {
     (bankPatterns && bankPatterns.length > 0) || subscription || onlineOnly
   );
 
+  await observeBranchScopeShadow(db, pagedMerchants, {lat:userLat,lng:userLng});
   const businesses = pagedMerchants
     .map((merchant) => {
       const locations = dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []);
@@ -3282,6 +3285,7 @@ async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
     rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup))
   );
   const locations = dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []);
+  await observeBranchScopeShadow(db, [merchant]);
   const bootstrapBusiness = {
     id: merchant.merchantId,
     name: merchant.merchantName,
