@@ -1,0 +1,21 @@
+{
+  "_id": "c095f0ef74769cd0d2b92956ed1effd0ac822d2ceda34182c55c89b9aad89642",
+  "schemaVersion": 1,
+  "provider": "banco-provincia",
+  "sourceId": "34",
+  "providerBranchId": "fixture-branch",
+  "benefitId": "cuentadni-benefit-1069-fixture",
+  "promotionId": "1069",
+  "bindingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "merchantId": "fixture-merchant",
+  "locationId": "fixture-location",
+  "evidence": {
+    "descriptorSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rawSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "receiptSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mappingSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "revision": 1,
+  "status": "quarantined",
+  "updatedByOperation": "op1"
+}

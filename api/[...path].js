@@ -1,3 +1,6 @@
+import { handleDni34Directory } from './dni34-directory.js';
+import { observeBranchScopeShadow } from './branch-scope-shadow.js';
+import { quarantineReadDb, quarantineEnabled, isQuarantinedBenefit } from './benefit-quarantine.js';
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
 import { getBenefitDiscountPercentage, getPromotionKind } from '../shared/benefit-presentation.js';
 import { renderAppSeoHtml } from './app-seo.js';
@@ -386,10 +389,20 @@ async function handleUpdateUserBanks(req, res) {
   return json(res, 200, { success: true, savedBankCodes: normalized.savedBankCodes });
 }
 
+function sanitizeQuarantinePayload(value) {
+  if (!quarantineEnabled() || value === null || typeof value !== 'object') return value;
+  if (isQuarantinedBenefit(value) && !value.error) return undefined;
+  if (Array.isArray(value)) return value.map(sanitizeQuarantinePayload).filter(v=>v!==undefined);
+  const prototype=Object.getPrototypeOf(value);
+  if (prototype!==Object.prototype && prototype!==null) return value;
+  const result=Object.fromEntries(Object.entries(value).map(([k,v])=>[k,sanitizeQuarantinePayload(v)]));
+  if (result.pagination && (Array.isArray(result.businesses)||Array.isArray(result.merchants))) result.pagination={...result.pagination,total:null,totalMerchants:null,totalKnown:false};
+  return result;
+}
 function json(res, statusCode, payload) {
   res.status(statusCode);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.send(JSON.stringify(payload));
+  res.send(JSON.stringify(sanitizeQuarantinePayload(payload)));
 }
 
 function redirect(res, statusCode, location) {
@@ -423,7 +436,7 @@ const CC_SEO_PAGE = 's-maxage=86400, stale-while-revalidate=604800, max-age=600'
 const CC_LOCATION = 'private, max-age=60';                                          // browser-only, 1m
 
 function setCacheControl(res, directive) {
-  res.setHeader('Cache-Control', directive);
+  res.setHeader('Cache-Control', quarantineEnabled() ? 'private, no-store, max-age=0' : directive);
 }
 
 function getCanonicalSiteUrl(url) {
@@ -1849,8 +1862,9 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
     .toArray();
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefitsByMerchant = groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, merchantIds);
-  const hasBenefitFilter = bankPatterns.length > 0 || searchParams.get('online') === 'true';
+  const hasBenefitFilter = quarantineEnabled() || bankPatterns.length > 0 || searchParams.get('online') === 'true';
 
+  await observeBranchScopeShadow(db, merchants);
   return merchants.map((merchant) => {
     if (!merchant?.merchantId) {
       return merchant;
@@ -1863,9 +1877,12 @@ async function hydrateSearchMerchantsWithBenefits(db, collectionName, merchants,
 
     return {
       ...merchant,
+      ...(quarantineEnabled()?{benefitCount:benefits.length,maxDiscountPercentage:getMaxBenefitSummaryDiscount(benefits),banks:getBenefitSummaryProviderNames(benefits)}:{}),
       business: {
         ...(merchant.business || {}),
+        ...(quarantineEnabled()?{description:''}:{}),
         benefits: responseView === 'full' ? benefits : selectListingBenefitSummaries(benefits),
+        ...(quarantineEnabled()?{quarantineSummaryVersion:1}:{}),
         location: responseView === 'full' ? locations : compactBusinessLocations(locations),
         benefitCount: hasBenefitFilter ? benefits.length : (merchant.benefitCount || benefits.length),
         locationCount: merchant.locationCount || locations.length,
@@ -2248,7 +2265,7 @@ async function getDb() {
     globalState.__blinkMongo.dbPromise = globalState.__blinkMongo.clientPromise.then((client) => client.db(DATABASE_NAME));
   }
 
-  return globalState.__blinkMongo.dbPromise;
+  return quarantineReadDb(await globalState.__blinkMongo.dbPromise);
 }
 
 async function getWritableDb() {
@@ -2660,6 +2677,7 @@ async function handleGetStats(req, res, url, db) {
 }
 
 async function loadCoreSeoSummary(db) {
+  if (quarantineEnabled()) return {...FALLBACK_CORE_SEO_SUMMARY, totalBenefits:null,merchantCount:null,activeMerchantCount:null,topCategories:[],topBanks:[],summaryUnavailable:true};
   if (!db) {
     return FALLBACK_CORE_SEO_SUMMARY;
   }
@@ -3149,10 +3167,11 @@ async function handleGetBusinesses(req, res, url, db) {
     : [];
   const cardNameLookup = await resolveCardNameLookup(db, rawBenefits);
   const benefitsByMerchant = groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, merchantIds);
-  const hasBenefitFilter = Boolean(
+  const hasBenefitFilter = quarantineEnabled() || Boolean(
     (bankPatterns && bankPatterns.length > 0) || subscription || onlineOnly
   );
 
+  await observeBranchScopeShadow(db, pagedMerchants, {lat:userLat,lng:userLng});
   const businesses = pagedMerchants
     .map((merchant) => {
       const locations = dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []);
@@ -3164,7 +3183,7 @@ async function handleGetBusinesses(req, res, url, db) {
         category: Array.isArray(merchant.categories) && merchant.categories.length > 0
           ? merchant.categories[0]
           : 'otros',
-        description: merchant.searchProfile?.description || '',
+        description: quarantineEnabled() ? '' : (merchant.searchProfile?.description || ''),
         rating: 5,
         locations: responseView === 'full' ? locations : compactBusinessLocations(locations),
         locationCount: Number(merchant.locationCount ?? locations.length),
@@ -3172,6 +3191,7 @@ async function handleGetBusinesses(req, res, url, db) {
         logo: merchant.logoUrl || null,
         coverImage: merchant.coverUrl || null,
         benefits: responseView === 'full' ? benefits : selectListingBenefitSummaries(benefits),
+        ...(quarantineEnabled()?{quarantineSummaryVersion:1}:{}),
         benefitCount: hasBenefitFilter
           ? benefits.length
           : (includeExpired ? Number(merchant.benefitCount || benefits.length) : Number(merchant.activeBenefitCount || benefits.length)),
@@ -3184,7 +3204,7 @@ async function handleGetBusinesses(req, res, url, db) {
         distance: merchant.distance ?? null,
         distanceText: merchant.distanceText ?? null,
         isNearby: Boolean(merchant.isNearby),
-        hasOnline: Boolean(merchant.hasOnlineBenefits)
+        hasOnline: quarantineEnabled() ? benefits.some(b => b.online === true) : Boolean(merchant.hasOnlineBenefits)
       };
     })
     .filter((merchant) => merchant.benefits.length > 0);
@@ -3266,31 +3286,33 @@ async function handleMerchantSeoPage(req, res, url, db, slugId, options = {}) {
     rawBenefits.map((benefit) => buildBusinessBenefitSummary(benefit, cardNameLookup))
   );
   const locations = dedupeLocations(Array.isArray(merchant.locations) ? merchant.locations : []);
+  await observeBranchScopeShadow(db, [merchant]);
   const bootstrapBusiness = {
     id: merchant.merchantId,
     name: merchant.merchantName,
     category: Array.isArray(merchant.categories) && merchant.categories.length > 0
       ? merchant.categories[0]
       : 'otros',
-    description: merchant.searchProfile?.description || '',
+    description: quarantineEnabled() ? '' : (merchant.searchProfile?.description || ''),
     rating: 5,
     location: locations,
     image: pickBusinessImage(merchant),
     benefits,
-    benefitCount: Number(merchant.benefitCount || benefits.length),
+    ...(quarantineEnabled()?{quarantineSummaryVersion:1}:{}),
+    benefitCount: quarantineEnabled() ? benefits.length : Number(merchant.benefitCount || benefits.length),
     locationCount: locations.length,
-    banks: Array.isArray(merchant.banks) && merchant.banks.length > 0
+    banks: !quarantineEnabled() && Array.isArray(merchant.banks) && merchant.banks.length > 0
       ? merchant.banks
       : getBenefitSummaryProviderNames(benefits),
-    maxDiscountPercentage: Number(
+    maxDiscountPercentage: quarantineEnabled() ? getMaxBenefitSummaryDiscount(benefits) : Number(
       merchant.maxDiscountPercentage || getMaxBenefitSummaryDiscount(benefits)
     ),
-    hasOnline: Boolean(merchant.hasOnlineBenefits)
+    hasOnline: quarantineEnabled() ? benefits.some(b => b.online === true) : Boolean(merchant.hasOnlineBenefits)
   };
   const appShell = options.appShell || readViteAppShell();
   const renderedHtml = renderMerchantSeoHtml({
     appShell,
-    merchant,
+    merchant: quarantineEnabled() ? {...merchant, benefitCount: benefits.length, activeBenefitCount: benefits.length, maxDiscountPercentage: getMaxBenefitSummaryDiscount(benefits), banks: getBenefitSummaryProviderNames(benefits), searchProfile: {...merchant.searchProfile,description: ''}} : merchant,
     benefits,
     bootstrapBusiness,
     path: canonicalPath,
@@ -3380,8 +3402,9 @@ async function handleCategorySeoPage(req, res, url, db, categoryParam, pageParam
   const renderedHtml = renderCategorySeoHtml({
     appShell,
     category,
-    merchants: data.merchants,
-    total: data.total,
+    merchants: quarantineEnabled() ? data.merchants.map(m=>({...m,summaryUnavailable:true,benefitCount:null,activeBenefitCount:null,maxDiscountPercentage:null,banks:[],hasOnlineBenefits:null,searchProfile:{...m.searchProfile,description:''}})) : data.merchants,
+    total: quarantineEnabled() ? null : data.total,
+    navigationTotal: data.total,
     page: data.page,
     path: canonicalPath,
     siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
@@ -3456,8 +3479,8 @@ async function handleLandingSeoPage(req, res, url, db, bankParam, categoryParam,
     bank,
     category,
     city,
-    merchants: data.merchants,
-    resultCount: data.resultCount,
+    merchants: quarantineEnabled() ? data.merchants.map(m=>({...m,summaryUnavailable:true,benefitCount:null,activeBenefitCount:null,maxDiscountPercentage:null,banks:[],hasOnlineBenefits:null,searchProfile:{...m.searchProfile,description:''}})) : data.merchants,
+    resultCount: quarantineEnabled() ? null : data.resultCount,
     path: canonicalPath,
     siteUrl: options.siteUrl || getCanonicalSiteUrl(url)
   });
@@ -3498,12 +3521,14 @@ function handleStaticNotFound(req, res, url) {
 }
 
 export {
+  sanitizeQuarantinePayload,
   applyLocalDistanceGuardrail,
   buildBusinessBenefitSummary,
   getActiveBenefitsMatch,
   resolveRequestPath,
   handleGetBenefitById,
   handleGetBenefits,
+  handleGetNearbyBenefits,
   handleGetBanks,
   handleGetStats,
   handleGetBusinesses,
@@ -3574,6 +3599,7 @@ export default async function handler(req, res) {
   const path = resolveRequestPath(url);
 
   try {
+    if (path === '/api/cuenta-dni/fuente-34' || path === '/api/cuenta-dni/fuente-34/page') return await handleDni34Directory(req, res, url, {format:path.endsWith('/page')?'html':'json'});
     if (isReadMethod(req) && path === '/api/__not_found') {
       return handleStaticNotFound(req, res, url);
     }

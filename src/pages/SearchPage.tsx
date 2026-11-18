@@ -558,7 +558,7 @@ function SearchPage() {
 
   const resultsStatusLabel = showPrimarySearchError
     ? 'No disponible'
-    : shouldShowResultsLoader ? 'Buscando...' : `${totalBusinesses} resultados`;
+    : shouldShowResultsLoader ? 'Buscando...' : totalBusinesses === null ? 'Resultados disponibles' : `${totalBusinesses} resultados`;
 
   // Label for the relatives section
   const relativesLabel = (() => {

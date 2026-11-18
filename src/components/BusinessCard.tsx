@@ -1,3 +1,4 @@
+import { quarantineBusiness, benefitCountLabel } from '../utils/benefitQuarantine';
 import { filterActiveBenefits } from '../utils/benefits';
 import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import React from "react";
@@ -22,11 +23,12 @@ interface BusinessCardProps {
 }
 
 const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
-  business,
+  business: inputBusiness,
   onClick,
   className = "",
   style,
 }) => {
+  const business=quarantineBusiness(inputBusiness);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -95,7 +97,8 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   };
 
   const getBenefitCount = (business: Business): string => {
-    const count = business.benefitCount || (business.benefits || []).length;
+    if(business.benefitCount===null)return benefitCountLabel(null,0);
+    const count = business.benefitCount ?? (business.benefits || []).length;
     return `+${count}`;
   };
 

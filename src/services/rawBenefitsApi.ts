@@ -1,3 +1,4 @@
+import { isQuarantinedBenefit } from '../utils/benefitQuarantine';
 /**
  * Raw Benefits API Service
  *
@@ -64,7 +65,7 @@ export async function getRawBenefitById(id: string): Promise<RawMongoBenefit | n
       rawBenefit = data.benefit;
     }
 
-    return rawBenefit || null;
+    return rawBenefit && !isQuarantinedBenefit(rawBenefit) ? rawBenefit : null;
   } catch {
     return null;
   }
