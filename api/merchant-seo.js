@@ -1,5 +1,6 @@
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
 import { getPromotionKind, getBenefitPercentage as extractDiscountPercentage } from '../shared/benefit-presentation.js';
+import { getInactiveMerchantDescription, getMerchantSeoAlternative } from '../shared/merchant-seo-alternative.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -192,6 +193,7 @@ function formatBenefitValue(benefit) {
 
 function buildMerchantDescription(merchant, benefits) {
   const name = getMerchantName(merchant);
+  if (benefits.length === 0) return getInactiveMerchantDescription(name);
   const category = getPrimaryCategory(merchant);
   const city = getPrimaryCity(merchant);
   const banks = uniqueDisplayStrings([
@@ -393,6 +395,7 @@ function renderFaq(faqItems) {
 function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, faqItems }) {
   const name = getMerchantName(merchant);
   const category = getPrimaryCategory(merchant);
+  const alternative = getMerchantSeoAlternative(category);
   const city = getPrimaryCity(merchant) || 'Argentina';
   const banks = formatList(
     uniqueDisplayStrings([
@@ -402,7 +405,7 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     ]).slice(0, 5),
     'bancos participantes'
   );
-  const maxDiscount = getMaxDiscountPercentage(merchant, activeBenefits);
+  const maxDiscount = activeBenefits.length > 0 ? getMaxDiscountPercentage(merchant, activeBenefits) : null;
   const maxDiscountText = maxDiscount ? `${maxDiscount}% OFF` : 'Promociones bancarias';
 
   return [
@@ -422,6 +425,9 @@ function buildBodyHtml({ merchant, activeBenefits, pastBenefits, description, fa
     '  <section class="blink-seo-section">',
     '    <h2>Beneficios activos</h2>',
     renderBenefitList(activeBenefits, 'No hay descuentos activos ahora.'),
+    activeBenefits.length === 0
+      ? `    <p><a href="${escapeHtml(alternative.href)}">${escapeHtml(alternative.label)}</a></p>`
+      : '',
     '  </section>',
     '  <section class="blink-seo-section">',
     '    <h2>Beneficios anteriores</h2>',

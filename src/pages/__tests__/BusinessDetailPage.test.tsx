@@ -4,6 +4,7 @@ import BusinessDetailPage from '../BusinessDetailPage';
 import { Business } from '../../types';
 import { fetchBusinessById } from '../../services/api';
 import { useSEO } from '../../hooks/useSEO';
+import { MemoryRouter } from 'react-router-dom';
 
 const TEST_SYSTEM_TIME = new Date('2026-05-15T12:00:00.000Z');
 const EXPIRED_VALID_UNTIL = '2020-01-01';
@@ -292,9 +293,13 @@ describe('BusinessDetailPage', () => {
       pathname: '/comercios/mostaza--merchant_69a6f741b7ff0ecb9e33cf58'
     });
 
-    render(<BusinessDetailPage />);
+    render(<MemoryRouter><BusinessDetailPage /></MemoryRouter>);
 
     expect(await screen.findByText('No hay descuentos activos ahora')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Ver descuentos en gastronom[ií]a$/ })).toHaveAttribute(
+      'href', '/categorias/gastronomia',
+    );
+    expect(vi.mocked(useSEO).mock.lastCall?.[0].description).toContain('Mostaza no tiene descuentos activos');
     expect(screen.getByText('Beneficios anteriores')).toBeInTheDocument();
     expect(screen.getByText(`Venció: ${EXPIRED_VALID_UNTIL}`)).toBeInTheDocument();
   });

@@ -101,10 +101,27 @@ describe('merchant SEO renderer', () => {
     });
 
     expect(html).toContain('<title>Comercio descuentos y promociones | Blink</title>');
-    expect(html).toContain('en Argentina');
-    expect(html).toContain('en comercios');
-    expect(html).toContain('bancos seleccionados');
-    expect(html).toContain('promociones bancarias');
+    expect(html).toContain('Comercio no tiene descuentos activos publicados en Blink.');
+    expect(html).toContain('<a href="/search">Buscar otros descuentos</a>');
+  });
+
+  it('links an inactive merchant to its canonical category without claiming a stale deal', () => {
+    const html = renderMerchantSeoHtml({
+      appShell,
+      siteUrl: 'https://www.blinkapp.com.ar',
+      merchant: {
+        merchantId: 'merchant_vea',
+        merchantName: 'Vea',
+        categories: ['supermercado'],
+        maxDiscountPercentage: 55,
+      },
+      now: new Date('2026-11-25T12:00:00Z'),
+      benefits: [{ benefit: '20% OFF', validUntil: '2026-11-24' }],
+    });
+    expect(html).toContain('Vea no tiene descuentos activos publicados en Blink.');
+    expect(html).toContain('<a href="/categorias/supermercados">Ver descuentos en supermercados</a>');
+    expect(html).toContain('Beneficios anteriores');
+    expect(html).not.toContain('55% OFF');
   });
 
   it('embeds an escaped business payload for client hydration', () => {
