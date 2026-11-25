@@ -1,6 +1,7 @@
 import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { getInactiveMerchantDescription, getMerchantSeoAlternative } from '../../shared/merchant-seo-alternative.js';
 import { Business, BankBenefit } from '../types';
 import { fetchBusinessById, normalizeBusinesses } from '../services/api';
 import { trackSelectBusiness, trackStartNavigation, trackViewBenefit } from '../analytics/intentTracking';
@@ -167,6 +168,7 @@ function BusinessDetailPage() {
   const isScrollingRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const businessCategory = business?.category?.toLowerCase() || 'comercios';
+  const merchantSeoAlternative = getMerchantSeoAlternative(businessCategory);
   const routePath = slugId && parsedSeoParam
     ? `/comercios/${slugId}`
     : routeMerchantId
@@ -276,7 +278,7 @@ function BusinessDetailPage() {
     description: business
       ? activeBenefitCount > 0
         ? `${activeBenefitCount} beneficios activos en ${business.name} para ${businessCategory} en Argentina.`
-        : `Consulta beneficios anteriores de ${business.name} para ${businessCategory} en Argentina.`
+        : getInactiveMerchantDescription(business.name)
       : 'Consulta descuentos, topes y condiciones por comercio en Blink.',
     path: canonicalBusinessPath,
     type: 'article',
@@ -881,15 +883,20 @@ function BusinessDetailPage() {
           </div>
         )}
 
-        {viewMode !== 'sucursal' && activeBenefitCount === 0 && pastBenefitCount > 0 && (
+        {viewMode !== 'sucursal' && activeBenefitCount === 0 && (
           <section
             className="mx-4 mt-3 bg-white rounded-2xl p-4"
             style={{ border: '1px solid #E8E6E1', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
           >
             <p className="text-sm font-semibold text-blink-ink">No hay descuentos activos ahora</p>
-            <p className="text-xs text-blink-muted mt-1">
-              Igual puedes revisar promociones anteriores de {business.name}.
-            </p>
+            {pastBenefitCount > 0 && (
+              <p className="text-xs text-blink-muted mt-1">
+                También podés revisar promociones anteriores de {business.name}.
+              </p>
+            )}
+            <Link to={merchantSeoAlternative.href} className="mt-2 inline-block text-sm font-semibold text-primary">
+              {merchantSeoAlternative.label}
+            </Link>
           </section>
         )}
 
