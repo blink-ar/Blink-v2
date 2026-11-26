@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { quarantineBusiness, filterQuarantinedBenefits } from '../utils/benefitQuarantine';
 import { Business } from '../types';
 import { RawMongoBenefit } from '../types/mongodb';
 import { fetchBusinessesPaginated, BusinessesApiResponse } from '../services/api';
@@ -28,7 +29,7 @@ interface UseBenefitsDataReturn {
     hasMore: boolean;
     loadMore: () => void;
     refreshData: () => Promise<void>;
-    totalBusinesses: number;
+    totalBusinesses: number | null;
     /** True when the user wants proximity sort but geolocation is unavailable/denied */
     proximityUnavailable: boolean;
 }
@@ -159,7 +160,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     // Flatten all pages into a single array of businesses and deduplicate by ID
     const businesses = useMemo(() => {
-        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const allBusinesses = data?.pages.flatMap(page => page.businesses.map(quarantineBusiness)) ?? [];
         const seenIds = new Set();
         return allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
@@ -170,7 +171,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
         });
     }, [data?.pages]);
 
-    const totalBusinesses = data?.pages[0]?.pagination.total ?? 0;
+    const totalBusinesses = data?.pages[0]?.pagination.total ?? null;
 
     const isPrimarySearchLoading = (!merchantId && positionLoading) || isLoadingBusinesses;
     const isLoading = isPrimarySearchLoading || isLoadingFeatured;
@@ -199,7 +200,7 @@ export function useBenefitsData(filters?: BenefitsFilters): UseBenefitsDataRetur
 
     return {
         businesses,
-        featuredBenefits,
+        featuredBenefits: filterQuarantinedBenefits(featuredBenefits),
         isLoading,
         isPrimarySearchLoading,
         isLoadingMore,
@@ -249,7 +250,7 @@ export function useBusinessesData() {
     });
 
     const businesses = useMemo(() => {
-        const allBusinesses = data?.pages.flatMap(page => page.businesses) ?? [];
+        const allBusinesses = data?.pages.flatMap(page => page.businesses.map(quarantineBusiness)) ?? [];
         const seenIds = new Set();
         return allBusinesses.filter(business => {
             if (seenIds.has(business.id)) {
@@ -288,7 +289,7 @@ export function useFeaturedBenefits() {
     });
 
     return {
-        featuredBenefits,
+        featuredBenefits: filterQuarantinedBenefits(featuredBenefits),
         isLoading,
         error: error ? (error as Error).message : null,
     };

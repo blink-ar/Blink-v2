@@ -1,3 +1,4 @@
+import { quarantineBusiness, benefitCountLabel } from '../utils/benefitQuarantine';
 import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import { Link } from 'react-router-dom';
 import { Business } from '../types';
@@ -68,14 +69,16 @@ const getBusinessBankBadges = (business: Business) => {
 };
 
 function BusinessResultCard({
-  business,
-  badgeSource,
+  business: inputBusiness,
+  badgeSource: inputBadgeSource,
   to,
   onClick,
   className = '',
   showDistance = true,
   variant = 'list',
 }: BusinessResultCardProps) {
+  const business=quarantineBusiness(inputBusiness);
+  const badgeSource=inputBadgeSource ? quarantineBusiness(inputBadgeSource) : undefined;
   const distanceText = formatDistance(business.distance);
   const bankBadges = getBusinessBankBadges(badgeSource ?? business);
   const visibleBadges = bankBadges.slice(0, 3);
@@ -84,7 +87,7 @@ function BusinessResultCard({
   const maxInstallments = getBusinessMaxInstallments(business);
   const categoryStyle = getCategoryStyle(business.category);
   const imageSrc = getOptimizedImageUrl(business.image, { width: 96 });
-  const benefitCount = business.benefitCount || business.benefits.length;
+  const benefitCount = benefitCountLabel(business.benefitCount,business.benefits.length);
   const baseClassName = `w-full bg-white rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-soft-md overflow-hidden text-left ${
     variant === 'card' ? 'flex flex-col' : variant === 'desktop-card' ? 'flex lg:flex-col' : 'flex'
   } ${className}`;
@@ -145,7 +148,7 @@ function BusinessResultCard({
           )}
         </div>
         <span className="block text-[10px] text-blink-muted mt-[7px]">
-          {benefitCount} {benefitCount !== 1 ? 'beneficios' : 'beneficio'}
+          {benefitCount}
         </span>
       </div>
 
@@ -219,7 +222,7 @@ function BusinessResultCard({
             )}
           </h2>
           <p className="mt-1 text-sm text-blink-muted">
-            {benefitCount} {benefitCount !== 1 ? 'beneficios' : 'beneficio'}
+            {benefitCount}
           </p>
         </div>
 

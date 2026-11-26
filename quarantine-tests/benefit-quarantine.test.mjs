@@ -1,0 +1,18 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {isQuarantinedBenefit as denied,publicBenefitMatch,publicBenefitPipeline,filterPublicBenefitRows} from '../api/benefit-quarantine.js';
+const id='cuentadni-benefit-1069-9b2a6031f3bc4d76';
+for(const field of ['id','_id','originalId','benefitDetailId','rawBenefitId'])test('deny namespace '+field,()=>{assert(denied({[field]:id}));assert(denied({[field]:'benefit:1069-0123456789abcdef'}));});
+test('renewed hashes remain denied but neighboring promotion and bank are untouched',()=>{assert(denied({id:'cuentadni-benefit-1069-'+'f'.repeat(64)}));for(const d of [{id:'cuentadni-benefit-10690-9b2a6031f3bc4d76'},{id:'icbc-1069-9b2a6031f3bc4d76'},{benefitId:1069,bank:'ICBC'},{title:id},{description:'1069'}])assert(!denied(d));assert(denied({benefitId:1069,sourceCollection:'CuentaDNI_BENEFITS'}));});
+test('explicit rollback flag changes no input data',()=>{const d={id};assert(!denied(d,{BLINK_CUENTADNI_1069_QUARANTINE:'off'}));assert.equal(d.id,id);});
+test('query guard is conjunctive, original filter cannot replace exclusion',()=>{const q={$or:[{id},{merchantIds:'merchant'}]},r=publicBenefitMatch(q);assert.equal(r.$and[0],q);assert(r.$and[1].$nor.length>0);assert.equal(publicBenefitMatch(q,{BLINK_CUENTADNI_1069_QUARANTINE:'off'}),q);});
+test('normal,geoNear,search pipelines exclude before grouping/counting/projecting',()=>{const p=[{$project:{id:0}},{$count:'n'}],r=publicBenefitPipeline(p);assert(r[0].$match);assert.deepEqual(r.slice(1),p);assert(publicBenefitPipeline([{$geoNear:{near:[0,0],query:{online:true}}}])[0].$geoNear.query.$and);assert(publicBenefitPipeline([{$search:{text:{query:'a',path:'title'}}},{$count:'n'}])[1].$match);assert.throws(()=>publicBenefitPipeline([{$merge:'x'}]),/READ_ONLY/);});
+test('defensive client/API row filter excludes stale cached exact namespace only',()=>{assert.deepEqual(filterPublicBenefitRows([{id},{id:'other'}]),[{id:'other'}]);});
+import {quarantineReadDb} from '../api/benefit-quarantine.js';
+test('read adapter guards every standard benefit read entry and joined/faceted benefits',()=>{
+ const calls=[],collection=name=>Object.fromEntries(['find','findOne','countDocuments','distinct','aggregate'].map(k=>[k,(...args)=>{calls.push({name,k,args});return 'cursor'}]));const db=quarantineReadDb({collection});
+ for(const name of ['confirmed_benefits','processed_benefits','benefits']){const c=db.collection(name);for(const fn of ['find','findOne','countDocuments']){c[fn]({id:'safe'});assert(calls.at(-1).args[0].$and);}c.distinct('id',{});assert(calls.at(-1).args[1].$and);c.aggregate([{$count:'count'}]);assert(calls.at(-1).args[0][0].$match);assert.throws(()=>c.estimatedDocumentCount(),/FILTERED_COUNT/);}
+ db.collection('merchant_assets').aggregate([{$facet:{cards:[{$lookup:{from:'confirmed_benefits',localField:'merchantId',foreignField:'merchantIds',as:'benefits'}}]}}]);assert(calls.at(-1).args[0][0].$facet.cards[0].$lookup.pipeline[0].$match);
+ db.collection('merchant_assets').aggregate([{$unionWith:'confirmed_benefits'}]);assert(calls.at(-1).args[0][0].$unionWith.pipeline[0].$match);
+ db.collection('merchant_assets').find({merchantId:'safe'});assert.deepEqual(calls.at(-1).args[0],{merchantId:'safe'});
+});
+
+test('upstream namespace boundary covers hash format renewal and unhashed raw IDs',()=>{for(const id of ['benefit:1069','benefit:1069-renewed-v2','cuentadni-benefit-1069','cuentadni-benefit-1069-new_opaque_hash'])assert(denied({id}));for(const id of ['benefit:10690-new','cuentadni-benefit-10690-new','other-benefit:1069'])assert(!denied({id}));});

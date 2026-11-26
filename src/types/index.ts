@@ -62,7 +62,9 @@ export interface Business {
   image: string;
   benefits: BankBenefit[];
   /** Total benefits for the merchant; list responses only include a small preview. */
-  benefitCount?: number;
+  benefitCount?: number | null;
+  /** Current server hydration excluded quarantined offers from summaries. */
+  quarantineSummaryVersion?: 1;
   /** Total branches; list responses only include a primary location preview. */
   locationCount?: number;
   banks?: string[];
@@ -131,7 +133,8 @@ export interface SearchApiResponse {
   merchants: SearchMerchantHit[];
   products: SearchProductHit[];
   pagination: {
-    totalMerchants: number;
+    totalMerchants: number | null;
+    totalKnown?: boolean;
     limit: number;
     offset: number;
     hasMore: boolean;

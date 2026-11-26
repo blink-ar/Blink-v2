@@ -1,3 +1,4 @@
+import { filterQuarantinedBenefits, isQuarantinedBenefit, quarantineBusiness } from '../utils/benefitQuarantine';
 import { getPromotionKind } from '../../shared/benefit-presentation.js';
 // Removed mockBusinesses import - using only real MongoDB data
 import { Business, BankBenefit, SearchApiResponse } from "../types";
@@ -40,7 +41,8 @@ export interface BusinessesApiResponse {
   success: boolean;
   businesses: Business[];
   pagination: {
-    total: number;
+    total: number | null;
+    totalKnown?: boolean;
     limit: number;
     offset: number;
     hasMore: boolean;
@@ -76,6 +78,7 @@ function mapSearchResponseToBusinessesResponse(
     businesses,
     pagination: {
       total: searchData.pagination.totalMerchants,
+      totalKnown: searchData.pagination.totalKnown,
       limit: options.limit,
       offset: options.offset,
       hasMore: searchData.pagination.hasMore
@@ -181,7 +184,7 @@ export function normalizeBusinesses(
     }
 
     const benefits = Array.isArray(raw.benefits)
-      ? raw.benefits.map((benefitValue) => {
+      ? filterQuarantinedBenefits(raw.benefits).map((benefitValue) => {
         const b = isRecord(benefitValue) ? benefitValue : {};
         return {
           ...b,
@@ -228,7 +231,7 @@ export function normalizeBusinesses(
       delete business.locations;
     }
 
-    return business as Business;
+    return quarantineBusiness({...business, ...(Array.isArray(raw.benefits) && raw.benefits.some(isQuarantinedBenefit) ? {benefitCount:null,banks:[],maxDiscountPercentage:undefined} : {})} as Business);
   }).filter((business) => options.includeExpired || business.benefits.length > 0);
 }
 
@@ -387,7 +390,7 @@ class BenefitsAPI {
     }
 
     const data: MongoBenefitsResponse = await response.json();
-    const rawBenefits = data.benefits || [];
+    const rawBenefits = filterQuarantinedBenefits(data.benefits || []);
     return rawBenefits.map(transformRawBenefitToBenefit);
   }
 
@@ -409,7 +412,7 @@ class BenefitsAPI {
     }
 
     const data: MongoBenefitsResponse = await response.json();
-    return data.benefits || [];
+    return filterQuarantinedBenefits(data.benefits || []);
   }
 
   async getBenefitsResponse(params: Record<string, string> = {}): Promise<MongoBenefitsResponse> {
@@ -428,7 +431,8 @@ class BenefitsAPI {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    return {...data, benefits: filterQuarantinedBenefits(data.benefits || [])};
   }
 
   async getBenefitById(id: string): Promise<Benefit | null> {
@@ -446,7 +450,7 @@ class BenefitsAPI {
       rawBenefit = data.benefit;
     }
 
-    if (!rawBenefit) return null;
+    if (!rawBenefit || isQuarantinedBenefit(rawBenefit)) return null;
 
     // Transform to your preferred Benefit structure
     return transformRawBenefitToBenefit(rawBenefit);
@@ -469,7 +473,7 @@ class BenefitsAPI {
     const data: MongoBenefitsResponse = await response.json();
 
     // Transform raw MongoDB benefits to your preferred Benefit structure
-    const rawBenefits = data.benefits || [];
+    const rawBenefits = filterQuarantinedBenefits(data.benefits || []);
     return rawBenefits.map(transformRawBenefitToBenefit);
   }
 

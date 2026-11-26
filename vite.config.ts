@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
           importScripts: ['sw-push.js'],
-          navigateFallbackDenylist: [/^\/api\//],
+          navigateFallbackDenylist: [/^\/api\//, /^\/cuenta-dni\/fuente-34/],
           // Smart caching for better mobile performance
           runtimeCaching: [
             {

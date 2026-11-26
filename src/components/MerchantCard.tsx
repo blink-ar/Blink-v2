@@ -1,3 +1,4 @@
+import { quarantineBusiness, benefitCountLabel } from '../utils/benefitQuarantine';
 import { getBenefitDiscountPercentage } from '../../shared/benefit-presentation.js';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -56,7 +57,8 @@ const getBankBadges = (benefits: Business['benefits'], businessBanks: string[] =
   return badges;
 };
 
-const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClick }) => {
+const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business: inputBusiness, onClick }) => {
+  const business=quarantineBusiness(inputBusiness);
   const distanceText = formatDistance(business.distance);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isAuthenticated } = useAuth();
@@ -127,9 +129,7 @@ const MerchantCard: React.FC<MerchantCardProps> = React.memo(({ business, onClic
             )}
           </div>
           <span className="text-[10px] text-blink-muted mt-[3px]">
-            {(business.benefitCount || activeBenefits.length) > 0
-              ? `${business.benefitCount || activeBenefits.length} ${(business.benefitCount || activeBenefits.length) !== 1 ? 'beneficios' : 'beneficio'}`
-              : 'Sin beneficios activos'}
+            {benefitCountLabel(business.benefitCount,activeBenefits.length)}
           </span>
         </div>
 

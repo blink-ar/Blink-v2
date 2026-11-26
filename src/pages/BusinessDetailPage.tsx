@@ -1,3 +1,4 @@
+import { quarantineBusiness } from '../utils/benefitQuarantine';
 import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -149,7 +150,8 @@ function BusinessDetailPage() {
   const { id, slugId } = useParams<{ id?: string; slugId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const passedBusiness = (location.state as { business?: Business } | null)?.business;
+  const rawPassedBusiness = (location.state as { business?: Business } | null)?.business;
+  const passedBusiness = useMemo(() => rawPassedBusiness ? quarantineBusiness(rawPassedBusiness) : undefined, [rawPassedBusiness]);
   const parsedSeoParam = parseMerchantSeoParam(slugId);
   const routeMerchantId = parsedSeoParam?.merchantId || id || '';
   const routePassedBusiness = passedBusiness && (!routeMerchantId || passedBusiness.id === routeMerchantId)
