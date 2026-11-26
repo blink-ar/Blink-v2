@@ -1,3 +1,4 @@
+import { getBenefitBranchRestriction } from '../../shared/benefit-branch-restrictions.js';
 import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -624,6 +625,10 @@ function BusinessDetailPage() {
                     const benefitIdx = business.benefits.indexOf(benefit);
                     const providerSummary = getBenefitProviderSummary(benefit);
                     const minPurchase = benefit.minimumPurchaseAmount?.amount ?? null;
+                    const restriction = benefit.branchRestriction ?? getBenefitBranchRestriction(benefit);
+                    const offerLocationLabel = restriction
+                      ? [restriction.payment, restriction.branches.length ? restriction.branches.join(' · ') : 'Sucursales por confirmar'].join(' • ')
+                      : [distanceText, branchLabel].filter(Boolean).join(' • ');
 
                     return (
                       <div
@@ -640,11 +645,11 @@ function BusinessDetailPage() {
                               {benefit.benefit || benefit.cardName}
                             </p>
 
-                            {(distanceText || branchLabel) && (
+                            {offerLocationLabel && (
                               <div className="flex items-center gap-1 mb-1">
                                 <span className="material-symbols-outlined text-blink-muted" style={{ fontSize: 12 }}>location_on</span>
                                 <span className="text-xs text-blink-muted">
-                                  {[distanceText, branchLabel].filter(Boolean).join(' • ')}
+                                  {offerLocationLabel}
                                 </span>
                               </div>
                             )}

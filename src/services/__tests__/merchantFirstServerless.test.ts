@@ -2547,6 +2547,47 @@ describe('merchant-first serverless helpers', () => {
     });
   });
 
+  it('preserves La Coope’s offer-only branches in both benefit API routes', async () => {
+    const offer = {
+      id: 'cuentadni-benefit-1087-d69ae6319a85ec60', merchantId: 'merchant_1',
+      online: true, validUntil: '2099-12-31',
+      locations: [{ formattedAddress: 'Unverified location' }]
+    };
+    const merchant = {
+      merchantId: 'merchant_1', merchantName: 'Cooperativa Obrera',
+      locations: [{ formattedAddress: 'Belgrano 45, Bahía Blanca', lat: -38.7, lng: -62.3 }]
+    };
+    const db = {
+      collection(name: string) {
+        if (name === 'confirmed_benefits') return {
+          find: () => createCursor([offer]), countDocuments: async () => 1, findOne: async () => offer
+        };
+        if (name === 'merchant_assets') return { find: () => createCursor([merchant]) };
+        throw new Error(`Unexpected collection: ${name}`);
+      }
+    };
+    const endpoint = 'https://example.com/api/benefits';
+    const list = createResponseCapture();
+    const detail = createResponseCapture();
+    await handleGetBenefits({} as never, list as never, new URL(endpoint), db as never);
+    await handleGetBenefitById({} as never, detail as never, new URL(`${endpoint}/${offer.id}`), db as never, offer.id);
+    expect(list.statusCode).toBe(200);
+    expect(detail.statusCode).toBe(200);
+    for (const payload of [JSON.parse(list.body || '{}').benefits[0], JSON.parse(detail.body || '{}').benefit]) {
+      expect(payload).toMatchObject({
+        id: offer.id, online: false, locations: [],
+        branchRestriction: { payment: 'Pago Clave DNI en caja', branches: ['Albertini 9, Lobos', 'Calle 7 Nº 1224, La Plata'] }
+      });
+    }
+    expect(buildBusinessBenefitSummary(offer, new Map())).toMatchObject({
+      usos: ['presencial'], branchRestriction: { branches: ['Albertini 9, Lobos', 'Calle 7 Nº 1224, La Plata'] }
+    });
+    expect(rehydrateBenefitDoc({ ...offer, id: 'cuentadni-benefit-1087-new-version' }, merchant).locations)
+      .toEqual(merchant.locations);
+    expect(merchant.locations).toHaveLength(1);
+  });
+
+
   it('handleGetBenefits rehydrates merchant-owned fields for benefit listings', async () => {
     const benefits = [
       {

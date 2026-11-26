@@ -1,3 +1,4 @@
+import { getBenefitBranchRestriction } from '../shared/benefit-branch-restrictions.js';
 import { getArgentinaDateOnly } from '../shared/benefit-dates.js';
 import { getBenefitDiscountPercentage, getPromotionKind } from '../shared/benefit-presentation.js';
 import { renderAppSeoHtml } from './app-seo.js';
@@ -907,6 +908,7 @@ function selectListingBenefitSummaries(benefits, limit = LISTING_BENEFIT_LIMIT) 
       discountPercentage: benefit.discountPercentage,
       validUntil: benefit.validUntil,
       subscriptionIds: benefit.subscriptionIds,
+      ...(benefit.branchRestriction ? { branchRestriction: benefit.branchRestriction } : {}),
       ...(benefit.sourceCollection ? { sourceCollection: benefit.sourceCollection } : {}),
       ...(benefit.rawBenefitCollection ? { rawBenefitCollection: benefit.rawBenefitCollection } : {}),
       ...(benefit.source ? { source: benefit.source } : {})
@@ -967,10 +969,16 @@ function groupBenefitSummariesByMerchant(rawBenefits, cardNameLookup, allowedMer
 }
 
 function rehydrateBenefitDoc(benefit, merchant) {
+  const branchRestriction = getBenefitBranchRestriction(benefit);
+  // Do not substitute chain-wide map points for verified offer-only addresses.
+  const restrictedFields = branchRestriction
+    ? { branchRestriction, online: false, locations: [] }
+    : {};
   const merchantIds = getEffectiveBenefitMerchantIds(benefit);
   if (!merchant || merchantIds.length !== 1) {
     return serializeDocWithId({
       ...benefit,
+      ...restrictedFields,
       merchantIds
     });
   }
@@ -983,6 +991,7 @@ function rehydrateBenefitDoc(benefit, merchant) {
     },
     categories: Array.isArray(merchant.categories) ? merchant.categories : benefit.categories || [],
     locations: Array.isArray(merchant.locations) ? merchant.locations : benefit.locations || [],
+    ...restrictedFields,
     merchantId: merchant.merchantId || benefit.merchantId || null,
     merchantSnapshot: merchant.merchantId
       ? {
@@ -1134,6 +1143,7 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
   );
   const value = formatBenefitValue(benefit);
   const providerNames = getBenefitProviderNames(benefit);
+  const branchRestriction = getBenefitBranchRestriction(benefit);
 
   return {
     id: benefit?.id || benefit?._id?.toString?.() || null,
@@ -1153,7 +1163,8 @@ function buildBusinessBenefitSummary(benefit, cardNameLookup) {
         : null,
     condicion: benefit?.termsAndConditions || null,
     requisitos: cardNames,
-    usos: benefit?.online ? ['online', 'presencial'] : ['presencial'],
+    usos: benefit?.online && !branchRestriction ? ['online', 'presencial'] : ['presencial'],
+    ...(branchRestriction ? { branchRestriction } : {}),
     textoAplicacion: benefit?.link || null,
     description: benefit?.description || '',
     installments: Number.isFinite(benefit?.installments) ? Number(benefit.installments) : null,
