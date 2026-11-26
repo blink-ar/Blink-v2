@@ -98,6 +98,21 @@ describe('BenefitDetailPage', () => {
     });
   });
 
+  it('lists only the verified La Coope addresses even if the cached merchant has other locations', async () => {
+    const business = makeBusiness();
+    business.benefits = [{
+      ...business.benefits[0], id: 'cuentadni-benefit-1087-d69ae6319a85ec60', bankName: 'Cuenta DNI',
+    }];
+    vi.mocked(fetchBusinessById).mockResolvedValue(business);
+    render(<BenefitDetailPage />);
+    expect(await screen.findByText('Albertini 9, Lobos')).toBeVisible();
+    expect(screen.getByText('Calle 7 Nº 1224, La Plata')).toBeVisible();
+    expect(screen.getByText('Pago Clave DNI en caja')).toBeVisible();
+    expect(screen.queryByText('Av. Rivadavia 5108')).not.toBeInTheDocument();
+    expect(screen.queryByText('Disponible en:')).not.toBeInTheDocument();
+  });
+
+
   it('starts terms closed below the calculator and locations, preserving content without source links', async () => {
     const business = makeBusiness({ benefits: [{
       bankName: 'Club La Gaceta', cardName: '', cardTypes: [], benefit: 'Porter Brew House',

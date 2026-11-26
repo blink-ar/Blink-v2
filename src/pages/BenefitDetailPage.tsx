@@ -1,3 +1,4 @@
+import { getBenefitBranchRestriction } from '../../shared/benefit-branch-restrictions.js';
 import { isBenefitActive as isActiveBenefit } from '../utils/benefits';
 import { getBenefitPercentage, getPromotionKind } from '../../shared/benefit-presentation.js';
 import { useState, useEffect, useRef } from 'react';
@@ -456,7 +457,9 @@ function BenefitDetailPage() {
     .filter(Boolean)
     .join('\n\n');
 
+  const restriction = benefit.branchRestriction ?? getBenefitBranchRestriction(benefit);
   const locations = (() => {
+    if (restriction) return [];
     const valid = business.location.filter((l) => l.lat !== 0 || l.lng !== 0);
     if (!userPosition) return valid;
     return [...valid].sort((a, b) =>
@@ -937,6 +940,19 @@ function BenefitDetailPage() {
           )}
 
           {/* ── Disponible en ── */}
+          {restriction && (
+            <section className="bg-white rounded-2xl border border-blink-border px-5 py-4">
+              <p className="font-bold text-[15px] text-blink-ink mb-1">Sucursales adheridas</p>
+              <p className="text-sm text-blink-muted mb-2">{restriction.payment}</p>
+              {restriction.branches.length > 0 ? (
+                <ul className="text-sm text-blink-ink space-y-1">
+                  {restriction.branches.map((address) => <li key={address}>{address}</li>)}
+                </ul>
+              ) : (
+                <p className="text-sm text-blink-muted">Sucursales por confirmar.</p>
+              )}
+            </section>
+          )}
           {locations.length > 0 && (
             <div
               className="bg-white rounded-2xl overflow-hidden"

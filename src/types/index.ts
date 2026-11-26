@@ -1,3 +1,5 @@
+import type { BenefitBranchRestriction } from '../../shared/benefit-branch-restrictions.js';
+
 export type EligibilityResolutionStatus = 'resolved' | 'partial' | 'unresolved' | 'not_required';
 
 export interface BenefitEligibility {
@@ -30,6 +32,7 @@ export interface BankBenefit {
   condicion?: string;
   requisitos?: string[];
   usos?: string[];
+  branchRestriction?: BenefitBranchRestriction;
   textoAplicacion?: string;
   // AI Analysis specific fields
   originalAnalyzedText?: string;

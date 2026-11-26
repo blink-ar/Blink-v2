@@ -106,6 +106,20 @@ describe('BusinessDetailPage', () => {
     vi.useRealTimers();
   });
 
+  it('shows the exact offer branches rather than the merchant-wide online and branch badge', async () => {
+    vi.mocked(fetchBusinessById).mockResolvedValue({
+      ...mockBusiness, hasOnline: true, benefits: [{
+        ...mockBusiness.benefits[0], id: 'cuentadni-benefit-1087-d69ae6319a85ec60',
+        bankName: 'Cuenta DNI', benefit: 'Promo de La Coope', validUntil: ACTIVE_VALID_UNTIL
+      }]
+    });
+    render(<BusinessDetailPage />);
+    const label = await screen.findByText(/Pago Clave DNI en caja.*Albertini 9, Lobos.*Calle 7 Nº 1224, La Plata/);
+    expect(label).toBeVisible();
+    expect(screen.queryByText('Online • 1 sucursal')).not.toBeInTheDocument();
+  });
+
+
   it('explains an empty today filter and restores all active benefits', async () => {
     vi.mocked(fetchBusinessById).mockResolvedValue({ ...mockBusiness, benefits: [{
       ...mockBusiness.benefits[0], cuando: 'Lunes, Martes, Miercoles', validUntil: ACTIVE_VALID_UNTIL,

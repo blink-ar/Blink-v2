@@ -375,6 +375,9 @@ function renderBenefitList(benefits, emptyText, isPast = false) {
       `  <strong>${escapeHtml(formatBenefitValue(benefit))}</strong>`,
       `  <span>${escapeHtml(getBenefitBankName(benefit))} - ${escapeHtml(benefit?.cardName || 'Tarjeta')}${bankSummary ? ` · ${escapeHtml(bankSummary)}` : ''}</span>`,
       `  <p>${escapeHtml(getBenefitTitle(benefit))}</p>`,
+      benefit?.branchRestriction
+        ? `  <p>${escapeHtml([benefit.branchRestriction.payment, ...benefit.branchRestriction.branches].join(' · '))}</p>`
+        : '',
       `  <small>${[days, cap, validUntil].filter(Boolean).join(' ') || (isPast ? 'Promocion anterior' : 'Beneficio activo')}</small>`,
       '</li>'
     ].join('');
